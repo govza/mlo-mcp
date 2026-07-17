@@ -114,6 +114,44 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
     }
   });
 
+  it("creates a deep subtree in one call and re-parents a task", async () => {
+    const caption = `e2e-tree-${Date.now()}`;
+    const added = await client.callTool({
+      name: "add_task",
+      arguments: { caption, subtasks: "Phase 1\n  Step A\n    Detail A1\n  Step B\nPhase 2" },
+    });
+    expect(added.isError).toBeFalsy();
+    const parent = (added.structuredContent as { task?: { id: string } }).task!;
+    const got = await client.callTool({ name: "get_task", arguments: { id: parent.id } });
+    const children = (got.structuredContent as { task: { children: Array<{ id: string; Caption: string }> } }).task.children;
+    expect(children.map((c) => c.Caption)).toEqual(["Phase 1", "Phase 2"]);
+
+    const deep = await client.callTool({ name: "search_tasks", arguments: { query: "Detail A1" } });
+    const deepTask = (deep.structuredContent as { tasks: Array<{ id: string; parentPath: string }> }).tasks[0];
+    expect(deepTask.parentPath).toBe(`${caption} > Phase 1 > Step A`);
+
+    // re-parent: move "Phase 2" under "Phase 1"
+    const phase2 = children.find((c) => c.Caption === "Phase 2")!;
+    const phase1 = children.find((c) => c.Caption === "Phase 1")!;
+    const moved = await client.callTool({
+      name: "update_task",
+      arguments: { id: phase2.id, moveToParentId: phase1.id },
+    });
+    expect(moved.isError).toBeFalsy();
+    const after = await client.callTool({ name: "search_tasks", arguments: { query: "Phase 2" } });
+    expect((after.structuredContent as { tasks: Array<{ parentPath: string }> }).tasks[0].parentPath).toBe(
+      `${caption} > Phase 1`
+    );
+
+    // cleanup: delete the whole tree
+    const fresh = await client.callTool({ name: "search_tasks", arguments: { query: caption } });
+    const freshId = (fresh.structuredContent as { tasks: Array<{ id: string }> }).tasks[0].id;
+    const del = await client.callTool({ name: "delete_task", arguments: { id: freshId } });
+    expect(del.isError).toBeFalsy();
+    const { promises: fs } = await import("node:fs");
+    for (const r of [moved, del]) await fs.rm((r.structuredContent as { backupPath: string }).backupPath, { force: true });
+  });
+
   it("creates a folder task (HideInToDoThisTask)", async () => {
     const caption = `e2e-folder-${Date.now()}`;
     const added = await client.callTool({ name: "add_task", arguments: { caption, folder: true } });

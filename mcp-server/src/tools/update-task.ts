@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { findRawById } from "../task-tree.js";
-import { setRawField, type RawTaskNode } from "../xml.js";
+import { findRawById, findById, flatten } from "../task-tree.js";
+import { setRawField, rootNode, type RawTaskNode } from "../xml.js";
 import { replaceDataFile } from "../write-pipeline.js";
 import { guard, textResult, type ToolContext } from "./shared.js";
 
@@ -50,6 +50,10 @@ export function registerUpdateTask(server: McpServer, ctx: ToolContext): void {
         EstimateMin: z.number().optional().describe("fractional days"),
         EstimateMax: z.number().optional(),
         TheGoal: z.number().int().min(0).max(3).optional().describe("0 none, 1 weekly, 2 monthly, 3 yearly"),
+        moveToParentId: z
+          .string()
+          .optional()
+          .describe('Re-parent: move this task (with its whole subtree) under the given task id; "" moves it to the top level'),
         HideInToDo: z.boolean().optional().describe("Hide this task AND its whole branch from to-do views"),
         HideInToDoThisTask: z
           .boolean()
@@ -60,10 +64,12 @@ export function registerUpdateTask(server: McpServer, ctx: ToolContext): void {
       outputSchema: { ok: z.boolean(), updatedFields: z.array(z.string()), backupPath: z.string() },
       annotations: { destructiveHint: true },
     },
-    guard("update_task", async ({ id, ...fields }) => {
+    guard("update_task", async ({ id, moveToParentId, ...fields }) => {
       const entries = Object.entries(fields).filter(([, v]) => v !== undefined);
-      if (entries.length === 0) return textResult("nothing to update — pass at least one field");
+      const moving = moveToParentId !== undefined;
+      if (entries.length === 0 && !moving) return textResult("nothing to update — pass at least one field");
       let caption = "";
+      let destCaption: string | undefined; // undefined = top level
       const { backupPath } = await replaceDataFile(
         ctx.config,
         (doc) => {
@@ -71,22 +77,39 @@ export function registerUpdateTask(server: McpServer, ctx: ToolContext): void {
           if (!found) throw new Error(`no task with id "${id}" — ids shift when the tree changes; re-run list_tasks`);
           for (const [k, v] of entries) applyField(found.raw, k, v);
           caption = found.raw["@_Caption"];
-        },
-        // the same position must still hold a task; caption check catches gross misplacement
-        (after) => {
-          const parts = id.split(".").map(Number);
-          let list = after;
-          let node;
-          for (let i = 0; i < parts.length; i++) {
-            node = list[parts[i] - 1];
-            if (!node) return false;
-            list = node.Children;
+          if (moving) {
+            let destSiblings: RawTaskNode[];
+            if (moveToParentId === "") {
+              destSiblings = rootNode(doc).TaskNode ??= [];
+            } else {
+              const dest = findRawById(doc, moveToParentId);
+              if (!dest) throw new Error(`no task with id "${moveToParentId}" to move under — re-run list_tasks`);
+              const inOwnSubtree = (n: RawTaskNode): boolean =>
+                n === dest.raw || (n.TaskNode ?? []).some(inOwnSubtree);
+              if (inOwnSubtree(found.raw)) {
+                throw new Error("cannot move a task into its own subtree");
+              }
+              destCaption = dest.raw["@_Caption"];
+              destSiblings = dest.raw.TaskNode ??= [];
+            }
+            found.siblings.splice(found.index, 1);
+            destSiblings.push(found.raw);
           }
-          return node!.Caption === caption;
+        },
+        (after) => {
+          const all = flatten(after);
+          if (moving) {
+            return all.some(
+              (t) => t.Caption === caption && (destCaption ? t.Path.at(-2) === destCaption : t.Path.length === 1)
+            );
+          }
+          // without a move the position is unchanged; the same id must still hold the caption
+          return findById(after, id)?.Caption === caption;
         }
       );
       ctx.store.invalidate();
       const names = entries.map(([k]) => k);
+      if (moving) names.push(`moved ${destCaption ? `under "${destCaption}"` : "to top level"}`);
       return textResult(`updated [${id}] "${caption}": ${names.join(", ")} (backup: ${backupPath})`, {
         ok: true,
         updatedFields: names,

@@ -17,16 +17,42 @@ function normalizeIso(s: string): string | undefined {
 /** GUI 1–5 scale → MLO's stored 0–200 scale */
 const scale5 = (n: number) => String((n - 1) * 50);
 
+/** Indented outline ("2 spaces or 1 tab per level") → nested RawTaskNodes. */
+export function parseOutline(outline: string): RawTaskNode[] {
+  const roots: RawTaskNode[] = [];
+  const stack: Array<{ depth: number; node: RawTaskNode }> = [];
+  for (const line of outline.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const m = /^(\s*)(.*)$/.exec(line)!;
+    const depth = Math.floor(m[1].replaceAll("\t", "  ").length / 2);
+    const node: RawTaskNode = { "@_Caption": m[2].trim() };
+    while (stack.length && stack[stack.length - 1].depth >= depth) stack.pop();
+    if (stack.length) {
+      (stack[stack.length - 1].node.TaskNode ??= []).push(node);
+    } else {
+      roots.push(node);
+    }
+    stack.push({ depth, node });
+  }
+  return roots;
+}
+
+function outlineCaptions(nodes: RawTaskNode[]): string[] {
+  return nodes.flatMap((n) => [n["@_Caption"], ...outlineCaptions(n.TaskNode ?? [])]);
+}
+
 export function registerAddTask(server: McpServer, ctx: ToolContext): void {
   server.registerTool(
     "add_task",
     {
       title: "Add task",
       description:
-        "Create a task. Fields and placement are written exactly via the XML pipeline (if the MLO app is open " +
-        "it is closed gracefully — it saves on close — and relaunched afterwards). Only a natural-language " +
-        "dueDate, urgency or parseText route through MLO's best-effort rapid-entry parser; a bare caption is " +
-        "added instantly without touching the app. Always check the reported result.",
+        "Create a task, optionally with a whole subtree in one call. MLO is an OUTLINER — deep nesting is " +
+        "idiomatic, so prefer parentId placement and the subtasks outline over flat top-level lists. Fields and " +
+        "placement are written exactly via the XML pipeline (if the MLO app is open it is closed gracefully — " +
+        "it saves on close — and relaunched afterwards). Only a natural-language dueDate, urgency or parseText " +
+        "route through MLO's best-effort rapid-entry parser; a bare caption is added instantly without touching " +
+        "the app. Always check the reported result.",
       inputSchema: {
         caption: z.string().min(1).describe("Task caption"),
         parentId: z.string().optional().describe("Place the task under this task id (default: top level / inbox)"),
@@ -50,17 +76,32 @@ export function registerAddTask(server: McpServer, ctx: ToolContext): void {
           .string()
           .optional()
           .describe('Raw MLO parser tail appended verbatim, e.g. "remind tomorrow 9am -h -p" — forces the parser path'),
+        subtasks: z
+          .string()
+          .optional()
+          .describe(
+            "Indented outline of subtasks created under the new task in the same write — one caption per line, " +
+              "2 spaces (or 1 tab) deeper = one level deeper. Arbitrary depth. Example:\n" +
+              "Warm-up\nMain set\n  Intervals\n  Cooldown swim\nStretching"
+          ),
       },
       outputSchema: { task: TaskSummarySchema.optional(), placement: z.string(), method: z.enum(["xml", "parser"]) },
       annotations: {},
     },
     guard("add_task", async (input) => {
-      const { caption, parentId, note, dueDate, startDate, contexts, importance, urgency, effort, starred, folder, flag, parseText } = input;
+      const { caption, parentId, note, dueDate, startDate, contexts, importance, urgency, effort, starred, folder, flag, parseText, subtasks } = input;
 
       const guiRunning = await isMloRunning();
       const isoDue = dueDate ? normalizeIso(dueDate) : undefined;
       const isoStart = startDate ? normalizeIso(startDate) : undefined;
       const needsParser = Boolean(parseText) || Boolean(urgency) || (dueDate !== undefined && !isoDue);
+      const subtree = subtasks ? parseOutline(subtasks) : [];
+      if (subtree.length && needsParser) {
+        return errorResult(
+          "subtasks require the exact XML path — use an ISO dueDate and drop urgency/parseText, " +
+            "or create the parent first and add parser-based subtasks separately"
+        );
+      }
 
       let parentCaption: string | undefined;
       if (parentId) {
@@ -80,7 +121,7 @@ export function registerAddTask(server: McpServer, ctx: ToolContext): void {
       const hasFields = Boolean(
         note || isoDue || isoStart || contexts?.length || importance || effort || starred || folder || flag || parentId
       );
-      const useXmlPath = !needsParser && (guiRunning ? ctx.config.autoRestartGui : hasFields);
+      const useXmlPath = (!needsParser && (guiRunning ? ctx.config.autoRestartGui : hasFields)) || subtree.length > 0;
 
       let guiRestarted = false;
       if (useXmlPath) {
@@ -113,15 +154,21 @@ export function registerAddTask(server: McpServer, ctx: ToolContext): void {
             if (folder) node.HideInToDoThisTask = "-1";
             if (flag) node.Flag = flag;
             if (contexts?.length) node.Places = { Place: contexts.map((c) => (c.startsWith("@") ? c : `@${c}`)) };
+            if (subtree.length) node.TaskNode = subtree;
             siblings.push(node);
           },
-          (after) =>
-            flatten(after).some(
+          (after) => {
+            const all = flatten(after);
+            const parent = all.find(
               (t) =>
                 t.Caption === caption &&
                 (!parentCaption || t.Path.slice(0, -1).includes(parentCaption)) &&
                 (!isoDue || t.DueDateTime === isoDue)
-            )
+            );
+            if (!parent) return false;
+            const subtreeCaptions = new Set(flatten(parent.Children).map((t) => t.Caption));
+            return outlineCaptions(subtree).every((c) => subtreeCaptions.has(c));
+          }
         ));
       } else {
         // Parser path: MLO rapid-entry syntax. Quotes shield the caption.
@@ -218,6 +265,7 @@ export function registerAddTask(server: McpServer, ctx: ToolContext): void {
       }
 
       const restartNote =
+        (subtree.length ? ` with ${outlineCaptions(subtree).length} subtasks` : "") +
         (guiRestarted ? "; MLO was closed for the write and relaunched" : "") +
         (relocated ? "; the GUI had another task selected, so the new task was moved to the requested position" : "");
       const text = created
