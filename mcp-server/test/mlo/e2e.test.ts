@@ -39,7 +39,7 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual(
-      ["add_task", "complete_task", "delete_task", "get_task", "list_tasks", "search_tasks", "sync", "update_task"]
+      ["add_task", "complete_task", "delete_task", "get_task", "list_contexts", "list_tasks", "search_tasks", "sync", "update_task"]
     );
     const list = tools.find((t) => t.name === "list_tasks")!;
     expect(list.annotations?.readOnlyHint).toBe(true);
@@ -75,6 +75,20 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
     const found = (second.structuredContent as { tasks: Array<{ Caption: string }>; total: number });
     expect(found.total).toBe(1);
     expect(found.tasks[0].Caption).toBe(caption);
+  });
+
+  it("lists contexts with usage counts", async () => {
+    const res = await client.callTool({ name: "list_contexts", arguments: {} });
+    expect(res.isError).toBeFalsy();
+    const { contexts } = res.structuredContent as {
+      contexts: Array<{ Caption: string; defined: boolean; tasksUsing: number }>;
+    };
+    const captions = contexts.map((c) => c.Caption);
+    expect(captions).toContain("@Office");
+    expect(captions).toContain("@Home");
+    const office = contexts.find((c) => c.Caption === "@Office")!;
+    expect(office.defined).toBe(true);
+    expect(office.tasksUsing).toBeGreaterThan(0);
   });
 
   it("get_task returns details and children ids", async () => {

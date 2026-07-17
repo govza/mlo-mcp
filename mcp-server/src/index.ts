@@ -8,6 +8,7 @@ import { registerSearchTasks } from "./tools/search-tasks.js";
 import { registerGetTask } from "./tools/get-task.js";
 import { registerAddTask } from "./tools/add-task.js";
 import { registerSync } from "./tools/sync.js";
+import { registerListContexts } from "./tools/list-contexts.js";
 import { registerCompleteTask } from "./tools/complete-task.js";
 import { registerUpdateTask } from "./tools/update-task.js";
 import { registerDeleteTask } from "./tools/delete-task.js";
@@ -23,6 +24,7 @@ async function main(): Promise<void> {
   registerGetTask(server, ctx);
   registerAddTask(server, ctx);
   registerSync(server, ctx);
+  registerListContexts(server, ctx);
   registerCompleteTask(server, ctx);
   registerUpdateTask(server, ctx);
   registerDeleteTask(server, ctx);
