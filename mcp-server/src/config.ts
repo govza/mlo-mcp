@@ -1,0 +1,21 @@
+import path from "node:path";
+import os from "node:os";
+import type { MloConfig } from "./types.js";
+
+const DEFAULT_EXE = "C:\\Program Files (x86)\\MyLifeOrganized.net\\MLO\\mlo.exe";
+
+export function loadConfig(): MloConfig {
+  const dataFile = process.env.MLO_DATA_FILE;
+  if (!dataFile) {
+    throw new Error(
+      "MLO_DATA_FILE environment variable is required. Set it to the path of your .ml data file."
+    );
+  }
+
+  return {
+    mloExePath: process.env.MLO_EXE_PATH ?? DEFAULT_EXE,
+    dataFile,
+    exportDir: process.env.MLO_EXPORT_DIR ?? path.join(os.tmpdir(), "mlo-mcp"),
+    cacheStaleMs: Number(process.env.MLO_CACHE_STALE_MS) || 30_000,
+  };
+}

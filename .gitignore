@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build output
+mcp-server/dist/
+
+# MLO reference material — sample data exports, file-format notes, the app's own
+# form/string resources used as a schema reference, helper scripts, installer, and
+# packaging tooling. Local-only (large/not needed to build).
+sources/
+
+# Temp exports
+*.tmp
+export_*.xml
+
+# Local machine config (permissions, etc.)
+.claude/settings.local.json
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log
