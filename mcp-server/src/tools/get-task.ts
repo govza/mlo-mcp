@@ -19,6 +19,7 @@ export function registerGetTask(server: McpServer, ctx: ToolContext): void {
           EstimateMax: z.number().optional().describe("fractional days"),
           LeadTime: z.number().optional().describe("days"),
           HideInToDo: z.boolean().optional(),
+          HideInToDoThisTask: z.boolean().optional().describe("true = folder-style task (hidden from to-do views itself)"),
           CompleteSubTasksInOrder: z.boolean().optional(),
           children: z.array(z.object({ id: z.string(), Caption: z.string() })),
         }),
@@ -38,6 +39,7 @@ export function registerGetTask(server: McpServer, ctx: ToolContext): void {
         EstimateMax: t.EstimateMax,
         LeadTime: t.LeadTime,
         HideInToDo: t.HideInToDo,
+        HideInToDoThisTask: t.HideInToDoThisTask,
         CompleteSubTasksInOrder: t.CompleteSubTasksInOrder,
         children: t.Children.map((c) => ({ id: c.id, Caption: c.Caption })),
       };

@@ -114,6 +114,27 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
     }
   });
 
+  it("creates a folder task (HideInToDoThisTask)", async () => {
+    const caption = `e2e-folder-${Date.now()}`;
+    const added = await client.callTool({ name: "add_task", arguments: { caption, folder: true } });
+    expect(added.isError).toBeFalsy();
+    const task = (added.structuredContent as { task?: { id: string } }).task;
+    expect(task).toBeDefined();
+    const got = await client.callTool({ name: "get_task", arguments: { id: task!.id } });
+    const detail = (got.structuredContent as { task: { HideInToDoThisTask?: boolean } }).task;
+    expect(detail.HideInToDoThisTask).toBe(true);
+    // and back to a normal task via update_task
+    const updated = await client.callTool({
+      name: "update_task",
+      arguments: { id: task!.id, HideInToDoThisTask: false },
+    });
+    expect(updated.isError).toBeFalsy();
+    const again = await client.callTool({ name: "get_task", arguments: { id: task!.id } });
+    expect((again.structuredContent as { task: { HideInToDoThisTask?: boolean } }).task.HideInToDoThisTask).toBeUndefined();
+    const { promises: fs } = await import("node:fs");
+    await fs.rm((updated.structuredContent as { backupPath: string }).backupPath, { force: true });
+  });
+
   it("update_task edits fields", async () => {
     const search = await client.callTool({ name: "search_tasks", arguments: { query: "Finish the presentation" } });
     const target = (search.structuredContent as { tasks: Array<{ id: string }> }).tasks[0];

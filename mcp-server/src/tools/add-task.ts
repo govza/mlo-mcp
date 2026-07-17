@@ -41,6 +41,10 @@ export function registerAddTask(server: McpServer, ctx: ToolContext): void {
         urgency: z.number().int().min(1).max(5).optional().describe("1–5; parser path only (no XML field)"),
         effort: z.number().int().min(1).max(5).optional(),
         starred: z.boolean().optional(),
+        folder: z
+          .boolean()
+          .optional()
+          .describe("Create as a folder: the task itself is hidden from to-do views, its children still show (MLO -f)"),
         flag: z.string().optional().describe('e.g. "Green Flag"'),
         parseText: z
           .string()
@@ -51,7 +55,7 @@ export function registerAddTask(server: McpServer, ctx: ToolContext): void {
       annotations: {},
     },
     guard("add_task", async (input) => {
-      const { caption, parentId, note, dueDate, startDate, contexts, importance, urgency, effort, starred, flag, parseText } = input;
+      const { caption, parentId, note, dueDate, startDate, contexts, importance, urgency, effort, starred, folder, flag, parseText } = input;
 
       const guiRunning = await isMloRunning();
       const isoDue = dueDate ? normalizeIso(dueDate) : undefined;
@@ -95,6 +99,7 @@ export function registerAddTask(server: McpServer, ctx: ToolContext): void {
               node.ScheduleType = "1";
             }
             if (starred) node.Starred = "-1";
+            if (folder) node.HideInToDoThisTask = "-1";
             if (flag) node.Flag = flag;
             if (contexts?.length) node.Places = { Place: contexts.map((c) => (c.startsWith("@") ? c : `@${c}`)) };
             siblings.push(node);
@@ -118,6 +123,7 @@ export function registerAddTask(server: McpServer, ctx: ToolContext): void {
         if (urgency) switches.push(`-u${urgency}`);
         if (effort) switches.push(`-e${effort}`);
         if (starred) switches.push("-star");
+        if (folder) switches.push("-f");
         if (flag) switches.push(`-fl${flag}`);
         if (parseText) switches.push(parseText);
 

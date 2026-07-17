@@ -50,7 +50,11 @@ export function registerUpdateTask(server: McpServer, ctx: ToolContext): void {
         EstimateMin: z.number().optional().describe("fractional days"),
         EstimateMax: z.number().optional(),
         TheGoal: z.number().int().min(0).max(3).optional().describe("0 none, 1 weekly, 2 monthly, 3 yearly"),
-        HideInToDo: z.boolean().optional(),
+        HideInToDo: z.boolean().optional().describe("Hide this task AND its whole branch from to-do views"),
+        HideInToDoThisTask: z
+          .boolean()
+          .optional()
+          .describe("Folder behavior: hide only this task from to-do views, children still show (true = make folder, false = make normal task)"),
         CompleteSubTasksInOrder: z.boolean().optional(),
       },
       outputSchema: { ok: z.boolean(), updatedFields: z.array(z.string()), backupPath: z.string() },
