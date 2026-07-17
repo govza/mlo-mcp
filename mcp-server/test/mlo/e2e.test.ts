@@ -152,6 +152,53 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
     for (const r of [moved, del]) await fs.rm((r.structuredContent as { backupPath: string }).backupPath, { force: true });
   });
 
+  it("sets, reports and clears dependencies", async () => {
+    const stamp = Date.now();
+    await client.callTool({
+      name: "add_task",
+      arguments: { caption: `e2e-dep-parent-${stamp}`, subtasks: "buy parts\ninstall parts" },
+    });
+    const search = async (q: string) =>
+      ((await client.callTool({ name: "search_tasks", arguments: { query: q } })).structuredContent as {
+        tasks: Array<{ id: string; Caption: string }>;
+      }).tasks[0];
+
+    const install = await search("install parts");
+    const buy = await search("buy parts");
+    const set = await client.callTool({
+      name: "update_task",
+      arguments: { id: install.id, dependsOn: [buy.id] },
+    });
+    expect(set.isError).toBeFalsy();
+
+    const got = await client.callTool({ name: "get_task", arguments: { id: (await search("install parts")).id } });
+    const detail = (got.structuredContent as {
+      task: { dependsOn: Array<{ Caption?: string }>; dependedOnBy: unknown[] };
+    }).task;
+    expect(detail.dependsOn.map((d) => d.Caption)).toEqual(["buy parts"]);
+
+    const gotBuy = await client.callTool({ name: "get_task", arguments: { id: (await search("buy parts")).id } });
+    const buyDetail = (gotBuy.structuredContent as { task: { dependedOnBy: Array<{ Caption: string }> } }).task;
+    expect(buyDetail.dependedOnBy.map((d) => d.Caption)).toEqual(["install parts"]);
+
+    const cleared = await client.callTool({
+      name: "update_task",
+      arguments: { id: (await search("install parts")).id, dependsOn: [] },
+    });
+    expect(cleared.isError).toBeFalsy();
+    const after = await client.callTool({ name: "get_task", arguments: { id: (await search("install parts")).id } });
+    expect(((after.structuredContent as { task: { dependsOn: unknown[] } }).task.dependsOn)).toEqual([]);
+
+    // cleanup
+    const parent = await search(`e2e-dep-parent-${stamp}`);
+    const del = await client.callTool({ name: "delete_task", arguments: { id: parent.id } });
+    const { promises: fs } = await import("node:fs");
+    for (const r of [set, cleared, del]) {
+      const p = (r.structuredContent as { backupPath?: string }).backupPath;
+      if (p) await fs.rm(p, { force: true });
+    }
+  });
+
   it("creates a folder task (HideInToDoThisTask)", async () => {
     const caption = `e2e-folder-${Date.now()}`;
     const added = await client.callTool({ name: "add_task", arguments: { caption, folder: true } });

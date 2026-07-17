@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { findById } from "../task-tree.js";
+import { findById, flatten } from "../task-tree.js";
 import { guard, textResult, errorResult, toSummary, TaskSummarySchema, type ToolContext } from "./shared.js";
 
 export function registerGetTask(server: McpServer, ctx: ToolContext): void {
@@ -22,6 +22,10 @@ export function registerGetTask(server: McpServer, ctx: ToolContext): void {
           HideInToDoThisTask: z.boolean().optional().describe("true = folder-style task (hidden from to-do views itself)"),
           CompleteSubTasksInOrder: z.boolean().optional(),
           children: z.array(z.object({ id: z.string(), Caption: z.string() })),
+          dependsOn: z
+            .array(z.object({ id: z.string().optional(), Caption: z.string().optional(), uid: z.string() }))
+            .describe("Tasks this task waits for"),
+          dependedOnBy: z.array(z.object({ id: z.string(), Caption: z.string() })).describe("Tasks waiting for this task"),
         }),
       },
       annotations: { readOnlyHint: true },
@@ -30,6 +34,15 @@ export function registerGetTask(server: McpServer, ctx: ToolContext): void {
       const snap = await ctx.store.getSnapshot();
       const t = findById(snap.tasks, id);
       if (!t) return errorResult(`no task with id "${id}" — ids shift when the tree changes; re-run list_tasks`);
+      const all = flatten(snap.tasks);
+      const byGuid = new Map(all.filter((x) => x.Guid).map((x) => [x.Guid!, x]));
+      const dependsOn = t.DependsOn.map((uid) => {
+        const dep = byGuid.get(uid);
+        return { id: dep?.id, Caption: dep?.Caption, uid };
+      });
+      const dependedOnBy = all
+        .filter((x) => t.Guid && x.DependsOn.includes(t.Guid))
+        .map((x) => ({ id: x.id, Caption: x.Caption }));
       const task = {
         ...toSummary(t),
         Note: t.Note,
@@ -42,6 +55,8 @@ export function registerGetTask(server: McpServer, ctx: ToolContext): void {
         HideInToDoThisTask: t.HideInToDoThisTask,
         CompleteSubTasksInOrder: t.CompleteSubTasksInOrder,
         children: t.Children.map((c) => ({ id: c.id, Caption: c.Caption })),
+        dependsOn,
+        dependedOnBy,
       };
       const lines = [
         `[${t.id}] ${t.Caption}`,
@@ -52,6 +67,10 @@ export function registerGetTask(server: McpServer, ctx: ToolContext): void {
         t.CompletionDateTime ? `completed: ${t.CompletionDateTime}` : undefined,
         t.Places.length ? `contexts: ${t.Places.join(", ")}` : undefined,
         t.Children.length ? `children: ${t.Children.map((c) => `[${c.id}] ${c.Caption}`).join(", ")}` : undefined,
+        dependsOn.length
+          ? `depends on: ${dependsOn.map((d) => (d.id ? `[${d.id}] ${d.Caption}` : `unresolved ${d.uid}`)).join(", ")}`
+          : undefined,
+        dependedOnBy.length ? `depended on by: ${dependedOnBy.map((d) => `[${d.id}] ${d.Caption}`).join(", ")}` : undefined,
       ].filter(Boolean);
       return textResult(lines.join("\n"), { task });
     })

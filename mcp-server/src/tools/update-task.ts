@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { randomUUID } from "node:crypto";
 import { findRawById, findById, flatten } from "../task-tree.js";
 import { setRawField, rootNode, type RawTaskNode } from "../xml.js";
 import { replaceDataFile } from "../write-pipeline.js";
@@ -54,6 +55,12 @@ export function registerUpdateTask(server: McpServer, ctx: ToolContext): void {
           .string()
           .optional()
           .describe('Re-parent: move this task (with its whole subtree) under the given task id; "" moves it to the top level'),
+        dependsOn: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Full replacement list of task ids this task depends on (waits for in to-do views); [] clears all dependencies"
+          ),
         HideInToDo: z.boolean().optional().describe("Hide this task AND its whole branch from to-do views"),
         HideInToDoThisTask: z
           .boolean()
@@ -64,12 +71,15 @@ export function registerUpdateTask(server: McpServer, ctx: ToolContext): void {
       outputSchema: { ok: z.boolean(), updatedFields: z.array(z.string()), backupPath: z.string() },
       annotations: { destructiveHint: true },
     },
-    guard("update_task", async ({ id, moveToParentId, ...fields }) => {
+    guard("update_task", async ({ id, moveToParentId, dependsOn, ...fields }) => {
       const entries = Object.entries(fields).filter(([, v]) => v !== undefined);
       const moving = moveToParentId !== undefined;
-      if (entries.length === 0 && !moving) return textResult("nothing to update — pass at least one field");
+      if (entries.length === 0 && !moving && dependsOn === undefined) {
+        return textResult("nothing to update — pass at least one field");
+      }
       let caption = "";
       let destCaption: string | undefined; // undefined = top level
+      const depCaptions: string[] = [];
       const { backupPath } = await replaceDataFile(
         ctx.config,
         (doc) => {
@@ -77,6 +87,24 @@ export function registerUpdateTask(server: McpServer, ctx: ToolContext): void {
           if (!found) throw new Error(`no task with id "${id}" — ids shift when the tree changes; re-run list_tasks`);
           for (const [k, v] of entries) applyField(found.raw, k, v);
           caption = found.raw["@_Caption"];
+          if (dependsOn !== undefined) {
+            if (dependsOn.length === 0) {
+              delete found.raw.Dependency;
+            } else {
+              const uids: string[] = [];
+              for (const depId of dependsOn) {
+                const target = findRawById(doc, depId);
+                if (!target) throw new Error(`dependsOn: no task with id "${depId}" — re-run list_tasks`);
+                if (target.raw === found.raw) throw new Error("a task cannot depend on itself");
+                // the target must expose its GUID as <IDD> for the link to import
+                target.raw.IDD ??= `{${randomUUID().toUpperCase()}}`;
+                setRawField(target.raw, "IDD", target.raw.IDD);
+                uids.push(target.raw.IDD);
+                depCaptions.push(target.raw["@_Caption"]);
+              }
+              setRawField(found.raw, "Dependency", { UID: uids });
+            }
+          }
           if (moving) {
             let destSiblings: RawTaskNode[];
             if (moveToParentId === "") {
@@ -98,18 +126,26 @@ export function registerUpdateTask(server: McpServer, ctx: ToolContext): void {
         },
         (after) => {
           const all = flatten(after);
-          if (moving) {
-            return all.some(
-              (t) => t.Caption === caption && (destCaption ? t.Path.at(-2) === destCaption : t.Path.length === 1)
-            );
+          const target = moving
+            ? all.find((t) => t.Caption === caption && (destCaption ? t.Path.at(-2) === destCaption : t.Path.length === 1))
+            : findById(after, id);
+          if (!target || target.Caption !== caption) return false;
+          if (dependsOn !== undefined) {
+            // GUIDs are remapped on import — verify by resolving UIDs to captions
+            const byGuid = new Map(all.filter((t) => t.Guid).map((t) => [t.Guid!, t.Caption]));
+            const resolved = target.DependsOn.map((uid) => byGuid.get(uid)).filter(Boolean);
+            if (resolved.length !== dependsOn.length) return false;
+            if (!depCaptions.every((c) => resolved.includes(c))) return false;
           }
-          // without a move the position is unchanged; the same id must still hold the caption
-          return findById(after, id)?.Caption === caption;
+          return true;
         }
       );
       ctx.store.invalidate();
       const names = entries.map(([k]) => k);
       if (moving) names.push(`moved ${destCaption ? `under "${destCaption}"` : "to top level"}`);
+      if (dependsOn !== undefined) {
+        names.push(dependsOn.length ? `depends on: ${depCaptions.map((c) => `"${c}"`).join(", ")}` : "dependencies cleared");
+      }
       return textResult(`updated [${id}] "${caption}": ${names.join(", ")} (backup: ${backupPath})`, {
         ok: true,
         updatedFields: names,

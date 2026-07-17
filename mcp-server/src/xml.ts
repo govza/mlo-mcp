@@ -9,6 +9,10 @@ import { XMLParser, XMLBuilder } from "fast-xml-parser";
 export interface RawTaskNode {
   "@_Caption": string;
   TaskNode?: RawTaskNode[];
+  /** Task GUID; exported by MLO only when another task depends on this one. */
+  IDD?: string;
+  /** Dependency on other tasks, referencing their IDD GUIDs. */
+  Dependency?: { UID?: string[] };
   Note?: string;
   Importance?: string;
   Effort?: string;
@@ -52,7 +56,7 @@ const parser = new XMLParser({
   trimValues: false,
   parseTagValue: false,
   parseAttributeValue: false,
-  isArray: (name: string) => name === "TaskNode" || name === "Place" || name === "TaskPlace",
+  isArray: (name: string) => name === "TaskNode" || name === "Place" || name === "TaskPlace" || name === "UID",
 });
 
 const builder = new XMLBuilder({
@@ -97,7 +101,9 @@ export function rootNode(doc: MloDocument): RawTaskNode {
 
 /** Element order used by MLO's own exports; unknown elements keep their place before children. */
 const FIELD_ORDER = [
+  "IDD",
   "Note",
+  "Dependency",
   "Importance",
   "Effort",
   "CompletionDateTime",

@@ -23,6 +23,8 @@ export interface TaskNode {
   ScheduleType?: number;
   LeadTime?: number;
   CompleteSubTasksInOrder?: boolean;
+  /** GUIDs (IDD) of tasks this task depends on (waits for). */
+  DependsOn: string[];
   Children: TaskNode[];
   Path: string[];
   Depth: number;

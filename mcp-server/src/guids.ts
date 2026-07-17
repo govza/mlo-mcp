@@ -112,7 +112,8 @@ export function annotateGuids(mlFile: Buffer, tasks: TaskNode[]): number {
   for (const n of postList) {
     if (n.capOff === undefined) continue;
     if (gi < guidOffs.length && guidOffs[gi] > n.capOff && guidOffs[gi] < n.endBound!) {
-      n.task.Guid = formatGuid(raw.subarray(guidOffs[gi], guidOffs[gi] + 16));
+      // an IDD from the XML export is authoritative — keep it, but still consume the slot
+      n.task.Guid ??= formatGuid(raw.subarray(guidOffs[gi], guidOffs[gi] + 16));
       gi++;
       assigned++;
     }

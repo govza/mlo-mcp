@@ -15,6 +15,7 @@ function toModel(raw: RawTaskNode, id: string, parentPath: string[], depth: numb
   const path = [...parentPath, raw["@_Caption"]];
   const node: TaskNode = {
     id,
+    Guid: raw.IDD,
     Caption: raw["@_Caption"],
     Note: raw.Note,
     Importance: num(raw.Importance),
@@ -35,6 +36,7 @@ function toModel(raw: RawTaskNode, id: string, parentPath: string[], depth: numb
     ScheduleType: num(raw.ScheduleType),
     LeadTime: num(raw.LeadTime),
     CompleteSubTasksInOrder: delphiBool(raw.CompleteSubTasksInOrder),
+    DependsOn: raw.Dependency?.UID ?? [],
     Children: [],
     Path: path,
     Depth: depth,
@@ -126,6 +128,7 @@ export function renderLine(t: TaskNode): string {
   if (t.Flag) marks.push(`[flag:${t.Flag}]`);
   if (t.Importance !== undefined && t.Importance !== 50) marks.push(`[imp:${t.Importance}]`);
   if (t.DueDateTime) marks.push(`due:${t.DueDateTime}`);
+  if (t.DependsOn.length) marks.push(`[waits-on:${t.DependsOn.length}]`);
   if (t.Places.length) marks.push(t.Places.join(","));
   return `[${t.id}] ${t.Caption}${marks.length ? " " + marks.join(" ") : ""}`;
 }
