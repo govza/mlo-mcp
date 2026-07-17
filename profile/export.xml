@@ -1,0 +1,1301 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MyLifeOrganized-xml ver="1.2">
+  <TaskTree>
+    <TaskNode Caption="">
+      <TaskNode Caption=".Introduction">
+        <Importance>50</Importance>
+        <HideInToDo>-1</HideInToDo>
+        <Note>Introduction
+ 
+This file contains demo data to illustrate MyLifeOrganized features.
+For more information refer to the notes of the tasks in this demo. 
+
+MyLife Organized (MLO) is a personal task outliner and to-do list manager which will help you to organize your goals, projects and tasks into a tree and generate the to-do list of actions that require immediate attention. This to-do list will be sorted in order of priority to keep you focused on the most important tasks. 
+
+To start using MLO please refer to "Getting Started" topic of the help documentation. Press F1 on any control to receive context help.
+
+There are more templates available for MyLife Organized application. Just click menu File-&gt;New... and select a template you like. 
+For example there are templates to implement Getting Things Done (GTD http://en.wikipedia.org/wiki/Getting_Things_Done) methodology.
+
+</Note>
+      </TaskNode>
+      <TaskNode Caption="Business and Career">
+        <Importance>75</Importance>
+        <HideInToDoThisTask>-1</HideInToDoThisTask>
+        <Places>
+          <Place>@Office</Place>
+        </Places>
+        <TaskNode Caption="Improve my professional skills">
+          <Importance>50</Importance>
+          <HideInToDoThisTask>-1</HideInToDoThisTask>
+          <TaskNode Caption="PMI certification">
+            <Note>www.pmi.org 
+</Note>
+            <IsProject>-1</IsProject>
+            <ProjectStatus>1</ProjectStatus>
+            <TaskNode Caption="Read &quot;Prep for PMI&quot; book">
+              <Importance>50</Importance>
+              <TheGoal>2</TheGoal>
+              <Places>
+                <Place>@Home</Place>
+              </Places>
+            </TaskNode>
+          </TaskNode>
+        </TaskNode>
+        <TaskNode Caption="Project &quot;X1&quot;">
+          <Importance>50</Importance>
+          <CompletionDateTime>2005-05-30T13:28:00</CompletionDateTime>
+          <IsProject>-1</IsProject>
+          <ProjectStatus>3</ProjectStatus>
+          <Places>
+            <Place>@Office</Place>
+          </Places>
+          <TaskNode Caption="Discuss the requirements with the client">
+            <EstimateMin>3</EstimateMin>
+            <EstimateMax>7</EstimateMax>
+            <CompletionDateTime>2005-05-30T12:27:00</CompletionDateTime>
+            <Places>
+              <Place>@Office</Place>
+            </Places>
+          </TaskNode>
+          <TaskNode Caption="Define Project schedule">
+            <EstimateMin>1</EstimateMin>
+            <EstimateMax>1</EstimateMax>
+            <CompletionDateTime>2005-05-30T12:27:00</CompletionDateTime>
+            <Places>
+              <Place>@Office</Place>
+            </Places>
+          </TaskNode>
+          <TaskNode Caption="Start work on the project">
+            <CompletionDateTime>2005-05-30T13:28:00</CompletionDateTime>
+            <DueDateTime>2010-12-03T00:00:00</DueDateTime>
+            <StartDateTime>2010-12-03T00:00:00</StartDateTime>
+            <LeadTime>0</LeadTime>
+            <ScheduleType>1</ScheduleType>
+            <Places>
+              <Place>@Office</Place>
+            </Places>
+            <TaskNode Caption="Define resources for X1 project ">
+              <EstimateMin>2</EstimateMin>
+              <EstimateMax>4</EstimateMax>
+              <CompletionDateTime>2005-05-30T13:28:00</CompletionDateTime>
+              <DueDateTime>2010-12-03T00:00:00</DueDateTime>
+              <StartDateTime>2010-12-03T00:00:00</StartDateTime>
+              <LeadTime>0</LeadTime>
+              <ScheduleType>1</ScheduleType>
+              <Places>
+                <Place>@Office</Place>
+              </Places>
+            </TaskNode>
+          </TaskNode>
+          <TaskNode Caption="Create X1 project documentation">
+            <EstimateMin>14</EstimateMin>
+            <EstimateMax>21</EstimateMax>
+            <CompletionDateTime>2005-05-30T13:28:00</CompletionDateTime>
+            <Places>
+              <Place>@Office</Place>
+            </Places>
+          </TaskNode>
+          <TaskNode Caption="Send X1 report">
+            <Importance>50</Importance>
+            <EstimateMin>0.041666667</EstimateMin>
+            <EstimateMax>0.083333333</EstimateMax>
+            <CompletionDateTime>2005-05-30T13:28:00</CompletionDateTime>
+            <DueDateTime>2010-06-03T00:00:00</DueDateTime>
+            <StartDateTime>2010-06-03T00:00:00</StartDateTime>
+            <LeadTime>0</LeadTime>
+            <ScheduleType>1</ScheduleType>
+            <Places>
+              <Place>@Office</Place>
+            </Places>
+          </TaskNode>
+          <TaskNode Caption="Finalize the project">
+            <EstimateMin>1</EstimateMin>
+            <EstimateMax>3</EstimateMax>
+            <CompletionDateTime>2005-05-30T13:28:00</CompletionDateTime>
+            <DueDateTime>2010-05-30T00:00:00</DueDateTime>
+            <StartDateTime>2010-05-30T00:00:00</StartDateTime>
+            <LeadTime>0</LeadTime>
+            <ScheduleType>1</ScheduleType>
+            <Places>
+              <Place>@Office</Place>
+            </Places>
+          </TaskNode>
+        </TaskNode>
+        <TaskNode Caption="Project &quot;X2&quot;">
+          <Importance>63</Importance>
+          <Note>Projects
+
+You can indicate that a certain task is a Project. All projects are included in a special Projects view. In this view projects are grouped by statuses and are easy to review. 
+
+To indicate that a task is a project select "This is a project" on the Project section of task Properties Pane.
+
+Each project has dynamically calculated Completion Percentage. This percentage is based on how many subtasks of the project are completed and what their Task Effort properties are. If a subtask has higher value of Task Effort property it adds more value to the completion percentage for the entire project. 
+
+Time required for the entire project read-only property is a sum of Time required for the task property for all subtasks of the project. 
+</Note>
+          <IsProject>-1</IsProject>
+          <ProjectStatus>1</ProjectStatus>
+          <Places>
+            <Place>@Office</Place>
+          </Places>
+          <TaskNode Caption=".Project Information">
+            <Effort>0</Effort>
+            <HideInToDo>-1</HideInToDo>
+            <Note>
+You can use links to your files and folders:
+file:\\c:\projects\X2\
+
+
+You might need to temporarily exclude branch (a task and all of its subtasks) from the ToDo list. 
+
+To hide branch in the ToDo list: 
+1. On the Outline tab, select a task.  	
+2. On the General section of task Properties Pane, select the "Hide the branch in ToDo" check box.  	
+
+	Note: This task and all of its subtasks will appear dimmed on the Outline tab. 	
+
+
+</Note>
+            <TaskNode Caption="Contacts">
+              <Effort>0</Effort>
+            </TaskNode>
+          </TaskNode>
+          <TaskNode Caption="Start work on the project">
+            <CompletionDateTime>2005-05-30T12:31:00</CompletionDateTime>
+            <Places>
+              <Place>@Office</Place>
+            </Places>
+          </TaskNode>
+          <TaskNode Caption="Task1">
+            <Importance>50</Importance>
+            <CompletionDateTime>2005-05-30T13:30:00</CompletionDateTime>
+            <Places>
+              <Place>@Office</Place>
+            </Places>
+          </TaskNode>
+          <TaskNode Caption="Task2">
+            <Importance>50</Importance>
+            <CompletionDateTime>2005-05-30T13:30:00</CompletionDateTime>
+            <Places>
+              <Place>@Office</Place>
+            </Places>
+          </TaskNode>
+          <TaskNode Caption="Task3">
+            <Importance>50</Importance>
+            <Places>
+              <Place>@Office</Place>
+            </Places>
+          </TaskNode>
+          <TaskNode Caption="Task4">
+            <Importance>50</Importance>
+            <Places>
+              <Place>@Office</Place>
+            </Places>
+          </TaskNode>
+          <TaskNode Caption="Send Project Status Report">
+            <EstimateMin>0.013888889</EstimateMin>
+            <EstimateMax>0.020833333</EstimateMax>
+            <Note>Complete subtasks in order 
+
+You can instruct MLO to place the next subtask of a project in the To-Do List only after previous subtask is completed. This way you can create projects where certain tasks are dependent on the completion of other tasks. 
+
+To set complete subtasks in order option for a task: 
+1. On the Outline tab, select a task. 
+2. On the General section of task Properties Pane, select the Complete subtasks in order check box. 
+</Note>
+            <CompleteSubTasksInOrder>-1</CompleteSubTasksInOrder>
+            <DueDateTime>2017-08-11T00:00:00</DueDateTime>
+            <StartDateTime>2017-08-11T00:00:00</StartDateTime>
+            <LeadTime>0</LeadTime>
+            <ScheduleType>2</ScheduleType>
+            <Recurrence RecurrenceType="0" PatternStartDate="38471" PatternEndDate="0" Occurrences="-1" Interval="7" PatternInstance="1" DayOfWeekMask="4" DayOfMonth="12" MonthOfYear="12" UseCompletionDate="-1" UncompleteSubtasks="-1" UncompleteSubtasksIfChecked="0" GeneratedCount="1" HourlyDelta="0.041666667" DoNotCreateCompletedCopy="0" RecurWhenSubtaskCompleted="0"/>
+            <Places>
+              <Place>@Office</Place>
+            </Places>
+            <TaskNode Caption="Gather all information needed">
+              <EstimateMin>0.027777778</EstimateMin>
+              <EstimateMax>0.041666667</EstimateMax>
+              <CompletionDateTime>2005-05-30T13:30:00</CompletionDateTime>
+              <Places>
+                <Place>@Office</Place>
+              </Places>
+            </TaskNode>
+            <TaskNode Caption="Report">
+              <EstimateMin>0.041666667</EstimateMin>
+              <EstimateMax>0.0625</EstimateMax>
+              <Places>
+                <Place>@Office</Place>
+              </Places>
+            </TaskNode>
+            <TaskNode Caption="Approve the report with my boss">
+              <EstimateMin>0.006944444</EstimateMin>
+              <EstimateMax>0.010416667</EstimateMax>
+              <Places>
+                <Place>@Office</Place>
+              </Places>
+            </TaskNode>
+          </TaskNode>
+          <TaskNode Caption="Send X1 report">
+            <Importance>50</Importance>
+            <EstimateMin>0.041666667</EstimateMin>
+            <EstimateMax>0.083333333</EstimateMax>
+            <CompletionDateTime>2005-05-30T13:28:00</CompletionDateTime>
+            <DueDateTime>2010-05-31T00:00:00</DueDateTime>
+            <StartDateTime>2010-05-31T00:00:00</StartDateTime>
+            <LeadTime>0</LeadTime>
+            <ScheduleType>1</ScheduleType>
+            <Places>
+              <Place>@Office</Place>
+            </Places>
+          </TaskNode>
+          <TaskNode Caption="Finish the presentation">
+            <DueDateTime>2010-08-10T00:00:00</DueDateTime>
+            <StartDateTime>2010-08-03T00:00:00</StartDateTime>
+            <LeadTime>7</LeadTime>
+            <ScheduleType>1</ScheduleType>
+            <Places>
+              <Place>@Office</Place>
+            </Places>
+          </TaskNode>
+        </TaskNode>
+        <TaskNode Caption="Project &quot;X3&quot;">
+          <Importance>50</Importance>
+          <IsProject>-1</IsProject>
+          <Places>
+            <Place>@Office</Place>
+          </Places>
+          <TaskNode Caption="Discuss the requirements">
+            <Importance>50</Importance>
+            <EstimateMin>0.083333333</EstimateMin>
+            <EstimateMax>0.125</EstimateMax>
+            <Places>
+              <Place>@Office</Place>
+            </Places>
+            <TaskNode Caption="Setup conference call">
+              <Importance>50</Importance>
+              <EstimateMin>0.006944444</EstimateMin>
+              <EstimateMax>0.013888889</EstimateMax>
+              <Note>Time Required for a Task 
+
+You can enter how much time required to accomplish a task. The minimum and maximum values can be entered. This time will be used in the "Time" filter on the To-Do list. 
+
+To enter the time required for a task 
+1. Open Properties Pane by selecting menu View -&gt; Properties Pane 
+2. Select Properties tab and open Timing &amp; Effort section 
+3. Enter the minimum and maximum time in the Time required for the task controls. 
+
+</Note>
+              <Places>
+                <Place>OfficeCalls</Place>
+              </Places>
+            </TaskNode>
+          </TaskNode>
+          <TaskNode Caption="Task1">
+            <Places>
+              <Place>@Office</Place>
+            </Places>
+          </TaskNode>
+          <TaskNode Caption="Task2">
+            <Places>
+              <Place>@Office</Place>
+            </Places>
+          </TaskNode>
+          <TaskNode Caption="Task3">
+            <Places>
+              <Place>@Office</Place>
+            </Places>
+          </TaskNode>
+        </TaskNode>
+        <TaskNode Caption="Review: Keep an eye of the future">
+          <Effort>92</Effort>
+          <EstimateMin>0.020833333</EstimateMin>
+          <EstimateMax>0.041666667</EstimateMax>
+          <Note>Goal for week, month and year 
+
+MLO helps you to organize your regular goal planning. You can indicate that a certain task is a weekly goal, monthly goal or yearly goal. The special Goals view is designed to easily review all your goals. 
+
+The weekly goal is what you should focus your activities on for the week. Monthly goals should be reviewed on a weekly basis to determine specific actions that can be done this week to achieve particular monthly goals. Yearly goals are usually reviewed on a monthly basis to determine if some of them can become goals for the current month. 
+
+To change the View: 
+1. On the Outline tab, click Advanced Views to open the View list.  	
+2. From the View list, select the option you need. 	
+</Note>
+          <TheGoal>1</TheGoal>
+          <Places>
+            <Place>@Office</Place>
+          </Places>
+          <Flag>Green Flag</Flag>
+        </TaskNode>
+      </TaskNode>
+      <TaskNode Caption="My family and friends">
+        <Importance>50</Importance>
+        <HideInToDoThisTask>-1</HideInToDoThisTask>
+        <TaskNode Caption="Buy a house">
+          <Importance>50</Importance>
+          <TheGoal>3</TheGoal>
+          <IsProject>-1</IsProject>
+          <TaskNode Caption="Find house we like">
+            <Importance>83</Importance>
+            <Effort>100</Effort>
+            <Note>Task Effort 
+
+You can select how much Effort will take you to complete the task. 
+
+This value affects dynamically calculated completion percentage for a Project. This percentage is based on how many subtasks of the project are completed and what their Task Effort properties are. If a task has higher value of Task Effort property it adds more value to completion percentage for the entire project. 
+
+	Note: This parameter is different from Time required for a task parameter. For example if you just read a book, it would require less effort than if you write MLO help documentation :-). It might take you the same amount of the time to accomplish these tasks but the Effort would be different.  	
+
+
+</Note>
+          </TaskNode>
+          <TaskNode Caption="Take a loan for the house">
+            <Importance>75</Importance>
+            <Effort>75</Effort>
+          </TaskNode>
+        </TaskNode>
+        <TaskNode Caption="I am a positive loving person">
+          <Importance>50</Importance>
+          <TaskNode Caption="Dinner with Katrin on Wednesday">
+            <Importance>50</Importance>
+            <EstimateMin>0.041666667</EstimateMin>
+            <EstimateMax>0.041666667</EstimateMax>
+            <Starred>-1</Starred>
+            <StarToggleDateTime>2010-03-17T10:56:00</StarToggleDateTime>
+            <Places>
+              <Place>@Downtown</Place>
+            </Places>
+          </TaskNode>
+          <TaskNode Caption="Visit Disnayland with my son">
+            <Importance>50</Importance>
+            <Starred>-1</Starred>
+            <StarToggleDateTime>2010-03-17T10:56:00</StarToggleDateTime>
+            <Places>
+              <Place>@Outdoors</Place>
+            </Places>
+          </TaskNode>
+          <TaskNode Caption="Visit my father">
+            <Importance>50</Importance>
+          </TaskNode>
+        </TaskNode>
+        <TaskNode Caption="Interact with my friends">
+          <Importance>25</Importance>
+          <TaskNode Caption="Party">
+            <Importance>50</Importance>
+            <IsProject>-1</IsProject>
+            <ProjectStatus>2</ProjectStatus>
+            <TaskNode Caption="Select place">
+              <Importance>75</Importance>
+              <CompletionDateTime>2005-05-30T12:31:00</CompletionDateTime>
+            </TaskNode>
+            <TaskNode Caption="Plan party menu">
+              <Importance>50</Importance>
+              <Places>
+                <Place>@Home</Place>
+              </Places>
+            </TaskNode>
+            <TaskNode Caption="Call friends about the party ">
+              <Importance>50</Importance>
+              <Effort>25</Effort>
+              <EstimateMin>0.013888889</EstimateMin>
+              <EstimateMax>0.020833333</EstimateMax>
+              <Note>Context Hours
+
+A context may have hours schedule during which it is open or closed. If a context you select for to-do filter is closed at the moment, the tasks associated with this context will NOT be shown in the To-Do list. Unless you check Include closed check box on To-Do tab.
+
+To set Open/Closed schedule for a context
+1. Click Tools-&gt;Manage Contexts... and select a context
+3. Select Hours tab on the right
+4. Select context open/closed schedule in the calendar using mouse pointer.
+
+Note: The green line in the calendar shows the current moment.
+</Note>
+              <Places>
+                <Place>HomeCalls</Place>
+              </Places>
+            </TaskNode>
+          </TaskNode>
+          <TaskNode Caption="Send link with our vacation photos">
+            <Importance>25</Importance>
+            <EstimateMin>0.002083333</EstimateMin>
+            <EstimateMax>0.006944444</EstimateMax>
+            <Places>
+              <Place>Internet</Place>
+            </Places>
+            <Flag>Blue Flag</Flag>
+          </TaskNode>
+          <TaskNode Caption="Recommend mylifeorganized.net to my friends">
+            <Importance>97</Importance>
+            <EstimateMin>0.003472222</EstimateMin>
+            <EstimateMax>0.006944444</EstimateMax>
+            <Note>www.mylifeorganized.net
+</Note>
+            <Places>
+              <Place>Internet</Place>
+            </Places>
+          </TaskNode>
+        </TaskNode>
+      </TaskNode>
+      <TaskNode Caption="Personal">
+        <Importance>50</Importance>
+        <HideInToDoThisTask>-1</HideInToDoThisTask>
+        <TaskNode Caption="Maintain physical and mental health">
+          <Importance>51</Importance>
+          <TaskNode Caption="Take vitamins">
+            <Importance>50</Importance>
+            <Note>Reoccurrence 
+
+You can set a task to occur repeatedly. For example a task that occurs on a regular basis, such as weekly status reports or periodical car maintenance, can be designed as recurring.
+</Note>
+            <DueDateTime>2017-08-11T00:00:00</DueDateTime>
+            <StartDateTime>2017-08-11T00:00:00</StartDateTime>
+            <LeadTime>0</LeadTime>
+            <ScheduleType>2</ScheduleType>
+            <Recurrence RecurrenceType="0" PatternStartDate="38502" PatternEndDate="0" Occurrences="-1" Interval="1" PatternInstance="1" DayOfWeekMask="8" DayOfMonth="31" MonthOfYear="5" UseCompletionDate="-1" UncompleteSubtasks="-1" UncompleteSubtasksIfChecked="0" GeneratedCount="1" HourlyDelta="0.041666667" DoNotCreateCompletedCopy="0" RecurWhenSubtaskCompleted="0"/>
+            <Places>
+              <Place>@Home</Place>
+            </Places>
+            <Flag>Red Flag</Flag>
+          </TaskNode>
+          <TaskNode Caption="Exercise twice a week">
+            <TaskNode Caption="Sign up for the swimming pool">
+              <EstimateMin>0.041666667</EstimateMin>
+              <EstimateMax>0.0625</EstimateMax>
+              <TheGoal>2</TheGoal>
+              <Starred>-1</Starred>
+              <StarToggleDateTime>2010-03-17T10:56:00</StarToggleDateTime>
+              <Places>
+                <Place>@Downtown</Place>
+              </Places>
+              <Flag>Red Flag</Flag>
+            </TaskNode>
+          </TaskNode>
+          <TaskNode Caption="Buy new mountain bike">
+            <Importance>81</Importance>
+            <Places>
+              <Place>Sport store</Place>
+            </Places>
+            <Flag>Green Flag</Flag>
+          </TaskNode>
+        </TaskNode>
+        <TaskNode Caption="Improve myself">
+          <Importance>50</Importance>
+          <TaskNode Caption="MyLife Organized">
+            <Importance>50</Importance>
+            <IsProject>-1</IsProject>
+            <ProjectStatus>1</ProjectStatus>
+            <TaskNode Caption="Advanced MLO features">
+              <HideInToDo>-1</HideInToDo>
+              <TaskNode Caption="Sync with Outlook "/>
+              <TaskNode Caption="Drag&amp;Drop items from Outlook to MLO outline"/>
+              <TaskNode Caption="Rapid Task Entry dialog">
+                <TaskNode Caption="Pares input like &quot;Call Jim tomorrow at 3p&quot;"/>
+              </TaskNode>
+              <TaskNode Caption="Links">
+                <TaskNode Caption="Link to other MLO tasks"/>
+                <TaskNode Caption="Links to files"/>
+              </TaskNode>
+            </TaskNode>
+            <TaskNode Caption="Download MLO">
+              <Importance>50</Importance>
+              <CompletionDateTime>2005-05-30T11:58:00</CompletionDateTime>
+            </TaskNode>
+            <TaskNode Caption="Study MLO application">
+              <Effort>39</Effort>
+              <Note>www.myLifeOrganized.net
+
+The links are supported in notes section.
+</Note>
+              <TheGoal>1</TheGoal>
+              <Places>
+                <Place>@Home</Place>
+                <Place>@Office</Place>
+              </Places>
+            </TaskNode>
+            <TaskNode Caption="Join MLO community">
+              <Importance>50</Importance>
+              <Effort>5</Effort>
+              <EstimateMin>0.001388889</EstimateMin>
+              <EstimateMax>0.002083333</EstimateMax>
+              <Note>URL:
+http://groups.google.com/group/myLifeOrganized
+</Note>
+              <TheGoal>1</TheGoal>
+              <Places>
+                <Place>Internet</Place>
+              </Places>
+            </TaskNode>
+            <TaskNode Caption="MyLife Organized License">
+              <Importance>25</Importance>
+              <Effort>15</Effort>
+              <EstimateMin>0.003472222</EstimateMin>
+              <EstimateMax>0.010416667</EstimateMax>
+              <TheGoal>2</TheGoal>
+              <Places>
+                <Place>Internet</Place>
+              </Places>
+            </TaskNode>
+          </TaskNode>
+          <TaskNode Caption="Time Management book">
+            <Effort>38</Effort>
+            <Places>
+              <Place>@Outdoors</Place>
+            </Places>
+          </TaskNode>
+        </TaskNode>
+        <TaskNode Caption=".Misc">
+          <Importance>50</Importance>
+          <HideInToDoThisTask>-1</HideInToDoThisTask>
+          <TaskNode Caption="Buy compact disc">
+            <Importance>50</Importance>
+            <Note>Understanding of contexts
+ 
+Many tasks can be completed only in certain places or situations. For example you can complete task "Buy the compact disk" only when you are in the music store. So you can create new contexts "Music store" and assign this place for this task. Now on the To-Do tab in the Contexts filter you can select context "Music store" and you will see only tasks which were assigned to this context. You can also think of the context as of the categories for the tasks. 
+
+Each context can also include other contexts in the hierarchy. 
+
+Each context can have open/closed schedule. 
+</Note>
+            <Places>
+              <Place>Music Store</Place>
+            </Places>
+            <Flag>Blue Flag</Flag>
+          </TaskNode>
+        </TaskNode>
+      </TaskNode>
+      <TaskNode Caption="&lt;Inbox&gt;">
+        <HideInToDoThisTask>-1</HideInToDoThisTask>
+      </TaskNode>
+    </TaskNode>
+  </TaskTree>
+  <PConfig>
+    <i0>ProfileDate_Desktop6=2026-07-18T22:43:24</i0>
+  </PConfig>
+  <PlacesList>
+    <TaskPlace Caption="Music Store">
+      <Open Days="MO TU WE TH FR" StartTime="09:00:00" EndTime="19:00:00"/>
+      <Open Days="SA" StartTime="09:00:00" EndTime="15:00:00"/>
+    </TaskPlace>
+    <TaskPlace Caption="@Outdoors">
+      <Open Days="MO TU WE TH FR" StartTime="17:00:00" EndTime="21:00:00"/>
+      <Open Days="SU SA" StartTime="08:00:00" EndTime="21:00:00"/>
+    </TaskPlace>
+    <TaskPlace Caption="Internet"/>
+    <TaskPlace Caption="@Home">
+      <Open Days="MO TU WE TH FR" StartTime="05:00:00" EndTime="07:00:00"/>
+      <Open Days="MO TU WE TH FR" StartTime="11:30:00" EndTime="12:30:00"/>
+      <Open Days="MO TU WE TH FR" StartTime="17:00:00" EndTime="22:30:00"/>
+      <Open Days="SU SA" StartTime="05:00:00" EndTime="22:30:00"/>
+      <Includes Place="HomeCalls"/>
+      <Includes Place="Internet"/>
+    </TaskPlace>
+    <TaskPlace Caption="HomeCalls">
+      <Open Days="MO TU WE TH FR" StartTime="11:30:00" EndTime="12:30:00"/>
+      <Open Days="MO TU WE TH FR" StartTime="17:00:00" EndTime="21:00:00"/>
+      <Open Days="SU SA" StartTime="08:30:00" EndTime="21:00:00"/>
+    </TaskPlace>
+    <TaskPlace Caption="@Office">
+      <Open Days="MO TU WE TH FR" StartTime="07:15:00" EndTime="11:30:00"/>
+      <Open Days="MO TU WE TH FR" StartTime="12:30:00" EndTime="17:00:00"/>
+      <Includes Place="Internet"/>
+      <Includes Place="OfficeCalls"/>
+    </TaskPlace>
+    <TaskPlace Caption="OfficeCalls">
+      <Open Days="MO TU WE TH FR" StartTime="08:00:00" EndTime="11:30:00"/>
+      <Open Days="MO TU WE TH FR" StartTime="12:30:00" EndTime="16:00:00"/>
+    </TaskPlace>
+    <TaskPlace Caption="Sport store">
+      <Open Days="MO TU WE TH FR" StartTime="09:00:00" EndTime="19:00:00"/>
+      <Open Days="SA" StartTime="09:00:00" EndTime="15:00:00"/>
+    </TaskPlace>
+    <TaskPlace Caption="@Downtown">
+      <Includes Place="Music Store"/>
+      <Includes Place="Sport store"/>
+    </TaskPlace>
+  </PlacesList>
+  <Flags>
+    <Flag Caption="Red Flag">AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAQAQAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wAdWIeWHViH/x1Yh5YdWIcP////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AHViH/1ai1v84e6z/HViHeP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AB1Yh/9Wotb/RYy+/x1Yh7P///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAdWIfYTZfK/1ai1v8dWIf/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AHViHiTyAsf9Wotb/HViH/////wD///8A////ACk4q5sWLtX1CiTs/gok6v4SJdj5KDSqxv///wD///8A////AB1Yh0Msa5z/VqLW/x1Yh/////8A////AP///wALKPfJlJv+/6Oo//+iqP//srb+/zVD+f8MIOz+S1XOzY+W+1hgauWeFh0y/1Oe1P8rapr/HViHPv///wD///8ADCrrspqg//xQW///SVP//3yD//+prv//wMT//5+m/P1UXfL2TVj5+15nwP9Wotb/On6w/x1Yh4P///8A////ABgvzYWPlv7xfYX//1xn//9eaP//hYz//6qw///f4P//vcH//7W5//+YmNH/VqLW/0aSx/8dWIfU////AP///wAkNbFQFyb74p2i//9UXv//V2D//4KK//+lqv//zdD//7e7//+aoP//k5TX8EKMwP99t9//HViH/////wD///8ALTmdJgwf+dKbov//UVz//1Bb//+Bif//n6T//8TH///Fyf//naP//3B18Pk1eaz/bq/b/x1Yh/////8A////ADM6jAsJJffDm6L//5+l//+boP//uLz//8jM//+2u///0dT//5+l//+VnP//NW6X/4/B5P8hX4//HViHGv///wA3PYYCByj1rgUm9foEJPX/BCH1/wMe9f+Tm/z/19r//+fo///Nz///x8r//6C0wP+GvOL/LnKk/x1Yh2L///8A////AP///wD///8A////AP///wD///8ACx7p/lFc+v/Lz/7/rLL+/zE+/P8uOdf/7/f7/zaEu/8dWIez////AP///wD///8A////AP///wD///8A////AD1DhhovOaixJzPE4SU1w+ArOKu1NGWInR1Yh/8dWIezHViHSv///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==</Flag>
+    <Flag Caption="Green Flag">AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAQAQAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wAdWIeWHViH/x1Yh5YdWIcP////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AHViH/1ai1v84e6z/HViHeP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AB1Yh/9Wotb/RYy+/x1Yh7P///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAdWIfYTZfK/1ai1v8dWIf/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AHViHkTyAsf9Wotb/HViH/////wD///8A////AFmFQt08o0X/M7JH/zOxR/84pUf/TYZE9P///wD///8A////AB1Yh1Usa5z/VqLW/x1Yh/////8A////AP///wB3lDvqm96l/6Pgqv+j4Kr/q+Ox/2rNe/81s0z/aqdj97bXmJqzvHjCFh0y/1Oe1P8rapr/HViHPv///wD///8AoYQwzKrjsP9jznf/X810/4DWjv+n46//tOe5/6Pgq/9oxXX/d8dw/qyzrP9Wotb/On6w/x1Yh4P///8A////AKB7PJ+g06n/kNub/2rQff9s0X7/htmU/57gp//F7Mf/tOa5/7Dmt/+Nq5D/VqLW/0aSx/8dWIfU////AP///wCIdE5wRplb/aLhq/9mz3r/aM98/4TYkv+b36X/tue6/6jjsP+V3qH/ncmi/0KMwP99t9//HViH/////wD///8AnWwtJkeUU/qh4Kn/ZM94/2TPeP+E2JL/l96j/7Dmt/+y5rf/mN+j/47Plv81eaz/bq/b/x1Yh/////8A////AIxnMwtZjEvxvenA/7jnvP+357z/wevD/8bsyP+o47D/uui+/5nfpP+n3J7/NW6X/4/B5P8hX4//HViHGv///wCGZjcCh4dH1zSlTP8xpkz/MaZN/zCmTf+Cwpb/w+vG/8nty/+56b//t+e8/6C0wP+GvOL/LnKk/x1Yh2L///8A////AP///wD///8A////AP///wD///8ANaBS/163ef+/6cL/ruS2/23RgP9HlFP/7/f7/zaEu/8dWIez////AP///wD///8A////AP///wD///8A////AGR2STVRelDuSY1U/EyYTPxWiEftNGWIvB1Yh/8dWIezHViHSv///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==</Flag>
+    <Flag Caption="Blue Flag">AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAQAQAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wAdWIeWHViH/x1Yh5YdWIcP////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AHViH/1ai1v84e6z/HViHeP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AB1Yh/9Wotb/RYy+/x1Yh7P///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAdWIfYTZfK/1ai1v8dWIf/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AHViHiTyAsf9Wotb/HViH/////wD///8A////AKtxKZvVfRb17IYK/uqFCv7YgxL5qnMoxv///wD///8A////AB1Yh0Msa5z/VqLW/x1Yh/////8A////AP///wD3iwvJ/tSU///bo///2qL//uGy//mqNf/sjQz+zphLzfvQj1jlr2CeFh0y/1Oe1P8rapr/HViHPv///wD///8A64MMsv/Xmvz/ulD//7hJ///MfP//3an//+bA//zWn/3ytFT2+bVN+6uyrf9Wotb/On6w/x1Yh4P///8A////AM15GIX+0o/x/8x9//++XP//v17//8+F///dqv//89///+W9///itf+tp4//VqLW/0aSx/8dWIfU////AP///wCxcSRQ+6AX4v/Znf//vFT//75X///Ngv//3KX//+vN///jt///15r/17+T8EKMwP99t9//HViH/////wD///8AnWwtJvmXDNL/15v//7pR//+6UP//zYH//9qf///oxP//6MX//9id//DAcPk1eaz/bq/b/x1Yh/////8A////AIxnMwv3jAnD/9eb///Zn///2Jv//+O4///pyP//4rb//+3R///Zn///1ZX/NW6X/4/B5P8hX4//HViHGv///wCGZjcC9YUHrvWEBfr1hQT/9YcE//WJA//80ZP//+/X///25///7M3//+nH/6C0wP+GvOL/LnKk/x1Yh2L///8A////AP///wD///8A////AP///wD///8A6YwL/vq3Uf/+6cv//t2s//yrMf/XlC7/7/f7/zaEu/8dWIez////AP///wD///8A////AP///wD///8A////AIZoPRqodS+xxIQn4cN+JeCrcyu1NGWInR1Yh/8dWIezHViHSv///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==</Flag>
+    <Flag Caption="Yellow Flag">AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAQAQAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wAdWIeWHViH/x1Yh5YdWIcP////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AHViH/1ai1v84e6z/HViHeP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AB1Yh/9Wotb/RYy+/x1Yh7P///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAdWIfYTZfK/1ai1v8dWIf/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AHViHiTyAsf9Wotb/HViH/////wD///8A////AFuksuQNksX/ApHK/wKQyf8Iksj/Ppu49////wD///8A////AB1Yh0Msa5z/VqLW/x1Yh/////8A////AP///wBDq774fdvy/5Dg9f+O3/T/o+X2/wm55f8Cl83/WbbK+LXTzZSqvaPEBoGx/1Oe1P8rapr/HViHPv///wD///8AVqm18IXc8/8qxOv/IsLr/2HT8P+X4vX/s+r4/4Hh7f8qydr/F8zc/yGhz/9Wotb/On6w/x1Yh4P///8A////AG2prtR+2e/+YtPw/znI7P87yOz/a9bx/5fi9f/V9vn/qez0/53r8v+Jx9D/VqLW/0aSx/8dWIfU////AP///wB9qaqaJ7LR/Yne9P8vxev/M8fs/2fV8P+S4fX/vfD2/6Dq8v934+z/g9Td/kKMwP99t9//HViH/////wD///8AhKqpVDqvxvqF3fP/KsTr/yrE6/9m1fD/i9/0/7Lu9f+z7vX/fuPu/0zR4P81eaz/bq/b/x1Yh/////8A////AIOqqhtJq7z2hd3z/4vf9P+G3vT/quf3/73t+f+f6vL/xPL4/4Dj7v9z4O3/NW6X/4/B5P8hX4//HViHGv///wCDqqoFXKq17geSyP8AkMr/AJLL/wCTzP982fH/zPT5/9/4+/++8ff/te71/6C2wv+GvOL/LnKk/x1Yh2L///8A////AP///wD///8A////AP///wD///8AApXN/y3D6f/A7fj/m+P1/wa35P8FmcD/7/f7/zaEu/8dWIez////AP///wD///8A////AP///wD///8A////AH+prjxSpbbvJqLF/SSfw/1cmqPoNGWInR1Yh/8dWIezHViHSv///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==</Flag>
+    <Flag Caption="Orange Flag">AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAQAQAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wAdWIeWHViH/x1Yh5YdWIcP////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AHViH/1ai1v84e6z/HViHeP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AB1Yh/9Wotb/RYy+/x1Yh7P///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAdWIfYTZfK/1ai1v8dWIf/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AHViHiTyAsf9Wotb/HViH/////wD///8A////ACluq5sWfdX1CoLs/gqB6v4Sd9j5KGqqxv///wD///8A////AB1Yh0Msa5z/VqLW/x1Yh/////8A////AP///wALivfJlMf+/6PO//+izv//stX+/zWU+f8Mfez+S4vOzY/D+1hgoeWeFh0y/1Oe1P8rapr/HViHPv///wD///8ADIbrsprK//xQo///SZ7//3y5//+p0v//wN7//5/M/P1Un/L2TZ/5+3ml0P9Wotb/On6w/x1Yh4P///8A////ABh6zYWPxP7xfbr//1yq//9eq///hb///6rT///f7v//vdz//7XY//+dssz/VqLW/0aSx/8dWIfU////AP///wAkb7FQF4X74p3L//9Upf//V6b//4K+//+lz///zeX//7fZ//+ayv//k7DX8EKMwP99t9//HViH/////wD///8ALWedJgyB+dKby///UaT//1Cj//+Bvf//n8z//8Tg///F4f//ncz//3Cq8Pk1eaz/bq/b/x1Yh/////8A////ADNfjAsJh/fDm8v//5/N//+byv//uNr//8ji//+22f//0ef//5/N//+VyP//NW6X/4/B5P8hX4//HViHGv///wA3XYYCB4r1rgWJ9foEiPX/BIX1/wOD9f+Txvz/1+r//+fy///N5P//x+H//6C0wP+GvOL/LnKk/x1Yh2L///8A////AP///wD///8A////AP///wD///8AC3rp/lGi+v/L5P7/rNT+/zGT/P8uf9f/7/f7/zaEu/8dWIez////AP///wD///8A////AP///wD///8A////AD1hhhova6ixJ3TE4SV2w+Arbau1NGWInR1Yh/8dWIezHViHSv///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==</Flag>
+    <Flag Caption="Pink Flag">AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAQAQAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wAdWIeWHViH/x1Yh5YdWIcP////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AHViH/1ai1v84e6z/HViHeP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AB1Yh/9Wotb/RYy+/x1Yh7P///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAdWIfYTZfK/1ai1v8dWIf/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AHViHiTyAsf9Wotb/HViH/////wD///8A////AJkUv5uzAOn1vgD0/rwA8v66AOj5nBO+xv///wD///8A////AB1Yh0Msa5z/VqLW/x1Yh/////8A////AP///wDEAf/J7JD//++g///un///8q7//9ot///GAPb+wjThzeuI/1jaSfieFh0y/1Oe1P8rapr/HViHPv///wD///8AuwD1su2X//ziTf//4Ub//+l5///wpv//9Lz//+yZ//3hRP/24ET/+7JVyP9Wotb/On6w/x1Yh4P///8A////AK4A44Xri//x6Xr//+NZ///kW///6oL///Cn///62///87r///Ky//+xibD/VqLW/0aSx/8dWIfU////AP///wCcDcdQ1hH/4u6a///jUf//5FT//+h////wov//9sn///K0///tl///1ofg8EKMwP99t9//HViH/////wD///8AjhuuJtEE/9LtmP//4k7//+JN///pfv//75z///XA///1wf//7Zr//+de//k1eaz/bq/b/x1Yh/////8A////AIMkmQvFAP7D7Zj//+6c///umP//8rX///XE///ys///983//+6c///skv//NW6X/4/B5P8hX4//HViHGv///wB/KpICvQD6rrwA+Pq9APf/vwD3/8AA9v/qjf//99P///vj///3yf//9cP//6C0wP+GvOL/LnKk/x1Yh2L///8A////AP///wD///8A////AP///wD///8AxADy/uFJ///1xv//76j//9ws///LEvD/7/f7/zaEu/8dWIez////AP///wD///8A////AP///wD///8A////AH8xkRqbG7qxtg3b4a8L2uCbFr+1NGWInR1Yh/8dWIezHViHSv///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==</Flag>
+    <Flag Caption="Purple Flag">AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAQAQAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wAdWIeWHViH/x1Yh5YdWIcP////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AHViH/1ai1v84e6z/HViHeP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AB1Yh/9Wotb/RYy+/x1Yh7P///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAdWIfYTZfK/1ai1v8dWIf/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AHViHiTyAsf9Wotb/HViH/////wD///8A////AMJcmpviTar19EOv/vJDrv7lSqX5wVuXxv///wD///8A////AB1Yh0Msa5z/VqLW/x1Yh/////8A////AP///wD8Q7bJ/63c//+64P//ueD//8Tl//1ku//0RKr+3HWxzf2p2VjthcGeKBwr/3mY0v8rapr/HViHPv///wD///8A80Sysv+z3vz/e8X//3bB//+c0///vuL//9Dq//613/33e8H2/HbB+++Cv/+jltH/On6w/x1Yh4P///8A////ANtOp4X/qtnx/53U//+Eyv//hsr//6PW//+/4///5/T//83p///T7P/ht87/ep3T/0aSx/8dWIfU////AP///wDGWJxQ/02x4v+13v//fsf//4HH//+h1v//u+H//9nu///J5///w+X/9Lzb/0OMwP99t9//HViH/////wD///8Atl+UJv1Er9L/tN///3zG//97xf//oNb//7ff///T6///0+z//8Xl//2k1v81eaz/bq/b/x1Yh/////8A////AKljjQv8QrTD/7Tf//+33///tN3//8ro///W7f//yOf//9zw///G5v//v+P/NW6X/4/B5P8hX4//HViHGv///wClZ4oC+kC3rvo/tvr6PrX/+j6z//o9sf/+rNr//+Hy///t9///4vL//97w/6C0wP+GvOL/LnKk/x1Yh2L///8A////AP///wD///8A////AP///wD///8A8UOp/v15xP/+1+7//8/q//94x//SZaj/7/f7/zaEu/8dWIez////AP///wD///8A////AP///wD///8A////AKVsjRq/YJix1Vmg4fJyvf3icaT5NGWInR1Yh/8dWIezHViHSv///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==</Flag>
+  </Flags>
+  <ToDoViewsRoot>
+    <ToDoView Name="Inbox" CounterType="3" CounterHierarchy="2" CounterHideIfZero="true" ToDoViewType="3">
+      <UI ActionFlt="4" UseHierarchy="true">
+        <HightlightFormat bold="1" inherit="0" options="0"/>
+      </UI>
+      <Group/>
+      <Sort Srt1="1" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+      <AdvFlt/>
+      <AdvFltParent/>
+      <AdvFltChild/>
+      <Columns>
+        <Column ID="0" Pos="0" Width="481"/>
+        <Column ID="4" Pos="4" Width="100"/>
+        <Column ID="7" Pos="7" Width="79"/>
+        <Column ID="27" Pos="27" Width="22"/>
+      </Columns>
+      <IcoData Caption="Inbox">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWR6ZmVk9WZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT1ZmVkev///wD///8A////AP///wD///8A////AP///wBmZWT4ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk+P///wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZEL///8A////AP///wD///8A////AGZlZEJmZWT/ZmVk/2ZlZP9mZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/2ZlZP9mZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/2ZlZP9mZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/2ZlZP9mZWT/ZmVk1f///wD///8A////AP///wD///8A////AP///wBmZWTTZmVk/2ZlZP9mZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8AZmVkEGZlZB7///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wBmZWQcZmVk2mZlZPRmZWQ+////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AGZlZBxmZWTbZmVk/2ZlZP9mZWT0ZmVkPf///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8AZmVkHWZlZNxmZWT/ZmVk/2ZlZP9mZWT/ZmVk9GZlZD3///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wBmZWQeZmVk3WZlZP9mZWTkZmVk/2ZlZP9mZWTEZmVk/2ZlZPNmZWQ9////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wBmZWTXZmVk/2ZlZORmZWQlZmVk/2ZlZP9mZWQNZmVkxGZlZP9mZWTzZmVkPP///wBmZWT5ZmVk/////wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wBmZWSeZmVk3mZlZCX///8AZmVk/2ZlZP////8AZmVkDmZlZMRmZWT/ZmVk82ZlZDxmZWRJZmVk+f///wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AGZlZA5mZWTFZmVk/2ZlZPJmZWQ8ZmVkSf///wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/2ZlZA3///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wBmZWQOZmVkxWZlZP9mZWTyZmVkO////wD///8A////AP///wD///8A////AP///wBmZWT4ZmVk/2ZlZP9mZWT/ZmVk/////wD///8AZmVk/2ZlZP////8A////AGZlZPdmZWREZmVkD2ZlZMVmZWT/ZmVk8mZlZDf///8A////AP///wD///8A////AP///wBmZWR7ZmVk9mZlZP9mZWT/ZmVk/////wD///8AZmVk/2ZlZP////8A////AGZlZP9mZWT1ZmVkPWZlZA9mZWTGZmVk/2ZlZJT///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wBmZWQOZmVkcGZlZA7///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkx2ZlZMz///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+    </ToDoView>
+    <ToDoView Name="Starred" CounterType="3" CounterHideIfZero="true" ToDoViewType="1">
+      <UI ActionFlt="4" UseAdvFlt="true">
+        <HightlightFormat bold="1" inherit="0" options="0"/>
+      </UI>
+      <Group/>
+      <Sort Srt1="1" Srt2="1" Srt3="1" Srt4="1" Manual="true"/>
+      <AdvFlt>
+        <RootRule>
+          <Rule Field="Starred" ConditionName="is true" ConditionID="310"/>
+        </RootRule>
+      </AdvFlt>
+      <AdvFltParent/>
+      <AdvFltChild/>
+      <Columns>
+        <Column ID="0" Pos="0" Width="481"/>
+        <Column ID="4" Pos="4" Width="100"/>
+        <Column ID="7" Pos="7" Width="79"/>
+        <Column ID="27" Pos="27" Width="22"/>
+      </Columns>
+      <IcoData Caption="Starred">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkA2ZlZNtmZWTBZmVkUmZlZAP///8A////AP///wD///8A////AP///wBmZWQEZmVkV2ZlZMdmZWTZ////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkBGZlZP9mZWT/ZmVk/2ZlZN5mZWRxZmVkDv///wD///8AZmVkEWZlZHZmZWTiZmVk/2ZlZP9mZWT3////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZPNmZWT/ZmVkwGZlZP9mZWT/ZmVk8WZlZJBmZWSVZmVk9GZlZP9mZWT/ZmVkv2ZlZP9mZWTm////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZOBmZWT/ZmVkIGZlZFJmZWS1ZmVk/2ZlZP9mZWT/ZmVk/2ZlZLJmZWRNZmVkKmZlZP9mZWTV////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZM1mZWT/ZmVkM////wD///8AZmVkM2ZlZG9mZWRrZmVkLv///wD///8AZmVkP2ZlZP9mZWTB////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZLpmZWT/ZmVkRf///wD///8A////AP///wD///8A////AP///wD///8AZmVkUWZlZP9mZWSv////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZKZmZWT/ZmVkWv///wD///8A////AP///wD///8A////AP///wD///8AZmVkYmZlZP9mZWSe////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkAWZlZLlmZWT/ZmVkR////wD///8A////AP///wD///8A////AP///wD///8AZmVkSGZlZP9mZWS4ZmVkAf///wD///8A////AP///wD///8A////AP///wD///8AZmVkh2ZlZP9mZWTcZmVkCv///wD///8A////AP///wD///8A////AP///wD///8AZmVkC2ZlZN1mZWT/ZmVkgv///wD///8A////AP///wD///8A////AP///wBmZWRpZmVk/2ZlZP9mZWQ8////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZEFmZWT/ZmVk/mZlZFv///8A////AP///wD///8A////AGZlZE5mZWT8ZmVk/2ZlZFr///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWSXZmVk/2ZlZPlmZWRC////AP///wD///8AZmVkLWZlZPJmZWT/ZmVkmf///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVknGZlZP9mZWTwZmVkLf///wD///8AZmVk32ZlZP9mZWT/ZmVkwGZlZIRmZWRIZmVkEP///wD///8A////AP///wD///8A////AP///wD///8AZmVkDmZlZEVmZWR/ZmVkvGZlZP9mZWT/ZmVk3v///wD///8AZmVkdWZlZMdmZWT6ZmVk/2ZlZP9mZWT/ZmVk/2ZlZMFmZWQq////AP///wD///8A////AGZlZClmZWTAZmVk/2ZlZP9mZWT/ZmVk/2ZlZPxmZWTQZmVkef///wD///8A////AP///wBmZWQJZmVkQGZlZHtmZWS3ZmVk8GZlZP9mZWThZmVkD////wD///8AZmVkBWZlZNdmZWT/ZmVk8mZlZLtmZWSBZmVkRGZlZA3///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkAmZlZLRmZWT/ZmVknv///wD///8AZmVkmmZlZP9mZWS+ZmVkA////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZCVmZWT4ZmVk/2ZlZDxmZWQ3ZmVk/2ZlZPtmZWQs////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWSHZmVk/2ZlZLdmZWS1ZmVk/2ZlZIz///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQMZmVk5GZlZP9mZWT/ZmVk52ZlZA7///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkVmZlZP9mZWT/ZmVkX////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZLFmZWS4ZmVkAf///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+    </ToDoView>
+    <ToDoView Name="Outline" IsFolder="true">
+      <UI ActionFlt="4">
+        <HightlightFormat bold="1" inherit="0" options="0"/>
+      </UI>
+      <Group/>
+      <Sort Srt1="1" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+      <AdvFlt/>
+      <AdvFltParent/>
+      <AdvFltChild/>
+      <Columns>
+        <Column ID="0" Pos="0" Width="481"/>
+        <Column ID="4" Pos="4" Width="100"/>
+        <Column ID="7" Pos="7" Width="79"/>
+        <Column ID="27" Pos="27" Width="22"/>
+      </Columns>
+      <ToDoView Name="All tasks" CounterType="8" CounterHideIfZero="true" ToDoViewType="2">
+        <UI ActionFlt="4" UseHierarchy="true">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group/>
+        <Sort Srt1="1" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt/>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="449"/>
+          <Column ID="4" Pos="4" Width="100"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="27" Pos="27" Width="15"/>
+        </Columns>
+        <IcoData Caption="All tasks">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZANmZWSaZmVkTf///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkA2ZlZKJmZWT/ZmVk+WZlZE////8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZP9mZWT/ZmVk+GZlZP9mZWT/////AP///wBmZWQDZmVkpGZlZP9mZWTUZmVk9WZlZPlmZWRR////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZP9mZWT/ZmVk/2ZlZP9mZWT/////AGZlZANmZWSgZmVk/2ZlZMtmZWQQZmVkQmZlZPVmZWT5ZmVkU////wD///8A////AP///wD///8A////AP///wD///8A////AGZlZP9mZWT/ZmVkB////wD///8A////AGZlZJRmZWT/ZmVkymZlZA////8A////AGZlZEBmZWT1ZmVk+mZlZFT///8A////AP///wD///8A////AP///wD///8A////AGZlZP9mZWT/////AP///wD///8A////AGZlZDNmZWS7ZmVkD////wD///8A////AP///wBmZWQ+ZmVk9GZlZPtmZWRU////AP///wD///8A////AP///wD///8A////AGZlZP9mZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkPWZlZPRmZWT7ZmVkVf///wD///8A////AP///wD///8A////AGZlZP9mZWT/////AP///wD///8A////AP///wD///8A////AGZlZANmZWSaZmVkTf///wD///8A////AGZlZD1mZWTzZmVkwWZlZAH///8A////AP///wD///8A////AGZlZP9mZWT/////AP///wD///8A////AP///wD///8AZmVkA2ZlZKJmZWT/ZmVk+WZlZE////8A////AP///wBmZWQzZmVkDf///wD///8A////AP///wD///8A////AGZlZP9mZWT/ZmVk/2ZlZP9mZWT/////AP///wBmZWQDZmVko2ZlZP9mZWTUZmVk9WZlZPlmZWRR////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZP9mZWT/ZmVk/2ZlZP9mZWT/////AGZlZANmZWSgZmVk/2ZlZMtmZWQQZmVkQmZlZPVmZWT5ZmVkU////wD///8A////AP///wD///8A////AP///wD///8A////AGZlZP9mZWT/////AP///wD///8A////AGZlZJRmZWT/ZmVkymZlZA////8A////AGZlZEBmZWT1ZmVk+WZlZFP///8A////AP///wD///8A////AP///wD///8A////AGZlZP9mZWT/////AP///wD///8A////AGZlZDNmZWS7ZmVkD////wD///8A////AP///wBmZWQ/ZmVk9WZlZPpmZWRU////AP///wD///8A////AP///wD///8A////AGZlZAFmZWQ0////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkPmZlZPRmZWT7ZmVkVf///wD///8A////AP///wD///8AZmVkAWZlZJlmZWT7ZmVkVf///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZD1mZWTzZmVkwWZlZAH///8A////AP///wBmZWQBZmVkm2ZlZP9mZWT/ZmVk/GZlZFf///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQzZmVkDf///wD///8A////AGZlZAFmZWSaZmVk/2ZlZNBmZWRRZmVk8mZlZPxmZWRY////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkAWZlZJlmZWT/ZmVkz2ZlZBT///8AZmVkO2ZlZPFmZWT8ZmVkWf///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkIGZlZOpmZWTOZmVkE////wD///8A////AGZlZDpmZWTwZmVk/GZlZFv///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZCpmZWQV////AP///wD///8A////AP///wBmZWQ5ZmVk8GZlZPxmZWRd////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkOGZlZPBmZWT8ZmVkT////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZDZmZWS8ZmVkEP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+      <ToDoView Name="Projects">
+        <UI ActionFlt="4" UseAdvFlt="true" UseHierarchy="true" IncludeParents="false" IncludeChild="true" ProcessInclBranch="true">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group ShowGroupName="false">
+          <Grp1 GroupBy="7"/>
+        </Group>
+        <Sort Srt1="1" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt>
+          <RootRule>
+            <Rule Field="IsProject" ConditionName="is true" ConditionID="310"/>
+          </RootRule>
+        </AdvFlt>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="481"/>
+          <Column ID="4" Pos="4" Width="100"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="27" Pos="27" Width="22"/>
+        </Columns>
+        <IcoData Caption="Projects">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZAZmZWSRZmVk7mZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/////wD///8A////AGZlZJBmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/////wD///8A////AGZlZO1mZWT/ZmVk0GZlZBhmZWRVZmVk/2ZlZOdmZWQO////AGZlZLxmZWT/ZmVkkf///wBmZWQoZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AGZlZP9mZWT/ZmVk52ZlZAxmZWQBZmVkwmZlZP9mZWSK////AGZlZCxmZWT7ZmVk+mZlZCj///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AGZlZP9mZWT/ZmVk/2ZlZIL///8AZmVkMmZlZP1mZWT4ZmVkJf///wBmZWSWZmVk/2ZlZLf///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AGZlZP9mZWT/ZmVk/mZlZPdmZWQf////AGZlZJtmZWT/ZmVkr////wBmZWQTZmVk72ZlZP9mZWRKZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AGZlZP9mZWT/ZmVkomZlZP9mZWSq////AGZlZBhmZWTxZmVk/2ZlZET///8AZmVkbmZlZP9mZWTXZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AGZlZP9mZWT/ZmVkG2ZlZPNmZWT/ZmVkPf///wBmZWR1ZmVk/2ZlZNNmZWQEZmVkBWZlZNdmZWT/ZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AGZlZP9mZWT/ZmVkGWZlZH1mZWT/ZmVkzWZlZAJmZWQHZmVk22ZlZP9mZWRp////AGZlZElmZWT/ZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AGZlZO1mZWT/ZmVktmZlZCBmZWTgZmVk/2ZlZGT///8AZmVkUGZlZP9mZWTsZmVkEP///wBmZWS1ZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AGZlZJBmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/////wD///8A////AGZlZAZmZWSRZmVk7WZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+      <ToDoView Name="Goals">
+        <UI ActionFlt="4" UseAdvFlt="true" UseHierarchy="true" IncludeParents="false" IncludeChild="true" ProcessInclBranch="true">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group ShowGroupName="false">
+          <Grp1 GroupBy="4"/>
+        </Group>
+        <Sort Srt1="1" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt>
+          <RootRule>
+            <Rule Field="GoalMaster" ConditionName="&lt;&gt;" DataValue="None" DataType="Integer" ConditionID="702"/>
+          </RootRule>
+        </AdvFlt>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="481"/>
+          <Column ID="4" Pos="4" Width="100"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="27" Pos="27" Width="22"/>
+        </Columns>
+        <IcoData Caption="Goals">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZDBmZWSMZmVkx2ZlZORmZWT3ZmVk5GZlZMdmZWSMZmVkMP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQiZmVkrWZlZP5mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/mZlZKxmZWQi////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZEhmZWTwZmVk/2ZlZPNmZWSOZmVkQGZlZBX///8AZmVkFWZlZEFmZWSOZmVk82ZlZP9mZWTvZmVkR////wD///8A////AP///wD///8A////AP///wD///8AZmVkTmZlZPxmZWT/ZmVkomZlZBj///8A////AP///wD///8A////AP///wD///8AZmVkGWZlZKVmZWT/ZmVk/GZlZE7///8A////AP///wD///8A////AP///wBmZWQlZmVk82ZlZP9mZWR/////AP///wBmZWQ+ZmVkqWZlZOVmZWT7ZmVk5WZlZKhmZWQ9////AP///wBmZWSAZmVk/2ZlZPNmZWQm////AP///wD///8A////AP///wBmZWSuZmVk/2ZlZKL///8AZmVkBWZlZJdmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVklWZlZAP///8AZmVko2ZlZP9mZWS3////AP///wD///8A////AGZlZDJmZWT/ZmVk72ZlZBH///8AZmVklGZlZP9mZWT1ZmVkfWZlZCJmZWQFZmVkI2ZlZH5mZWT2ZmVk/2ZlZJT///8AZmVkE2ZlZO9mZWT/ZmVkM////wD///8A////AGZlZI5mZWT/ZmVkj////wBmZWQ8ZmVk/2ZlZPVmZWQ5////AP///wD///8A////AP///wBmZWQ5ZmVk9WZlZP9mZWQ6////AGZlZJJmZWT/ZmVkjP///wD///8A////AGZlZMxmZWT/ZmVkQv///wBmZWSnZmVk/2ZlZH7///8AZmVkIGZlZMBmZWT3ZmVku2ZlZB////8AZmVkfWZlZP9mZWSl////AGZlZENmZWT/ZmVkyP///wD///8A////AGZlZPBmZWT/ZmVkFv///wBmZWToZmVk/2ZlZCH///8AZmVkwGZlZP9mZWT/ZmVk/2ZlZL////8AZmVkImZlZP9mZWTm////AGZlZBdmZWT/ZmVk5f///wD///8A////AGZlZP9mZWT/ZmVkAv///wBmZWT/ZmVk/2ZlZAT///8AZmVk/WZlZP9mZWT/ZmVk/2ZlZPn///8AZmVkBmZlZP9mZWT9////AGZlZARmZWT/ZmVk/P///wD///8A////AGZlZPFmZWT/ZmVkFv///wBmZWToZmVk/2ZlZCH///8AZmVkwmZlZP9mZWT/ZmVk/2ZlZMD///8AZmVkImZlZP9mZWTm////AGZlZBdmZWT/ZmVk7v///wD///8A////AGZlZMxmZWT/ZmVkQf///wBmZWSnZmVk/2ZlZH3///8AZmVkIGZlZMBmZWT4ZmVku2ZlZCD///8AZmVkfGZlZP9mZWSl////AGZlZEJmZWT/ZmVky////wD///8A////AGZlZI5mZWT/ZmVkj////wBmZWQ8ZmVk/2ZlZPVmZWQ5////AP///wD///8A////AP///wBmZWQ5ZmVk9WZlZP9mZWQ7////AGZlZJFmZWT/ZmVkjf///wD///8A////AGZlZDNmZWT/ZmVk72ZlZBD///8AZmVklWZlZP9mZWT1ZmVkfWZlZCJmZWQEZmVkImZlZH1mZWT1ZmVk/2ZlZJT///8AZmVkEmZlZO9mZWT/ZmVkNP///wD///8A////AP///wBmZWSvZmVk/2ZlZKH///8AZmVkBWZlZJdmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVklmZlZAT///8AZmVkomZlZP9mZWS3////AP///wD///8A////AP///wBmZWQlZmVk9GZlZP9mZWR+////AP///wBmZWQ/ZmVkqWZlZOZmZWT9ZmVk5mZlZKlmZWQ+////AP///wBmZWSAZmVk/2ZlZPNmZWQm////AP///wD///8A////AP///wD///8AZmVkT2ZlZPxmZWT/ZmVkoWZlZBb///8A////AP///wD///8A////AP///wD///8AZmVkGGZlZKVmZWT/ZmVk/GZlZE7///8A////AP///wD///8A////AP///wD///8A////AGZlZEpmZWTwZmVk/2ZlZPNmZWSOZmVkP2ZlZBL///8AZmVkEmZlZD9mZWSOZmVk82ZlZP9mZWTwZmVkSf///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQkZmVkrmZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/mZlZK5mZWQi////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZDBmZWSNZmVkyGZlZOVmZWT5ZmVk5WZlZMhmZWSNZmVkMP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+      <ToDoView Name="Review" CounterType="3" CounterHierarchy="2" CounterHideIfZero="true">
+        <UI ActionFlt="4" UseAdvFlt="true" UseHierarchy="true" IncludeParents="false" IncludeChild="true">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group/>
+        <Sort Srt1="26" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt>
+          <RootRule>
+            <Rule Field="NextReview" ConditionName="exists" ConditionID="429"/>
+            <Rule Field="NextReview" ConditionName="on or before" DataValue="Today" DataType="TDateTime" ConditionID="414"/>
+          </RootRule>
+        </AdvFlt>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="189"/>
+          <Column ID="36" Pos="9" Width="89"/>
+          <Column ID="33" Pos="13" Width="100"/>
+          <Column ID="35" Pos="14" Width="100"/>
+          <Column ID="34" Pos="28" Width="103"/>
+          <Column ID="7" Pos="29" Width="79"/>
+          <Column ID="27" Pos="36" Width="22"/>
+        </Columns>
+        <IcoData Caption="Review">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkR2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVkQv///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkxmZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVkxP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQqZmVk/2ZlZP9mZWRq////AP///wD///8A////AP///wD///8A////AGZlZHRmZWT/ZmVk/2ZlZC3///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWSFZmVk/2ZlZNJmZWQC////AP///wD///8A////AP///wD///8A////AGZlZANmZWTbZmVk/2ZlZIr///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWTLZmVk/2ZlZGP///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWR4ZmVk/2ZlZNf///8A////AP///wD///8A////AGZlZD9mZWTGZmVk92ZlZP9mZWT/ZmVk+2ZlZBD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQxZmVk/2ZlZP9mZWQg////AP///wD///8AZmVkUWZlZP5mZWT/ZmVk/2ZlZP9mZWT/ZmVkyP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQCZmVk6mZlZP9mZWRe////AP///wD///8AZmVk0WZlZP9mZWSTZmVkFGZlZJdmZWT/ZmVkj////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkq2ZlZP9mZWSY////AP///wD///8AZmVk+GZlZP9mZWQS////AGZlZMRmZWT/ZmVkWv///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkcGZlZP9mZWTB////AP///wD///8AZmVk2GZlZP9mZWSTZmVkFGZlZNpmZWT/ZmVkLP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkOmZlZP9mZWTa////AP///wD///8AZmVkXWZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVkGP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkF2ZlZP9mZWTu////AP///wD///8A////AGZlZFtmZWTZZmVk/2ZlZP9mZWT/ZmVkBv///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkCGZlZP9mZWT1////AP///wD///8A////AP///wD///8AZmVkAmZlZP9mZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZP9mZWT/////AP///wD///8A////AP///wD///8A////AGZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT+////AP///wD///8A////AP///wD///8A////AGZlZMZmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP1mZWSn////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZB9mZWTuZmVk1GZlZANmZWQfZmVk7mZlZNRmZWQDZmVkH2ZlZO5mZWTUZmVkA////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZJBmZWT/ZmVkX////wBmZWSQZmVk/2ZlZF////8AZmVkkGZlZP9mZWRf////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkGGZlZPhmZWTWZmVkAmZlZBhmZWT4ZmVk1mZlZAJmZWQYZmVk+GZlZNZmZWQC////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkTmZlZP9mZWSs////AGZlZE5mZWT/ZmVkrP///wBmZWROZmVk/2ZlZKz///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkD2ZlZLdmZWTwZmVkDWZlZA9mZWS3ZmVk8GZlZA1mZWQPZmVkt2ZlZPBmZWQN////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQD////AP///wD///8AZmVkA////wD///8A////AGZlZAP///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+    </ToDoView>
+    <ToDoView Name="To-Do" IsFolder="true">
+      <UI ActionFlt="4">
+        <HightlightFormat bold="1" inherit="0" options="0"/>
+      </UI>
+      <Group/>
+      <Sort Srt1="1" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+      <AdvFlt/>
+      <AdvFltParent/>
+      <AdvFltChild/>
+      <Columns>
+        <Column ID="0" Pos="0" Width="481"/>
+        <Column ID="4" Pos="4" Width="100"/>
+        <Column ID="7" Pos="7" Width="79"/>
+        <Column ID="27" Pos="27" Width="22"/>
+      </Columns>
+      <ToDoView Name="Active Actions" CounterType="10" CounterHideIfZero="true">
+        <UI InclClosedCntx="false">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group/>
+        <Sort Srt1="-13" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt/>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="481"/>
+          <Column ID="4" Pos="4" Width="100"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="27" Pos="27" Width="22"/>
+        </Columns>
+        <IcoData Caption="Active Actions">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQPZmVktmZlZDb///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZBBmZWTKZmVk/2ZlZPBmZWQ6////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkEmZlZM1mZWT/ZmVk/2ZlZP9mZWTyZmVkPP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQSZmVkzmZlZP9mZWT/ZmVkymZlZP5mZWT/ZmVk82ZlZD7///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWS5ZmVk/2ZlZP9mZWSrZmVkBWZlZGFmZWT8ZmVk/2ZlZPVmZWRC////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQtZmVk6mZlZKhmZWQD////AP///wBmZWReZmVk/GZlZP9mZWT1ZmVkRv///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkIGZlZAP///8A////AP///wD///8AZmVkWmZlZPxmZWT/ZmVk92ZlZEj///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQPZmVktmZlZDb///8A////AGZlZFZmZWT7ZmVk/2ZlZK////8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZBBmZWTKZmVk/2ZlZPBmZWQ6////AP///wBmZWRTZmVkrmZlZAb///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkEmZlZM1mZWT/ZmVk/2ZlZP9mZWTyZmVkPP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQSZmVkzmZlZP9mZWT/ZmVkymZlZP5mZWT/ZmVk82ZlZD7///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWS5ZmVk/2ZlZP9mZWSrZmVkBWZlZGFmZWT8ZmVk/2ZlZPVmZWRC////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQtZmVk6mZlZKhmZWQD////AP///wBmZWReZmVk/GZlZP9mZWT1ZmVkRv///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkIGZlZAP///8A////AP///wD///8AZmVkWmZlZPxmZWT/ZmVk92ZlZEj///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQPZmVktmZlZDb///8A////AGZlZFZmZWT7ZmVk/2ZlZK////8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZBBmZWTKZmVk/2ZlZPBmZWQ6////AP///wBmZWRTZmVkrmZlZAb///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkEmZlZM1mZWT/ZmVk/2ZlZP9mZWTyZmVkPP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQSZmVkzmZlZP9mZWT/ZmVkzGZlZP5mZWT/ZmVk82ZlZD7///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWS5ZmVk/2ZlZP9mZWSrZmVkBWZlZGJmZWT8ZmVk/2ZlZPVmZWRC////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQtZmVk6mZlZKhmZWQE////AP///wBmZWReZmVk/GZlZP9mZWT1ZmVkRv///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkIGZlZAP///8A////AP///wD///8AZmVkWmZlZPxmZWT/ZmVk92ZlZEj///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZFZmZWT7ZmVk/2ZlZK////8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWRTZmVkrmZlZAb///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+      <ToDoView Name="Active by Context">
+        <UI InclClosedCntx="false">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group>
+          <Grp1 GroupBy="2"/>
+        </Group>
+        <Sort Srt1="-13" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt/>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="481"/>
+          <Column ID="4" Pos="4" Width="100"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="27" Pos="27" Width="22"/>
+        </Columns>
+        <IcoData Caption="Active by Context">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQOZmVkaGZlZLFmZWTYZmVk7GZlZPhmZWTjZmVkuWZlZHBmZWQN////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZGRmZWTvZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWRc////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkimZlZP9mZWT/ZmVkumZlZFVmZWQfZmVkCf///wBmZWQSZmVkPmZlZIlmZWQb////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWRjZmVk/2ZlZPlmZWRa////AP///wD///8A////AP///wD///8A////AP///wBmZWQUZmVkGf///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZAtmZWTqZmVk/2ZlZF3///8A////AP///wD///8A////AP///wD///8AZmVkIWZlZMdmZWT/ZmVk/2ZlZOJmZWRl////AP///wD///8A////AP///wD///8A////AGZlZGBmZWT/ZmVky////wD///8A////AP///wD///8A////AP///wD///8AZmVkuGZlZP9mZWTtZmVktGZlZPFmZWT/ZmVkef///wD///8A////AP///wD///8A////AGZlZK9mZWT/ZmVkav///wD///8AZmVkSmZlZOdmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWTpZmVkSmZlZCJmZWTtZmVk+mZlZCP///8A////AP///wD///8A////AGZlZOZmZWT/ZmVkIf///wD///8AZmVk5mZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk5////wBmZWR8ZmVk/2ZlZIT///8A////AP///wD///8A////AGZlZPxmZWT/ZmVkAv///wD///8AZmVk/2ZlZP9mZWQ8ZmVkA2ZlZKBmZWR2////AGZlZDtmZWT/ZmVk/////wBmZWQyZmVk/2ZlZMj///8A////AP///wD///8A////AGZlZPlmZWT/ZmVkBv///wD///8AZmVk/2ZlZP9mZWQGZmVkq2ZlZP9mZWT/ZmVkh////wBmZWR/ZmVk/////wBmZWQPZmVk/2ZlZOv///8A////AP///wD///8A////AGZlZOJmZWT/ZmVkIv///wD///8AZmVk/2ZlZP9mZWSqZmVk/2ZlZNVmZWToZmVk/2ZlZJZmZWQCZmVkf////wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AGZlZLhmZWT/ZmVkSf///wD///8AZmVk/2ZlZP9mZWQ4ZmVkuWZlZBFmZWQnZmVk4WZlZP9mZWSkZmVkBf///wBmZWQDZmVk/2ZlZPT///8A////AP///wD///8A////AGZlZHNmZWT/ZmVkjf///wD///8AZmVk/2ZlZP////8A////AP///wD///8AZmVkHmZlZNhmZWT/ZmVkqP///wBmZWQeZmVk/2ZlZN3///8A////AP///wD///8A////AGZlZCVmZWT+ZmVk62ZlZAn///8AZmVk/2ZlZP9mZWQ8////AP///wD///8A////AGZlZBZmZWTAZmVkPv///wBmZWRTZmVk/2ZlZKz///8A////AP///wD///8A////AP///wBmZWS2ZmVk/2ZlZG7///8AZmVk5mZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZID///8A////AP///wBmZWSsZmVk/2ZlZGn///8A////AP///wD///8A////AP///wBmZWQxZmVk+mZlZPJmZWQtZmVkSWZlZOZmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWRv////AGZlZDpmZWT9ZmVk8GZlZBD///8A////AP///wD///8A////AP///wD///8AZmVkdWZlZP9mZWToZmVkQ////wD///8A////AP///wD///8A////AP///wD///8AZmVkHGZlZN5mZWT/ZmVkYv///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZIVmZWT/ZmVk/2ZlZLNmZWRUZmVkF2ZlZAFmZWQEZmVkGGZlZEpmZWSkZmVk+2ZlZP9mZWSS////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWRNZmVk22ZlZP9mZWT/ZmVk/2ZlZP1mZWT/ZmVk/2ZlZP9mZWT/ZmVk72ZlZGz///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkBmZlZGBmZWSuZmVk32ZlZPdmZWT6ZmVk5mZlZLRmZWRsZmVkEv///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+      <ToDoView Name="Active by Project">
+        <UI>
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group>
+          <Grp1 GroupBy="6" Asc="false"/>
+        </Group>
+        <Sort Srt1="1" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt/>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="481"/>
+          <Column ID="4" Pos="4" Width="100"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="27" Pos="27" Width="22"/>
+        </Columns>
+        <IcoData Caption="Active by Project">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk8WZlZP9mZWT/ZmVk/2ZlZP9mZWTk////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZA7///8A////AGZlZA9mZWTw////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/////wD///8A////AP///wBmZWTw////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/2ZlZP////8AZmVk/////wD///8A////AP///wBmZWTw////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8AZmVk/2ZlZAv///8A////AGZlZA1mZWTw////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8AZmVk82ZlZP9mZWT/ZmVk/2ZlZP9mZWTl////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8AZmVk6WZlZP9mZWT/ZmVk/2ZlZP9mZWTd////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8AZmVk/2ZlZA3///8A////AGZlZA5mZWTw////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8AZmVk/////wD///8A////AP///wBmZWTw////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/2ZlZP////8AZmVk/////wD///8A////AP///wBmZWTw////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8AZmVk/2ZlZA3///8A////AGZlZA5mZWTw////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8AZmVk82ZlZP9mZWT/ZmVk/2ZlZP9mZWTm////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkwGZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWT5ZmVkoP///wBmZWSlZmVk9WZlZB5mZWRAZmVk/////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWSGZmVk/mZlZDRmZWQeZmVk9WZlZKZmZWQPZmVk+f///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWQMZmVk5mZlZMVmZWQBZmVkf2ZlZP5mZWRHZmVk8f///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWRFZmVkX2ZlZP9mZWRaZmVkCmZlZOFmZWTOZmVk8P///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVkw2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+      <ToDoView Name="Next by Project" Visible="false">
+        <UI ActionFlt="2">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group>
+          <Grp1 GroupBy="6" Asc="false"/>
+        </Group>
+        <Sort Srt1="1" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt/>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="481"/>
+          <Column ID="4" Pos="4" Width="100"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="27" Pos="27" Width="22"/>
+        </Columns>
+        <IcoData Caption="Next by Project">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZOlmZWT/ZmVk/2ZlZP9mZWT/ZmVk3f///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZP9mZWQN////AP///wBmZWQOZmVk8P///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZP////8A////AP///wD///8AZmVk8P///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWT/////AGZlZP////8A////AP///wD///8AZmVk8P///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/////wD///8A////AGZlZP9mZWQN////AP///wBmZWQOZmVk8P///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/////wD///8A////AGZlZPNmZWT/ZmVk/2ZlZP9mZWT/ZmVk5v///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkq2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/mZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/////AP///wD///8AZmVkWWZlZJpmZWQB////AP///wD///8AZmVk/2ZlZP9mZWTvZmVk/GZlZDD///8AZmVkqmZlZP9mZWR9////AGZlZFtmZWT/ZmVk/////wD///8A////AP///wD///8AZmVkrmZlZP9mZWSeZmVkAf///wD///8AZmVk/2ZlZP9mZWRpZmVk/2ZlZL7///8AZmVkIWZlZPdmZWTzZmVkG2ZlZAFmZWTHZmVk/////wD///8A////AP///wD///8AZmVkB2ZlZLtmZWT/ZmVkkv///wD///8AZmVk/2ZlZP9mZWQDZmVk0mZlZP9mZWRT////AGZlZIVmZWT/ZmVkov///wBmZWQ2ZmVk/////wD///8AZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZIj///8AZmVk/2ZlZP////8AZmVkQWZlZP9mZWTeZmVkCGZlZAxmZWTlZmVk/mZlZDj///8AZmVk/////wD///8AZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZIb///8AZmVk/2ZlZP9mZWQs////AGZlZK9mZWT/ZmVkef///wBmZWRfZmVk/2ZlZMdmZWQBZmVk/////wD///8A////AP///wD///8AZmVkCGZlZLxmZWT/ZmVkkf///wD///8AZmVk/2ZlZP9mZWS7////AGZlZCJmZWT4ZmVk82ZlZBlmZWQBZmVkymZlZP9mZWRdZmVk/////wD///8A////AP///wD///8AZmVkrmZlZP9mZWSdZmVkAf///wD///8AZmVk/mZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/////AP///wD///8AZmVkWWZlZJpmZWQB////AP///wD///8AZmVkpGZlZP5mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+      <ToDoView Name="Active by Flag" Visible="false">
+        <UI InclClosedCntx="false" UseAdvFlt="true">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group ShowGroupName="false">
+          <Grp1 GroupBy="26"/>
+        </Group>
+        <Sort Srt1="-13" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt>
+          <RootRule>
+            <Rule Field="Flag" ConditionName="&lt;&gt;" DataValue="(none)" DataType="Integer" ConditionID="1302"/>
+          </RootRule>
+        </AdvFlt>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="474"/>
+          <Column ID="1" Pos="1" Width="21"/>
+          <Column ID="4" Pos="4" Width="100"/>
+          <Column ID="7" Pos="7" Width="79"/>
+        </Columns>
+        <IcoData Caption="Active by Flag">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk8WZlZP9mZWT/ZmVk/2ZlZP9mZWTk////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZA7///8A////AGZlZA9mZWTw////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/////wD///8A////AP///wBmZWTw////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/2ZlZP////8AZmVk/////wD///8A////AP///wBmZWTw////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8AZmVk/2ZlZAv///8A////AGZlZA1mZWTw////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8AZmVk82ZlZP9mZWT/ZmVk/2ZlZP9mZWTl////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8AZmVk8WZlZP9mZWT/ZmVk/2ZlZP9mZWTw////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8AZmVk/2ZlZA3///8A////AGZlZA5mZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8AZmVk/////wD///8A////AP///wBmZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/2ZlZP////8AZmVk/////wD///8A////AP///wBmZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8AZmVk/2ZlZA3///8A////AGZlZA5mZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8AZmVk8mZlZP9mZWT/ZmVk/2ZlZP9mZWTv////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AGZlZDz///8A////AGZlZC5mZWS7ZmVk/2ZlZP9mZWTE////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AGZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AGZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AGZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AGZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AGZlZMNmZWT/ZmVk/2ZlZNhmZWRN////AP///wBmZWQ7////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+      <ToDoView Name="Active Starred" Visible="false" ToDoViewType="4">
+        <UI InclClosedCntx="false" UseAdvFlt="true">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group/>
+        <Sort Srt1="1" Srt2="1" Srt3="1" Srt4="1" Manual="true"/>
+        <AdvFlt>
+          <RootRule>
+            <Rule Field="Starred" ConditionName="is true" ConditionID="310"/>
+          </RootRule>
+        </AdvFlt>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="481"/>
+          <Column ID="4" Pos="4" Width="100"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="27" Pos="27" Width="22"/>
+        </Columns>
+        <IcoData Caption="Active Starred">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZPFmZWT/ZmVk/2ZlZP9mZWT/ZmVk5P///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZP9mZWQO////AP///wBmZWQPZmVk8P///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZP////8A////AP///wD///8AZmVk8P///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWT/////AGZlZP////8A////AP///wD///8AZmVk8P///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/////wD///8A////AGZlZP9mZWQL////AP///wBmZWQNZmVk8P///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/////wD///8A////AGZlZPNmZWT/ZmVk/2ZlZP9mZWT/ZmVk5f///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/////wD///8A////AGZlZOlmZWT/ZmVk/2ZlZP9mZWT/ZmVk3f///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/////wD///8A////AGZlZP9mZWQN////AP///wBmZWQOZmVk8P///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/////wD///8A////AGZlZP////8A////AP///wD///8AZmVk8P///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWT/////AGZlZP////8A////AP///wD///8AZmVk8P///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/////wD///8A////AGZlZP9mZWQN////AP///wBmZWQOZmVk8P///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/////wD///8A////AGZlZPNmZWT/ZmVk/2ZlZP9mZWT/ZmVk5v///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkCv///wD///8A////AP///wD///8AZmVkCv///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVktmZlZGJmZWQC////AGZlZAJmZWRiZmVktv///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkiWZlZP9mZWTOZmVkaGZlZM5mZWT/ZmVkif///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkRmZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVkRP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkNWZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVkM////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWRMZmVk8mZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk8WZlZEr///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZHRmZWT8ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZPxmZWRx////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZANmZWQYZmVkLGZlZEJmZWTrZmVk/2ZlZOtmZWRCZmVkLGZlZBhmZWQD////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWSDZmVk/2ZlZIP///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQZZmVk82ZlZBn///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+      <ToDoView Name="Active Goals" Visible="false">
+        <UI InclClosedCntx="false" UseAdvFlt="true">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group ShowGroupName="false">
+          <Grp1 GroupBy="4"/>
+        </Group>
+        <Sort Srt1="-13" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt>
+          <RootRule>
+            <Rule Field="Goal" ConditionName="&lt;&gt;" DataValue="None" DataType="Integer" ConditionID="702"/>
+          </RootRule>
+        </AdvFlt>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="481"/>
+          <Column ID="4" Pos="4" Width="100"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="27" Pos="27" Width="22"/>
+        </Columns>
+        <IcoData Caption="Active Goals">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk8WZlZP9mZWT/ZmVk/2ZlZP9mZWTk////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZA7///8A////AGZlZA9mZWTw////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/////wD///8A////AP///wBmZWTw////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/2ZlZP////8AZmVk/////wD///8A////AP///wBmZWTw////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8AZmVk/2ZlZAv///8A////AGZlZA1mZWTw////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8AZmVk82ZlZP9mZWT/ZmVk/2ZlZP9mZWTl////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8AZmVk6WZlZP9mZWT/ZmVk/2ZlZP9mZWTd////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8AZmVk/2ZlZA3///8A////AGZlZA5mZWTw////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8AZmVk/////wD///8A////AP///wBmZWTw////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/2ZlZP////8AZmVk/////wD///8A////AP///wBmZWTw////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8AZmVk/2ZlZA3///8A////AGZlZA5mZWTw////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/////AP///wD///8AZmVk82ZlZP9mZWT/ZmVk/2ZlZP9mZWTm////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQJZmVkgWZlZNxmZWT5ZmVk3GZlZIFmZWQJ////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZApmZWTFZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWTFZmVkCv///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZINmZWT/ZmVk3WZlZEJmZWQMZmVkQWZlZN1mZWT/ZmVkgP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZN1mZWT/ZmVkOWZlZIVmZWTzZmVkhWZlZDtmZWT/ZmVk3v///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZPlmZWT/ZmVkAmZlZPNmZWQ7ZmVk82ZlZANmZWT/ZmVk+f///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZN1mZWT/ZmVkO2ZlZIVmZWTzZmVkhWZlZDtmZWT/ZmVk3v///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZINmZWT/ZmVk3WZlZEJmZWQMZmVkQmZlZN1mZWT/ZmVkgP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZApmZWTFZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWTFZmVkCv///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQJZmVkgWZlZNxmZWT5ZmVk3GZlZIFmZWQJ////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+      <ToDoView Name="Start Next 7 days" Visible="false">
+        <UI ActionFlt="1" DTmaxS="Today + 7" HideUndated="true">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group ShowGroupName="false" GroupOnlyByDays="true">
+          <Grp1 GroupBy="9"/>
+        </Group>
+        <Sort Srt1="14" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt/>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="481"/>
+          <Column ID="3" Pos="3" Width="100"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="27" Pos="27" Width="22"/>
+        </Columns>
+        <IcoData Caption="Start Next 7 days">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkBmZlZFpmZWSqZmVk32ZlZPpmZWT5ZmVk3mZlZKNmZWRQZmVkBf///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWRPZmVk4GZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk32ZlZEv///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkAWZlZIlmZWT/ZmVk/2ZlZNtmZWRtZmVkLGZlZAxmZWQGZmVkKWZlZHFmZWTcZmVk/2ZlZP5mZWSEZmVkAf///wD///8A////AP///wD///8A////AP///wD///8AZmVkhmZlZP9mZWT+ZmVkf2ZlZAb///8A////AP///wD///8A////AP///wBmZWQIZmVkhWZlZP5mZWT/ZmVkhP///wD///8A////AP///wD///8A////AP///wBmZWRHZmVk/mZlZP5mZWRf////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZGNmZWT/ZmVk/mZlZEP///8A////AP///wD///8A////AGZlZAJmZWTTZmVk/2ZlZIn///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWSSZmVk/2ZlZNZmZWQC////AP///wD///8A////AGZlZE5mZWT/ZmVk5mZlZAr///8A////AP///wD///8AZmVkS2ZlZP9mZWT/ZmVkQv///wD///8A////AP///wBmZWQPZmVk7WZlZP9mZWRL////AP///wD///8A////AGZlZJtmZWT/ZmVkiP///wD///8A////AP///wD///8AZmVkAWZlZNBmZWT/ZmVkuf///wD///8A////AP///wD///8AZmVkjWZlZP9mZWSe////AP///wD///8A////AGZlZN1mZWT/ZmVkPf///wD///8A////AP///wD///8A////AGZlZFlmZWT/ZmVk/2ZlZDL///8A////AP///wD///8AZmVkQ2ZlZP9mZWTY////AP///wD///8A////AGZlZPxmZWT/ZmVkFv///wD///8A////AP///wD///8A////AGZlZARmZWTcZmVk/2ZlZKn///8A////AP///wD///8AZmVkGGZlZP9mZWT2////AP///wD///8A////AGZlZP9mZWT/ZmVkAv///wD///8A////AP///wD///8A////AP///wBmZWRnZmVk/2ZlZP1mZWQk////AP///wD///8AZmVkCGZlZP9mZWT9////AP///wD///8A////AGZlZPFmZWT/ZmVkFv///wD///8A////AP///wD///8A////AP///wBmZWQIZmVk5mZlZP9mZWSa////AP///wD///8AZmVkGWZlZP9mZWTo////AP///wD///8A////AGZlZMNmZWT/ZmVkPf///wD///8A////AP///wBmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT5////AP///wD///8AZmVkQ2ZlZP9mZWS+////AP///wD///8A////AGZlZH9mZWT/ZmVkaP///wD///8A////AP///wBmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/////AP///wD///8AZmVkjWZlZP9mZWR3////AP///wD///8A////AGZlZBJmZWR6ZmVkE////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQPZmVk7mZlZPlmZWQc////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWSTZmVk/2ZlZJH///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZGNmZWT/ZmVk0mZlZAv///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQIZmVkhWZlZP5mZWThZmVkI////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkJ2ZlZNpmZWTUZmVkHmZlZB1mZWTpZmVk/2ZlZMJmZWQY////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkfWZlZP9mZWT/ZmVkbWZlZBZmZWTBZmVkYGZlZAH///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkJmZlZNlmZWTTZmVkHf///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+      <ToDoView Name="Start Next 30 days" Visible="false">
+        <UI ActionFlt="1" DTmaxS="Today + 30" HideUndated="true">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group ShowGroupName="false" GroupOnlyByDays="true">
+          <Grp1 GroupBy="9"/>
+        </Group>
+        <Sort Srt1="14" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt/>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="481"/>
+          <Column ID="3" Pos="3" Width="100"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="27" Pos="27" Width="22"/>
+        </Columns>
+        <IcoData Caption="Start Next 30 days">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkBmZlZFpmZWSqZmVk32ZlZPpmZWT5ZmVk3mZlZKNmZWRQZmVkBf///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWRPZmVk4GZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk32ZlZEv///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkAWZlZIlmZWT/ZmVk/2ZlZNtmZWRtZmVkLGZlZAxmZWQGZmVkKWZlZHFmZWTcZmVk/2ZlZP5mZWSEZmVkAf///wD///8A////AP///wD///8A////AP///wD///8AZmVkhmZlZP9mZWT+ZmVkf2ZlZAb///8A////AP///wD///8A////AP///wBmZWQIZmVkhWZlZP5mZWT/ZmVkhP///wD///8A////AP///wD///8A////AP///wBmZWRHZmVk/mZlZP5mZWRf////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZGNmZWT/ZmVk/mZlZEP///8A////AP///wD///8A////AGZlZAJmZWTTZmVk/2ZlZIn///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWSSZmVk/2ZlZNZmZWQC////AP///wD///8A////AGZlZE5mZWT/ZmVk5mZlZAr///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQPZmVk7WZlZP9mZWRL////AP///wD///8A////AGZlZJtmZWT/ZmVkiP///wD///8AZmVkYWZlZN9mZWT7ZmVktWZlZA9mZWQQZmVkuGZlZPdmZWS6ZmVkEv///wD///8AZmVkjWZlZP9mZWSe////AP///wD///8A////AGZlZN1mZWT/ZmVkPf///wD///8AZmVkrGZlZG9mZWRkZmVk+GZlZHZmZWSVZmVk2GZlZFtmZWTbZmVkl////wD///8AZmVkQ2ZlZP9mZWTY////AP///wD///8A////AGZlZPxmZWT/ZmVkFv///wD///8AZmVkAf///wBmZWQTZmVk7mZlZGxmZWTiZmVkbf///wBmZWRsZmVk4////wD///8AZmVkGGZlZP9mZWT2////AP///wD///8A////AGZlZP9mZWT/ZmVkAv///wD///8A////AGZlZH5mZWT8ZmVkomZlZANmZWT9ZmVkV////wBmZWRTZmVk/P///wD///8AZmVkCGZlZP9mZWT9////AP///wD///8A////AGZlZPFmZWT/ZmVkFv///wD///8A////AP///wBmZWQuZmVk+GZlZD5mZWTiZmVkbf///wBmZWRrZmVk6f///wD///8AZmVkGWZlZP9mZWTo////AP///wD///8A////AGZlZMNmZWT/ZmVkPf///wD///8AZmVkkWZlZGdmZWRpZmVk/mZlZG5mZWSWZmVk2GZlZFJmZWTXZmVkmf///wD///8AZmVkQ2ZlZP9mZWS+////AP///wD///8A////AGZlZH9mZWT/ZmVkaP///wD///8AZmVkV2ZlZN1mZWT4ZmVkumZlZBJmZWQSZmVku2ZlZPlmZWS+ZmVkE////wD///8AZmVkjWZlZP9mZWR3////AP///wD///8A////AGZlZBJmZWR6ZmVkE////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQPZmVk7mZlZPlmZWQc////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWSTZmVk/2ZlZJH///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZGNmZWT/ZmVk0mZlZAv///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQIZmVkhWZlZP5mZWThZmVkI////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkJ2ZlZNpmZWTUZmVkHmZlZA5mZWTlZmVk/2ZlZMJmZWQY////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkfWZlZP9mZWT/ZmVkbWZlZAZmZWSkZmVkW2ZlZAH///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkJmZlZNlmZWTTZmVkHf///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+      <ToDoView Name="Due Next 7 days" CounterType="10" CounterHideIfZero="true">
+        <UI ActionFlt="1" DTmaxS="Today + 7" UseAdvFlt="true">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group ShowGroupName="false" GroupOnlyByDays="true">
+          <Grp1 GroupBy="10"/>
+        </Group>
+        <Sort Srt1="4" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt>
+          <RootRule>
+            <Rule Field="DueDateTime" ConditionName="on or before" DataValue="Today+7" DataType="TDateTime" ConditionID="414"/>
+          </RootRule>
+        </AdvFlt>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="481"/>
+          <Column ID="4" Pos="4" Width="100"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="27" Pos="27" Width="22"/>
+        </Columns>
+        <IcoData Caption="Due Next 7 days">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkSmZlZOdmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWTkZmVkSv///wD///8A////AP///wD///8A////AP///wD///8AZmVk5mZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk5////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWQ8////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZDtmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8AZmVkS2ZlZP9mZWT/ZmVkQv///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8AZmVkAWZlZNBmZWT/ZmVkuf///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AGZlZFlmZWT/ZmVk/2ZlZDL///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AGZlZARmZWTcZmVk/2ZlZKn///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wBmZWRnZmVk/2ZlZP1mZWQk////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wBmZWQIZmVk5mZlZP9mZWSa////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wBmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT5////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wBmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWQ8////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZDxmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk5mZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk5v///wD///8A////AP///wD///8A////AP///wD///8AZmVkSWZlZOZmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWTmZmVkSf///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AGZlZP9mZWT/////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AGZlZP9mZWT/////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+      <ToDoView Name="Due Next 30 days" Visible="false">
+        <UI ActionFlt="1" DTmaxS="Today + 30" UseAdvFlt="true">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group ShowGroupName="false" GroupOnlyByDays="true">
+          <Grp1 GroupBy="10"/>
+        </Group>
+        <Sort Srt1="4" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt>
+          <RootRule>
+            <Rule Field="DueDateTime" ConditionName="on or before" DataValue="Today+30" DataType="TDateTime" ConditionID="414"/>
+          </RootRule>
+        </AdvFlt>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="481"/>
+          <Column ID="4" Pos="4" Width="100"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="27" Pos="27" Width="22"/>
+        </Columns>
+        <IcoData Caption="Due Next 30 days">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkSmZlZOdmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWTkZmVkSv///wD///8A////AP///wD///8A////AP///wD///8AZmVk5mZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk5////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWQ8////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZDtmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8AZmVkYWZlZN9mZWT7ZmVktWZlZA9mZWQPZmVkuGZlZPdmZWS6ZmVkEv///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8AZmVkq2ZlZG9mZWRkZmVk+GZlZHZmZWSVZmVk2GZlZFtmZWTbZmVkl////wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8AZmVkAf///wBmZWQTZmVk7mZlZGxmZWTiZmVkbf///wBmZWRsZmVk4////wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AGZlZH5mZWT8ZmVkomZlZANmZWT9ZmVkV////wBmZWRTZmVk/P///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wBmZWQuZmVk+GZlZD5mZWTiZmVkbf///wBmZWRrZmVk6f///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8AZmVkkWZlZGdmZWRpZmVk/mZlZG5mZWSWZmVk2GZlZFJmZWTXZmVkmf///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8AZmVkV2ZlZN1mZWT4ZmVkumZlZBJmZWQRZmVkumZlZPlmZWS+ZmVkE////wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWQ8////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZDxmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk5mZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk5v///wD///8A////AP///wD///8A////AP///wD///8AZmVkSWZlZOZmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWTmZmVkSf///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AGZlZP9mZWT/////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AGZlZP9mZWT/////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+      <ToDoView Name="By Next Alert" Visible="false">
+        <UI ActionFlt="4" UseAdvFlt="true">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group>
+          <Grp1 GroupBy="18"/>
+        </Group>
+        <Sort Srt1="16" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt>
+          <RootRule>
+            <Rule Field="Reminder" ConditionName="is true" ConditionID="310"/>
+          </RootRule>
+        </AdvFlt>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="532"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="18" Pos="18" Width="131"/>
+          <Column ID="27" Pos="27" Width="22"/>
+        </Columns>
+        <IcoData Caption="By Next Alert">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQoZmVkxWZlZPhmZWS+ZmVkJ////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWTVZmVk/2ZlZP9mZWT/ZmVk1f///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk12ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWTY////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkiGZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWSJ////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkOWZlZP9mZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWQ5////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkAmZlZP9mZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWQC////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZP9mZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZP9mZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZP9mZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZP9mZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZP9mZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZO9mZWT/ZmVkEP///wD///8A////AP///wD///8A////AP///wBmZWQOZmVk/2ZlZOj///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZKpmZWT/ZmVkXf///wD///8A////AP///wD///8A////AP///wBmZWRbZmVk/2ZlZKP///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZDxmZWT+ZmVk5WZlZCD///8A////AP///wD///8A////AGZlZCBmZWTlZmVk/mZlZDj///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWSMZmVk/2ZlZOxmZWRyZmVkIGZlZARmZWQgZmVkcmZlZOxmZWT/ZmVkkP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQBZmVkkWZlZP5mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP5mZWSUZmVkA////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZDxmZWSmZmVk/2ZlZP9mZWT/ZmVkpWZlZDr///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk0WZlZP9mZWTS////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+      <ToDoView Name="Missed Reminders" CounterType="3" CounterHideIfZero="true">
+        <UI ActionFlt="4" UseAdvFlt="true">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group GroupOnlyByDays="true">
+          <Grp1 GroupBy="18"/>
+        </Group>
+        <Sort Srt1="16" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt>
+          <RootRule>
+            <Rule Field="NextAlertTime" ConditionName="on or before" DataValue="Now" DataType="TDateTime" ConditionID="414"/>
+          </RootRule>
+        </AdvFlt>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="532"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="18" Pos="18" Width="131"/>
+          <Column ID="27" Pos="27" Width="22"/>
+        </Columns>
+        <IcoData Caption="Missed Reminders">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkFGZlZIZmZWTTZmVk+mZlZPRmZWTOZmVkg2ZlZBT///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWRUZmVk8mZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZPJmZWRT////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZFNmZWT+ZmVk/2ZlZLFmZWRBZmVkC2ZlZAtmZWRBZmVksmZlZP9mZWT+ZmVkU////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkFmZlZPFmZWT/ZmVke////wD///8A////AP///wD///8A////AGZlZHtmZWT/ZmVk8WZlZBb///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkgmZlZP9mZWSy////AP///wD///8AZmVk/2ZlZP////8A////AP///wBmZWSyZmVk/2ZlZIb///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk0GZlZP9mZWRB////AP///wD///8AZmVk/2ZlZP////8A////AP///wBmZWRBZmVk/2ZlZNH///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk+GZlZP9mZWQN////AP///wD///8A////AP///wD///8A////AP///wBmZWQMZmVk/2ZlZPP///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVk+GZlZP9mZWQN////AP///wD///8AZmVk/2ZlZP////8A////AP///wBmZWQNZmVk/2ZlZPn///8A////AP///wD///8A////AGZlZDlmZWTbZmVk2////wD///8AZmVk0GZlZP9mZWRB////AP///wD///8AZmVk/2ZlZP////8A////AP///wBmZWRBZmVk/2ZlZNL///8A////AP///wD///8A////AGZlZN1mZWT/ZmVk/////wD///8AZmVkgmZlZP9mZWSz////AP///wD///8AZmVk/2ZlZP////8A////AP///wBmZWSyZmVk/2ZlZIb///8AZmVk12ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/////wD///8AZmVkFWZlZPFmZWT/ZmVke////wD///8AZmVk/2ZlZP////8A////AGZlZHtmZWT/ZmVk8WZlZBb///8AZmVkgmZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZCP///8A////AGZlZFNmZWT+ZmVk/2ZlZLJmZWRBZmVkDGZlZAxmZWRBZmVks2ZlZP9mZWT+ZmVkU////wD///8AZmVkL2ZlZP9mZWT/////AP///wD///8A////AP///wD///8A////AP///wBmZWRTZmVk8GZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZPFmZWRT////AP///wD///8A////AGZlZP9mZWT/////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkFGZlZIZmZWTSZmVk+GZlZPhmZWTQZmVkgmZlZBT///8A////AP///wD///8A////AGZlZP9mZWT/////AP///wD///8A////AP///wD///8AZmVkfmZlZCP///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZP9mZWT/////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZP9mZWT/////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZP5mZWT/ZmVkB////wD///8A////AP///wBmZWQHZmVk/2ZlZP7///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZOBmZWT/ZmVkT////wD///8A////AP///wBmZWRPZmVk/2ZlZOH///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZH1mZWT/ZmVk62ZlZFZmZWQNZmVkD2ZlZF9mZWTtZmVk/2ZlZH////8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZAZmZWSxZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVks2ZlZAb///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQBZmVkX2ZlZMJmZWT/ZmVk/2ZlZMJmZWRfZmVkAf///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBmZWTDZmVkw////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+    </ToDoView>
+    <ToDoView Name="Completed" Visible="false" IsFolder="true">
+      <UI ActionFlt="4">
+        <HightlightFormat bold="1" inherit="0" options="0"/>
+      </UI>
+      <Group/>
+      <Sort Srt1="1" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+      <AdvFlt/>
+      <AdvFltParent/>
+      <AdvFltChild/>
+      <Columns>
+        <Column ID="0" Pos="0" Width="481"/>
+        <Column ID="4" Pos="4" Width="100"/>
+        <Column ID="7" Pos="7" Width="79"/>
+        <Column ID="27" Pos="27" Width="22"/>
+      </Columns>
+      <ToDoView Name="Completed in Outline">
+        <UI ActionFlt="4" UseAdvFlt="true" UseHierarchy="true">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group/>
+        <Sort Srt1="1" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt>
+          <RootRule>
+            <Rule Field="Complete" ConditionName="is true" ConditionID="310"/>
+          </RootRule>
+        </AdvFlt>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="347"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="13" Pos="13" Width="100"/>
+          <Column ID="27" Pos="27" Width="22"/>
+        </Columns>
+        <IcoData Caption="Completed in Outline">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkSmZlZOdmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWTkZmVkSv///wD///8A////AP///wD///8A////AP///wD///8AZmVk5mZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk5////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWQ8////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZDtmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8AZmVkCP///wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wBmZWQ1ZmVk5mZlZD7///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AGZlZDRmZWTwZmVk/2ZlZPRmZWQ8////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8AZmVkMGZlZOxmZWT/ZmVk/2ZlZP9mZWTyZmVkO////wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWQGZmVk4WZlZP9mZWTzZmVkamZlZPBmZWT/ZmVk8WZlZDr///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8AZmVkP2ZlZOpmZWQ9////AGZlZDVmZWTwZmVk/2ZlZPBmZWQ3////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AGZlZAn///8A////AP///wBmZWQ3ZmVk8GZlZP9mZWTwZmVkNf///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8AZmVkOmZlZPFmZWT/ZmVk4mZlZAZmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AGZlZDtmZWTkZmVkO////wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQJ////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWQ8////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZDxmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk5mZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk5v///wD///8A////AP///wD///8A////AP///wD///8AZmVkSWZlZOZmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWTmZmVkSf///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+      <ToDoView Name="Completed by Context">
+        <UI ActionFlt="4" UseAdvFlt="true">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group>
+          <Grp1 GroupBy="2"/>
+        </Group>
+        <Sort Srt1="-2" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt>
+          <RootRule>
+            <Rule Field="Complete" ConditionName="is true" ConditionID="310"/>
+          </RootRule>
+        </AdvFlt>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="347"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="13" Pos="13" Width="100"/>
+          <Column ID="27" Pos="27" Width="22"/>
+        </Columns>
+        <IcoData Caption="Completed in Outline">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkSmZlZOdmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWTkZmVkSv///wD///8A////AP///wD///8A////AP///wD///8AZmVk5mZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk5////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWQ8////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZDtmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8AZmVkCP///wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wBmZWQ1ZmVk5mZlZD7///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AGZlZDRmZWTwZmVk/2ZlZPRmZWQ8////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8AZmVkMGZlZOxmZWT/ZmVk/2ZlZP9mZWTyZmVkO////wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWQGZmVk4WZlZP9mZWTzZmVkamZlZPBmZWT/ZmVk8WZlZDr///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8AZmVkP2ZlZOpmZWQ9////AGZlZDVmZWTwZmVk/2ZlZPBmZWQ3////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AGZlZAn///8A////AP///wBmZWQ3ZmVk8GZlZP9mZWTwZmVkNf///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8AZmVkOmZlZPFmZWT/ZmVk4mZlZAZmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AGZlZDtmZWTkZmVkO////wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQJ////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWQ8////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZDxmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk5mZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk5v///wD///8A////AP///wD///8A////AP///wD///8AZmVkSWZlZOZmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWTmZmVkSf///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+      <ToDoView Name="Completed by Project">
+        <UI ActionFlt="4" UseAdvFlt="true">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group>
+          <Grp1 GroupBy="6" Asc="false"/>
+        </Group>
+        <Sort Srt1="-2" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt>
+          <RootRule>
+            <Rule Field="Complete" ConditionName="is true" ConditionID="310"/>
+            <Rule Field="ProjectName" ConditionName="is not empty" ConditionID="519"/>
+          </RootRule>
+        </AdvFlt>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="347"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="13" Pos="13" Width="100"/>
+          <Column ID="27" Pos="27" Width="22"/>
+        </Columns>
+        <IcoData Caption="Completed in Outline">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkSmZlZOdmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWTkZmVkSv///wD///8A////AP///wD///8A////AP///wD///8AZmVk5mZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk5////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWQ8////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZDtmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8AZmVkCP///wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wBmZWQ1ZmVk5mZlZD7///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AGZlZDRmZWTwZmVk/2ZlZPRmZWQ8////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8AZmVkMGZlZOxmZWT/ZmVk/2ZlZP9mZWTyZmVkO////wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWQGZmVk4WZlZP9mZWTzZmVkamZlZPBmZWT/ZmVk8WZlZDr///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8AZmVkP2ZlZOpmZWQ9////AGZlZDVmZWTwZmVk/2ZlZPBmZWQ3////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AGZlZAn///8A////AP///wBmZWQ3ZmVk8GZlZP9mZWTwZmVkNf///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8AZmVkOmZlZPFmZWT/ZmVk4mZlZAZmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AGZlZDtmZWTkZmVkO////wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQJ////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWQ8////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZDxmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk5mZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk5v///wD///8A////AP///wD///8A////AP///wD///8AZmVkSWZlZOZmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWTmZmVkSf///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+      <ToDoView Name="Completed by Flag">
+        <UI ActionFlt="4" UseAdvFlt="true">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group>
+          <Grp1 GroupBy="26"/>
+        </Group>
+        <Sort Srt1="-2" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt>
+          <RootRule>
+            <Rule Field="Complete" ConditionName="is true" ConditionID="310"/>
+          </RootRule>
+        </AdvFlt>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="378"/>
+          <Column ID="1" Pos="1" Width="21"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="13" Pos="13" Width="145"/>
+          <Column ID="27" Pos="27" Width="22"/>
+        </Columns>
+        <IcoData Caption="Completed in Outline">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkSmZlZOdmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWTkZmVkSv///wD///8A////AP///wD///8A////AP///wD///8AZmVk5mZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk5////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWQ8////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZDtmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8AZmVkCP///wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wBmZWQ1ZmVk5mZlZD7///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AGZlZDRmZWTwZmVk/2ZlZPRmZWQ8////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8AZmVkMGZlZOxmZWT/ZmVk/2ZlZP9mZWTyZmVkO////wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWQGZmVk4WZlZP9mZWTzZmVkamZlZPBmZWT/ZmVk8WZlZDr///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8AZmVkP2ZlZOpmZWQ9////AGZlZDVmZWTwZmVk/2ZlZPBmZWQ3////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AGZlZAn///8A////AP///wBmZWQ3ZmVk8GZlZP9mZWTwZmVkNf///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8AZmVkOmZlZPFmZWT/ZmVk4mZlZAZmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AGZlZDtmZWTkZmVkO////wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQJ////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWQ8////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZDxmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk5mZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk5v///wD///8A////AP///wD///8A////AP///wD///8AZmVkSWZlZOZmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWTmZmVkSf///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+    </ToDoView>
+    <ToDoView Name="Recent" IsFolder="true">
+      <UI ActionFlt="4">
+        <HightlightFormat bold="1" inherit="0" options="0"/>
+      </UI>
+      <Group/>
+      <Sort Srt1="1" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+      <AdvFlt/>
+      <AdvFltParent/>
+      <AdvFltChild/>
+      <Columns>
+        <Column ID="0" Pos="0" Width="481"/>
+        <Column ID="4" Pos="4" Width="100"/>
+        <Column ID="7" Pos="7" Width="79"/>
+        <Column ID="27" Pos="27" Width="22"/>
+      </Columns>
+      <ToDoView Name="Completed Recently">
+        <UI ActionFlt="4" UseAdvFlt="true">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group>
+          <Grp1 GroupBy="12" Asc="false"/>
+        </Group>
+        <Sort Srt1="-2" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt>
+          <RootRule>
+            <Rule Field="Complete" ConditionName="is true" ConditionID="310"/>
+          </RootRule>
+        </AdvFlt>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="347"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="13" Pos="13" Width="100"/>
+          <Column ID="27" Pos="27" Width="22"/>
+        </Columns>
+        <IcoData Caption="Completed in Outline">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkSmZlZOdmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWTkZmVkSv///wD///8A////AP///wD///8A////AP///wD///8AZmVk5mZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk5////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWQ8////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZDtmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8AZmVkCP///wD///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wBmZWQ1ZmVk5mZlZD7///8A////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AGZlZDRmZWTwZmVk/2ZlZPRmZWQ8////AP///wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8AZmVkMGZlZOxmZWT/ZmVk/2ZlZP9mZWTyZmVkO////wD///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWQGZmVk4WZlZP9mZWTzZmVkamZlZPBmZWT/ZmVk8WZlZDr///8A////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8AZmVkP2ZlZOpmZWQ9////AGZlZDVmZWTwZmVk/2ZlZPBmZWQ3////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AGZlZAn///8A////AP///wBmZWQ3ZmVk8GZlZP9mZWTwZmVkNf///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8AZmVkOmZlZPFmZWT/ZmVk4mZlZAZmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AGZlZDtmZWTkZmVkO////wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP////8A////AP///wD///8A////AP///wD///8A////AP///wBmZWQJ////AP///wBmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk/2ZlZP9mZWQ8////AP///wD///8A////AP///wD///8A////AP///wD///8A////AGZlZDxmZWT/ZmVk/////wD///8A////AP///wD///8A////AP///wD///8AZmVk5mZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk5v///wD///8A////AP///wD///8A////AP///wD///8AZmVkSWZlZOZmZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWTmZmVkSf///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+      <ToDoView Name="Modified Recently">
+        <UI ActionFlt="4">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group>
+          <Grp1 GroupBy="11" Asc="false"/>
+        </Group>
+        <Sort Srt1="-10" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt/>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="596"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="12" Pos="12" Width="180"/>
+          <Column ID="27" Pos="27" Width="22"/>
+        </Columns>
+        <IcoData Caption="Modified Recently">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQA////AP///wD///8AZmVkAGZlZABmZWSFZmVk+WZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk+mZlZIVmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQA////AP///wD///8AZmVkAGZlZABmZWT8ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZPlmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQA////AP///wD///8AZmVkAGZlZABmZWT/ZmVk/2ZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVk/2ZlZP9mZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQA////AP///wD///8AZmVkAGZlZABmZWT/ZmVk/2ZlZABmZWQAZmVkN2ZlZLRmZWQKZmVkAGZlZABmZWQAZmVk/2ZlZP9mZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQA////AP///wD///8AZmVkAGZlZABmZWT/ZmVk/2ZlZABmZWQyZmVk8GZlZP9mZWS9ZmVkCmZlZABmZWQAZmVk/2ZlZP9mZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQA////AP///wD///8AZmVkAGZlZABmZWT/ZmVk/2ZlZB1mZWTqZmVk/2ZlZOtmZWT/ZmVkt2ZlZAZmZWQAZmVk/2ZlZP9mZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQA////AP///wD///8AZmVkAGZlZABmZWT/ZmVk/2ZlZAFmZWSRZmVkjmZlZBVmZWTUZmVk/2ZlZK9mZWQGZmVk/2ZlZP9mZWQAZmVkAGZlZP9mZWT/ZmVk+mZlZIVmZWQA////AP///wD///8AZmVkAGZlZABmZWT/ZmVk/2ZlZABmZWQBZmVkAWZlZABmZWQZZmVk2mZlZK9mZWQGZmVk/2ZlZP9mZWQAZmVkAGZlZP9mZWT/ZmVk/2ZlZPlmZWQA////AP///wD///8AZmVkAGZlZABmZWT/ZmVk/2ZlZABmZWQAZmVkAGZlZABmZWQAZmVkGGZlZAZmZWQAZmVk/2ZlZP9mZWQAZmVkAGZlZABmZWQAZmVk/2ZlZP9mZWQA////AP///wD///8AZmVkAGZlZABmZWT/ZmVk/2ZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVk/2ZlZP9mZWQAZmVkAGZlZABmZWQAZmVk/2ZlZP9mZWQA////AP///wD///8AZmVkAGZlZABmZWT8ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZPlmZWQAZmVkAGZlZABmZWQAZmVk/2ZlZP9mZWQA////AP///wD///8AZmVkAGZlZABmZWSFZmVk+WZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk+WZlZIVmZWQAZmVkAGZlZABmZWQAZmVk/2ZlZP9mZWQA////AP///wD///8AZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVk/2ZlZP9mZWQA////AP///wD///8AZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVk/2ZlZP9mZWQA////AP///wD///8AZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWT/ZmVk/2ZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVk/2ZlZP9mZWQA////AP///wD///8AZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWT/ZmVk/2ZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVk/2ZlZP9mZWQA////AP///wD///8AZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWT8ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZPlmZWQA////AP///wD///8AZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWSFZmVk+WZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk+WZlZIVmZWQA////AP///wD///8AZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQA////AP///wD///8AZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQA////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+      <ToDoView Name="Created Recently" Visible="false">
+        <UI ActionFlt="4">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group>
+          <Grp1 GroupBy="20" Asc="false"/>
+        </Group>
+        <Sort Srt1="-11" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt/>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="516"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="11" Pos="11" Width="180"/>
+          <Column ID="27" Pos="27" Width="22"/>
+        </Columns>
+        <IcoData Caption="Modified Recently">AAABAAEAGBgAAAEAIACICQAAFgAAACgAAAAYAAAAMAAAAAEAIAAAAAAAYAkAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQA////AP///wD///8AZmVkAGZlZABmZWSFZmVk+WZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk+mZlZIVmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQA////AP///wD///8AZmVkAGZlZABmZWT8ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZPlmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQA////AP///wD///8AZmVkAGZlZABmZWT/ZmVk/2ZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVk/2ZlZP9mZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQA////AP///wD///8AZmVkAGZlZABmZWT/ZmVk/2ZlZABmZWQAZmVkN2ZlZLRmZWQKZmVkAGZlZABmZWQAZmVk/2ZlZP9mZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQA////AP///wD///8AZmVkAGZlZABmZWT/ZmVk/2ZlZABmZWQyZmVk8GZlZP9mZWS9ZmVkCmZlZABmZWQAZmVk/2ZlZP9mZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQA////AP///wD///8AZmVkAGZlZABmZWT/ZmVk/2ZlZB1mZWTqZmVk/2ZlZOtmZWT/ZmVkt2ZlZAZmZWQAZmVk/2ZlZP9mZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQA////AP///wD///8AZmVkAGZlZABmZWT/ZmVk/2ZlZAFmZWSRZmVkjmZlZBVmZWTUZmVk/2ZlZK9mZWQGZmVk/2ZlZP9mZWQAZmVkAGZlZP9mZWT/ZmVk+mZlZIVmZWQA////AP///wD///8AZmVkAGZlZABmZWT/ZmVk/2ZlZABmZWQBZmVkAWZlZABmZWQZZmVk2mZlZK9mZWQGZmVk/2ZlZP9mZWQAZmVkAGZlZP9mZWT/ZmVk/2ZlZPlmZWQA////AP///wD///8AZmVkAGZlZABmZWT/ZmVk/2ZlZABmZWQAZmVkAGZlZABmZWQAZmVkGGZlZAZmZWQAZmVk/2ZlZP9mZWQAZmVkAGZlZABmZWQAZmVk/2ZlZP9mZWQA////AP///wD///8AZmVkAGZlZABmZWT/ZmVk/2ZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVk/2ZlZP9mZWQAZmVkAGZlZABmZWQAZmVk/2ZlZP9mZWQA////AP///wD///8AZmVkAGZlZABmZWT8ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZPlmZWQAZmVkAGZlZABmZWQAZmVk/2ZlZP9mZWQA////AP///wD///8AZmVkAGZlZABmZWSFZmVk+WZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk+WZlZIVmZWQAZmVkAGZlZABmZWQAZmVk/2ZlZP9mZWQA////AP///wD///8AZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVk/2ZlZP9mZWQA////AP///wD///8AZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVk/2ZlZP9mZWQA////AP///wD///8AZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWT/ZmVk/2ZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVk/2ZlZP9mZWQA////AP///wD///8AZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWT/ZmVk/2ZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVk/2ZlZP9mZWQA////AP///wD///8AZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWT8ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZPlmZWQA////AP///wD///8AZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWSFZmVk+WZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk/2ZlZP9mZWT/ZmVk+WZlZIVmZWQA////AP///wD///8AZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQA////AP///wD///8AZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQAZmVkAGZlZABmZWQA////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</IcoData>
+      </ToDoView>
+    </ToDoView>
+    <ToDoView Name="More Views" Visible="false" IsFolder="true">
+      <UI ActionFlt="4">
+        <HightlightFormat bold="1" inherit="0" options="0"/>
+      </UI>
+      <Group/>
+      <Sort Srt1="1" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+      <AdvFlt/>
+      <AdvFltParent/>
+      <AdvFltChild/>
+      <Columns>
+        <Column ID="0" Pos="0" Width="481"/>
+        <Column ID="4" Pos="4" Width="100"/>
+        <Column ID="7" Pos="7" Width="79"/>
+        <Column ID="27" Pos="27" Width="22"/>
+      </Columns>
+      <ToDoView Name="By Start Date">
+        <UI ActionFlt="4" UseAdvFlt="true">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group>
+          <Grp1 GroupBy="9"/>
+        </Group>
+        <Sort Srt1="14" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt>
+          <RootRule>
+            <Rule Field="StartDateTime" ConditionName="exists" ConditionID="429"/>
+          </RootRule>
+        </AdvFlt>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="481"/>
+          <Column ID="3" Pos="3" Width="100"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="27" Pos="27" Width="22"/>
+        </Columns>
+      </ToDoView>
+      <ToDoView Name="By Due Date">
+        <UI ActionFlt="4" UseAdvFlt="true">
+          <HightlightFormat bold="1" inherit="0" options="0"/>
+        </UI>
+        <Group>
+          <Grp1 GroupBy="10"/>
+        </Group>
+        <Sort Srt1="4" Srt2="1" Srt3="1" Srt4="1" Manual="false"/>
+        <AdvFlt>
+          <RootRule>
+            <Rule Field="DueDateTime" ConditionName="exists" ConditionID="429"/>
+          </RootRule>
+        </AdvFlt>
+        <AdvFltParent/>
+        <AdvFltChild/>
+        <Columns>
+          <Column ID="0" Pos="0" Width="481"/>
+          <Column ID="4" Pos="4" Width="100"/>
+          <Column ID="7" Pos="7" Width="79"/>
+          <Column ID="27" Pos="27" Width="22"/>
+        </Columns>
+      </ToDoView>
+    </ToDoView>
+  </ToDoViewsRoot>
+</MyLifeOrganized-xml>

@@ -13,6 +13,9 @@ sources/
 *.tmp
 export_*.xml
 
+# Backups made by the mlo-mcp write pipeline
+*.ml.bak-*
+
 # Local machine config (permissions, etc.)
 .claude/settings.local.json
 

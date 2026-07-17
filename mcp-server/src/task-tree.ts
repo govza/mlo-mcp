@@ -1,0 +1,152 @@
+import type { RawTaskNode, MloDocument } from "./xml.js";
+import { rootNode } from "./xml.js";
+import type { TaskNode } from "./types.js";
+
+/** Delphi boolean convention: -1 = true, absent/0 = false. */
+function delphiBool(v: string | undefined): boolean | undefined {
+  return v === undefined ? undefined : v === "-1";
+}
+
+function num(v: string | undefined): number | undefined {
+  return v === undefined || v === "" ? undefined : Number(v);
+}
+
+function toModel(raw: RawTaskNode, id: string, parentPath: string[], depth: number): TaskNode {
+  const path = [...parentPath, raw["@_Caption"]];
+  const node: TaskNode = {
+    id,
+    Caption: raw["@_Caption"],
+    Note: raw.Note,
+    Importance: num(raw.Importance),
+    Effort: num(raw.Effort),
+    DueDateTime: raw.DueDateTime,
+    StartDateTime: raw.StartDateTime,
+    CompletionDateTime: raw.CompletionDateTime,
+    IsProject: delphiBool(raw.IsProject),
+    ProjectStatus: num(raw.ProjectStatus),
+    Starred: delphiBool(raw.Starred),
+    Flag: raw.Flag,
+    Places: raw.Places?.Place ?? [],
+    EstimateMin: num(raw.EstimateMin),
+    EstimateMax: num(raw.EstimateMax),
+    TheGoal: num(raw.TheGoal),
+    HideInToDo: delphiBool(raw.HideInToDo),
+    HideInToDoThisTask: delphiBool(raw.HideInToDoThisTask),
+    ScheduleType: num(raw.ScheduleType),
+    LeadTime: num(raw.LeadTime),
+    CompleteSubTasksInOrder: delphiBool(raw.CompleteSubTasksInOrder),
+    Children: [],
+    Path: path,
+    Depth: depth,
+  };
+  node.Children = (raw.TaskNode ?? []).map((c, i) => toModel(c, `${id}.${i + 1}`, path, depth + 1));
+  return node;
+}
+
+/** Build the model tree from a parsed export. Returns top-level tasks (root Caption="" excluded). */
+export function buildTaskTree(doc: MloDocument): TaskNode[] {
+  return (rootNode(doc).TaskNode ?? []).map((c, i) => toModel(c, String(i + 1), [], 0));
+}
+
+export function flatten(tasks: TaskNode[]): TaskNode[] {
+  const out: TaskNode[] = [];
+  const walk = (list: TaskNode[]) => {
+    for (const t of list) {
+      out.push(t);
+      walk(t.Children);
+    }
+  };
+  walk(tasks);
+  return out;
+}
+
+export function findById(tasks: TaskNode[], id: string): TaskNode | undefined {
+  return flatten(tasks).find((t) => t.id === id);
+}
+
+/**
+ * Locate the RawTaskNode for a path id inside the parsed document, together
+ * with its parent's child array and index — what a mutation needs.
+ */
+export function findRawById(
+  doc: MloDocument,
+  id: string
+): { raw: RawTaskNode; siblings: RawTaskNode[]; index: number } | undefined {
+  const parts = id.split(".").map((p) => Number(p));
+  if (parts.length === 0 || parts.some((p) => !Number.isInteger(p) || p < 1)) return undefined;
+  let siblings = rootNode(doc).TaskNode ?? [];
+  let raw: RawTaskNode | undefined;
+  let index = -1;
+  for (let i = 0; i < parts.length; i++) {
+    index = parts[i] - 1;
+    raw = siblings[index];
+    if (!raw) return undefined;
+    if (i < parts.length - 1) siblings = raw.TaskNode ?? [];
+  }
+  return raw ? { raw, siblings, index } : undefined;
+}
+
+export interface SearchFilters {
+  /** Case-insensitive substring match against Caption and Note. */
+  query?: string;
+  /** Context name, with or without the leading @. */
+  context?: string;
+  dueBefore?: string;
+  dueAfter?: string;
+  starred?: boolean;
+  completed?: boolean;
+  isProject?: boolean;
+  flag?: string;
+  minImportance?: number;
+}
+
+export function searchTasks(tasks: TaskNode[], f: SearchFilters): TaskNode[] {
+  const q = f.query?.toLowerCase();
+  const ctx = f.context?.replace(/^@/, "").toLowerCase();
+  return flatten(tasks).filter((t) => {
+    if (q && !t.Caption.toLowerCase().includes(q) && !(t.Note ?? "").toLowerCase().includes(q)) return false;
+    if (ctx && !t.Places.some((p) => p.replace(/^@/, "").toLowerCase() === ctx)) return false;
+    if (f.dueBefore && !(t.DueDateTime && t.DueDateTime < f.dueBefore)) return false;
+    if (f.dueAfter && !(t.DueDateTime && t.DueDateTime > f.dueAfter)) return false;
+    if (f.starred !== undefined && (t.Starred ?? false) !== f.starred) return false;
+    if (f.completed !== undefined && Boolean(t.CompletionDateTime) !== f.completed) return false;
+    if (f.isProject !== undefined && (t.IsProject ?? false) !== f.isProject) return false;
+    if (f.flag && t.Flag !== f.flag) return false;
+    if (f.minImportance !== undefined && (t.Importance ?? 50) < f.minImportance) return false;
+    return true;
+  });
+}
+
+/** One-line human-readable summary of a task. */
+export function renderLine(t: TaskNode): string {
+  const marks: string[] = [];
+  if (t.CompletionDateTime) marks.push("[done]");
+  if (t.IsProject) marks.push("[project]");
+  if (t.Starred) marks.push("[*]");
+  if (t.Flag) marks.push(`[flag:${t.Flag}]`);
+  if (t.Importance !== undefined && t.Importance !== 50) marks.push(`[imp:${t.Importance}]`);
+  if (t.DueDateTime) marks.push(`due:${t.DueDateTime}`);
+  if (t.Places.length) marks.push(t.Places.join(","));
+  return `[${t.id}] ${t.Caption}${marks.length ? " " + marks.join(" ") : ""}`;
+}
+
+export interface RenderOptions {
+  format?: "tree" | "flat";
+  includeCompleted?: boolean;
+  maxDepth?: number;
+}
+
+export function renderTasks(tasks: TaskNode[], opts: RenderOptions = {}): string {
+  const { format = "tree", includeCompleted = false, maxDepth } = opts;
+  const lines: string[] = [];
+  const walk = (list: TaskNode[], depth: number) => {
+    for (const t of list) {
+      if (!includeCompleted && t.CompletionDateTime) continue;
+      if (maxDepth !== undefined && depth >= maxDepth) continue;
+      lines.push(format === "tree" ? "  ".repeat(depth) + renderLine(t) : renderLine(t));
+      walk(t.Children, depth + 1);
+    }
+  };
+  walk(tasks, 0);
+  return lines.length ? lines.join("\n") : "(no tasks)";
+}

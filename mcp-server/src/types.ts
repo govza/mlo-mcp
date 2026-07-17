@@ -1,5 +1,8 @@
 export interface TaskNode {
+  /** Path-based id from depth-first position: "1", "1.2", "1.2.3" (root excluded). */
   id: string;
+  /** Internal MLO GUID recovered from the .ml binary; undefined when extraction failed for this node. */
+  Guid?: string;
   Caption: string;
   Note?: string;
   Importance?: number;
