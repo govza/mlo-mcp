@@ -12,7 +12,8 @@ export function registerDeleteTask(server: McpServer, ctx: ToolContext): void {
       title: "Delete task",
       description:
         "Permanently delete a task AND all of its subtasks. Rewrites the data file (timestamped backup kept — " +
-        "restore it to undo). Requires the MLO app to be closed.",
+        "restore it to undo). If the MLO app is open it is closed gracefully (it saves on close) and " +
+        "relaunched after the write.",
       inputSchema: { id: z.string().describe("Path-based task id from list_tasks/search_tasks") },
       outputSchema: { ok: z.boolean(), deletedCaption: z.string(), deletedSubtasks: z.number(), backupPath: z.string() },
       annotations: { destructiveHint: true },

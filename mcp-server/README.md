@@ -29,6 +29,7 @@ claude mcp add mlo -e MLO_DATA_FILE=D:\path\to\your.ml -- node D:\dev\projects\o
 | `MLO_EXE_PATH` | no | Program Files path above | mlo.exe location |
 | `MLO_EXPORT_DIR` | no | `%TEMP%\mlo-mcp` | Scratch dir for XML exports |
 | `MLO_CACHE_STALE_MS` | no | `30000` | Task-tree cache lifetime |
+| `MLO_AUTO_RESTART_GUI` | no | `1` | Close + relaunch a running MLO app around writes; `0` = refuse writes while it runs |
 
 ## Tools
 
@@ -43,7 +44,7 @@ claude mcp add mlo -e MLO_DATA_FILE=D:\path\to\your.ml -- node D:\dev\projects\o
 | `update_task` | destructive | field edits by id |
 | `delete_task` | destructive | removes subtree |
 
-Destructive tools rewrite the data file via `export → edit XML → -saveML → replace`, keep a timestamped `.bak-*` next to the file, verify by re-export, and restore the backup on mismatch. They **refuse to run while the MLO app is open** (the GUI would overwrite the change from memory). Reads and adds work with the app open.
+Destructive tools rewrite the data file via `export → edit XML → -saveML → replace`, keep a timestamped `.bak-*` next to the file, verify by re-export, and restore the backup on mismatch. The running MLO app would overwrite such a change from memory, so when the app is open the server **closes it gracefully (MLO saves on close, same as clicking X), applies the write, and relaunches it** — set `MLO_AUTO_RESTART_GUI=0` to refuse writes instead. Reads and bare-caption adds never touch the app.
 
 Task ids are path-based (`1.2.3`) and shift when the tree changes — the server re-exports before every mutation, and `get_task` also reports each task's stable internal GUID (recovered from the `.ml` binary; recurring tasks may lack one).
 

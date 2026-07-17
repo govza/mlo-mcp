@@ -32,7 +32,7 @@ export function registerUpdateTask(server: McpServer, ctx: ToolContext): void {
       description:
         "Edit fields of a task by id. Only provided fields change; pass an empty string to clear a text field, " +
         "false to clear a boolean, [] to clear contexts. Rewrites the data file (timestamped backup kept). " +
-        "Requires the MLO app to be closed.",
+        "If the MLO app is open it is closed gracefully (it saves on close) and relaunched after the write.",
       inputSchema: {
         id: z.string().describe("Path-based task id"),
         Caption: z.string().min(1).optional(),

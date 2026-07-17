@@ -33,4 +33,6 @@ export interface MloConfig {
   dataFile: string;
   exportDir: string;
   cacheStaleMs: number;
+  /** Close the running MLO GUI for writes and relaunch it afterwards (default true). */
+  autoRestartGui: boolean;
 }

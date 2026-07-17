@@ -95,6 +95,40 @@ export function isMloRunning(): Promise<boolean> {
   });
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Gracefully close the MLO GUI (taskkill without /F posts WM_CLOSE — the same
+ * as clicking X, so MLO saves its data on the way out). Fails when a modal
+ * dialog is blocking the app.
+ */
+export async function closeMloGui(): Promise<void> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await new Promise<void>((resolve) => {
+      execFile("taskkill", ["/IM", "mlo.exe"], { windowsHide: true, timeout: 10_000 }, () => resolve());
+    });
+    for (let i = 0; i < 10; i++) {
+      await sleep(700);
+      if (!(await isMloRunning())) return;
+    }
+  }
+  throw new MloError(
+    "could not close the MyLifeOrganized app — a dialog may be blocking it. " +
+      "Close MLO manually (including any popup) and retry."
+  );
+}
+
+/** Relaunch the MLO GUI detached on the given data file (no -console: it must stay open). */
+export function launchMloGui(config: MloConfig): void {
+  const child = spawn(config.mloExePath, [delphiQuote(config.dataFile)], {
+    windowsVerbatimArguments: true,
+    argv0: delphiQuote(config.mloExePath),
+    detached: true,
+    stdio: "ignore",
+  });
+  child.unref();
+}
+
 async function ensureDataFile(config: MloConfig): Promise<void> {
   try {
     await fs.access(config.dataFile);

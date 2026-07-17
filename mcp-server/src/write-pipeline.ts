@@ -4,11 +4,13 @@ import type { MloConfig, TaskNode } from "./types.js";
 import type { MloDocument } from "./xml.js";
 import { parseMloXml, buildMloXml } from "./xml.js";
 import { buildTaskTree } from "./task-tree.js";
-import { exportXml, convertXmlToMl, isMloRunning, MloError } from "./mlo-cli.js";
+import { exportXml, convertXmlToMl, isMloRunning, closeMloGui, launchMloGui, MloError } from "./mlo-cli.js";
 import { log } from "./log.js";
 
 export interface WriteResult {
   backupPath: string;
+  /** true when the MLO GUI was closed for the write and relaunched afterwards */
+  guiRestarted: boolean;
 }
 
 /**
@@ -16,21 +18,47 @@ export interface WriteResult {
  *   fresh export → mutate(doc) → build XML → -saveML to temp .ml →
  *   backup original → replace → verify via re-export → restore on failure.
  *
- * Refuses when the MLO GUI is running: the GUI holds the tree in memory and
- * would overwrite our replacement on its next autosave.
+ * The running MLO GUI holds the tree in memory and would overwrite our
+ * replacement on its next autosave, so it must not be open during the swap.
+ * With autoRestartGui (default) the GUI is closed gracefully first — it saves
+ * on close, exactly like clicking X — and relaunched afterwards; otherwise
+ * the write is refused while MLO is open.
  */
 export async function replaceDataFile(
   config: MloConfig,
   mutate: (doc: MloDocument) => void,
   verify: (tasks: TaskNode[]) => boolean
 ): Promise<WriteResult> {
+  let guiRestarted = false;
   if (await isMloRunning()) {
-    throw new MloError(
-      "The MyLifeOrganized app is running — it holds the data file in memory and would " +
-        "overwrite this change on its next save. Close MLO (including the tray icon) and retry."
-    );
+    if (!config.autoRestartGui) {
+      throw new MloError(
+        "The MyLifeOrganized app is running — it holds the data file in memory and would " +
+          "overwrite this change on its next save. Close MLO (including the tray icon) and retry, " +
+          "or unset MLO_AUTO_RESTART_GUI=0 to let the server restart MLO around writes."
+      );
+    }
+    log("closing the MLO GUI for a write (it will be relaunched)");
+    await closeMloGui();
+    guiRestarted = true;
   }
 
+  try {
+    return await replaceClosed(config, mutate, verify, guiRestarted);
+  } finally {
+    if (guiRestarted) {
+      launchMloGui(config);
+      log("relaunched the MLO GUI");
+    }
+  }
+}
+
+async function replaceClosed(
+  config: MloConfig,
+  mutate: (doc: MloDocument) => void,
+  verify: (tasks: TaskNode[]) => boolean,
+  guiRestarted: boolean
+): Promise<WriteResult> {
   const doc = parseMloXml(await exportXml(config));
   mutate(doc);
 
@@ -55,7 +83,7 @@ export async function replaceDataFile(
       );
     }
     log(`data file replaced; backup at ${backupPath}`);
-    return { backupPath };
+    return { backupPath, guiRestarted };
   } finally {
     await fs.rm(tempXml, { force: true });
     await fs.rm(tempMl, { force: true });

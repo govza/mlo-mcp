@@ -23,10 +23,10 @@ export function registerAddTask(server: McpServer, ctx: ToolContext): void {
     {
       title: "Add task",
       description:
-        "Create a task. With the MLO app closed and an ISO dueDate (or none), fields are written exactly. " +
-        "With the app open, or with a natural-language dueDate or parseText, the task goes through MLO's " +
-        "rapid-entry parser instead — that parser is best-effort (captions containing digits can absorb " +
-        "unparsed tokens), so always check the reported result.",
+        "Create a task. Fields and placement are written exactly via the XML pipeline (if the MLO app is open " +
+        "it is closed gracefully — it saves on close — and relaunched afterwards). Only a natural-language " +
+        "dueDate, urgency or parseText route through MLO's best-effort rapid-entry parser; a bare caption is " +
+        "added instantly without touching the app. Always check the reported result.",
       inputSchema: {
         caption: z.string().min(1).describe("Task caption"),
         parentId: z.string().optional().describe("Place the task under this task id (default: top level / inbox)"),
@@ -72,10 +72,19 @@ export function registerAddTask(server: McpServer, ctx: ToolContext): void {
       let placement = parentCaption ? `under "${parentCaption}"` : "top level";
       let method: "xml" | "parser";
 
-      if (!needsParser && !guiRunning) {
+      // Exact XML insert whenever the parser isn't required. A plain caption
+      // with no fields and no parent goes through -AddSubtask IPC instead —
+      // it's exact too and doesn't need the GUI closed.
+      const hasFields = Boolean(
+        note || isoDue || isoStart || contexts?.length || importance || effort || starred || folder || flag || parentId
+      );
+      const useXmlPath = !needsParser && hasFields && (!guiRunning || ctx.config.autoRestartGui);
+
+      let guiRestarted = false;
+      if (useXmlPath) {
         // Deterministic path: insert the node straight into the XML round-trip.
         method = "xml";
-        await replaceDataFile(
+        ({ guiRestarted } = await replaceDataFile(
           ctx.config,
           (doc) => {
             let siblings: RawTaskNode[];
@@ -111,7 +120,7 @@ export function registerAddTask(server: McpServer, ctx: ToolContext): void {
                 (!parentCaption || t.Path.slice(0, -1).includes(parentCaption)) &&
                 (!isoDue || t.DueDateTime === isoDue)
             )
-        );
+        ));
       } else {
         // Parser path: MLO rapid-entry syntax. Quotes shield the caption.
         method = "parser";
@@ -148,8 +157,9 @@ export function registerAddTask(server: McpServer, ctx: ToolContext): void {
       const created = flatten(snap.tasks)
         .filter((t) => t.Caption === caption || (method === "parser" && t.Caption.startsWith(caption)))
         .at(-1);
+      const restartNote = guiRestarted ? "; MLO was closed for the write and relaunched" : "";
       const text = created
-        ? `created [${created.id}] "${created.Caption}" (${placement}, ${method}); parent path: ${created.Path.slice(0, -1).join(" > ") || "(top)"}`
+        ? `created [${created.id}] "${created.Caption}" (${placement}, ${method}); parent path: ${created.Path.slice(0, -1).join(" > ") || "(top)"}${restartNote}`
         : `task submitted (${placement}, ${method}) but not found in re-export under caption "${caption}" — check list_tasks`;
       return textResult(text, { task: created ? toSummary(created) : undefined, placement, method });
     })

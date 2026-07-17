@@ -12,7 +12,8 @@ export function registerCompleteTask(server: McpServer, ctx: ToolContext): void 
       title: "Complete task",
       description:
         "Mark a task completed (sets CompletionDateTime; for projects also ProjectStatus). " +
-        "Rewrites the data file — a timestamped backup is kept next to it. Requires the MLO app to be closed.",
+        "Rewrites the data file — a timestamped backup is kept next to it. If the MLO app is open " +
+        "it is closed gracefully (it saves on close) and relaunched after the write.",
       inputSchema: { id: z.string().describe("Path-based task id from list_tasks/search_tasks") },
       outputSchema: { ok: z.boolean(), completedAt: z.string(), backupPath: z.string() },
       annotations: { destructiveHint: true },

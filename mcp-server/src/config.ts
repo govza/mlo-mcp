@@ -17,5 +17,9 @@ export function loadConfig(): MloConfig {
     dataFile,
     exportDir: process.env.MLO_EXPORT_DIR ?? path.join(os.tmpdir(), "mlo-mcp"),
     cacheStaleMs: Number(process.env.MLO_CACHE_STALE_MS) || 30_000,
+    // When a write needs the GUI gone, close it gracefully (it saves on close,
+    // same as clicking X), apply the change, and relaunch it on the same file.
+    // Set MLO_AUTO_RESTART_GUI=0 to refuse writes instead while MLO is open.
+    autoRestartGui: !["0", "false", "no"].includes((process.env.MLO_AUTO_RESTART_GUI ?? "1").toLowerCase()),
   };
 }
