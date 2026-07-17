@@ -4,7 +4,15 @@ import type { MloConfig, TaskNode } from "./types.js";
 import type { MloDocument } from "./xml.js";
 import { parseMloXml, buildMloXml } from "./xml.js";
 import { buildTaskTree } from "./task-tree.js";
-import { exportXml, convertXmlToMl, isMloRunning, closeMloGui, launchMloGui, MloError } from "./mlo-cli.js";
+import {
+  exportXmlUnlocked,
+  convertXmlToMlUnlocked,
+  isMloRunning,
+  closeMloGui,
+  launchMloGui,
+  withMloFileLock,
+  MloError,
+} from "./mlo-cli.js";
 import { log } from "./log.js";
 
 export interface WriteResult {
@@ -24,33 +32,39 @@ export interface WriteResult {
  * on close, exactly like clicking X — and relaunched afterwards; otherwise
  * the write is refused while MLO is open.
  */
-export async function replaceDataFile(
+export function replaceDataFile(
   config: MloConfig,
   mutate: (doc: MloDocument) => void,
   verify: (tasks: TaskNode[]) => boolean
 ): Promise<WriteResult> {
-  let guiRestarted = false;
-  if (await isMloRunning()) {
-    if (!config.autoRestartGui) {
-      throw new MloError(
-        "The MyLifeOrganized app is running — it holds the data file in memory and would " +
-          "overwrite this change on its next save. Close MLO (including the tray icon) and retry, " +
-          "or unset MLO_AUTO_RESTART_GUI=0 to let the server restart MLO around writes."
-      );
+  // Hold BOTH locks (in-process chain + cross-process lock dir) across the
+  // whole close → replace → verify → relaunch window: another mlo-mcp process
+  // exporting mid-swap would race the .ml file and trigger MLO's
+  // "file is locked by another process" dialog.
+  return withMloFileLock(config, async () => {
+    let guiRestarted = false;
+    if (await isMloRunning()) {
+      if (!config.autoRestartGui) {
+        throw new MloError(
+          "The MyLifeOrganized app is running — it holds the data file in memory and would " +
+            "overwrite this change on its next save. Close MLO (including the tray icon) and retry, " +
+            "or unset MLO_AUTO_RESTART_GUI=0 to let the server restart MLO around writes."
+        );
+      }
+      log("closing the MLO GUI for a write (it will be relaunched)");
+      await closeMloGui();
+      guiRestarted = true;
     }
-    log("closing the MLO GUI for a write (it will be relaunched)");
-    await closeMloGui();
-    guiRestarted = true;
-  }
 
-  try {
-    return await replaceClosed(config, mutate, verify, guiRestarted);
-  } finally {
-    if (guiRestarted) {
-      launchMloGui(config);
-      log("relaunched the MLO GUI");
+    try {
+      return await replaceClosed(config, mutate, verify, guiRestarted);
+    } finally {
+      if (guiRestarted) {
+        await launchMloGui(config);
+        log("relaunched the MLO GUI");
+      }
     }
-  }
+  });
 }
 
 async function replaceClosed(
@@ -59,7 +73,7 @@ async function replaceClosed(
   verify: (tasks: TaskNode[]) => boolean,
   guiRestarted: boolean
 ): Promise<WriteResult> {
-  const doc = parseMloXml(await exportXml(config));
+  const doc = parseMloXml(await exportXmlUnlocked(config));
   mutate(doc);
 
   await fs.mkdir(config.exportDir, { recursive: true });
@@ -70,12 +84,12 @@ async function replaceClosed(
 
   try {
     await fs.writeFile(tempXml, buildMloXml(doc), "utf8");
-    await convertXmlToMl(config, tempXml, tempMl);
+    await convertXmlToMlUnlocked(config, tempXml, tempMl);
 
     await fs.copyFile(config.dataFile, backupPath);
     await fs.copyFile(tempMl, config.dataFile);
 
-    const after = buildTaskTree(parseMloXml(await exportXml(config)));
+    const after = buildTaskTree(parseMloXml(await exportXmlUnlocked(config)));
     if (!verify(after)) {
       await fs.copyFile(backupPath, config.dataFile);
       throw new MloError(
