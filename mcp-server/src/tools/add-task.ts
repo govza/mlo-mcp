@@ -72,13 +72,15 @@ export function registerAddTask(server: McpServer, ctx: ToolContext): void {
       let placement = parentCaption ? `under "${parentCaption}"` : "top level";
       let method: "xml" | "parser";
 
-      // Exact XML insert whenever the parser isn't required. A plain caption
-      // with no fields and no parent goes through -AddSubtask IPC instead —
-      // it's exact too and doesn't need the GUI closed.
+      // Exact XML insert whenever the parser isn't required. The -AddSubtask
+      // IPC shortcut is only trustworthy with no GUI running: a running GUI
+      // applies it to whatever row the user has selected, so with the GUI open
+      // every parser-free add goes through the XML pipeline (which restarts
+      // the app around the write).
       const hasFields = Boolean(
         note || isoDue || isoStart || contexts?.length || importance || effort || starred || folder || flag || parentId
       );
-      const useXmlPath = !needsParser && hasFields && (!guiRunning || ctx.config.autoRestartGui);
+      const useXmlPath = !needsParser && (guiRunning ? ctx.config.autoRestartGui : hasFields);
 
       let guiRestarted = false;
       if (useXmlPath) {
@@ -153,11 +155,71 @@ export function registerAddTask(server: McpServer, ctx: ToolContext): void {
       }
 
       ctx.store.invalidate();
-      const snap = await ctx.store.getSnapshot(true);
-      const created = flatten(snap.tasks)
+      let snap = await ctx.store.getSnapshot(true);
+      let created = flatten(snap.tasks)
         .filter((t) => t.Caption === caption || (method === "parser" && t.Caption.startsWith(caption)))
         .at(-1);
-      const restartNote = guiRestarted ? "; MLO was closed for the write and relaunched" : "";
+
+      // A running GUI applies -AddSubtask to whatever row the USER has selected
+      // ("Add subtask to the selected task"), so an IPC add can land anywhere.
+      // Detect that and move the task to where it was actually asked to go.
+      let relocated = false;
+      if (created && method === "parser") {
+        const actualParent = created.Path.at(-2);
+        const misplaced = parentCaption ? actualParent !== parentCaption : created.Path.length > 1;
+        if (misplaced) {
+          const movedCaption = created.Caption;
+          {
+            // Locate nodes by caption inside the pipeline's own export — the
+            // GUI's close-save can shift path ids computed from the live view.
+            const findLastByCaption = (
+              siblings: RawTaskNode[],
+              cap: string
+            ): { siblings: RawTaskNode[]; index: number; raw: RawTaskNode } | undefined => {
+              let hit: { siblings: RawTaskNode[]; index: number; raw: RawTaskNode } | undefined;
+              for (let i = 0; i < siblings.length; i++) {
+                const raw = siblings[i];
+                if (raw["@_Caption"] === cap) hit = { siblings, index: i, raw };
+                const deeper = findLastByCaption(raw.TaskNode ?? [], cap);
+                if (deeper) hit = deeper;
+              }
+              return hit;
+            };
+            await replaceDataFile(
+              ctx.config,
+              (doc) => {
+                const rootChildren = rootNode(doc).TaskNode ??= [];
+                const found = findLastByCaption(rootChildren, movedCaption);
+                if (!found) throw new Error("could not relocate the new task — it is missing from a fresh export");
+                found.siblings.splice(found.index, 1);
+                let destSiblings: RawTaskNode[];
+                if (parentCaption) {
+                  const dest = findLastByCaption(rootChildren, parentCaption);
+                  if (!dest) throw new Error("could not find the requested parent to relocate the new task");
+                  destSiblings = dest.raw.TaskNode ??= [];
+                } else {
+                  destSiblings = rootChildren;
+                }
+                destSiblings.push(found.raw);
+              },
+              (after) =>
+                flatten(after).some(
+                  (t) => t.Caption === movedCaption && (parentCaption ? t.Path.at(-2) === parentCaption : t.Path.length === 1)
+                )
+            );
+            relocated = true;
+            ctx.store.invalidate();
+            snap = await ctx.store.getSnapshot(true);
+            created = flatten(snap.tasks)
+              .filter((t) => t.Caption === movedCaption)
+              .at(-1);
+          }
+        }
+      }
+
+      const restartNote =
+        (guiRestarted ? "; MLO was closed for the write and relaunched" : "") +
+        (relocated ? "; the GUI had another task selected, so the new task was moved to the requested position" : "");
       const text = created
         ? `created [${created.id}] "${created.Caption}" (${placement}, ${method}); parent path: ${created.Path.slice(0, -1).join(" > ") || "(top)"}${restartNote}`
         : `task submitted (${placement}, ${method}) but not found in re-export under caption "${caption}" — check list_tasks`;
