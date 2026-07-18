@@ -40,7 +40,7 @@ Either register directly:
 claude mcp add mlo -e MLO_DATA_FILE=C:\path\to\your.ml -- npx -y github:govza/mlo-mcp
 ```
 
-or install as a plugin (also ships the mlo-gtd skill; updates via `/plugin update`):
+or install as a plugin (also ships the GTD skills; updates via `/plugin update`):
 
 ```
 /plugin marketplace add govza/mlo-mcp

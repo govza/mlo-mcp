@@ -221,7 +221,7 @@ The concepts above are what the `add_task` / `update_task` fields ultimately set
 Rough correspondence (see each tool's own description for exact names/scales):
 
 - **Contexts** → `add_task.contexts` / `update_task.Places` (full-list replace).
-  Follow the `mlo-gtd` skill: one existing context per actionable leaf.
+  Follow the `conventions` skill: one existing context per actionable leaf.
 - **Starred / Folder / dates / note** → the like-named inputs.
 - **Project** → set `IsProject` via `update_task`.
 - **Sequencing** → *within* a branch use complete-subtasks-in-order; *across*

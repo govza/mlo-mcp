@@ -1,5 +1,5 @@
 ---
-name: mlo-gtd
+name: conventions
 description: The user's GTD conventions for managing tasks in MyLifeOrganized via the mlo MCP tools. Use whenever adding, organizing, or editing MLO tasks (add_task, update_task, etc.) so tasks follow the user's methodology — especially context assignment.
 ---
 
