@@ -62,6 +62,13 @@ export function registerTool(server: McpServer, tool: MloTool, ctx: ToolContext)
   );
 }
 
+/**
+ * Default cap on tasks returned by list_tasks/search_tasks. Results are
+ * emitted twice (text + structuredContent), so an uncapped call on a large
+ * profile floods the caller's context; the cap is overridable via `limit`.
+ */
+export const DEFAULT_RESULT_LIMIT = 200;
+
 /** Machine-readable task summary used in structuredContent across tools. */
 export const TaskSummaryShape = {
   id: z.string().describe('Path-based id ("1.2.3"); stable only until the tree changes'),

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { searchTasks, renderLine } from "../task-tree.js";
-import { defineTool, textResult, toSummary, TaskSummarySchema } from "./shared.js";
+import { defineTool, textResult, toSummary, TaskSummarySchema, DEFAULT_RESULT_LIMIT } from "./shared.js";
 
 export const searchTasksTool = defineTool({
   name: "search_tasks",
@@ -16,15 +16,28 @@ export const searchTasksTool = defineTool({
     isProject: z.boolean().optional(),
     flag: z.string().optional().describe('Exact flag name, e.g. "Green Flag"'),
     minImportance: z.number().min(0).max(100).optional(),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe(`Max tasks to return (default ${DEFAULT_RESULT_LIMIT}); the output notes when truncated`),
   },
-  outputSchema: { tasks: z.array(TaskSummarySchema), total: z.number() },
+  outputSchema: {
+    tasks: z.array(TaskSummarySchema),
+    total: z.number().describe("Matching tasks before the limit was applied"),
+  },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  async execute(filters, ctx) {
+  async execute({ limit, ...filters }, ctx) {
     const snap = await ctx.store.getSnapshot();
     const matches = searchTasks(snap.tasks, filters);
-    const text = matches.length
-      ? matches.map((t) => `${renderLine(t)}  (${t.Path.slice(0, -1).join(" > ") || "top level"})`).join("\n")
+    const shown = matches.slice(0, limit ?? DEFAULT_RESULT_LIMIT);
+    let text = shown.length
+      ? shown.map((t) => `${renderLine(t)}  (${t.Path.slice(0, -1).join(" > ") || "top level"})`).join("\n")
       : "no matching tasks";
-    return textResult(text, { tasks: matches.map(toSummary), total: matches.length });
+    if (shown.length < matches.length) {
+      text += `\n… showing ${shown.length} of ${matches.length} matches — narrow the filters or raise limit`;
+    }
+    return textResult(text, { tasks: shown.map(toSummary), total: matches.length });
   },
 });

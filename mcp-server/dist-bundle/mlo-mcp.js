@@ -23633,19 +23633,22 @@ function renderLine(t) {
   if (t.Places.length) marks.push(t.Places.join(","));
   return `[${t.id}] ${t.Caption}${marks.length ? " " + marks.join(" ") : ""}`;
 }
-function renderTasks(tasks, opts = {}) {
-  const { format = "tree", includeCompleted = false, maxDepth } = opts;
-  const lines = [];
+function collectVisible(tasks, opts = {}) {
+  const out = [];
   const walk = (list, depth) => {
     for (const t of list) {
-      if (!includeCompleted && t.CompletionDateTime) continue;
-      if (maxDepth !== void 0 && depth >= maxDepth) continue;
-      lines.push(format === "tree" ? "  ".repeat(depth) + renderLine(t) : renderLine(t));
+      if (!opts.includeCompleted && t.CompletionDateTime) continue;
+      if (opts.maxDepth !== void 0 && depth >= opts.maxDepth) continue;
+      out.push({ task: t, depth });
       walk(t.Children, depth + 1);
     }
   };
   walk(tasks, 0);
-  return lines.length ? lines.join("\n") : "(no tasks)";
+  return out;
+}
+function renderVisible(entries, format = "tree") {
+  if (!entries.length) return "(no tasks)";
+  return entries.map((e) => (format === "flat" ? "" : "  ".repeat(e.depth)) + renderLine(e.task)).join("\n");
 }
 
 // src/guids.ts
@@ -23777,6 +23780,7 @@ function registerTool(server, tool, ctx) {
     guard(tool.name, (args) => tool.execute(args, ctx))
   );
 }
+var DEFAULT_RESULT_LIMIT = 200;
 var TaskSummaryShape = {
   id: external_exports.string().describe('Path-based id ("1.2.3"); stable only until the tree changes'),
   Guid: external_exports.string().optional().describe("Internal MLO GUID (stable), when recoverable"),
@@ -23835,16 +23839,20 @@ function nowIso() {
 var listTasksTool = defineTool({
   name: "list_tasks",
   title: "List tasks",
-  description: 'List the MyLifeOrganized task tree (or a subtree). Returns a text outline plus structured task data. Ids are path-based ("1.2.3") and shift when the tree changes \u2014 treat them as valid only for immediate follow-up calls.',
+  description: `List the MyLifeOrganized task tree (or a subtree). Returns a text outline plus structured task data. Ids are path-based ("1.2.3") and shift when the tree changes \u2014 treat them as valid only for immediate follow-up calls. On large profiles, narrow with parentId/maxDepth instead of raising limit (default ${DEFAULT_RESULT_LIMIT}).`,
   inputSchema: {
     format: external_exports.enum(["tree", "flat"]).optional().describe("tree (indented outline, default) or flat"),
     includeCompleted: external_exports.boolean().optional().describe("Include completed tasks (default false)"),
     parentId: external_exports.string().optional().describe("Only list the subtree under this task id"),
-    maxDepth: external_exports.number().int().min(1).optional().describe("Limit outline depth")
+    maxDepth: external_exports.number().int().min(1).optional().describe("Limit outline depth"),
+    limit: external_exports.number().int().min(1).optional().describe(`Max tasks to return (default ${DEFAULT_RESULT_LIMIT}); the output notes when truncated`)
   },
-  outputSchema: { tasks: external_exports.array(TaskSummarySchema) },
+  outputSchema: {
+    tasks: external_exports.array(TaskSummarySchema),
+    total: external_exports.number().describe("Visible tasks before the limit was applied")
+  },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  async execute({ format, includeCompleted, parentId, maxDepth }, ctx) {
+  async execute({ format, includeCompleted, parentId, maxDepth, limit }, ctx) {
     const snap = await ctx.store.getSnapshot();
     let tasks = snap.tasks;
     if (parentId) {
@@ -23852,9 +23860,14 @@ var listTasksTool = defineTool({
       if (!parent) return errorResult(`no task with id "${parentId}" \u2014 call list_tasks or search_tasks first`);
       tasks = parent.Children;
     }
-    const visible = flatten(tasks).filter((t) => includeCompleted || !t.CompletionDateTime);
-    const text = renderTasks(tasks, { format, includeCompleted, maxDepth });
-    return textResult(text, { tasks: visible.map(toSummary) });
+    const entries = collectVisible(tasks, { includeCompleted, maxDepth });
+    const shown = entries.slice(0, limit ?? DEFAULT_RESULT_LIMIT);
+    let text = renderVisible(shown, format);
+    if (shown.length < entries.length) {
+      text += `
+\u2026 showing ${shown.length} of ${entries.length} tasks \u2014 narrow with parentId/maxDepth or raise limit`;
+    }
+    return textResult(text, { tasks: shown.map((e) => toSummary(e.task)), total: entries.length });
   }
 });
 
@@ -23872,15 +23885,24 @@ var searchTasksTool = defineTool({
     completed: external_exports.boolean().optional().describe("Default: both; true = only completed; false = only open"),
     isProject: external_exports.boolean().optional(),
     flag: external_exports.string().optional().describe('Exact flag name, e.g. "Green Flag"'),
-    minImportance: external_exports.number().min(0).max(100).optional()
+    minImportance: external_exports.number().min(0).max(100).optional(),
+    limit: external_exports.number().int().min(1).optional().describe(`Max tasks to return (default ${DEFAULT_RESULT_LIMIT}); the output notes when truncated`)
   },
-  outputSchema: { tasks: external_exports.array(TaskSummarySchema), total: external_exports.number() },
+  outputSchema: {
+    tasks: external_exports.array(TaskSummarySchema),
+    total: external_exports.number().describe("Matching tasks before the limit was applied")
+  },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  async execute(filters, ctx) {
+  async execute({ limit, ...filters }, ctx) {
     const snap = await ctx.store.getSnapshot();
     const matches = searchTasks(snap.tasks, filters);
-    const text = matches.length ? matches.map((t) => `${renderLine(t)}  (${t.Path.slice(0, -1).join(" > ") || "top level"})`).join("\n") : "no matching tasks";
-    return textResult(text, { tasks: matches.map(toSummary), total: matches.length });
+    const shown = matches.slice(0, limit ?? DEFAULT_RESULT_LIMIT);
+    let text = shown.length ? shown.map((t) => `${renderLine(t)}  (${t.Path.slice(0, -1).join(" > ") || "top level"})`).join("\n") : "no matching tasks";
+    if (shown.length < matches.length) {
+      text += `
+\u2026 showing ${shown.length} of ${matches.length} matches \u2014 narrow the filters or raise limit`;
+    }
+    return textResult(text, { tasks: shown.map(toSummary), total: matches.length });
   }
 });
 

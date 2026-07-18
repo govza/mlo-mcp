@@ -136,23 +136,37 @@ export function renderLine(t: TaskNode): string {
   return `[${t.id}] ${t.Caption}${marks.length ? " " + marks.join(" ") : ""}`;
 }
 
-export interface RenderOptions {
-  format?: "tree" | "flat";
-  includeCompleted?: boolean;
-  maxDepth?: number;
+export interface VisibleTask {
+  task: TaskNode;
+  depth: number;
 }
 
-export function renderTasks(tasks: TaskNode[], opts: RenderOptions = {}): string {
-  const { format = "tree", includeCompleted = false, maxDepth } = opts;
-  const lines: string[] = [];
+/**
+ * Depth-first list of what the outline shows: completed tasks prune their
+ * whole subtree (unless includeCompleted) and maxDepth cuts descendants.
+ * Single source of truth for list_tasks — its text outline and its
+ * structuredContent must come from the same entries.
+ */
+export function collectVisible(
+  tasks: TaskNode[],
+  opts: { includeCompleted?: boolean; maxDepth?: number } = {}
+): VisibleTask[] {
+  const out: VisibleTask[] = [];
   const walk = (list: TaskNode[], depth: number) => {
     for (const t of list) {
-      if (!includeCompleted && t.CompletionDateTime) continue;
-      if (maxDepth !== undefined && depth >= maxDepth) continue;
-      lines.push(format === "tree" ? "  ".repeat(depth) + renderLine(t) : renderLine(t));
+      if (!opts.includeCompleted && t.CompletionDateTime) continue;
+      if (opts.maxDepth !== undefined && depth >= opts.maxDepth) continue;
+      out.push({ task: t, depth });
       walk(t.Children, depth + 1);
     }
   };
   walk(tasks, 0);
-  return lines.length ? lines.join("\n") : "(no tasks)";
+  return out;
+}
+
+export function renderVisible(entries: VisibleTask[], format: "tree" | "flat" = "tree"): string {
+  if (!entries.length) return "(no tasks)";
+  return entries
+    .map((e) => (format === "flat" ? "" : "  ".repeat(e.depth)) + renderLine(e.task))
+    .join("\n");
 }
