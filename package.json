@@ -1,0 +1,20 @@
+{
+  "name": "mlo-mcp",
+  "version": "0.2.0",
+  "description": "MCP server for the MyLifeOrganized (MLO) Windows desktop app — drives mlo.exe locally, no cloud API",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/govza/mlo-mcp"
+  },
+  "bin": {
+    "mlo-mcp": "mcp-server/dist-bundle/mlo-mcp.js"
+  },
+  "files": [
+    "mcp-server/dist-bundle"
+  ],
+  "engines": {
+    "node": ">=22"
+  }
+}

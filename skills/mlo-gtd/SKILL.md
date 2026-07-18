@@ -19,7 +19,8 @@ These are my standing preferences for how tasks in MLO should be managed. Anythi
 
 ## How to apply
 
-- Before assigning a context: `list_contexts` → choose the best existing match for where/how the action happens (errands → `@Shopping`, calls/desk work → `@Office`, home chores → `@Home`). Pass it via `add_task.contexts` or `update_task.Places` (Places is a full-replacement list — include existing contexts you mean to keep).
+- Before assigning a context: `list_contexts` → choose the best existing match for where/how the action happens (errands → `@Shopping`, calls/desk work → `@Office`, home chores → `@Home`). Pass it via `add_task.contexts` or `Places` in an `update_task` entry (Places is a full-replacement list — include existing contexts you mean to keep).
+- Batch related changes into single calls (`add_task.tasks`, `update_task.updates`, `complete_task.ids`, …) — every separate write restarts the MLO app.
 - If no existing context fits, say so and ask whether to create one — do not silently invent contexts.
 - When I ask to "GTD-ify" or organize tasks: phrase captions as concrete next actions (verb-first), keep project structure in the outline (nesting, dependencies), and put reference material in the task's Note.
 - Tool mechanics (path-id freshness, app restarts around writes, backups) are covered by the tools' own descriptions — follow those; don't re-derive them here.
