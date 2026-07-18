@@ -70,10 +70,13 @@ export function findById(tasks: TaskNode[], id: string): TaskNode | undefined {
  * Locate the RawTaskNode for a path id inside the parsed document, together
  * with its parent's child array and index — what a mutation needs.
  */
-export function findRawById(
-  doc: MloDocument,
-  id: string
-): { raw: RawTaskNode; siblings: RawTaskNode[]; index: number } | undefined {
+export interface FoundRaw {
+  raw: RawTaskNode;
+  siblings: RawTaskNode[];
+  index: number;
+}
+
+export function findRawById(doc: MloDocument, id: string): FoundRaw | undefined {
   const parts = id.split(".").map((p) => Number(p));
   if (parts.length === 0 || parts.some((p) => !Number.isInteger(p) || p < 1)) return undefined;
   let siblings = rootNode(doc).TaskNode ?? [];

@@ -39,13 +39,23 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual(
-      ["add_task", "complete_task", "delete_task", "get_task", "list_contexts", "list_tasks", "search_tasks", "sync", "update_task"]
+      ["add_task", "complete_task", "delete_task", "get_task", "list_contexts", "list_tasks", "search_tasks", "sync", "uncomplete_task", "update_task"]
     );
     const list = tools.find((t) => t.name === "list_tasks")!;
     expect(list.annotations?.readOnlyHint).toBe(true);
     expect(list.outputSchema).toBeDefined();
     const del = tools.find((t) => t.name === "delete_task")!;
     expect(del.annotations?.destructiveHint).toBe(true);
+    // every tool states its full annotation contract
+    for (const t of tools) {
+      for (const hint of ["readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"] as const) {
+        expect(t.annotations?.[hint], `${t.name} ${hint}`).toBeTypeOf("boolean");
+      }
+    }
+  });
+
+  it("exposes server instructions", async () => {
+    expect(client.getInstructions()).toContain("PATH-BASED");
   });
 
   it("runs a list → add → list cycle", async () => {
@@ -107,7 +117,7 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
     const search = await client.callTool({ name: "search_tasks", arguments: { query: caption } });
     const victim = (search.structuredContent as { tasks: Array<{ id: string }> }).tasks[0];
 
-    const done = await client.callTool({ name: "complete_task", arguments: { id: victim.id } });
+    const done = await client.callTool({ name: "complete_task", arguments: { ids: [victim.id] } });
     expect(done.isError).toBeFalsy();
     const doneOut = done.structuredContent as { ok: boolean; backupPath: string };
     expect(doneOut.ok).toBe(true);
@@ -116,7 +126,7 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
     const again = (research.structuredContent as { tasks: Array<{ id: string }>; total: number });
     expect(again.total).toBe(1);
 
-    const del = await client.callTool({ name: "delete_task", arguments: { id: again.tasks[0].id } });
+    const del = await client.callTool({ name: "delete_task", arguments: { ids: [again.tasks[0].id] } });
     expect(del.isError).toBeFalsy();
     const gone = await client.callTool({ name: "search_tasks", arguments: { query: caption } });
     expect((gone.structuredContent as { total: number }).total).toBe(0);
@@ -149,7 +159,7 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
     const phase1 = children.find((c) => c.Caption === "Phase 1")!;
     const moved = await client.callTool({
       name: "update_task",
-      arguments: { id: phase2.id, moveToParentId: phase1.id },
+      arguments: { updates: [{ id: phase2.id, moveToParentId: phase1.id }] },
     });
     expect(moved.isError).toBeFalsy();
     const after = await client.callTool({ name: "search_tasks", arguments: { query: "Phase 2" } });
@@ -160,7 +170,7 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
     // cleanup: delete the whole tree
     const fresh = await client.callTool({ name: "search_tasks", arguments: { query: caption } });
     const freshId = (fresh.structuredContent as { tasks: Array<{ id: string }> }).tasks[0].id;
-    const del = await client.callTool({ name: "delete_task", arguments: { id: freshId } });
+    const del = await client.callTool({ name: "delete_task", arguments: { ids: [freshId] } });
     expect(del.isError).toBeFalsy();
     const { promises: fs } = await import("node:fs");
     for (const r of [moved, del]) await fs.rm((r.structuredContent as { backupPath: string }).backupPath, { force: true });
@@ -181,7 +191,7 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
     const buy = await search("buy parts");
     const set = await client.callTool({
       name: "update_task",
-      arguments: { id: install.id, dependsOn: [buy.id] },
+      arguments: { updates: [{ id: install.id, dependsOn: [buy.id] }] },
     });
     expect(set.isError).toBeFalsy();
 
@@ -197,7 +207,7 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
 
     const cleared = await client.callTool({
       name: "update_task",
-      arguments: { id: (await search("install parts")).id, dependsOn: [] },
+      arguments: { updates: [{ id: (await search("install parts")).id, dependsOn: [] }] },
     });
     expect(cleared.isError).toBeFalsy();
     const after = await client.callTool({ name: "get_task", arguments: { id: (await search("install parts")).id } });
@@ -205,7 +215,7 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
 
     // cleanup
     const parent = await search(`e2e-dep-parent-${stamp}`);
-    const del = await client.callTool({ name: "delete_task", arguments: { id: parent.id } });
+    const del = await client.callTool({ name: "delete_task", arguments: { ids: [parent.id] } });
     const { promises: fs } = await import("node:fs");
     for (const r of [set, cleared, del]) {
       const p = (r.structuredContent as { backupPath?: string }).backupPath;
@@ -225,7 +235,7 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
     // and back to a normal task via update_task
     const updated = await client.callTool({
       name: "update_task",
-      arguments: { id: task!.id, HideInToDoThisTask: false },
+      arguments: { updates: [{ id: task!.id, HideInToDoThisTask: false }] },
     });
     expect(updated.isError).toBeFalsy();
     const again = await client.callTool({ name: "get_task", arguments: { id: task!.id } });
@@ -239,7 +249,7 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
     const target = (search.structuredContent as { tasks: Array<{ id: string }> }).tasks[0];
     const updated = await client.callTool({
       name: "update_task",
-      arguments: { id: target.id, Note: "note set by e2e", Starred: true },
+      arguments: { updates: [{ id: target.id, Note: "note set by e2e", Starred: true }] },
     });
     expect(updated.isError).toBeFalsy();
     const got = await client.callTool({ name: "get_task", arguments: { id: target.id } });
@@ -249,5 +259,63 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
     expect(task.Starred).toBe(true);
     const { promises: fs } = await import("node:fs");
     await fs.rm((updated.structuredContent as { backupPath: string }).backupPath, { force: true });
+  });
+
+  it("batches adds, updates, completes, reopens and deletes — one write each", async () => {
+    const stamp = Date.now();
+    const caps = [0, 1, 2].map((i) => `e2e-batch-${stamp}-${i}`);
+    const added = await client.callTool({
+      name: "add_task",
+      arguments: {
+        tasks: [
+          { caption: caps[0], starred: true },
+          { caption: caps[1], subtasks: "child A\nchild B" },
+          { caption: caps[2], contexts: ["Office"] },
+        ],
+      },
+    });
+    expect(added.isError).toBeFalsy();
+    const addedOut = added.structuredContent as { tasks: Array<{ id: string; Caption: string }>; method: string };
+    expect(addedOut.method).toBe("xml");
+    expect(addedOut.tasks.map((t) => t.Caption)).toEqual(caps);
+
+    // batch field updates across two tasks in one write
+    const updated = await client.callTool({
+      name: "update_task",
+      arguments: {
+        updates: [
+          { id: addedOut.tasks[0].id, Note: "batch note" },
+          { id: addedOut.tasks[2].id, Starred: true },
+        ],
+      },
+    });
+    expect(updated.isError).toBeFalsy();
+    expect((updated.structuredContent as { updated: unknown[] }).updated).toHaveLength(2);
+
+    const ids = addedOut.tasks.map((t) => t.id);
+    const done = await client.callTool({ name: "complete_task", arguments: { ids } });
+    expect(done.isError).toBeFalsy();
+    const doneOut = done.structuredContent as { completed: unknown[]; backupPath: string };
+    expect(doneOut.completed).toHaveLength(3);
+
+    const reopened = await client.callTool({ name: "uncomplete_task", arguments: { ids: [ids[0]] } });
+    expect(reopened.isError).toBeFalsy();
+    const openAgain = await client.callTool({ name: "search_tasks", arguments: { query: caps[0], completed: false } });
+    expect((openAgain.structuredContent as { total: number }).total).toBe(1);
+
+    // batch delete all three roots (6 tasks with the subtree) in one write
+    const del = await client.callTool({ name: "delete_task", arguments: { ids } });
+    expect(del.isError).toBeFalsy();
+    const delOut = del.structuredContent as { deleted: Array<{ subtasks: number }>; backupPath: string };
+    expect(delOut.deleted).toHaveLength(3);
+    expect(delOut.deleted.reduce((a, d) => a + d.subtasks, 0)).toBe(2);
+    const gone = await client.callTool({ name: "search_tasks", arguments: { query: `e2e-batch-${stamp}` } });
+    expect((gone.structuredContent as { total: number }).total).toBe(0);
+
+    const { promises: fs } = await import("node:fs");
+    for (const r of [added, updated, done, reopened, del]) {
+      const p = (r.structuredContent as { backupPath?: string }).backupPath;
+      if (p) await fs.rm(p, { force: true });
+    }
   });
 });

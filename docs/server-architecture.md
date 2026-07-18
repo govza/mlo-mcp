@@ -6,7 +6,8 @@ TypeScript MCP server (`mcp-server/`) over stdio. Node 22, pnpm, ESM, strict TS;
 
 ```
 src/
-  index.ts          McpServer wiring, registerTool calls, stdio transport
+  index.ts          McpServer wiring (registers tools/registry.ts, server
+                    instructions string), stdio transport
   config.ts         env config (MLO_DATA_FILE required; MLO_EXE_PATH, MLO_EXPORT_DIR,
                     MLO_CACHE_STALE_MS, MLO_AUTO_RESTART_GUI)
   mlo-cli.ts        mlo.exe invocation: Delphi quoting, timeouts, exit-code mapping,
@@ -16,8 +17,17 @@ src/
   guids.ts          Caption→GUID recovery from the .ml binary (see ml-binary-format.md)
   store.ts          cached snapshot: export → parse → tree → GUID annotation
   write-pipeline.ts the file-replacement write (below)
-  tools/*.ts        one file per tool + shared helpers
+  tools/*.ts        one declarative MloTool per file (shared.ts: contract +
+                    registerTool; registry.ts: the authoritative tool list)
+scripts/
+  run-tool.ts       invoke any tool directly, no MCP client: `pnpm tool <name> '<json>'`
 ```
+
+Tools are declarative objects (`defineTool` in `tools/shared.ts`: name, schemas, all four
+MCP annotation hints, `execute(args, ctx)`) — callable without a server, which is what
+`scripts/run-tool.ts` uses. Write tools take batches (`ids`/`updates`/`tasks` arrays) and
+apply the whole batch in ONE write-pipeline round-trip, since every write may restart the
+GUI; batches are atomic (any bad id aborts before mutation).
 
 ## Concurrency: two locks
 

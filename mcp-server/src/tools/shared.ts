@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { MloConfig, TaskNode } from "../types.js";
 import type { MloStore } from "../store.js";
 import { log } from "../log.js";
@@ -7,6 +8,58 @@ import { log } from "../log.js";
 export interface ToolContext {
   config: MloConfig;
   store: MloStore;
+}
+
+/** All four hints are mandatory so every tool states its contract explicitly. */
+export interface MloToolAnnotations {
+  readOnlyHint: boolean;
+  destructiveHint: boolean;
+  /**
+   * Id-based write tools are NOT idempotent even when the operation looks it:
+   * path ids re-resolve against the current tree, so a replayed call can hit a
+   * different task.
+   */
+  idempotentHint: boolean;
+  openWorldHint: boolean;
+}
+
+/**
+ * Declarative tool definition: schemas + metadata + an execute() that is
+ * callable without an MCP server (used by scripts/run-tool.ts and tests).
+ */
+export interface MloTool<
+  In extends z.ZodRawShape = z.ZodRawShape,
+  Out extends z.ZodRawShape = z.ZodRawShape,
+> {
+  name: string;
+  title: string;
+  description: string;
+  inputSchema: In;
+  outputSchema: Out;
+  annotations: MloToolAnnotations;
+  execute(args: z.objectOutputType<In, z.ZodTypeAny>, ctx: ToolContext): Promise<CallToolResult>;
+}
+
+/** Identity helper so tool literals get full inference for execute()'s args. */
+export function defineTool<In extends z.ZodRawShape, Out extends z.ZodRawShape>(
+  tool: MloTool<In, Out>
+): MloTool<In, Out> {
+  return tool;
+}
+
+/** Wire a declarative tool into the MCP server, wrapping execute() in guard(). */
+export function registerTool(server: McpServer, tool: MloTool, ctx: ToolContext): void {
+  server.registerTool(
+    tool.name,
+    {
+      title: tool.title,
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+      outputSchema: tool.outputSchema,
+      annotations: tool.annotations,
+    },
+    guard(tool.name, (args) => tool.execute(args, ctx))
+  );
 }
 
 /** Machine-readable task summary used in structuredContent across tools. */
