@@ -1,6 +1,9 @@
+import { promises as fs } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadConfig } from "./config.js";
+import { isMloBusy } from "./mlo-cli.js";
 import { MloStore } from "./store.js";
 import { log } from "./log.js";
 import { registerListTasks } from "./tools/list-tasks.js";
@@ -31,6 +34,31 @@ async function main(): Promise<void> {
 
   await server.connect(new StdioServerTransport());
   log(`ready — data file: ${config.dataFile}`);
+  watchOwnBuild();
+}
+
+/**
+ * Long-lived sessions kept running stale server builds after every rebuild
+ * (stdio servers live as long as the client connection). Watch our own entry
+ * file; when a rebuild changes it, exit cleanly while idle so the client
+ * respawns the current code on the next tool call.
+ */
+function watchOwnBuild(): void {
+  const entry = fileURLToPath(import.meta.url);
+  let startMtime: number | undefined;
+  const timer = setInterval(async () => {
+    try {
+      const mtime = (await fs.stat(entry)).mtimeMs;
+      startMtime ??= mtime;
+      if (mtime !== startMtime && !isMloBusy()) {
+        log("server build changed on disk — exiting so the client restarts the new version");
+        process.exit(0);
+      }
+    } catch {
+      /* transient stat failure (mid-rebuild) — retry next tick */
+    }
+  }, 15_000);
+  timer.unref();
 }
 
 main().catch((e) => {

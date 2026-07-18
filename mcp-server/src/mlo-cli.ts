@@ -44,6 +44,11 @@ export function withMloLock<T>(fn: () => Promise<T>): Promise<T> {
  */
 let fileLockHeld = false;
 
+/** True while an MLO operation (or the whole write pipeline) is in flight. */
+export function isMloBusy(): boolean {
+  return fileLockHeld;
+}
+
 async function withFileLock<T>(config: MloConfig, fn: () => Promise<T>): Promise<T> {
   if (fileLockHeld) return fn();
   const lockDir = `${config.dataFile}.mcp-lock`;
