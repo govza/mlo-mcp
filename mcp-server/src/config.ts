@@ -21,5 +21,10 @@ export function loadConfig(): MloConfig {
     // same as clicking X), apply the change, and relaunch it on the same file.
     // Set MLO_AUTO_RESTART_GUI=0 to refuse writes instead while MLO is open.
     autoRestartGui: !["0", "false", "no"].includes((process.env.MLO_AUTO_RESTART_GUI ?? "1").toLowerCase()),
+    // "minimized" relaunches without popping a window into focus; "normal"
+    // restores the old behavior; "none" leaves MLO closed after writes.
+    relaunchStyle: (["minimized", "normal", "none"].includes((process.env.MLO_RELAUNCH_STYLE ?? "").toLowerCase())
+      ? (process.env.MLO_RELAUNCH_STYLE as string).toLowerCase()
+      : "minimized") as MloConfig["relaunchStyle"],
   };
 }

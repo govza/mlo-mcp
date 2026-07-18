@@ -37,4 +37,6 @@ export interface MloConfig {
   cacheStaleMs: number;
   /** Close the running MLO GUI for writes and relaunch it afterwards (default true). */
   autoRestartGui: boolean;
+  /** How to relaunch the GUI after a write: minimized (default, no focus steal), normal, or none. */
+  relaunchStyle: "minimized" | "normal" | "none";
 }

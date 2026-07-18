@@ -32,6 +32,7 @@ claude mcp add mlo -e MLO_DATA_FILE=D:\path\to\your.ml -- node D:\dev\projects\o
 | `MLO_EXPORT_DIR` | no | `%TEMP%\mlo-mcp` | Scratch dir for XML exports |
 | `MLO_CACHE_STALE_MS` | no | `30000` | Task-tree cache lifetime |
 | `MLO_AUTO_RESTART_GUI` | no | `1` | Close + relaunch a running MLO app around writes; `0` = refuse writes while it runs |
+| `MLO_RELAUNCH_STYLE` | no | `minimized` | How MLO comes back after a write: `minimized` (no window pop / focus steal; combines with MLO's "Minimize to system tray" option to be fully invisible), `normal`, or `none` (leave it closed) |
 
 ## Tools
 

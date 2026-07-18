@@ -60,8 +60,12 @@ export function replaceDataFile(
       return await replaceClosed(config, mutate, verify, guiRestarted);
     } finally {
       if (guiRestarted) {
-        await launchMloGui(config);
-        log("relaunched the MLO GUI");
+        if (config.relaunchStyle === "none") {
+          log("MLO left closed after the write (MLO_RELAUNCH_STYLE=none)");
+        } else {
+          await launchMloGui(config);
+          log(`relaunched the MLO GUI (${config.relaunchStyle})`);
+        }
       }
     }
   });

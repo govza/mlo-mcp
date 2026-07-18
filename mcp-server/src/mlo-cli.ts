@@ -175,18 +175,33 @@ export async function closeMloGui(): Promise<void> {
  * .ml file and MLO pops a "file is locked by another process" dialog.
  */
 export async function launchMloGui(config: MloConfig): Promise<void> {
-  const child = spawn(config.mloExePath, [delphiQuote(config.dataFile)], {
-    windowsVerbatimArguments: true,
-    argv0: delphiQuote(config.mloExePath),
-    detached: true,
-    stdio: "ignore",
-  });
-  child.unref();
-  // ready = a window titled "...MyLifeOrganized" exists (set after the file loads)
+  if (config.relaunchStyle === "minimized") {
+    // Launch through `start /min`: the SW_SHOWMINIMIZED startup hint keeps the
+    // window out of the user's face and does not steal focus. (Node cannot set
+    // STARTUPINFO.wShowWindow itself.) The empty "" is start's window title slot.
+    const child = spawn("cmd.exe", ["/c", "start", '""', "/min", delphiQuote(config.mloExePath), delphiQuote(config.dataFile)], {
+      windowsVerbatimArguments: true,
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    child.unref();
+  } else {
+    const child = spawn(config.mloExePath, [delphiQuote(config.dataFile)], {
+      windowsVerbatimArguments: true,
+      argv0: delphiQuote(config.mloExePath),
+      detached: true,
+      stdio: "ignore",
+    });
+    child.unref();
+  }
+
+  // ready = a "...MyLifeOrganized" window title exists, OR MLO holds the data
+  // file (a minimized-to-tray window has no title, so probe the file lock too).
   const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
     await sleep(800);
-    const ready = await new Promise<boolean>((resolve) => {
+    const titleReady = await new Promise<boolean>((resolve) => {
       execFile(
         "tasklist",
         ["/V", "/FO", "CSV", "/NH", "/FI", "IMAGENAME eq mlo.exe"],
@@ -194,9 +209,20 @@ export async function launchMloGui(config: MloConfig): Promise<void> {
         (error, stdout) => resolve(!error && stdout.includes("MyLifeOrganized"))
       );
     });
-    if (ready) break;
+    if (titleReady || (await isDataFileLocked(config))) break;
   }
   await sleep(1500); // settle: let it finish acquiring file handles
+}
+
+/** True when another process (the MLO GUI) holds the data file open. */
+async function isDataFileLocked(config: MloConfig): Promise<boolean> {
+  try {
+    const handle = await fs.open(config.dataFile, "r+");
+    await handle.close();
+    return false;
+  } catch {
+    return true;
+  }
 }
 
 async function ensureDataFile(config: MloConfig): Promise<void> {

@@ -41,7 +41,7 @@ lock (both) → [GUI running? close it gracefully] → fresh export → mutate p
 → [relaunch GUI, wait until it has loaded] → unlock
 ```
 
-- **GUI auto-restart**: a running MLO holds the tree in memory and would clobber the replaced file on its next autosave, so it is closed first — `taskkill` *without* `/F` posts WM_CLOSE, the same as clicking X, and MLO saves on close. After the swap the GUI is relaunched detached and the pipeline *waits until its window exists* (title poll + settle) before releasing the lock — returning earlier lets the next invocation race the boot. `MLO_AUTO_RESTART_GUI=0` restores refuse-while-open behavior.
+- **GUI auto-restart**: a running MLO holds the tree in memory and would clobber the replaced file on its next autosave, so it is closed first — `taskkill` *without* `/F` posts WM_CLOSE, the same as clicking X, and MLO saves on close. After the swap the GUI is relaunched detached — by default **minimized without focus** (`cmd /c start /min`; Node can't set `STARTUPINFO.wShowWindow` itself), which combined with MLO's "Minimize to system tray" option makes the restart invisible. The pipeline waits until MLO is ready before releasing the lock — window-title poll *or* a data-file lock probe (a tray-hidden window has no title) — because returning earlier lets the next invocation race the boot. `MLO_AUTO_RESTART_GUI=0` restores refuse-while-open behavior; `MLO_RELAUNCH_STYLE` = `minimized` (default) / `normal` / `none`.
 - **Verification is caption-based** where GUIDs are involved: `-saveML` regenerates all GUIDs on every import, so predicates must not compare GUID values across a write.
 
 ## add_task's three paths
