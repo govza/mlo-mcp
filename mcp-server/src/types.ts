@@ -39,4 +39,6 @@ export interface MloConfig {
   autoRestartGui: boolean;
   /** How to relaunch the GUI after a write: minimized (default, no focus steal), normal, or none. */
   relaunchStyle: "minimized" | "normal" | "none";
+  /** Caption of the top-level task acting as the capture inbox, overriding <Inbox>/Inbox detection. */
+  inboxCaption?: string;
 }

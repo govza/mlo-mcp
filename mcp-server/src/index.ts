@@ -39,6 +39,10 @@ Each write keeps a timestamped backup next to the data file; batches are atomic 
   handle recurrence.
 - add_task's natural-language dates/urgency/parseText use MLO's best-effort rapid-entry parser;
   everything else is written exactly. Batch mode is exact-only.
+- add_task without a parentId files the task into the profile's capture inbox — the top-level
+  "<Inbox>" node (same caption in every MLO language; list_tasks marks it [inbox]). Pass
+  parentId "root" for a deliberate top-level task. No inbox node → top level, and the result
+  says so.
 
 ### Completion
 complete_task marks done (projects get ProjectStatus too); uncomplete_task reopens.

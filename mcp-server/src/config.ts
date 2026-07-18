@@ -26,5 +26,9 @@ export function loadConfig(): MloConfig {
     relaunchStyle: (["minimized", "normal", "none"].includes((process.env.MLO_RELAUNCH_STYLE ?? "").toLowerCase())
       ? (process.env.MLO_RELAUNCH_STYLE as string).toLowerCase()
       : "minimized") as MloConfig["relaunchStyle"],
+    // Only needed when the capture inbox is NOT MLO's own <Inbox> node (e.g. a
+    // hand-made "Входящие" folder). MLO itself hardcodes the caption "<Inbox>"
+    // in every UI language, so most profiles need no override.
+    inboxCaption: process.env.MLO_INBOX_CAPTION || undefined,
   };
 }

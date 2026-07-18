@@ -23218,7 +23218,11 @@ function loadConfig() {
     autoRestartGui: !["0", "false", "no"].includes((process.env.MLO_AUTO_RESTART_GUI ?? "1").toLowerCase()),
     // "minimized" relaunches without popping a window into focus; "normal"
     // restores the old behavior; "none" leaves MLO closed after writes.
-    relaunchStyle: ["minimized", "normal", "none"].includes((process.env.MLO_RELAUNCH_STYLE ?? "").toLowerCase()) ? process.env.MLO_RELAUNCH_STYLE.toLowerCase() : "minimized"
+    relaunchStyle: ["minimized", "normal", "none"].includes((process.env.MLO_RELAUNCH_STYLE ?? "").toLowerCase()) ? process.env.MLO_RELAUNCH_STYLE.toLowerCase() : "minimized",
+    // Only needed when the capture inbox is NOT MLO's own <Inbox> node (e.g. a
+    // hand-made "Входящие" folder). MLO itself hardcodes the caption "<Inbox>"
+    // in every UI language, so most profiles need no override.
+    inboxCaption: process.env.MLO_INBOX_CAPTION || void 0
   };
 }
 
@@ -23591,6 +23595,28 @@ function flatten(tasks) {
 function findById(tasks, id) {
   return flatten(tasks).find((t) => t.id === id);
 }
+var INBOX_CAPTIONS = ["<Inbox>", "Inbox"];
+function inboxCaptions(configCaption) {
+  return configCaption ? [configCaption, ...INBOX_CAPTIONS] : INBOX_CAPTIONS;
+}
+function looksLikeInbox(t) {
+  return t.Depth === 0 && INBOX_CAPTIONS.includes(t.Caption);
+}
+function findInbox(tasks, configCaption) {
+  for (const cap of inboxCaptions(configCaption)) {
+    const hit = tasks.find((t) => t.Caption === cap);
+    if (hit) return hit;
+  }
+  return void 0;
+}
+function findRawInbox(doc, configCaption) {
+  const top = rootNode(doc).TaskNode ?? [];
+  for (const cap of inboxCaptions(configCaption)) {
+    const hit = top.find((n) => n["@_Caption"] === cap);
+    if (hit) return hit;
+  }
+  return void 0;
+}
 function findRawById(doc, id) {
   const parts = id.split(".").map((p) => Number(p));
   if (parts.length === 0 || parts.some((p) => !Number.isInteger(p) || p < 1)) return void 0;
@@ -23623,6 +23649,7 @@ function searchTasks(tasks, f) {
 }
 function renderLine(t) {
   const marks = [];
+  if (looksLikeInbox(t)) marks.push("[inbox]");
   if (t.CompletionDateTime) marks.push("[done]");
   if (t.IsProject) marks.push("[project]");
   if (t.Starred) marks.push("[*]");
@@ -24073,7 +24100,7 @@ var XmlFields = {
 var BatchEntry = external_exports.object({
   caption: external_exports.string().min(1).describe("Task caption"),
   parentId: external_exports.string().optional().describe(
-    "Place under this EXISTING task id (default: top level). Batch entries cannot parent on each other \u2014 use one entry's subtasks outline to create a new tree"
+    `Place under this EXISTING task id; "root" forces top level. Default: the profile's <Inbox> node (top level if the profile has none). Batch entries cannot parent on each other \u2014 use one entry's subtasks outline to create a new tree`
   ),
   dueDate: external_exports.string().optional().describe('ISO only in batch mode ("2026-08-01" or "2026-08-01T15:00")'),
   ...XmlFields
@@ -24117,8 +24144,16 @@ async function executeBatch(entries, ctx) {
     built.push({ entry, isoDue, isoStart, subtree: entry.subtasks ? parseOutline(entry.subtasks) : [] });
   }
   const snapBefore = await ctx.store.getSnapshot();
+  const inbox = findInbox(snapBefore.tasks, ctx.config.inboxCaption);
   for (const b of built) {
-    if (!b.entry.parentId) continue;
+    if (b.entry.parentId === "root") continue;
+    if (!b.entry.parentId) {
+      if (inbox) {
+        b.toInbox = true;
+        b.parentCaption = inbox.Caption;
+      }
+      continue;
+    }
     const parent = findById(snapBefore.tasks, b.entry.parentId);
     if (!parent) return errorResult(`entry "${b.entry.caption}": no task with id "${b.entry.parentId}" \u2014 re-run list_tasks`);
     b.parentCaption = parent.Caption;
@@ -24127,7 +24162,12 @@ async function executeBatch(entries, ctx) {
     ctx.config,
     (doc) => {
       const inserts = built.map((b) => {
-        if (!b.entry.parentId) return { b, siblings: rootNode(doc).TaskNode ??= [] };
+        if (b.toInbox) {
+          const rawInbox = findRawInbox(doc, ctx.config.inboxCaption);
+          if (!rawInbox) throw new Error(`entry "${b.entry.caption}": the inbox node vanished between snapshot and write \u2014 retry`);
+          return { b, siblings: rawInbox.TaskNode ??= [] };
+        }
+        if (!b.entry.parentId || b.entry.parentId === "root") return { b, siblings: rootNode(doc).TaskNode ??= [] };
         const found = findRawById(doc, b.entry.parentId);
         if (!found) throw new Error(`entry "${b.entry.caption}": no task with id "${b.entry.parentId}" \u2014 re-run list_tasks`);
         return { b, siblings: found.raw.TaskNode ??= [] };
@@ -24145,9 +24185,12 @@ async function executeBatch(entries, ctx) {
   const created = built.map(
     (b) => all.filter((t) => t.Caption === b.entry.caption && (!b.parentCaption || t.Path.slice(0, -1).includes(b.parentCaption))).at(-1)
   );
-  const lines = created.map(
-    (t, i) => t ? `created [${t.id}] "${t.Caption}" (${built[i].parentCaption ? `under "${built[i].parentCaption}"` : "top level"})` : `entry "${built[i].entry.caption}" written but not found in re-export`
-  );
+  const lines = created.map((t, i) => {
+    const b = built[i];
+    if (!t) return `entry "${b.entry.caption}" written but not found in re-export`;
+    const where = b.toInbox ? "inbox" : b.parentCaption ? `under "${b.parentCaption}"` : b.entry.parentId === "root" ? "top level" : "top level \u2014 no inbox node found in this profile";
+    return `created [${t.id}] "${t.Caption}" (${where})`;
+  });
   const restartNote = guiRestarted ? "\nMLO was closed for the write and relaunched" : "";
   return textResult(`${built.length} tasks in one write (backup: ${backupPath}):
 ${lines.join("\n")}${restartNote}`, {
@@ -24160,10 +24203,10 @@ ${lines.join("\n")}${restartNote}`, {
 var addTaskTool = defineTool({
   name: "add_task",
   title: "Add tasks",
-  description: "Create a task \u2014 or several in one write via `tasks` \u2014 optionally each with a whole subtree. MLO is an OUTLINER: deep nesting is idiomatic, so prefer parentId placement and the subtasks outline over flat top-level lists. Fields and placement are written exactly via the XML pipeline (if the MLO app is open it is closed gracefully \u2014 it saves on close \u2014 and relaunched afterwards); ALWAYS batch multiple adds into one call (`tasks` or subtasks outline) instead of calling per task. Only a natural-language dueDate, urgency or parseText route through MLO's best-effort rapid-entry parser (single-task mode only). Always check the reported result.",
+  description: "Create a task \u2014 or several in one write via `tasks` \u2014 optionally each with a whole subtree. MLO is an OUTLINER: deep nesting is idiomatic, so prefer parentId placement and the subtasks outline over flat top-level lists. Fields and placement are written exactly via the XML pipeline (if the MLO app is open it is closed gracefully \u2014 it saves on close \u2014 and relaunched afterwards); ALWAYS batch multiple adds into one call (`tasks` or subtasks outline) instead of calling per task. Without a parentId, tasks are filed into the profile's <Inbox> node for later processing (parentId \"root\" forces a deliberate top-level task). Only a natural-language dueDate, urgency or parseText route through MLO's best-effort rapid-entry parser (single-task mode only). Always check the reported result.",
   inputSchema: {
     caption: external_exports.string().min(1).optional().describe("Task caption (single-task mode; omit when using `tasks`)"),
-    parentId: external_exports.string().optional().describe("Place the task under this task id (default: top level / inbox)"),
+    parentId: external_exports.string().optional().describe(`Place the task under this task id; "root" forces top level (default: the profile's <Inbox> node, else top level)`),
     dueDate: external_exports.string().optional().describe(`ISO ("2026-08-01" or "2026-08-01T15:00") is applied exactly; natural language ("tomorrow 3pm") goes through MLO's parser`),
     urgency: external_exports.number().int().min(1).max(5).optional().describe("1\u20135; parser path only (no XML field)"),
     parseText: external_exports.string().optional().describe('Raw MLO parser tail appended verbatim, e.g. "remind tomorrow 9am -h -p" \u2014 forces the parser path'),
@@ -24200,16 +24243,20 @@ var addTaskTool = defineTool({
         "subtasks require the exact XML path \u2014 use an ISO dueDate and drop urgency/parseText, or create the parent first and add parser-based subtasks separately"
       );
     }
-    let parentCaption;
-    if (parentId) {
-      const parent = findById((await ctx.store.getSnapshot()).tasks, parentId);
+    let parent;
+    let toInbox = false;
+    if (parentId && parentId !== "root") {
+      parent = findById((await ctx.store.getSnapshot()).tasks, parentId);
       if (!parent) return errorResult(`no task with id "${parentId}" \u2014 re-run list_tasks and retry`);
-      parentCaption = parent.Caption;
+    } else if (!parentId) {
+      parent = findInbox((await ctx.store.getSnapshot()).tasks, ctx.config.inboxCaption);
+      toInbox = Boolean(parent);
     }
-    let placement = parentCaption ? `under "${parentCaption}"` : "top level";
+    const parentCaption = parent?.Caption;
+    let placement = toInbox ? "inbox" : parentCaption ? `under "${parentCaption}"` : parentId === "root" ? "top level" : "top level \u2014 no inbox node found in this profile";
     let method;
     const hasFields = Boolean(
-      note || isoDue || isoStart || contexts?.length || importance || effort || starred || folder || flag || parentId
+      note || isoDue || isoStart || contexts?.length || importance || effort || starred || folder || flag || parent
     );
     const useXmlPath = !needsParser && (guiRunning ? ctx.config.autoRestartGui : hasFields) || subtree.length > 0;
     let guiRestarted = false;
@@ -24226,7 +24273,11 @@ var addTaskTool = defineTool({
         ctx.config,
         (doc) => {
           let siblings;
-          if (parentId) {
+          if (toInbox) {
+            const rawInbox = findRawInbox(doc, ctx.config.inboxCaption);
+            if (!rawInbox) throw new Error("the inbox node vanished between snapshot and write \u2014 retry");
+            siblings = rawInbox.TaskNode ??= [];
+          } else if (parent && parentId) {
             const found = findRawById(doc, parentId);
             if (!found) throw new Error(`no task with id "${parentId}" \u2014 re-run list_tasks and retry`);
             siblings = found.raw.TaskNode ??= [];
@@ -24251,12 +24302,11 @@ var addTaskTool = defineTool({
       if (flag) switches.push(`-fl${flag}`);
       if (parseText) switches.push(parseText);
       let parentGuid;
-      if (parentId && parentCaption) {
-        const parent = findById((await ctx.store.getSnapshot()).tasks, parentId);
-        if (parent?.Guid && !guiRunning) {
+      if (parent) {
+        if (parent.Guid && !guiRunning) {
           parentGuid = parent.Guid;
           placement += " via GUID";
-        } else {
+        } else if (!toInbox) {
           switches.push(`-to${parentCaption}`);
           placement += " via name match";
         }
@@ -24712,6 +24762,10 @@ Each write keeps a timestamped backup next to the data file; batches are atomic 
   handle recurrence.
 - add_task's natural-language dates/urgency/parseText use MLO's best-effort rapid-entry parser;
   everything else is written exactly. Batch mode is exact-only.
+- add_task without a parentId files the task into the profile's capture inbox \u2014 the top-level
+  "<Inbox>" node (same caption in every MLO language; list_tasks marks it [inbox]). Pass
+  parentId "root" for a deliberate top-level task. No inbox node \u2192 top level, and the result
+  says so.
 
 ### Completion
 complete_task marks done (projects get ProjectStatus too); uncomplete_task reopens.

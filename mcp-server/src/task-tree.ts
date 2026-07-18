@@ -67,6 +67,43 @@ export function findById(tasks: TaskNode[], id: string): TaskNode | undefined {
 }
 
 /**
+ * MLO's inbox is an ordinary top-level task the GUI creates on first
+ * rapid-entry capture, captioned literally "<Inbox>". That caption is the
+ * identity: it is hardcoded in mlo.exe for every UI language (the .lng files
+ * localize only the Inbox VIEW label) and the profile stores no other pointer
+ * to the node. A plain "Inbox" is matched too for hand-made capture folders;
+ * anything else needs the MLO_INBOX_CAPTION config override.
+ */
+const INBOX_CAPTIONS = ["<Inbox>", "Inbox"];
+
+function inboxCaptions(configCaption?: string): string[] {
+  return configCaption ? [configCaption, ...INBOX_CAPTIONS] : INBOX_CAPTIONS;
+}
+
+/** Marker check for outline rendering (canonical captions only, top level only). */
+export function looksLikeInbox(t: TaskNode): boolean {
+  return t.Depth === 0 && INBOX_CAPTIONS.includes(t.Caption);
+}
+
+export function findInbox(tasks: TaskNode[], configCaption?: string): TaskNode | undefined {
+  for (const cap of inboxCaptions(configCaption)) {
+    const hit = tasks.find((t) => t.Caption === cap);
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+/** The inbox as a RawTaskNode inside a parsed document (for mutation callbacks). */
+export function findRawInbox(doc: MloDocument, configCaption?: string): RawTaskNode | undefined {
+  const top = rootNode(doc).TaskNode ?? [];
+  for (const cap of inboxCaptions(configCaption)) {
+    const hit = top.find((n) => n["@_Caption"] === cap);
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+/**
  * Locate the RawTaskNode for a path id inside the parsed document, together
  * with its parent's child array and index — what a mutation needs.
  */
@@ -125,6 +162,7 @@ export function searchTasks(tasks: TaskNode[], f: SearchFilters): TaskNode[] {
 /** One-line human-readable summary of a task. */
 export function renderLine(t: TaskNode): string {
   const marks: string[] = [];
+  if (looksLikeInbox(t)) marks.push("[inbox]");
   if (t.CompletionDateTime) marks.push("[done]");
   if (t.IsProject) marks.push("[project]");
   if (t.Starred) marks.push("[*]");

@@ -215,6 +215,25 @@ Handy when driving the GUI to check what the MCP server wrote.
 
 ---
 
+## 5b. The Inbox (empirically verified)
+
+MLO's capture inbox is an **ordinary top-level task captioned literally
+`<Inbox>`** — the built-in Inbox view (ToDoViewType 3) shows its children, and
+GUI rapid entry files new tasks under it, creating the node on first use.
+
+The caption **is** the identity, in every UI language:
+
+- `<Inbox>` is hardcoded as a UTF-16 string in `mlo.exe`; the `.lng` language
+  files translate only the Inbox *view* label (Russian "Входящее"), not the
+  node caption — a Russian profile still stores `<Inbox>`.
+- The profile contains no other pointer to the node: its GUID appears exactly
+  once (its own task record) in both the task DB and the app-state streams.
+
+The CLI (`-AddSubtask` without `-task`) bypasses the inbox and targets the tree
+root — which is why the server resolves the inbox itself: `add_task` without a
+`parentId` files under the `<Inbox>` node (or a plain `Inbox`, or the
+`MLO_INBOX_CAPTION` override), and `parentId: "root"` forces top level.
+
 ## 6. How this maps to the MCP tools
 
 The concepts above are what the `add_task` / `update_task` fields ultimately set.
