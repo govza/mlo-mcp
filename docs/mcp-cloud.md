@@ -191,6 +191,14 @@ The local sync endpoint always starts alongside the MCP server.
   `CreatedDate`/`LastModified` in MLO's zone-free ISO form), appends it to the
   log as an `origin:"mcp"` delta, triggers `mlo.exe -QuickSync`, then verifies
   the task appeared via a fresh export.
+- `cloud_delete_task` — resolves path-based ids to GUIDs and appends ONE
+  `origin:"mcp"` delta with `TodoItems.Deleted` tombstones for every selected
+  task *and all of its descendants* (whether MLO cascades a bare parent
+  tombstone to children is unverified — cloud-sync.md's delete experiment used
+  a childless task — and extra tombstones union-merge harmlessly), triggers
+  `mlo.exe -QuickSync`, then verifies the GUIDs are gone from a fresh export.
+  Fails atomically when any task in a selected subtree has no recoverable
+  GUID (fall back to `delete_task`).
 - `cloud_status` — read-only mirror of `GET /v1/status`.
 
 The long-term goal is to route the existing write tools through this path;

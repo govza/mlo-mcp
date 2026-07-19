@@ -18,16 +18,20 @@ describe("cloud deltas", () => {
     expect(section.rows[0]![19]).toBe("50");
   });
 
-  it("builds only a TodoItems.Deleted tombstone", () => {
-    const delta = buildTaskDeleteDelta(uid);
+  it("builds only TodoItems.Deleted tombstones, one row per uid", () => {
+    const other = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}";
+    const delta = buildTaskDeleteDelta([uid, other]);
     expect(findSection(delta, "TodoItems")!.rows).toEqual([]);
-    expect(findSection(delta, "TodoItems.Deleted")!.rows).toEqual([["{12345678-1234-1234-1234-123456789ABC}"]]);
+    expect(findSection(delta, "TodoItems.Deleted")!.rows).toEqual([
+      ["{12345678-1234-1234-1234-123456789ABC}"],
+      [other],
+    ]);
   });
 
   it("uses newest full records and lets a tombstone remove a pending task", () => {
     const first = buildTaskAddDelta({ uid, caption: "old", createdDate: "a", lastModified: "a" });
     const second = buildTaskAddDelta({ uid, caption: "new", createdDate: "a", lastModified: "b" });
-    const deleted = buildTaskDeleteDelta(uid);
+    const deleted = buildTaskDeleteDelta([uid]);
     expect(findSection(mergeDeltas([first, second]), "TodoItems")!.rows[0]![3]).toBe("new");
     const merged = mergeDeltas([first, second, deleted]);
     expect(findSection(merged, "TodoItems")!.rows).toEqual([]);

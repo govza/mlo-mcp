@@ -97,9 +97,10 @@ export function buildTaskAddDelta(input: TaskAddDeltaInput): SectionedCsv {
   return document;
 }
 
-export function buildTaskDeleteDelta(uid: string): SectionedCsv {
+export function buildTaskDeleteDelta(uids: readonly string[]): SectionedCsv {
   const document = createDeltaSkeleton();
-  findSection(document, "TodoItems.Deleted")!.rows.push([normalizeGuid(uid)]);
+  const section = findSection(document, "TodoItems.Deleted")!;
+  for (const uid of uids) section.rows.push([normalizeGuid(uid)]);
   return document;
 }
 

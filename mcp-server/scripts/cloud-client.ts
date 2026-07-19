@@ -75,7 +75,7 @@ async function pushDelta(cursor: CloudCursor, commandArgs: string[]): Promise<{ 
   if (commandArgs[0] === "--delete") {
     if (!commandArgs[1]) throw new Error("push --delete requires a UID");
     uid = commandArgs[1];
-    delta = buildTaskDeleteDelta(uid);
+    delta = buildTaskDeleteDelta([uid]);
   } else {
     const caption = commandArgs.join(" ");
     if (!caption) throw new Error("push requires a caption or --delete UID");
