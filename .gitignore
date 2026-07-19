@@ -17,6 +17,9 @@ export_*.xml
 *.ml.bak-*
 *.ml.mcp-lock/
 
+# mcp-cloud delta log + state, and the reference client's cursor files
+*.ml.mcp-cloud/
+
 # Local machine config (permissions, etc.)
 .claude/settings.local.json
 

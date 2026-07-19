@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
     "test:mlo": "vitest run --project mlo",
-    "tool": "tsx scripts/run-tool.ts"
+    "tool": "tsx scripts/run-tool.ts",
+    "cloud": "tsx scripts/cloud-client.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
