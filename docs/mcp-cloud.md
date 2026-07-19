@@ -192,16 +192,19 @@ appends `origin:"mcp"` deltas here and triggers `mlo.exe -QuickSync`
 ([tools.md](tools.md) defines the surface):
 
 - `add_task` — builds a full `TodoItems` row (fresh braced uppercase GUID,
-  `CreatedDate`/`LastModified` in MLO's zone-free ISO form), appends it, then
-  verifies the task appeared via a fresh export.
+  `CreatedDate`/`LastModified` in MLO's zone-free ISO form), optional existing
+  Places/Flag/dependency relations and task booleans, appends it, then verifies
+  the task appeared via a fresh export. `add_tasks` applies the same projection
+  to up to 50 locally-keyed tasks as one atomic outline delta.
 - `update_task` — batched full-row field edits (caption, note, dates,
-  importance/effort/estimates, project status, goal) and re-parenting moves
-  via `ParentUID`. Sourced from the delta log like the completion tools.
-  Deliberately unsupported until their wire encoding is observed in a real
-  app delta: boolean columns (the CSV true-value — `1` vs Delphi `-1` — has
-  never been captured), `FlagUID` resolution, and Places/dependency relation
-  edits (no `TodoItemPlaces.Deleted` section exists, so removal semantics are
-  unknown). Date edits on recurring tasks are refused.
+  importance/effort/estimates, project status, goal, task booleans including
+  Folder/Project/Starred, existing Flag assignment, complete Places replacement)
+  and re-parenting moves via `ParentUID`. Rows, existing relations, Places,
+  Flags, and starred ordering are projected from the delta log. Context removal
+  uses the observed full-replacement rule: a task row with no relation rows
+  clears its contexts. Dependencies use the same complete-replacement rule and
+  resolve path ids to stable GUIDs before queueing. Date edits on recurring
+  tasks are refused.
 - `complete_task` / `uncomplete_task` — full-row updates that set or clear
   `CompletionDateTime` (and flip `ProjectStatus` for projects). A changed
   object must travel as a complete 82-column record, and the XML export
@@ -218,7 +221,8 @@ appends `origin:"mcp"` deltas here and triggers `mlo.exe -QuickSync`
   unverified — cloud-sync.md's delete experiment used a childless task — and
   extra tombstones union-merge harmlessly), then verifies the GUIDs are gone
   from a fresh export. Fails atomically when any task in a selected subtree
-  has no recoverable GUID.
+  has no GUID recoverable from the binary/XML or an unambiguous logged cloud
+  path.
 - `cloud_status` — read-only mirror of `GET /v1/status`.
 
 ## Open questions (do not hard-code answers)

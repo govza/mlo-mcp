@@ -136,6 +136,43 @@ The rename delta again contained the complete 82-column task row:
 
 A changed object is therefore projected as a full logical record, not only the changed column.
 
+## Controlled Starred, context, Folder, Project, and Flag experiment
+
+A second experiment used one disposable task and one QuickSync after every
+single UI change. The local endpoint captured each
+`ApplyModificationsBytesEx` upload byte-for-byte in `messages/delta-*.zip`.
+There is no field-specific cloud method: all these changes use the same upload
+operation and sectioned delta envelope.
+
+| UI change | `TodoItems` values | Companion rows |
+|---|---|---|
+| Star on | `Starred=1`; `StarToggleDateTime` and `LastModified` set to the change time | `TodoView.ManualOrdering.Starred(UID, ItemIndex)` |
+| Assign `@Home` | existing `Starred=1`; `LastModified` advances | `TodoItemPlaces(TodoItemUID, @Home PlaceUID)` |
+| Star off | `Starred=0`; `StarToggleDateTime` and `LastModified` advance | no starred-order row; unchanged context relation is re-emitted |
+| Remove last context | full task row; `LastModified` advances | zero `TodoItemPlaces` rows for the task |
+| Folder on | `HideInToDoThisTask=1` | none |
+| Project on | `IsProject=1`, `ProjectStatus=0` | none |
+| Assign Red Flag | `FlagUID` equals the Red Flag row's UID in `Flags` | none |
+| Add dependency | `DependOper=0`, `DependPostpone=0`; `LastModified` advances | `TodoItems.Dependency(TaskUID, DependencyUID)` |
+| Remove last dependency | full task row; `LastModified` advances | zero `TodoItems.Dependency` rows for the task |
+| Hide branch + complete in order | `HideInToDo=1`, `CompleteInOrder=1` | none |
+| Add two children | each child has the parent's task UID in `ParentUID` | observed sibling `ItemIndex` values `25`, `50` |
+
+Cloud CSV booleans are therefore `1`/`0`, not the native XML format's Delphi
+`-1`/absent representation. Places and Flags are referenced by GUID; their
+captions are lookup data from the `Places` and `Flags` sections.
+
+The context removal is especially important: relation rows for an emitted task
+are a **complete replacement set**. There is no `TodoItemPlaces.Deleted`
+section. A merger must discard that task's older place relations when it sees a
+new `TodoItems` row, then add only the `TodoItemPlaces` rows present in the same
+delta. The observed app also re-emits unchanged relations when another property
+of a contextual task changes.
+
+Dependencies use the same complete-replacement rule. `TaskUID` is the waiting
+task; `DependencyUID` is the blocker. Removing the last blocker is represented
+by the waiting task's full row and no dependency rows, with no deletion table.
+
 ### Delete
 
 The delete delta contained:

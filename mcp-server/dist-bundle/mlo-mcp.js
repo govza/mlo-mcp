@@ -23791,74 +23791,6 @@ var searchTasksTool = defineTool({
   }
 });
 
-// src/tools/get-task.ts
-var getTaskTool = defineTool({
-  name: "get_task",
-  title: "Get task details",
-  description: "Full details of one task by id, including note, estimates, schedule fields and child tasks.",
-  inputSchema: { id: external_exports.string().describe('Path-based id from list_tasks/search_tasks, e.g. "1.2.3"') },
-  outputSchema: {
-    task: TaskSummarySchema.extend({
-      Note: external_exports.string().optional(),
-      Effort: external_exports.number().optional(),
-      CompletionDateTime: external_exports.string().optional(),
-      EstimateMin: external_exports.number().optional().describe("fractional days"),
-      EstimateMax: external_exports.number().optional().describe("fractional days"),
-      LeadTime: external_exports.number().optional().describe("days"),
-      HideInToDo: external_exports.boolean().optional(),
-      HideInToDoThisTask: external_exports.boolean().optional().describe("true = folder-style task (hidden from to-do views itself)"),
-      CompleteSubTasksInOrder: external_exports.boolean().optional(),
-      children: external_exports.array(external_exports.object({ id: external_exports.string(), Caption: external_exports.string() })),
-      dependsOn: external_exports.array(external_exports.object({ id: external_exports.string().optional(), Caption: external_exports.string().optional(), uid: external_exports.string() })).describe("Tasks this task waits for"),
-      dependedOnBy: external_exports.array(external_exports.object({ id: external_exports.string(), Caption: external_exports.string() })).describe("Tasks waiting for this task")
-    })
-  },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  async execute({ id }, ctx) {
-    const snap = await ctx.store.getSnapshot();
-    const t = findById(snap.tasks, id);
-    if (!t) return errorResult(`no task with id "${id}" \u2014 ids shift when the tree changes; re-run list_tasks`);
-    const all = flatten(snap.tasks);
-    const byGuid = new Map(all.filter((x2) => x2.Guid).map((x2) => [x2.Guid, x2]));
-    const dependsOn = t.DependsOn.map((uid) => {
-      const dep = byGuid.get(uid);
-      return { id: dep?.id, Caption: dep?.Caption, uid };
-    });
-    const dependedOnBy = all.filter((x2) => t.Guid && x2.DependsOn.includes(t.Guid)).map((x2) => ({ id: x2.id, Caption: x2.Caption }));
-    const task = {
-      ...toSummary(t),
-      Note: t.Note,
-      Effort: t.Effort,
-      CompletionDateTime: t.CompletionDateTime,
-      EstimateMin: t.EstimateMin,
-      EstimateMax: t.EstimateMax,
-      LeadTime: t.LeadTime,
-      HideInToDo: t.HideInToDo,
-      HideInToDoThisTask: t.HideInToDoThisTask,
-      CompleteSubTasksInOrder: t.CompleteSubTasksInOrder,
-      children: t.Children.map((c) => ({ id: c.id, Caption: c.Caption })),
-      dependsOn,
-      dependedOnBy
-    };
-    const lines = [
-      `[${t.id}] ${t.Caption}`,
-      t.Guid ? `guid: ${t.Guid}` : "guid: (not recoverable)",
-      `path: ${t.Path.join(" > ")}`,
-      t.Note ? `note: ${t.Note}` : void 0,
-      t.DueDateTime ? `due: ${t.DueDateTime}` : void 0,
-      t.CompletionDateTime ? `completed: ${t.CompletionDateTime}` : void 0,
-      t.Places.length ? `contexts: ${t.Places.join(", ")}` : void 0,
-      t.Children.length ? `children: ${t.Children.map((c) => `[${c.id}] ${c.Caption}`).join(", ")}` : void 0,
-      dependsOn.length ? `depends on: ${dependsOn.map((d) => d.id ? `[${d.id}] ${d.Caption}` : `unresolved ${d.uid}`).join(", ")}` : void 0,
-      dependedOnBy.length ? `depended on by: ${dependedOnBy.map((d) => `[${d.id}] ${d.Caption}`).join(", ")}` : void 0
-    ].filter(Boolean);
-    return textResult(lines.join("\n"), { task });
-  }
-});
-
-// src/cloud/delta.ts
-import { randomUUID } from "node:crypto";
-
 // src/cloud/csv.ts
 function parseRecords(input) {
   const records = [];
@@ -23954,6 +23886,7 @@ function findSection(document, name) {
 }
 
 // src/cloud/delta.ts
+import { randomUUID } from "node:crypto";
 var FILE_VERSION = "3";
 var PROGRAM_VERSION = "6.1.3";
 var EDITION = "MLO-Windows";
@@ -24028,7 +23961,31 @@ function buildTaskAddDelta(input) {
   set("CreatedDate", input.createdDate);
   set("LastModified", input.lastModified);
   set("Note", input.note);
+  if (input.isProject !== void 0) set("IsProject", input.isProject ? "1" : "0");
+  if (input.starred !== void 0) {
+    set("Starred", input.starred ? "1" : "0");
+    if (input.starred) set("StarToggleDateTime", input.lastModified);
+  }
+  if (input.hideInToDo !== void 0) set("HideInToDo", input.hideInToDo ? "1" : "0");
+  if (input.hideInToDoThisTask !== void 0) set("HideInToDoThisTask", input.hideInToDoThisTask ? "1" : "0");
+  if (input.completeInOrder !== void 0) set("CompleteInOrder", input.completeInOrder ? "1" : "0");
+  if (input.flagUid !== void 0) set("FlagUID", input.flagUid ? normalizeGuid(input.flagUid) : "");
   findSection(document, "TodoItems").rows.push(row);
+  for (const placeUid of input.placeUids ?? []) {
+    findSection(document, "TodoItemPlaces").rows.push([normalizeGuid(input.uid), normalizeGuid(placeUid)]);
+  }
+  for (const dependencyUid of input.dependencyUids ?? []) {
+    findSection(document, "TodoItems.Dependency").rows.push([
+      normalizeGuid(input.uid),
+      normalizeGuid(dependencyUid)
+    ]);
+  }
+  if (input.starred && input.starredOrderIndex) {
+    findSection(document, "TodoView.ManualOrdering.Starred").rows.push([
+      normalizeGuid(input.uid),
+      input.starredOrderIndex
+    ]);
+  }
   return document;
 }
 function buildTaskDeleteDelta(uids) {
@@ -24054,6 +24011,16 @@ function buildTaskUpdatesDelta(updates) {
       row[index] = value;
     }
     section.rows.push(row);
+    const uid = normalizeGuid(row[section.header.indexOf("UID")] ?? "");
+    for (const placeUid of update.placeUids ?? []) {
+      findSection(document, "TodoItemPlaces").rows.push([uid, normalizeGuid(placeUid)]);
+    }
+    for (const dependencyUid of update.dependencyUids ?? []) {
+      findSection(document, "TodoItems.Dependency").rows.push([uid, normalizeGuid(dependencyUid)]);
+    }
+    if (update.starredOrderIndex !== void 0) {
+      findSection(document, "TodoView.ManualOrdering.Starred").rows.push([uid, update.starredOrderIndex]);
+    }
   }
   return document;
 }
@@ -24087,6 +24054,37 @@ function mergeDeltas(entries) {
   for (const [name] of SECTION_HEADERS) maps.set(name, /* @__PURE__ */ new Map());
   const unknown2 = /* @__PURE__ */ new Map();
   for (const document of entries) {
+    const taskSection = findSection(document, "TodoItems");
+    const deletedSection = findSection(document, "TodoItems.Deleted");
+    const changedUids = /* @__PURE__ */ new Set();
+    const deletedUids = /* @__PURE__ */ new Set();
+    if (taskSection) {
+      const uidIndex = taskSection.header.indexOf("UID");
+      for (const row of taskSection.rows) changedUids.add((row[uidIndex] ?? "").toUpperCase());
+    }
+    if (deletedSection) {
+      const uidIndex = deletedSection.header.indexOf("TodoItemUID");
+      for (const row of deletedSection.rows) deletedUids.add((row[uidIndex] ?? "").toUpperCase());
+    }
+    const purgeRelations = (sectionName, uids) => {
+      const map = maps.get(sectionName);
+      for (const key of [...map.keys()]) if (uids.has(key.split("\0", 1)[0].toUpperCase())) map.delete(key);
+    };
+    purgeRelations("TodoItemPlaces", changedUids);
+    purgeRelations("TodoItems.Dependency", changedUids);
+    purgeRelations("TodoItemPlaces", deletedUids);
+    purgeRelations("TodoItems.Dependency", deletedUids);
+    const starredOrder = maps.get("TodoView.ManualOrdering.Starred");
+    for (const uid of deletedUids) starredOrder.delete(uid);
+    if (taskSection) {
+      const uidIndex = taskSection.header.indexOf("UID");
+      const starredIndex = taskSection.header.indexOf("Starred");
+      if (starredIndex >= 0) {
+        for (const row of taskSection.rows) {
+          if ((row[starredIndex] ?? "") === "0") starredOrder.delete((row[uidIndex] ?? "").toUpperCase());
+        }
+      }
+    }
     for (const section of document.sections) {
       if (section.name === "SysVersions") continue;
       if (!knownNames.has(section.name)) {
@@ -24110,6 +24108,7 @@ function mergeDeltas(entries) {
       const map = maps.get(section.name);
       for (const row of section.rows) {
         const key = rowKey(section, row, keys);
+        if ((section.name === "TodoItemPlaces" || section.name === "TodoItems.Dependency") && deletedUids.has((row[0] ?? "").toUpperCase())) continue;
         const targetHeader = targets.get(section.name).header;
         const projected = targetHeader.map((column) => {
           const index = section.header.indexOf(column);
@@ -24117,6 +24116,8 @@ function mergeDeltas(entries) {
         });
         map.set(key, projected);
         if (section.name === "TodoItems.Deleted") maps.get("TodoItems").delete(key);
+        if (section.name === "Places.Deleted") maps.get("Places").delete(key);
+        if (section.name === "Flags.Deleted") maps.get("Flags").delete(key);
       }
     }
   }
@@ -25141,9 +25142,172 @@ function parseCursor(value) {
   return parsed;
 }
 
+// src/cloud/log-projection.ts
+function rowValue(known, column) {
+  const index = known.header.indexOf(column);
+  return index < 0 ? "" : known.row[index] ?? "";
+}
+function resolveTaskUid(task, rows) {
+  let parentUid = "";
+  for (const caption of task.Path) {
+    const matches = [...rows.entries()].filter(
+      ([, known]) => rowValue(known, "ParentUID").toUpperCase() === parentUid && rowValue(known, "Caption") === caption
+    );
+    if (matches.length !== 1) return void 0;
+    parentUid = matches[0][0].toUpperCase();
+  }
+  return parentUid || void 0;
+}
+function latestFullRows(documents) {
+  const merged = mergeDeltas(documents);
+  const section = findSection(merged, "TodoItems");
+  const uidIndex = section.header.indexOf("UID");
+  const rows = /* @__PURE__ */ new Map();
+  for (const row of section.rows) {
+    const uid = (row[uidIndex] ?? "").toUpperCase();
+    if (uid) rows.set(uid, { header: section.header, row });
+  }
+  return rows;
+}
+async function knownCloudProjection(state) {
+  const entries = await state.entriesAfter(ZERO_CURSOR);
+  const merged = mergeDeltas(entries.map((entry) => unpackEnvelope(entry.bytes)));
+  const rows = latestFullRows([merged]);
+  const collectRelations = (sectionName, ownerColumn, valueColumn) => {
+    const section = findSection(merged, sectionName);
+    const ownerIndex = section.header.indexOf(ownerColumn);
+    const valueIndex = section.header.indexOf(valueColumn);
+    const result = /* @__PURE__ */ new Map();
+    for (const row of section.rows) {
+      const owner = (row[ownerIndex] ?? "").toUpperCase();
+      const value = (row[valueIndex] ?? "").toUpperCase();
+      if (owner && value) result.set(owner, [...result.get(owner) ?? [], value]);
+    }
+    return result;
+  };
+  const named = (sectionName) => {
+    const section = findSection(merged, sectionName);
+    const uidIndex = section.header.indexOf("UID");
+    const captionIndex = section.header.indexOf("Caption");
+    return section.rows.map((row) => ({ uid: (row[uidIndex] ?? "").toUpperCase(), caption: row[captionIndex] ?? "" })).filter(({ uid, caption }) => uid !== "" && caption !== "");
+  };
+  const order = findSection(merged, "TodoView.ManualOrdering.Starred");
+  const orderUid = order.header.indexOf("UID");
+  const orderIndex = order.header.indexOf("ItemIndex");
+  return {
+    rows,
+    placeUidsByTask: collectRelations("TodoItemPlaces", "TodoItemUID", "PlaceUID"),
+    dependencyUidsByTask: collectRelations("TodoItems.Dependency", "TaskUID", "DependencyUID"),
+    places: named("Places"),
+    flags: named("Flags"),
+    starredOrderByTask: new Map(order.rows.map((row) => [
+      (row[orderUid] ?? "").toUpperCase(),
+      row[orderIndex] ?? ""
+    ]))
+  };
+}
+
+// src/tools/get-task.ts
+var getTaskTool = defineTool({
+  name: "get_task",
+  title: "Get task details",
+  description: "Full details of one task by id, including note, estimates, schedule fields and child tasks.",
+  inputSchema: { id: external_exports.string().describe('Path-based id from list_tasks/search_tasks, e.g. "1.2.3"') },
+  outputSchema: {
+    task: TaskSummarySchema.extend({
+      Note: external_exports.string().optional(),
+      Effort: external_exports.number().optional(),
+      CompletionDateTime: external_exports.string().optional(),
+      EstimateMin: external_exports.number().optional().describe("fractional days"),
+      EstimateMax: external_exports.number().optional().describe("fractional days"),
+      LeadTime: external_exports.number().optional().describe("days"),
+      HideInToDo: external_exports.boolean().optional(),
+      HideInToDoThisTask: external_exports.boolean().optional().describe("true = folder-style task (hidden from to-do views itself)"),
+      CompleteSubTasksInOrder: external_exports.boolean().optional(),
+      children: external_exports.array(external_exports.object({ id: external_exports.string(), Caption: external_exports.string() })),
+      dependsOn: external_exports.array(external_exports.object({ id: external_exports.string().optional(), Caption: external_exports.string().optional(), uid: external_exports.string() })).describe("Tasks this task waits for"),
+      dependedOnBy: external_exports.array(external_exports.object({ id: external_exports.string(), Caption: external_exports.string() })).describe("Tasks waiting for this task")
+    })
+  },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  async execute({ id }, ctx) {
+    const snap = await ctx.store.getSnapshot();
+    const t = findById(snap.tasks, id);
+    if (!t) return errorResult(`no task with id "${id}" \u2014 ids shift when the tree changes; re-run list_tasks`);
+    const all = flatten(snap.tasks);
+    const cloud = await knownCloudProjection(ctx.cloudState);
+    const uidFor = (task2) => task2.Guid?.toUpperCase() ?? resolveTaskUid(task2, cloud.rows);
+    const resolvedUid = uidFor(t);
+    const byGuid = /* @__PURE__ */ new Map();
+    for (const task2 of all) {
+      const uid = uidFor(task2);
+      if (uid) byGuid.set(uid, task2);
+    }
+    const dependsOn = t.DependsOn.map((uid) => {
+      const dep = byGuid.get(uid.toUpperCase());
+      return { id: dep?.id, Caption: dep?.Caption, uid };
+    });
+    const dependedOnBy = all.filter((x2) => resolvedUid && x2.DependsOn.map((uid) => uid.toUpperCase()).includes(resolvedUid)).map((x2) => ({ id: x2.id, Caption: x2.Caption }));
+    const task = {
+      ...toSummary(t),
+      Guid: resolvedUid,
+      Note: t.Note,
+      Effort: t.Effort,
+      CompletionDateTime: t.CompletionDateTime,
+      EstimateMin: t.EstimateMin,
+      EstimateMax: t.EstimateMax,
+      LeadTime: t.LeadTime,
+      HideInToDo: t.HideInToDo,
+      HideInToDoThisTask: t.HideInToDoThisTask,
+      CompleteSubTasksInOrder: t.CompleteSubTasksInOrder,
+      children: t.Children.map((c) => ({ id: c.id, Caption: c.Caption })),
+      dependsOn,
+      dependedOnBy
+    };
+    const lines = [
+      `[${t.id}] ${t.Caption}`,
+      resolvedUid ? `guid: ${resolvedUid}` : "guid: (not recoverable)",
+      `path: ${t.Path.join(" > ")}`,
+      t.Note ? `note: ${t.Note}` : void 0,
+      t.DueDateTime ? `due: ${t.DueDateTime}` : void 0,
+      t.CompletionDateTime ? `completed: ${t.CompletionDateTime}` : void 0,
+      t.Places.length ? `contexts: ${t.Places.join(", ")}` : void 0,
+      t.Children.length ? `children: ${t.Children.map((c) => `[${c.id}] ${c.Caption}`).join(", ")}` : void 0,
+      dependsOn.length ? `depends on: ${dependsOn.map((d) => d.id ? `[${d.id}] ${d.Caption}` : `unresolved ${d.uid}`).join(", ")}` : void 0,
+      dependedOnBy.length ? `depended on by: ${dependedOnBy.map((d) => `[${d.id}] ${d.Caption}`).join(", ")}` : void 0
+    ].filter(Boolean);
+    return textResult(lines.join("\n"), { task });
+  }
+});
+
 // src/tools/add-task.ts
 function matchesInput(task, caption, note) {
   return task.Caption === caption && (note === void 0 || task.Note === note);
+}
+function resolveNamed(caption, objects, kind) {
+  const matches = objects.filter((object3) => object3.caption.toLocaleLowerCase() === caption.toLocaleLowerCase());
+  if (matches.length === 0) throw new Error(`unknown ${kind} "${caption}" \u2014 use an existing ${kind}`);
+  if (matches.length > 1) throw new Error(`ambiguous ${kind} "${caption}" \u2014 ${matches.length} definitions have that caption`);
+  return matches[0].uid;
+}
+function matchesRequestedFields(task, args) {
+  if (args.IsProject !== void 0 && (task.IsProject ?? false) !== args.IsProject) return false;
+  if (args.Starred !== void 0 && (task.Starred ?? false) !== args.Starred) return false;
+  if (args.Folder !== void 0 && (task.HideInToDoThisTask ?? false) !== args.Folder) return false;
+  if (args.HideInToDo !== void 0 && (task.HideInToDo ?? false) !== args.HideInToDo) return false;
+  if (args.CompleteSubTasksInOrder !== void 0 && (task.CompleteSubTasksInOrder ?? false) !== args.CompleteSubTasksInOrder) return false;
+  if (args.Flag !== void 0 && (task.Flag ?? "").toLocaleLowerCase() !== args.Flag.toLocaleLowerCase()) return false;
+  if (args.Places !== void 0) {
+    const expected = args.Places.map((place) => place.toLocaleLowerCase()).sort();
+    const actual = task.Places.map((place) => place.toLocaleLowerCase()).sort();
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) return false;
+  }
+  if (args.dependsOnUids !== void 0) {
+    const expected = args.dependsOnUids.map((uid) => uid.toUpperCase()).sort();
+    const actual = task.DependsOn.map((uid) => uid.toUpperCase()).sort();
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) return false;
+  }
+  return true;
 }
 function wasTaskAdded(before, after, caption, note, queuedUid) {
   const beforeMatches = flatten(before).filter((task) => matchesInput(task, caption, note));
@@ -25159,7 +25323,15 @@ var addTaskTool = defineTool({
     note: external_exports.string().optional(),
     dueDateTime: external_exports.string().optional(),
     startDateTime: external_exports.string().optional(),
-    parentUid: external_exports.string().optional()
+    parentUid: external_exports.string().optional(),
+    IsProject: external_exports.boolean().optional(),
+    Starred: external_exports.boolean().optional(),
+    Folder: external_exports.boolean().optional().describe("Hide only this task from To-Do views; children remain eligible"),
+    HideInToDo: external_exports.boolean().optional().describe("Hide this task and its whole branch from To-Do views"),
+    CompleteSubTasksInOrder: external_exports.boolean().optional(),
+    Flag: external_exports.string().optional().describe("Existing flag caption"),
+    Places: external_exports.array(external_exports.string().min(1)).max(25).optional().describe("Existing context captions"),
+    dependsOnUids: external_exports.array(external_exports.string()).max(25).optional().describe("Stable GUIDs of existing tasks this new task waits for (from get_task)")
   },
   outputSchema: {
     uid: external_exports.string(),
@@ -25171,6 +25343,15 @@ var addTaskTool = defineTool({
   async execute(args, ctx) {
     const uid = generateGuid();
     const timestamp = nowIso();
+    const uniquePlaces = [...new Set((args.Places ?? []).map((place) => place.toLocaleLowerCase()))];
+    if (uniquePlaces.length !== (args.Places ?? []).length) throw new Error("duplicate context in Places");
+    const dependencyUids = [...new Set((args.dependsOnUids ?? []).map((uid2) => uid2.toUpperCase()))];
+    if (dependencyUids.length !== (args.dependsOnUids ?? []).length) throw new Error("duplicate GUID in dependsOnUids");
+    const needsLookups = args.Flag !== void 0 || args.Places !== void 0 || args.Starred === true;
+    const cloud = needsLookups ? await knownCloudProjection(ctx.cloudState) : void 0;
+    const flagUid = args.Flag !== void 0 ? resolveNamed(args.Flag, cloud.flags, "flag") : void 0;
+    const placeUids = args.Places?.map((place) => resolveNamed(place, cloud.places, "context"));
+    const starredOrderIndex = args.Starred === true ? String(Math.max(0, ...[...cloud.starredOrderByTask.values()].map(Number).filter(Number.isFinite)) + 500) : void 0;
     let beforeTasks;
     try {
       beforeTasks = (await ctx.store.getSnapshot(true)).tasks;
@@ -25184,7 +25365,16 @@ var addTaskTool = defineTool({
       ...args.parentUid ? { parentUid: args.parentUid } : {},
       ...args.note !== void 0 ? { note: args.note } : {},
       ...args.dueDateTime !== void 0 ? { dueDateTime: args.dueDateTime } : {},
-      ...args.startDateTime !== void 0 ? { startDateTime: args.startDateTime } : {}
+      ...args.startDateTime !== void 0 ? { startDateTime: args.startDateTime } : {},
+      ...args.IsProject !== void 0 ? { isProject: args.IsProject } : {},
+      ...args.Starred !== void 0 ? { starred: args.Starred } : {},
+      ...args.Folder !== void 0 ? { hideInToDoThisTask: args.Folder } : {},
+      ...args.HideInToDo !== void 0 ? { hideInToDo: args.HideInToDo } : {},
+      ...args.CompleteSubTasksInOrder !== void 0 ? { completeInOrder: args.CompleteSubTasksInOrder } : {},
+      ...flagUid !== void 0 ? { flagUid } : {},
+      ...placeUids !== void 0 ? { placeUids } : {},
+      ...args.dependsOnUids !== void 0 ? { dependencyUids } : {},
+      ...starredOrderIndex !== void 0 ? { starredOrderIndex } : {}
     });
     const cursor = cursorToDecimalString(await ctx.cloudState.append("mcp", packEnvelope(delta)));
     let verified = false;
@@ -25194,7 +25384,10 @@ var addTaskTool = defineTool({
       ctx.store.invalidate();
       try {
         const snapshot = await ctx.store.getSnapshot(true);
-        verified = beforeTasks ? wasTaskAdded(beforeTasks, snapshot.tasks, args.caption, args.note, uid) : flatten(snapshot.tasks).some((task) => task.Guid?.toUpperCase() === uid);
+        const candidates = flatten(snapshot.tasks).filter(
+          (task) => (task.Guid?.toUpperCase() === uid || matchesInput(task, args.caption, args.note)) && matchesRequestedFields(task, args)
+        );
+        verified = beforeTasks ? wasTaskAdded(beforeTasks, candidates, args.caption, args.note, uid) : candidates.length > 0;
         message = verified ? "Task was queued and verified in a fresh MLO export." : "Task was queued, but no newly added matching task was present in the fresh export after QuickSync.";
       } catch (error2) {
         message = `Task was queued, but verification failed: ${error2 instanceof Error ? error2.message : String(error2)}`;
@@ -25207,56 +25400,231 @@ var addTaskTool = defineTool({
   }
 });
 
-// src/cloud/log-projection.ts
-function rowValue(known, column) {
-  const index = known.header.indexOf(column);
-  return index < 0 ? "" : known.row[index] ?? "";
+// src/tools/add-tasks.ts
+var BatchTask = external_exports.object({
+  key: external_exports.string().min(1).describe("Unique local key used by parentKey/dependsOnKeys within this call"),
+  caption: external_exports.string().min(1),
+  note: external_exports.string().optional(),
+  dueDateTime: external_exports.string().optional(),
+  startDateTime: external_exports.string().optional(),
+  parentKey: external_exports.string().optional().describe("Local key of another task in this batch"),
+  parentUid: external_exports.string().optional().describe("GUID of an existing parent; omit both parent fields for top level"),
+  IsProject: external_exports.boolean().optional(),
+  Starred: external_exports.boolean().optional(),
+  Folder: external_exports.boolean().optional(),
+  HideInToDo: external_exports.boolean().optional(),
+  CompleteSubTasksInOrder: external_exports.boolean().optional(),
+  Flag: external_exports.string().optional().describe("Existing flag caption"),
+  Places: external_exports.array(external_exports.string().min(1)).max(25).optional().describe("Existing context captions"),
+  dependsOnKeys: external_exports.array(external_exports.string()).max(25).optional().describe("Local keys in this batch that this task waits for"),
+  dependsOnUids: external_exports.array(external_exports.string()).max(25).optional().describe("GUIDs of existing tasks that this task waits for")
+});
+function resolveNamed2(caption, objects, kind) {
+  const matches = objects.filter((object3) => object3.caption.toLocaleLowerCase() === caption.toLocaleLowerCase());
+  if (matches.length === 0) throw new Error(`unknown ${kind} "${caption}" \u2014 use an existing ${kind}`);
+  if (matches.length > 1) throw new Error(`ambiguous ${kind} "${caption}" \u2014 ${matches.length} definitions have that caption`);
+  return matches[0].uid;
 }
-function latestFullRows(documents) {
-  const merged = mergeDeltas(documents);
-  const section = findSection(merged, "TodoItems");
-  const uidIndex = section.header.indexOf("UID");
-  const rows = /* @__PURE__ */ new Map();
-  for (const row of section.rows) {
-    const uid = (row[uidIndex] ?? "").toUpperCase();
-    if (uid) rows.set(uid, { header: section.header, row });
+function validateGraph(specs, byKey) {
+  for (const spec of specs) {
+    if (spec.parentKey !== void 0 && spec.parentUid !== void 0) {
+      throw new Error(`task "${spec.key}" cannot have both parentKey and parentUid`);
+    }
+    if (spec.parentKey !== void 0 && !byKey.has(spec.parentKey)) {
+      throw new Error(`task "${spec.key}" references unknown parentKey "${spec.parentKey}"`);
+    }
+    const relationKeys = spec.dependsOnKeys ?? [];
+    if (new Set(relationKeys).size !== relationKeys.length) throw new Error(`task "${spec.key}" has duplicate dependsOnKeys`);
+    for (const key of relationKeys) {
+      if (!byKey.has(key)) throw new Error(`task "${spec.key}" references unknown dependsOnKey "${key}"`);
+      if (key === spec.key) throw new Error(`task "${spec.key}" cannot depend on itself`);
+    }
+    const places = (spec.Places ?? []).map((place) => place.toLocaleLowerCase());
+    if (new Set(places).size !== places.length) throw new Error(`task "${spec.key}" has duplicate Places`);
   }
-  return rows;
+  for (const spec of specs) {
+    const seen = /* @__PURE__ */ new Set([spec.key]);
+    let parentKey = spec.parentKey;
+    while (parentKey !== void 0) {
+      if (seen.has(parentKey)) throw new Error(`parentKey cycle involving "${spec.key}" and "${parentKey}"`);
+      seen.add(parentKey);
+      parentKey = byKey.get(parentKey).parentKey;
+    }
+  }
 }
-async function knownFullRows(state) {
-  const entries = await state.entriesAfter(ZERO_CURSOR);
-  return latestFullRows(entries.map((entry) => unpackEnvelope(entry.bytes)));
+function signature(task) {
+  return `${task.Caption}\0${task.Note ?? ""}`;
 }
+function countSignatures(tasks) {
+  const result = /* @__PURE__ */ new Map();
+  for (const task of flatten([...tasks])) result.set(signature(task), (result.get(signature(task)) ?? 0) + 1);
+  return result;
+}
+var addTasksTool = defineTool({
+  name: "add_tasks",
+  title: "Add an atomic task outline",
+  description: "Queue 1\u201350 new tasks as one atomic cloud delta. Local keys express arbitrary parent/child outlines and within-batch dependencies; parentUid and dependsOnUids link to existing tasks by stable GUID.",
+  inputSchema: {
+    tasks: external_exports.array(BatchTask).min(1).max(50).describe("Flat task definitions; input order is used as sibling order")
+  },
+  outputSchema: {
+    tasks: external_exports.array(external_exports.object({ key: external_exports.string(), uid: external_exports.string() })),
+    cursor: external_exports.string(),
+    verified: external_exports.boolean(),
+    message: external_exports.string()
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  async execute({ tasks }, ctx) {
+    const byKey = /* @__PURE__ */ new Map();
+    for (const spec of tasks) {
+      if (byKey.has(spec.key)) throw new Error(`duplicate task key "${spec.key}"`);
+      byKey.set(spec.key, spec);
+    }
+    validateGraph(tasks, byKey);
+    const uids = new Map(tasks.map((spec) => [spec.key, generateGuid()]));
+    const cloud = await knownCloudProjection(ctx.cloudState);
+    let starredIndex = Math.max(0, ...[...cloud.starredOrderByTask.values()].map(Number).filter(Number.isFinite)) + 500;
+    const maxItemIndexByParent = /* @__PURE__ */ new Map();
+    for (const known of cloud.rows.values()) {
+      const parentUid = rowValue(known, "ParentUID").toUpperCase();
+      const itemIndex = Number(rowValue(known, "ItemIndex"));
+      if (Number.isFinite(itemIndex)) maxItemIndexByParent.set(parentUid, Math.max(maxItemIndexByParent.get(parentUid) ?? 0, itemIndex));
+    }
+    const timestamp = nowIso();
+    let before;
+    try {
+      before = (await ctx.store.getSnapshot(true)).tasks;
+    } catch {
+    }
+    const documents = tasks.map((spec) => {
+      const existingDependencies = (spec.dependsOnUids ?? []).map((uid) => uid.toUpperCase());
+      const batchDependencies = (spec.dependsOnKeys ?? []).map((key) => uids.get(key));
+      const dependencyUids = [...existingDependencies, ...batchDependencies];
+      if (new Set(dependencyUids).size !== dependencyUids.length) {
+        throw new Error(`task "${spec.key}" has duplicate dependency targets`);
+      }
+      const starOrder = spec.Starred ? String(starredIndex) : void 0;
+      if (spec.Starred) starredIndex += 500;
+      const parentUid = spec.parentKey !== void 0 ? uids.get(spec.parentKey) : spec.parentUid;
+      const parentKey = parentUid?.toUpperCase() ?? "";
+      const itemIndex = (maxItemIndexByParent.get(parentKey) ?? 0) + 25;
+      maxItemIndexByParent.set(parentKey, itemIndex);
+      return buildTaskAddDelta({
+        uid: uids.get(spec.key),
+        parentUid,
+        itemIndex: String(itemIndex),
+        caption: spec.caption,
+        createdDate: timestamp,
+        lastModified: timestamp,
+        ...spec.note !== void 0 ? { note: spec.note } : {},
+        ...spec.dueDateTime !== void 0 ? { dueDateTime: spec.dueDateTime } : {},
+        ...spec.startDateTime !== void 0 ? { startDateTime: spec.startDateTime } : {},
+        ...spec.IsProject !== void 0 ? { isProject: spec.IsProject } : {},
+        ...spec.Starred !== void 0 ? { starred: spec.Starred } : {},
+        ...spec.Folder !== void 0 ? { hideInToDoThisTask: spec.Folder } : {},
+        ...spec.HideInToDo !== void 0 ? { hideInToDo: spec.HideInToDo } : {},
+        ...spec.CompleteSubTasksInOrder !== void 0 ? { completeInOrder: spec.CompleteSubTasksInOrder } : {},
+        ...spec.Flag !== void 0 ? { flagUid: resolveNamed2(spec.Flag, cloud.flags, "flag") } : {},
+        ...spec.Places !== void 0 ? { placeUids: spec.Places.map((place) => resolveNamed2(place, cloud.places, "context")) } : {},
+        ...dependencyUids.length ? { dependencyUids } : {},
+        ...starOrder !== void 0 ? { starredOrderIndex: starOrder } : {}
+      });
+    });
+    const cursor = cursorToDecimalString(await ctx.cloudState.append("mcp", packEnvelope(mergeDeltas(documents))));
+    const resultTasks = tasks.map((spec) => ({ key: spec.key, uid: uids.get(spec.key) }));
+    let verified = false;
+    let message;
+    try {
+      await quickSync(ctx.config);
+      ctx.store.invalidate();
+      try {
+        const after = (await ctx.store.getSnapshot(true)).tasks;
+        const afterFlat = flatten(after);
+        const afterGuids = new Set(afterFlat.map((task) => task.Guid?.toUpperCase()).filter(Boolean));
+        verified = resultTasks.every(({ uid }) => afterGuids.has(uid));
+        if (!verified && before) {
+          const beforeCounts = countSignatures(before);
+          const afterCounts = countSignatures(after);
+          const requested = /* @__PURE__ */ new Map();
+          for (const spec of tasks) requested.set(signature({ Caption: spec.caption, Note: spec.note }), (requested.get(signature({ Caption: spec.caption, Note: spec.note })) ?? 0) + 1);
+          verified = [...requested].every(([key, count]) => (afterCounts.get(key) ?? 0) - (beforeCounts.get(key) ?? 0) >= count);
+        }
+        message = verified ? `${tasks.length} tasks were queued atomically and verified in a fresh MLO export.` : `${tasks.length} tasks were queued atomically, but a fresh export does not confirm the whole outline yet.`;
+      } catch (error2) {
+        message = `${tasks.length} tasks were queued atomically, but verification failed: ${error2 instanceof Error ? error2.message : String(error2)}`;
+      }
+    } catch (error2) {
+      ctx.store.invalidate();
+      message = `${tasks.length} tasks were queued atomically for the next session, but QuickSync failed: ${error2 instanceof Error ? error2.message : String(error2)}`;
+    }
+    return textResult(message, { tasks: resultTasks, cursor, verified, message });
+  }
+});
 
 // src/tools/row-update.ts
 async function runCloudRowUpdate(ctx, ids, plan) {
   const before = (await ctx.store.getSnapshot(true)).tasks;
+  const cloud = await knownCloudProjection(ctx.cloudState);
   const resolved = [...new Set(ids)].map((id) => {
     const task = findById(before, id);
     if (!task) throw new Error(`no task with id "${id}" \u2014 ids shift when the tree changes; re-run list_tasks`);
-    return { id, task };
+    return { id, task, uid: task.Guid?.toUpperCase() ?? resolveTaskUid(task, cloud.rows) };
   });
-  const noGuid = resolved.filter(({ task }) => !task.Guid);
+  const noGuid = resolved.filter(({ uid }) => !uid);
   if (noGuid.length > 0) {
     const list = noGuid.map(({ id, task }) => `[${id}] "${task.Caption}"`).join(", ");
     throw new Error(`no recoverable GUID for ${list} \u2014 nothing was queued; make this change in the MLO app`);
   }
-  const rows = await knownFullRows(ctx.cloudState);
-  const targets = resolved.map(({ id, task }) => {
-    const uid = task.Guid.toUpperCase();
-    const known = rows.get(uid);
+  const targets = resolved.map(({ id, task, uid }) => {
+    const resolvedUid = uid;
+    const known = cloud.rows.get(resolvedUid);
     if (!known) {
       throw new Error(
         `no full record for [${id}] "${task.Caption}" in the delta log \u2014 the cloud path can only rewrite tasks it has seen a complete row for (added via a cloud tool, or changed in MLO since the local endpoint took over); nothing was queued; make this change in the MLO app`
       );
     }
-    return { id, task, uid, known };
+    return {
+      id,
+      task,
+      uid: resolvedUid,
+      known,
+      placeUids: cloud.placeUidsByTask.get(resolvedUid) ?? [],
+      dependencyUids: cloud.dependencyUidsByTask.get(resolvedUid) ?? []
+    };
   });
-  plan.prepare?.(before, targets);
+  const placeCaptionByUid = new Map(cloud.places.map((place) => [place.uid, place.caption]));
+  for (const target of targets) {
+    const loggedPlaces = target.placeUids.map((uid) => placeCaptionByUid.get(uid)).filter((value) => value !== void 0);
+    const expectedPlaces = [...target.task.Places].sort((a, b) => a.localeCompare(b));
+    const actualPlaces = [...loggedPlaces].sort((a, b) => a.localeCompare(b));
+    if (JSON.stringify(expectedPlaces) !== JSON.stringify(actualPlaces)) {
+      throw new Error(
+        `context relation state for [${target.id}] "${target.task.Caption}" is not fully recoverable from the delta log \u2014 nothing was queued; change this task once in MLO and sync`
+      );
+    }
+    const expectedDependencies = [...target.task.DependsOn].map((uid) => uid.toUpperCase()).sort();
+    const actualDependencies = [...target.dependencyUids].sort();
+    if (JSON.stringify(expectedDependencies) !== JSON.stringify(actualDependencies)) {
+      throw new Error(
+        `dependency relation state for [${target.id}] "${target.task.Caption}" is not fully recoverable from the delta log \u2014 nothing was queued; change this task once in MLO and sync`
+      );
+    }
+  }
+  plan.prepare?.(before, targets, cloud);
   for (const target of targets) plan.guard?.(target);
   const now = nowIso();
   const delta = buildTaskUpdatesDelta(
-    targets.map((target) => ({ header: target.known.header, row: target.known.row, patch: plan.patchFor(target, now) }))
+    targets.map((target) => {
+      const starredOrderIndex = plan.starredOrderIndexFor?.(target);
+      return {
+        header: target.known.header,
+        row: target.known.row,
+        patch: plan.patchFor(target, now),
+        placeUids: plan.placeUidsFor?.(target) ?? target.placeUids,
+        dependencyUids: plan.dependencyUidsFor?.(target) ?? target.dependencyUids,
+        ...starredOrderIndex !== void 0 ? { starredOrderIndex } : {}
+      };
+    })
   );
   const cursor = cursorToDecimalString(await ctx.cloudState.append("mcp", packEnvelope(delta)));
   const described = targets.map(({ id, task }) => `[${id}] "${task.Caption}"`).join(", ");
@@ -25268,7 +25636,12 @@ async function runCloudRowUpdate(ctx, ids, plan) {
     ctx.store.invalidate();
     try {
       const after = flatten((await ctx.store.getSnapshot(true)).tasks);
-      const byGuid = new Map(after.filter((task) => task.Guid).map((task) => [task.Guid.toUpperCase(), task]));
+      const verificationCloud = await knownCloudProjection(ctx.cloudState);
+      const byGuid = /* @__PURE__ */ new Map();
+      for (const task of after) {
+        const uid = task.Guid?.toUpperCase() ?? resolveTaskUid(task, verificationCloud.rows);
+        if (uid) byGuid.set(uid, task);
+      }
       verified = targets.every((target) => {
         const task = byGuid.get(target.uid);
         return task !== void 0 && plan.verified(task, target);
@@ -25301,6 +25674,14 @@ var CloudUpdateEntry = external_exports.object({
   EstimateMin: external_exports.number().optional().describe("fractional days"),
   EstimateMax: external_exports.number().optional(),
   TheGoal: external_exports.number().int().min(0).max(3).optional().describe("0 none, 1 weekly, 2 monthly, 3 yearly"),
+  IsProject: external_exports.boolean().optional(),
+  Starred: external_exports.boolean().optional(),
+  Folder: external_exports.boolean().optional().describe("Hide only this task from To-Do views; its children remain eligible"),
+  HideInToDo: external_exports.boolean().optional().describe("Hide this task and its whole branch from To-Do views"),
+  CompleteSubTasksInOrder: external_exports.boolean().optional(),
+  Flag: external_exports.string().optional().describe('Existing flag caption; "" clears'),
+  Places: external_exports.array(external_exports.string().min(1)).max(25).optional().describe("Complete replacement set of existing context captions; [] clears all contexts"),
+  dependsOnIds: external_exports.array(external_exports.string()).max(25).optional().describe("Complete replacement set of path ids this task waits for; [] clears all dependencies"),
   moveToParentId: external_exports.string().optional().describe('Re-parent: move this task (with its whole subtree) under the given task id; "" moves it to the top level')
 });
 var STRING_COLUMNS = ["Caption", "Note", "DueDateTime", "StartDateTime", "CompletionDateTime"];
@@ -25312,7 +25693,14 @@ var NUMBER_COLUMNS = [
   ["EstimateMax", "EstimateMax"],
   ["TheGoal", "GoalFor"]
 ];
-function updatePatch(spec, known, now, move) {
+var BOOLEAN_COLUMNS = [
+  ["IsProject", "IsProject"],
+  ["Starred", "Starred"],
+  ["Folder", "HideInToDoThisTask"],
+  ["HideInToDo", "HideInToDo"],
+  ["CompleteSubTasksInOrder", "CompleteInOrder"]
+];
+function updatePatch(spec, known, now, move, resolved = {}) {
   const patch = { LastModified: now };
   for (const column of STRING_COLUMNS) {
     const value = spec[column];
@@ -25322,6 +25710,14 @@ function updatePatch(spec, known, now, move) {
     const value = spec[field2];
     if (value !== void 0) patch[column] = String(value);
   }
+  for (const [field2, column] of BOOLEAN_COLUMNS) {
+    const value = spec[field2];
+    if (typeof value === "boolean") patch[column] = value ? "1" : "0";
+  }
+  if (spec.Starred !== void 0 && csvTruthy(rowValue(known, "Starred")) !== spec.Starred) {
+    patch.StarToggleDateTime = now;
+  }
+  if (spec.Flag !== void 0) patch.FlagUID = resolved.flagUid ?? "";
   if (move) patch.ParentUID = move.parentUid;
   if (spec.DueDateTime !== void 0 || spec.StartDateTime !== void 0) {
     const due = spec.DueDateTime ?? rowValue(known, "DueDateTime");
@@ -25331,19 +25727,45 @@ function updatePatch(spec, known, now, move) {
   }
   return patch;
 }
-function verifiesUpdate(task, spec, move) {
+function verifiesUpdate(task, spec, move, resolved = {}) {
   if (spec.Caption !== void 0 && task.Caption !== spec.Caption) return false;
   if (spec.Note !== void 0 && (task.Note ?? "") !== spec.Note) return false;
   if (spec.DueDateTime !== void 0 && (task.DueDateTime ?? "") !== spec.DueDateTime) return false;
   if (spec.StartDateTime !== void 0 && (task.StartDateTime ?? "") !== spec.StartDateTime) return false;
   if (spec.CompletionDateTime !== void 0 && (task.CompletionDateTime ?? "") !== spec.CompletionDateTime) return false;
+  if (spec.IsProject !== void 0 && (task.IsProject ?? false) !== spec.IsProject) return false;
+  if (spec.Starred !== void 0 && (task.Starred ?? false) !== spec.Starred) return false;
+  if (spec.Folder !== void 0 && (task.HideInToDoThisTask ?? false) !== spec.Folder) return false;
+  if (spec.HideInToDo !== void 0 && (task.HideInToDo ?? false) !== spec.HideInToDo) return false;
+  if (spec.CompleteSubTasksInOrder !== void 0 && (task.CompleteSubTasksInOrder ?? false) !== spec.CompleteSubTasksInOrder) return false;
+  if (spec.Flag !== void 0 && (task.Flag ?? "").toLocaleLowerCase() !== spec.Flag.toLocaleLowerCase()) return false;
+  if (spec.Places !== void 0) {
+    const expected = [...new Set(spec.Places.map((place) => place.toLocaleLowerCase()))].sort();
+    const actual = task.Places.map((place) => place.toLocaleLowerCase()).sort();
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) return false;
+  }
+  if (spec.dependsOnIds !== void 0) {
+    const expected = [...resolved.dependencyUids ?? []].map((uid) => uid.toUpperCase()).sort();
+    const actual = task.DependsOn.map((uid) => uid.toUpperCase()).sort();
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) return false;
+  }
   if (move) return move.destCaption ? task.Path.at(-2) === move.destCaption : task.Path.length === 1;
   return true;
+}
+function resolveNamed3(caption, objects, kind) {
+  const matches = objects.filter((object3) => object3.caption.toLocaleLowerCase() === caption.toLocaleLowerCase());
+  if (matches.length === 0) throw new Error(`unknown ${kind} "${caption}" \u2014 use an existing ${kind}`);
+  if (matches.length > 1) throw new Error(`ambiguous ${kind} "${caption}" \u2014 ${matches.length} definitions have that caption`);
+  return matches[0].uid;
+}
+function nextStarredIndex(cloud) {
+  const values = [...cloud.starredOrderByTask.values()].map(Number).filter(Number.isFinite);
+  return (values.length ? Math.max(...values) : 0) + 500;
 }
 var updateTaskTool = defineTool({
   name: "update_task",
   title: "Update tasks",
-  description: 'Queue full-row field edits (and re-parenting moves) for one or more tasks, trigger QuickSync, and verify in a fresh export. Only provided fields change; "" clears a text field. The whole batch travels as ONE delta. Only works for tasks whose complete record is in the delta log (added by this server or changed in MLO since the local endpoint took over); date edits on recurring tasks are refused. Booleans (IsProject, Starred, Hide*), Flag, Places, and dependsOn cannot be edited yet (wire encoding unobserved) \u2014 make those changes in the MLO app.',
+  description: 'Queue full-row field edits (and re-parenting moves) for one or more tasks, trigger QuickSync, and verify in a fresh export. Only provided fields change; "" clears a text field. The whole batch travels as ONE delta. Only works for tasks whose complete record is in the delta log (added by this server or changed in MLO since the local endpoint took over); date edits on recurring tasks are refused. IsProject, Starred, Folder, visibility, sequential-subtask mode, existing Flag assignment, complete context replacement, and complete dependency replacement are supported.',
   inputSchema: {
     updates: external_exports.array(CloudUpdateEntry).min(1).max(25).describe("Per-task updates (max 25), applied in one delta")
   },
@@ -25365,11 +25787,46 @@ var updateTaskTool = defineTool({
       specs.set(id, spec);
     }
     const moves = /* @__PURE__ */ new Map();
+    const flagUids = /* @__PURE__ */ new Map();
+    const placeUids = /* @__PURE__ */ new Map();
+    const starredOrder = /* @__PURE__ */ new Map();
+    const dependencyUids = /* @__PURE__ */ new Map();
     return runCloudRowUpdate(ctx, [...specs.keys()], {
       verb: "Update",
-      prepare(before, targets) {
+      prepare(before, targets, cloud) {
+        let starIndex = nextStarredIndex(cloud);
         for (const { id, task } of targets) {
-          const moveTo = specs.get(id).moveToParentId;
+          const spec = specs.get(id);
+          if (spec.Flag !== void 0 && spec.Flag !== "") flagUids.set(id, resolveNamed3(spec.Flag, cloud.flags, "flag"));
+          if (spec.Places !== void 0) {
+            const unique = [...new Set(spec.Places.map((place) => place.toLocaleLowerCase()))];
+            if (unique.length !== spec.Places.length) throw new Error(`duplicate context in Places for [${id}] "${task.Caption}"`);
+            placeUids.set(id, spec.Places.map((place) => resolveNamed3(place, cloud.places, "context")));
+          }
+          if (spec.dependsOnIds !== void 0) {
+            const unique = [...new Set(spec.dependsOnIds)];
+            if (unique.length !== spec.dependsOnIds.length) {
+              throw new Error(`duplicate id in dependsOnIds for [${id}] "${task.Caption}"`);
+            }
+            const dependencies = spec.dependsOnIds.map((dependencyId) => {
+              const dependency = findById(before, dependencyId);
+              if (!dependency) throw new Error(`no dependency task with id "${dependencyId}" \u2014 re-run list_tasks`);
+              if (dependency === task) throw new Error(`[${id}] "${task.Caption}" cannot depend on itself`);
+              const dependencyUid = dependency.Guid?.toUpperCase() ?? resolveTaskUid(dependency, cloud.rows);
+              if (!dependencyUid) {
+                throw new Error(`no recoverable GUID for dependency [${dependencyId}] "${dependency.Caption}"`);
+              }
+              return dependencyUid;
+            });
+            dependencyUids.set(id, dependencies);
+          }
+          if (spec.Starred === true) {
+            const taskUid = task.Guid?.toUpperCase() ?? resolveTaskUid(task, cloud.rows);
+            const current = taskUid ? cloud.starredOrderByTask.get(taskUid) : void 0;
+            starredOrder.set(id, current || String(starIndex));
+            if (!current) starIndex += 500;
+          }
+          const moveTo = spec.moveToParentId;
           if (moveTo === void 0) continue;
           if (moveTo === "") {
             moves.set(id, { parentUid: "" });
@@ -25380,12 +25837,13 @@ var updateTaskTool = defineTool({
           if (flatten([task]).includes(dest)) {
             throw new Error(`cannot move [${id}] "${task.Caption}" into its own subtree`);
           }
-          if (!dest.Guid) {
+          const destUid = dest.Guid?.toUpperCase() ?? resolveTaskUid(dest, cloud.rows);
+          if (!destUid) {
             throw new Error(
               `no recoverable GUID for move destination [${moveTo}] "${dest.Caption}" \u2014 move the task in the MLO app`
             );
           }
-          moves.set(id, { parentUid: dest.Guid.toUpperCase(), destCaption: dest.Caption });
+          moves.set(id, { parentUid: destUid, destCaption: dest.Caption });
         }
       },
       guard({ id, task, known }) {
@@ -25397,8 +25855,22 @@ var updateTaskTool = defineTool({
           );
         }
       },
-      patchFor: ({ id, known }, now) => updatePatch(specs.get(id), known, now, moves.get(id)),
-      verified: (task, { id }) => verifiesUpdate(task, specs.get(id), moves.get(id))
+      patchFor: ({ id, known }, now) => updatePatch(
+        specs.get(id),
+        known,
+        now,
+        moves.get(id),
+        { ...flagUids.has(id) ? { flagUid: flagUids.get(id) } : {} }
+      ),
+      placeUidsFor: ({ id, placeUids: current }) => placeUids.get(id) ?? current,
+      dependencyUidsFor: ({ id, dependencyUids: current }) => dependencyUids.get(id) ?? current,
+      starredOrderIndexFor: ({ id }) => starredOrder.get(id),
+      verified: (task, { id }) => verifiesUpdate(
+        task,
+        specs.get(id),
+        moves.get(id),
+        { ...dependencyUids.has(id) ? { dependencyUids: dependencyUids.get(id) } : {} }
+      )
     });
   }
 });
@@ -25476,7 +25948,7 @@ var uncompleteTaskTool = defineTool({
 });
 
 // src/tools/delete-task.ts
-function collectTombstones(tasks, ids) {
+function collectTombstones(tasks, ids, resolveUid = (task) => task.Guid) {
   const targets = [...new Set(ids)].map((id) => {
     const task = findById(tasks, id);
     if (!task) throw new Error(`no task with id "${id}" \u2014 ids shift when the tree changes; re-run list_tasks`);
@@ -25486,7 +25958,8 @@ function collectTombstones(tasks, ids) {
   const missingGuid = /* @__PURE__ */ new Set();
   for (const { task } of targets) {
     for (const node of flatten([task])) {
-      if (node.Guid) uids.add(node.Guid.toUpperCase());
+      const uid = resolveUid(node);
+      if (uid) uids.add(uid.toUpperCase());
       else missingGuid.add(node);
     }
   }
@@ -25501,7 +25974,7 @@ function wereTasksDeleted(after, uids) {
 var deleteTaskTool = defineTool({
   name: "delete_task",
   title: "Delete tasks",
-  description: "Queue tombstone deltas for one or more tasks AND all of their subtasks, trigger QuickSync, and verify they disappeared from a fresh export. The whole batch travels as ONE delta. Requires every task in the selected subtrees to have a recoverable GUID; otherwise nothing is queued \u2014 delete such tasks in the MLO app.",
+  description: "Queue tombstone deltas for one or more tasks AND all of their subtasks, trigger QuickSync, and verify they disappeared from a fresh export. The whole batch travels as ONE delta. Requires every task in the selected subtrees to have a GUID recoverable from binary/XML or an unambiguous logged cloud path; otherwise nothing is queued \u2014 delete such tasks in the MLO app.",
   inputSchema: {
     ids: external_exports.array(external_exports.string()).min(1).max(50).describe("Path-based task ids from list_tasks/search_tasks")
   },
@@ -25514,7 +25987,12 @@ var deleteTaskTool = defineTool({
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   async execute({ ids }, ctx) {
     const before = (await ctx.store.getSnapshot(true)).tasks;
-    const { targets, uids, missingGuid } = collectTombstones(before, ids);
+    const cloud = await knownCloudProjection(ctx.cloudState);
+    const { targets, uids, missingGuid } = collectTombstones(
+      before,
+      ids,
+      (task) => task.Guid?.toUpperCase() ?? resolveTaskUid(task, cloud.rows)
+    );
     if (missingGuid.length > 0) {
       const list = missingGuid.map((task) => `[${task.id}] "${task.Caption}"`).join(", ");
       throw new Error(
@@ -25628,6 +26106,7 @@ var allTools = [
   searchTasksTool,
   getTaskTool,
   addTaskTool,
+  addTasksTool,
   updateTaskTool,
   completeTaskTool,
   uncompleteTaskTool,
@@ -26333,6 +26812,8 @@ Task ids are PATH-BASED ("1.2.3" = position in the tree) and shift whenever the 
 Treat them as valid only for immediate follow-up calls; after any write (or if MLO was used
 interactively), re-run list_tasks/search_tasks before using ids again. Never store path ids.
 add_task takes a parent GUID (\`parentUid\`, from get_task) instead of a path id.
+add_tasks creates up to 50 tasks atomically; local \`key\` values connect its
+\`parentKey\` and \`dependsOnKeys\` outline/dependency references.
 
 ### How writes work
 Writes never touch the data file. Each write queues a sync delta on the local cloud endpoint
@@ -26346,16 +26827,19 @@ one bad id and nothing is queued.
 - update_task / complete_task / uncomplete_task need the task's full record in the delta
   log \u2014 available once a task was added by this server or changed in MLO since the local
   endpoint took over. Otherwise make the change in the MLO app.
-- update_task cannot edit booleans (IsProject, Starred, Hide*), Flag, Places, or
-  dependencies yet; date edits on recurring tasks are refused (the series would desync).
+- add_task/update_task support Folder, Project, Starred, visibility/sequential
+  booleans, existing Flag assignment, and existing contexts (Places).
+- update_task replaces dependencies through \`dependsOnIds\` (path ids resolved
+  atomically to GUIDs); date edits on recurring tasks are refused (the series would desync).
 - complete_task refuses recurring tasks \u2014 completing in MLO generates the next occurrence.
-- delete_task removes each task AND its whole subtree; it needs recoverable GUIDs for the
-  full subtree.
+- delete_task removes each task AND its whole subtree; it needs binary/XML or
+  unambiguous logged-path GUID recovery for the full subtree.
 
 ### Field conventions
 - Dates are local ISO without timezone ("2026-08-01T15:00:00").
 - Importance/Effort are 0\u2013200 (100 = normal).
-- Contexts are MLO "Places" (@Office); currently read-only (list_contexts, search filters).
+- Contexts are MLO "Places" (@Office); pass existing captions in \`Places\` after
+  consulting list_contexts. On update, \`Places\` is the complete replacement set.
 
 ### Completion
 complete_task marks done (projects get ProjectStatus too); uncomplete_task reopens.

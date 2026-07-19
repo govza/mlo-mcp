@@ -44,7 +44,7 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual(
-      ["add_task", "cloud_status", "complete_task", "delete_task", "get_task", "list_contexts", "list_tasks", "search_tasks", "sync", "uncomplete_task", "update_task"]
+      ["add_task", "add_tasks", "cloud_status", "complete_task", "delete_task", "get_task", "list_contexts", "list_tasks", "search_tasks", "sync", "uncomplete_task", "update_task"]
     );
     const list = tools.find((t) => t.name === "list_tasks")!;
     expect(list.annotations?.readOnlyHint).toBe(true);

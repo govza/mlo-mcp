@@ -19,8 +19,9 @@ shapes. If they ever disagree on a shape, the catalog is right.
 - **Ids are path-based** (`"1.2.3"` = position in the tree) and shift whenever
   the tree changes. They are valid only for immediate follow-up calls; after
   any write, re-run `list_tasks`/`search_tasks`. GUIDs (`{…}`) are the stable
-  identity but are recovered best-effort from the `.ml` binary and the XML
-  export, so a task may have none. `add_task` takes a parent **GUID**
+  identity. They are recovered first from the `.ml` binary/XML and then, for
+  logged tasks, from an unambiguous caption/`ParentUID` cloud path; duplicate
+  sibling captions can still leave a task unresolved. `add_task` takes a parent **GUID**
   (`parentUid`, from `get_task`), not a path id.
 - **Writes never touch the data file.** Every write queues a sync delta on the
   local cloud endpoint ([mcp-cloud.md](mcp-cloud.md)) and triggers QuickSync;
@@ -60,19 +61,26 @@ All follow queue → QuickSync → verify. See [mcp-cloud.md](mcp-cloud.md) for
 the delta/envelope details behind each.
 
 - **`add_task`** — one task per call, emitted as a full fresh row; parent by
-  GUID (`parentUid`) or top level when omitted.
+  GUID (`parentUid`) or top level when omitted. Supports Folder, Project,
+  Starred, visibility/sequential booleans, an existing Flag, and existing
+  contexts (`Places`), plus dependencies by stable GUID.
+- **`add_tasks`** — 1–50 new tasks in ONE atomic delta. Each entry has a local
+  `key`; `parentKey` creates arbitrary nested outlines and `dependsOnKeys`
+  creates dependencies within the new batch. `parentUid`/`dependsOnUids` link
+  to existing tasks.
 - **`update_task`** — batched field edits (caption, note, dates,
-  importance/effort/estimates, project status, goal) and re-parenting moves
-  over logged full rows. Not yet editable (wire encoding unobserved): boolean
-  columns, flag, contexts, dependencies — make those changes in the MLO app.
-  Date edits on recurring tasks are refused (the series would desync).
+  importance/effort/estimates, project status, goal), Folder/Project/Starred
+  and other task booleans, existing Flag assignment, complete context
+  replacement, complete dependency replacement (`dependsOnIds`), and
+  re-parenting moves over logged full rows. Date edits on recurring tasks are
+  refused (the series would desync).
 - **`complete_task` / `uncomplete_task`** — set/clear `CompletionDateTime`
   (projects also flip `ProjectStatus`) over logged full rows. Completing
   recurring tasks is refused — completing them in MLO generates the next
   occurrence, a full-row rewrite would not.
 - **`delete_task`** — tombstones each selected task *and its whole subtree*
   (cascade behavior of a bare parent tombstone is unverified; extra
-  tombstones union-merge harmlessly). Needs recoverable GUIDs for the whole
-  subtree, else nothing is queued.
+  tombstones union-merge harmlessly). Needs binary/XML or unambiguous logged
+  GUID recovery for the whole subtree, else nothing is queued.
 - **`sync`** — run MLO QuickSync on demand (every write triggers it
   internally; this reruns it, e.g. to pick up a previously queued delta).

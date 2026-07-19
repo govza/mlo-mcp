@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildTaskAddDelta, buildTaskDeleteDelta, buildTaskUpdatesDelta, TODO_ITEMS_HEADER } from "../../src/cloud/delta.js";
 import { findSection } from "../../src/cloud/csv.js";
-import { latestFullRows, rowValue, type KnownRow } from "../../src/cloud/log-projection.js";
+import { latestFullRows, resolveTaskUid, rowValue, type KnownRow } from "../../src/cloud/log-projection.js";
 import { completionPatch, guardNotRecurring } from "../../src/tools/complete-task.js";
 import { reopenPatch } from "../../src/tools/uncomplete-task.js";
 import type { TaskNode } from "../../src/types.js";
@@ -26,6 +26,25 @@ describe("latestFullRows", () => {
   it("drops a UID once tombstoned", () => {
     const add = buildTaskAddDelta({ uid, caption: "gone", createdDate: "a", lastModified: "a" });
     expect(latestFullRows([add, buildTaskDeleteDelta([uid])]).has(uid)).toBe(false);
+  });
+
+  it("resolves a missing binary GUID through an unambiguous logged parent path", () => {
+    const childUid = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}";
+    const root = buildTaskAddDelta({ uid, caption: "root", createdDate: "a", lastModified: "a" });
+    const child = buildTaskAddDelta({ uid: childUid, parentUid: uid, caption: "child", createdDate: "a", lastModified: "a" });
+    const rows = latestFullRows([root, child]);
+    const task = { id: "1.1", Caption: "child", Places: [], DependsOn: [], Children: [], Path: ["root", "child"], Depth: 1 } as TaskNode;
+    expect(resolveTaskUid(task, rows)).toBe(childUid);
+  });
+
+  it("refuses ambiguous duplicate-caption cloud paths", () => {
+    const other = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}";
+    const rows = latestFullRows([
+      buildTaskAddDelta({ uid, caption: "same", createdDate: "a", lastModified: "a" }),
+      buildTaskAddDelta({ uid: other, caption: "same", createdDate: "a", lastModified: "a" }),
+    ]);
+    const task = { id: "1", Caption: "same", Places: [], DependsOn: [], Children: [], Path: ["same"], Depth: 0 } as TaskNode;
+    expect(resolveTaskUid(task, rows)).toBeUndefined();
   });
 });
 

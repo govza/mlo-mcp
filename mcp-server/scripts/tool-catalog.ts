@@ -14,7 +14,7 @@ export interface FieldInfo {
   type: string;
   required: boolean;
   description?: string;
-  /** One level of nesting for object / object[] params (e.g. add_task's `tasks`). */
+  /** One level of nesting for object / object[] params (e.g. add_tasks' `tasks`). */
   fields?: FieldInfo[];
 }
 

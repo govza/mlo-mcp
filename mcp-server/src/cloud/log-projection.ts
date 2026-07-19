@@ -3,15 +3,43 @@ import { mergeDeltas } from "./delta.js";
 import { unpackEnvelope } from "./envelope.js";
 import { ZERO_CURSOR } from "./cursor.js";
 import type { CloudState } from "./state.js";
+import type { TaskNode } from "../types.js";
 
 export interface KnownRow {
   header: string[];
   row: string[];
 }
 
+export interface NamedCloudObject {
+  uid: string;
+  caption: string;
+}
+
+export interface KnownCloudProjection {
+  rows: Map<string, KnownRow>;
+  placeUidsByTask: Map<string, string[]>;
+  dependencyUidsByTask: Map<string, string[]>;
+  places: NamedCloudObject[];
+  flags: NamedCloudObject[];
+  starredOrderByTask: Map<string, string>;
+}
+
 export function rowValue(known: KnownRow, column: string): string {
   const index = known.header.indexOf(column);
   return index < 0 ? "" : known.row[index] ?? "";
+}
+
+/** Resolve by caption/ParentUID path; duplicate sibling captions stay ambiguous. */
+export function resolveTaskUid(task: TaskNode, rows: ReadonlyMap<string, KnownRow>): string | undefined {
+  let parentUid = "";
+  for (const caption of task.Path) {
+    const matches = [...rows.entries()].filter(([, known]) =>
+      rowValue(known, "ParentUID").toUpperCase() === parentUid && rowValue(known, "Caption") === caption
+    );
+    if (matches.length !== 1) return undefined;
+    parentUid = matches[0]![0].toUpperCase();
+  }
+  return parentUid || undefined;
 }
 
 /** Latest full TodoItems row per uppercase braced UID, newest-last over the given deltas. */
@@ -37,6 +65,45 @@ export function latestFullRows(documents: readonly SectionedCsv[]): Map<string, 
  * touched in MLO since the local endpoint took over.
  */
 export async function knownFullRows(state: CloudState): Promise<Map<string, KnownRow>> {
+  return (await knownCloudProjection(state)).rows;
+}
+
+/** Latest task rows plus relation/lookup state needed to author lossless updates. */
+export async function knownCloudProjection(state: CloudState): Promise<KnownCloudProjection> {
   const entries = await state.entriesAfter(ZERO_CURSOR);
-  return latestFullRows(entries.map((entry) => unpackEnvelope(entry.bytes)));
+  const merged = mergeDeltas(entries.map((entry) => unpackEnvelope(entry.bytes)));
+  const rows = latestFullRows([merged]);
+  const collectRelations = (sectionName: string, ownerColumn: string, valueColumn: string): Map<string, string[]> => {
+    const section = findSection(merged, sectionName)!;
+    const ownerIndex = section.header.indexOf(ownerColumn);
+    const valueIndex = section.header.indexOf(valueColumn);
+    const result = new Map<string, string[]>();
+    for (const row of section.rows) {
+      const owner = (row[ownerIndex] ?? "").toUpperCase();
+      const value = (row[valueIndex] ?? "").toUpperCase();
+      if (owner && value) result.set(owner, [...(result.get(owner) ?? []), value]);
+    }
+    return result;
+  };
+  const named = (sectionName: "Places" | "Flags"): NamedCloudObject[] => {
+    const section = findSection(merged, sectionName)!;
+    const uidIndex = section.header.indexOf("UID");
+    const captionIndex = section.header.indexOf("Caption");
+    return section.rows
+      .map((row) => ({ uid: (row[uidIndex] ?? "").toUpperCase(), caption: row[captionIndex] ?? "" }))
+      .filter(({ uid, caption }) => uid !== "" && caption !== "");
+  };
+  const order = findSection(merged, "TodoView.ManualOrdering.Starred")!;
+  const orderUid = order.header.indexOf("UID");
+  const orderIndex = order.header.indexOf("ItemIndex");
+  return {
+    rows,
+    placeUidsByTask: collectRelations("TodoItemPlaces", "TodoItemUID", "PlaceUID"),
+    dependencyUidsByTask: collectRelations("TodoItems.Dependency", "TaskUID", "DependencyUID"),
+    places: named("Places"),
+    flags: named("Flags"),
+    starredOrderByTask: new Map(order.rows.map((row) => [
+      (row[orderUid] ?? "").toUpperCase(), row[orderIndex] ?? "",
+    ])),
+  };
 }

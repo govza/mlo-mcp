@@ -4,6 +4,38 @@ This workflow observes the disposable development profile's MLO cloud traffic
 while keeping credentials out of console output. It is for local protocol
 debugging only. Do not capture a personal profile or commit capture files.
 
+## Prefer the local endpoint's delta log
+
+When MLO is already configured to use mcp-cloud at `127.0.0.1:8080`, no MITM
+tool is needed to reverse-engineer an app-side field change. The endpoint
+terminates `ApplyModificationsBytesEx` locally and stores the exact uploaded ZIP
+as an `origin:"app"` entry in `messages/` (or `MLO_CLOUD_STATE_DIR`):
+
+1. Note `highWater` in `messages/state.json`.
+2. Make exactly one change to a disposable task in the MLO UI.
+3. Run QuickSync once.
+4. Confirm that `state.json` has one new app entry and preserve its
+   `delta-<cursor>.zip` locally.
+5. Extract `data.csv` and compare the changed task's full `TodoItems` row plus
+   every relation section against the previous cursor.
+6. Reverse the change and sync again when deletion/false semantics matter.
+
+Use separate syncs for create, true/add, false/remove, and delete. An isolated
+delta makes an omitted row meaningful; a combined edit does not. Never infer
+relation deletion from a missing `*.Deleted` section: the Starred/context
+experiment in [cloud-sync.md](cloud-sync.md) showed that task relations are
+complete replacement sets associated with the emitted task row.
+
+The ZIPs contain task data. They are ignored runtime evidence, not fixtures:
+sanitize a minimal payload before adding any test fixture, and never commit the
+raw `messages/`, `.mitmproxy/`, credentials, or profile identifiers.
+
+Use mitmproxy only when the local adapter does not yet recognize an operation,
+or when a vendor-host HTTPS `CONNECT` prevents the built-in structural observer
+from seeing the SOAP shape. Once the operation is recognized, reproduce it
+through the local endpoint so the delta is captured without sending the
+controlled edit to the vendor service.
+
 ## Local configuration
 
 The forward proxy listens on `127.0.0.1:8888`. This is deliberately separate

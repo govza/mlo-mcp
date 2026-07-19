@@ -6,6 +6,7 @@ import { quickSync } from "../mlo-cli.js";
 import { findById, flatten } from "../task-tree.js";
 import { defineTool, textResult } from "./shared.js";
 import type { TaskNode } from "../types.js";
+import { knownCloudProjection, resolveTaskUid } from "../cloud/log-projection.js";
 
 export interface TombstoneSelection {
   targets: Array<{ id: string; task: TaskNode }>;
@@ -20,7 +21,11 @@ export interface TombstoneSelection {
  * to children is unknown — explicit descendant tombstones are emitted instead,
  * and union merging makes them harmless if MLO does cascade.
  */
-export function collectTombstones(tasks: TaskNode[], ids: readonly string[]): TombstoneSelection {
+export function collectTombstones(
+  tasks: TaskNode[],
+  ids: readonly string[],
+  resolveUid: (task: TaskNode) => string | undefined = (task) => task.Guid,
+): TombstoneSelection {
   const targets = [...new Set(ids)].map((id) => {
     const task = findById(tasks, id);
     if (!task) throw new Error(`no task with id "${id}" — ids shift when the tree changes; re-run list_tasks`);
@@ -30,7 +35,8 @@ export function collectTombstones(tasks: TaskNode[], ids: readonly string[]): To
   const missingGuid = new Set<TaskNode>();
   for (const { task } of targets) {
     for (const node of flatten([task])) {
-      if (node.Guid) uids.add(node.Guid.toUpperCase());
+      const uid = resolveUid(node);
+      if (uid) uids.add(uid.toUpperCase());
       else missingGuid.add(node);
     }
   }
@@ -51,7 +57,8 @@ export const deleteTaskTool = defineTool({
   description:
     "Queue tombstone deltas for one or more tasks AND all of their subtasks, trigger QuickSync, and verify they " +
     "disappeared from a fresh export. The whole batch travels as ONE delta. Requires every task in the selected " +
-    "subtrees to have a recoverable GUID; otherwise nothing is queued — delete such tasks in the MLO app.",
+    "subtrees to have a GUID recoverable from binary/XML or an unambiguous logged cloud path; otherwise nothing " +
+    "is queued — delete such tasks in the MLO app.",
   inputSchema: {
     ids: z.array(z.string()).min(1).max(50).describe("Path-based task ids from list_tasks/search_tasks"),
   },
@@ -66,7 +73,12 @@ export const deleteTaskTool = defineTool({
     // Unlike add_task, the pre-sync export is mandatory: it is the only
     // source for the path-id → GUID resolution the tombstones are made of.
     const before = (await ctx.store.getSnapshot(true)).tasks;
-    const { targets, uids, missingGuid } = collectTombstones(before, ids);
+    const cloud = await knownCloudProjection(ctx.cloudState);
+    const { targets, uids, missingGuid } = collectTombstones(
+      before,
+      ids,
+      (task) => task.Guid?.toUpperCase() ?? resolveTaskUid(task, cloud.rows),
+    );
     if (missingGuid.length > 0) {
       const list = missingGuid.map((task) => `[${task.id}] "${task.Caption}"`).join(", ");
       throw new Error(

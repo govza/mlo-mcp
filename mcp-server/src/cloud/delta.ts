@@ -76,6 +76,15 @@ export interface TaskAddDeltaInput {
   startDateTime?: string;
   createdDate: string;
   lastModified: string;
+  isProject?: boolean;
+  starred?: boolean;
+  hideInToDo?: boolean;
+  hideInToDoThisTask?: boolean;
+  completeInOrder?: boolean;
+  flagUid?: string;
+  placeUids?: readonly string[];
+  dependencyUids?: readonly string[];
+  starredOrderIndex?: string;
 }
 
 export function buildTaskAddDelta(input: TaskAddDeltaInput): SectionedCsv {
@@ -93,7 +102,29 @@ export function buildTaskAddDelta(input: TaskAddDeltaInput): SectionedCsv {
   set("CreatedDate", input.createdDate);
   set("LastModified", input.lastModified);
   set("Note", input.note);
+  if (input.isProject !== undefined) set("IsProject", input.isProject ? "1" : "0");
+  if (input.starred !== undefined) {
+    set("Starred", input.starred ? "1" : "0");
+    if (input.starred) set("StarToggleDateTime", input.lastModified);
+  }
+  if (input.hideInToDo !== undefined) set("HideInToDo", input.hideInToDo ? "1" : "0");
+  if (input.hideInToDoThisTask !== undefined) set("HideInToDoThisTask", input.hideInToDoThisTask ? "1" : "0");
+  if (input.completeInOrder !== undefined) set("CompleteInOrder", input.completeInOrder ? "1" : "0");
+  if (input.flagUid !== undefined) set("FlagUID", input.flagUid ? normalizeGuid(input.flagUid) : "");
   findSection(document, "TodoItems")!.rows.push(row);
+  for (const placeUid of input.placeUids ?? []) {
+    findSection(document, "TodoItemPlaces")!.rows.push([normalizeGuid(input.uid), normalizeGuid(placeUid)]);
+  }
+  for (const dependencyUid of input.dependencyUids ?? []) {
+    findSection(document, "TodoItems.Dependency")!.rows.push([
+      normalizeGuid(input.uid), normalizeGuid(dependencyUid),
+    ]);
+  }
+  if (input.starred && input.starredOrderIndex) {
+    findSection(document, "TodoView.ManualOrdering.Starred")!.rows.push([
+      normalizeGuid(input.uid), input.starredOrderIndex,
+    ]);
+  }
   return document;
 }
 
@@ -108,6 +139,11 @@ export interface TaskRowUpdate {
   header: readonly string[];
   row: readonly string[];
   patch: Readonly<Record<string, string>>;
+  /** Complete current relation sets. MLO treats relations for an emitted task as replacement sets. */
+  placeUids?: readonly string[];
+  dependencyUids?: readonly string[];
+  /** Present only when this update explicitly adds/retains a starred ordering row. */
+  starredOrderIndex?: string;
 }
 
 /**
@@ -133,6 +169,16 @@ export function buildTaskUpdatesDelta(updates: readonly TaskRowUpdate[]): Sectio
       row[index] = value;
     }
     section.rows.push(row);
+    const uid = normalizeGuid(row[section.header.indexOf("UID")] ?? "");
+    for (const placeUid of update.placeUids ?? []) {
+      findSection(document, "TodoItemPlaces")!.rows.push([uid, normalizeGuid(placeUid)]);
+    }
+    for (const dependencyUid of update.dependencyUids ?? []) {
+      findSection(document, "TodoItems.Dependency")!.rows.push([uid, normalizeGuid(dependencyUid)]);
+    }
+    if (update.starredOrderIndex !== undefined) {
+      findSection(document, "TodoView.ManualOrdering.Starred")!.rows.push([uid, update.starredOrderIndex]);
+    }
   }
   return document;
 }
@@ -170,6 +216,42 @@ export function mergeDeltas(entries: readonly SectionedCsv[]): SectionedCsv {
   const unknown = new Map<string, CsvSection>();
 
   for (const document of entries) {
+    // App captures show that relation rows belonging to each emitted task are
+    // a complete replacement set. In particular, removing the last context is
+    // encoded as a TodoItems row and zero TodoItemPlaces rows (there is no
+    // TodoItemPlaces.Deleted section). Apply that replacement rule before
+    // consuming the document's current relation rows.
+    const taskSection = findSection(document, "TodoItems");
+    const deletedSection = findSection(document, "TodoItems.Deleted");
+    const changedUids = new Set<string>();
+    const deletedUids = new Set<string>();
+    if (taskSection) {
+      const uidIndex = taskSection.header.indexOf("UID");
+      for (const row of taskSection.rows) changedUids.add((row[uidIndex] ?? "").toUpperCase());
+    }
+    if (deletedSection) {
+      const uidIndex = deletedSection.header.indexOf("TodoItemUID");
+      for (const row of deletedSection.rows) deletedUids.add((row[uidIndex] ?? "").toUpperCase());
+    }
+    const purgeRelations = (sectionName: "TodoItemPlaces" | "TodoItems.Dependency", uids: Set<string>) => {
+      const map = maps.get(sectionName)!;
+      for (const key of [...map.keys()]) if (uids.has(key.split("\u0000", 1)[0]!.toUpperCase())) map.delete(key);
+    };
+    purgeRelations("TodoItemPlaces", changedUids);
+    purgeRelations("TodoItems.Dependency", changedUids);
+    purgeRelations("TodoItemPlaces", deletedUids);
+    purgeRelations("TodoItems.Dependency", deletedUids);
+    const starredOrder = maps.get("TodoView.ManualOrdering.Starred")!;
+    for (const uid of deletedUids) starredOrder.delete(uid);
+    if (taskSection) {
+      const uidIndex = taskSection.header.indexOf("UID");
+      const starredIndex = taskSection.header.indexOf("Starred");
+      if (starredIndex >= 0) {
+        for (const row of taskSection.rows) {
+          if ((row[starredIndex] ?? "") === "0") starredOrder.delete((row[uidIndex] ?? "").toUpperCase());
+        }
+      }
+    }
     for (const section of document.sections) {
       if (section.name === "SysVersions") continue;
       if (!knownNames.has(section.name)) {
@@ -193,6 +275,8 @@ export function mergeDeltas(entries: readonly SectionedCsv[]): SectionedCsv {
       const map = maps.get(section.name)!;
       for (const row of section.rows) {
         const key = rowKey(section, row, keys);
+        if ((section.name === "TodoItemPlaces" || section.name === "TodoItems.Dependency") &&
+            deletedUids.has((row[0] ?? "").toUpperCase())) continue;
         const targetHeader = targets.get(section.name)!.header;
         const projected = targetHeader.map((column) => {
           const index = section.header.indexOf(column);
@@ -200,6 +284,8 @@ export function mergeDeltas(entries: readonly SectionedCsv[]): SectionedCsv {
         });
         map.set(key, projected);
         if (section.name === "TodoItems.Deleted") maps.get("TodoItems")!.delete(key);
+        if (section.name === "Places.Deleted") maps.get("Places")!.delete(key);
+        if (section.name === "Flags.Deleted") maps.get("Flags")!.delete(key);
       }
     }
   }

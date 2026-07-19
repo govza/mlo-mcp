@@ -2,7 +2,7 @@
 
 MCP server for the **MyLifeOrganized** (MLO) Windows desktop app. AI agents (Claude Code, Codex, Cursor, Claude Desktop — anything that speaks MCP over stdio) manage your MLO task tree by driving `mlo.exe`'s undocumented command line locally. No cloud API, no account, your data never leaves the machine.
 
-- 11 tools: list/search/get tasks, contexts, add/update/complete/uncomplete/delete (writes batched & atomic), QuickSync, cloud status
+- 12 tools: list/search/get tasks, contexts, single/atomic-outline add, update/complete/uncomplete/delete, QuickSync, cloud status
 - Writes never touch your data file: the server runs a local cloud-sync endpoint, queues changes as sync deltas, and MLO's **own** merge logic applies them via QuickSync — the app keeps running, and the append-only delta log is the durable record of every change (see [docs/mcp-cloud.md](docs/mcp-cloud.md), including the one-time proxy wiring that routes the app's sync to the local endpoint)
 - Ships four customizable [GTD skills](skills/README.md) (`/mind`, `/inbox`, `/weekly` + standing conventions) for any SKILL.md-capable agent
 

@@ -2,7 +2,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { buildTaskUpdatesDelta } from "../cloud/delta.js";
 import { packEnvelope } from "../cloud/envelope.js";
 import { cursorToDecimalString } from "../cloud/cursor.js";
-import { knownFullRows, type KnownRow } from "../cloud/log-projection.js";
+import { knownCloudProjection, resolveTaskUid, type KnownCloudProjection, type KnownRow } from "../cloud/log-projection.js";
 import { quickSync } from "../mlo-cli.js";
 import { findById, flatten } from "../task-tree.js";
 import { nowIso, textResult, type ToolContext } from "./shared.js";
@@ -13,16 +13,24 @@ export interface CloudRowTarget {
   task: TaskNode;
   uid: string;
   known: KnownRow;
+  placeUids: string[];
+  dependencyUids: string[];
 }
 
 export interface CloudRowUpdatePlan {
   /** Leads the human message: "<verb> of [1] "x" was queued …" */
   verb: string;
   /** Runs once after target resolution, before guards — e.g. to resolve move destinations against the same snapshot. */
-  prepare?(before: TaskNode[], targets: CloudRowTarget[]): void;
+  prepare?(before: TaskNode[], targets: CloudRowTarget[], cloud: KnownCloudProjection): void;
   /** Throw to abort the whole batch before anything is queued. */
   guard?(target: CloudRowTarget): void;
   patchFor(target: CloudRowTarget, now: string): Record<string, string>;
+  /** Override the complete current Places relation set for a target. */
+  placeUidsFor?(target: CloudRowTarget): readonly string[];
+  /** Override the complete current dependency relation set for a target. */
+  dependencyUidsFor?(target: CloudRowTarget): readonly string[];
+  /** Emit a starred manual-order row when the operation explicitly stars a task. */
+  starredOrderIndexFor?(target: CloudRowTarget): string | undefined;
   /** Post-QuickSync check on the target as found by GUID in a fresh export. */
   verified(task: TaskNode, target: CloudRowTarget): boolean;
 }
@@ -38,22 +46,23 @@ export async function runCloudRowUpdate(
   ids: readonly string[],
   plan: CloudRowUpdatePlan
 ): Promise<CallToolResult> {
-  // The pre-sync export is mandatory: it is the only path-id → GUID resolver.
+  // The pre-sync export supplies path ids; GUIDs come from binary/XML first,
+  // then conservatively from the logged Caption/ParentUID path.
   const before = (await ctx.store.getSnapshot(true)).tasks;
+  const cloud = await knownCloudProjection(ctx.cloudState);
   const resolved = [...new Set(ids)].map((id) => {
     const task = findById(before, id);
     if (!task) throw new Error(`no task with id "${id}" — ids shift when the tree changes; re-run list_tasks`);
-    return { id, task };
+    return { id, task, uid: task.Guid?.toUpperCase() ?? resolveTaskUid(task, cloud.rows) };
   });
-  const noGuid = resolved.filter(({ task }) => !task.Guid);
+  const noGuid = resolved.filter(({ uid }) => !uid);
   if (noGuid.length > 0) {
     const list = noGuid.map(({ id, task }) => `[${id}] "${task.Caption}"`).join(", ");
     throw new Error(`no recoverable GUID for ${list} — nothing was queued; make this change in the MLO app`);
   }
-  const rows = await knownFullRows(ctx.cloudState);
-  const targets: CloudRowTarget[] = resolved.map(({ id, task }) => {
-    const uid = task.Guid!.toUpperCase();
-    const known = rows.get(uid);
+  const targets: CloudRowTarget[] = resolved.map(({ id, task, uid }) => {
+    const resolvedUid = uid!;
+    const known = cloud.rows.get(resolvedUid);
     if (!known) {
       throw new Error(
         `no full record for [${id}] "${task.Caption}" in the delta log — the cloud path can only rewrite tasks it has ` +
@@ -61,14 +70,48 @@ export async function runCloudRowUpdate(
           "nothing was queued; make this change in the MLO app"
       );
     }
-    return { id, task, uid, known };
+    return {
+      id, task, uid: resolvedUid, known,
+      placeUids: cloud.placeUidsByTask.get(resolvedUid) ?? [],
+      dependencyUids: cloud.dependencyUidsByTask.get(resolvedUid) ?? [],
+    };
   });
-  plan.prepare?.(before, targets);
+  const placeCaptionByUid = new Map(cloud.places.map((place) => [place.uid, place.caption]));
+  for (const target of targets) {
+    const loggedPlaces = target.placeUids.map((uid) => placeCaptionByUid.get(uid)).filter((value): value is string => value !== undefined);
+    const expectedPlaces = [...target.task.Places].sort((a, b) => a.localeCompare(b));
+    const actualPlaces = [...loggedPlaces].sort((a, b) => a.localeCompare(b));
+    if (JSON.stringify(expectedPlaces) !== JSON.stringify(actualPlaces)) {
+      throw new Error(
+        `context relation state for [${target.id}] "${target.task.Caption}" is not fully recoverable from the delta log — ` +
+          "nothing was queued; change this task once in MLO and sync"
+      );
+    }
+    const expectedDependencies = [...target.task.DependsOn].map((uid) => uid.toUpperCase()).sort();
+    const actualDependencies = [...target.dependencyUids].sort();
+    if (JSON.stringify(expectedDependencies) !== JSON.stringify(actualDependencies)) {
+      throw new Error(
+        `dependency relation state for [${target.id}] "${target.task.Caption}" is not fully recoverable from the delta log — ` +
+          "nothing was queued; change this task once in MLO and sync"
+      );
+    }
+  }
+  plan.prepare?.(before, targets, cloud);
   for (const target of targets) plan.guard?.(target);
 
   const now = nowIso();
   const delta = buildTaskUpdatesDelta(
-    targets.map((target) => ({ header: target.known.header, row: target.known.row, patch: plan.patchFor(target, now) }))
+    targets.map((target) => {
+      const starredOrderIndex = plan.starredOrderIndexFor?.(target);
+      return {
+        header: target.known.header,
+        row: target.known.row,
+        patch: plan.patchFor(target, now),
+        placeUids: plan.placeUidsFor?.(target) ?? target.placeUids,
+        dependencyUids: plan.dependencyUidsFor?.(target) ?? target.dependencyUids,
+        ...(starredOrderIndex !== undefined ? { starredOrderIndex } : {}),
+      };
+    })
   );
   const cursor = cursorToDecimalString(await ctx.cloudState.append("mcp", packEnvelope(delta)));
   const described = targets.map(({ id, task }) => `[${id}] "${task.Caption}"`).join(", ");
@@ -80,7 +123,12 @@ export async function runCloudRowUpdate(
     ctx.store.invalidate();
     try {
       const after = flatten((await ctx.store.getSnapshot(true)).tasks);
-      const byGuid = new Map(after.filter((task) => task.Guid).map((task) => [task.Guid!.toUpperCase(), task]));
+      const verificationCloud = await knownCloudProjection(ctx.cloudState);
+      const byGuid = new Map<string, TaskNode>();
+      for (const task of after) {
+        const uid = task.Guid?.toUpperCase() ?? resolveTaskUid(task, verificationCloud.rows);
+        if (uid) byGuid.set(uid, task);
+      }
       verified = targets.every((target) => {
         const task = byGuid.get(target.uid);
         return task !== undefined && plan.verified(task, target);

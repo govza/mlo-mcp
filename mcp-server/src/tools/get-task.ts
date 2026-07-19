@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { findById, flatten } from "../task-tree.js";
 import { defineTool, textResult, errorResult, toSummary, TaskSummarySchema } from "./shared.js";
+import { knownCloudProjection, resolveTaskUid } from "../cloud/log-projection.js";
+import type { TaskNode } from "../types.js";
 
 export const getTaskTool = defineTool({
   name: "get_task",
@@ -31,16 +33,24 @@ export const getTaskTool = defineTool({
     const t = findById(snap.tasks, id);
     if (!t) return errorResult(`no task with id "${id}" — ids shift when the tree changes; re-run list_tasks`);
     const all = flatten(snap.tasks);
-    const byGuid = new Map(all.filter((x) => x.Guid).map((x) => [x.Guid!, x]));
+    const cloud = await knownCloudProjection(ctx.cloudState);
+    const uidFor = (task: TaskNode) => task.Guid?.toUpperCase() ?? resolveTaskUid(task, cloud.rows);
+    const resolvedUid = uidFor(t);
+    const byGuid = new Map<string, TaskNode>();
+    for (const task of all) {
+      const uid = uidFor(task);
+      if (uid) byGuid.set(uid, task);
+    }
     const dependsOn = t.DependsOn.map((uid) => {
-      const dep = byGuid.get(uid);
+      const dep = byGuid.get(uid.toUpperCase());
       return { id: dep?.id, Caption: dep?.Caption, uid };
     });
     const dependedOnBy = all
-      .filter((x) => t.Guid && x.DependsOn.includes(t.Guid))
+      .filter((x) => resolvedUid && x.DependsOn.map((uid) => uid.toUpperCase()).includes(resolvedUid))
       .map((x) => ({ id: x.id, Caption: x.Caption }));
     const task = {
       ...toSummary(t),
+      Guid: resolvedUid,
       Note: t.Note,
       Effort: t.Effort,
       CompletionDateTime: t.CompletionDateTime,
@@ -56,7 +66,7 @@ export const getTaskTool = defineTool({
     };
     const lines = [
       `[${t.id}] ${t.Caption}`,
-      t.Guid ? `guid: ${t.Guid}` : "guid: (not recoverable)",
+      resolvedUid ? `guid: ${resolvedUid}` : "guid: (not recoverable)",
       `path: ${t.Path.join(" > ")}`,
       t.Note ? `note: ${t.Note}` : undefined,
       t.DueDateTime ? `due: ${t.DueDateTime}` : undefined,

@@ -51,16 +51,17 @@ Installs from npm (no `profile/` shipped) still require it.
 | `get_task` | read | full fields, GUID, children, dependencies |
 | `list_contexts` | read | contexts (Places) with usage counts |
 | `cloud_status` | read | local sync endpoint cursor + delta counts |
-| `add_task` | write | one full-row task per call; parent by GUID (`parentUid`) |
+| `add_task` | write | one full-row task per call; parent by GUID; booleans, existing Flag/Places |
+| `add_tasks` | write | atomic 1–50 task outline; local parent/dependency keys + existing GUID links |
 | `sync` | write | `-QuickSync` |
 | `complete_task` | destructive | `ids` batch, one delta; refuses recurring tasks |
 | `uncomplete_task` | destructive | reopens completed tasks, `ids` batch |
-| `update_task` | destructive | `updates` batch: field edits + re-parenting moves (booleans/flag/contexts/dependencies not yet) |
+| `update_task` | destructive | `updates` batch: fields, booleans, Flag/Places/dependencies + re-parenting |
 | `delete_task` | destructive | tombstones each task + whole subtree, `ids` batch |
 
 Writes never touch the data file. Each write queues a sync delta on the server's local cloud endpoint and triggers QuickSync; **MLO's own merge logic** applies it while the app keeps running. Batches travel as ONE delta and are atomic (one bad id and nothing is queued). Results carry a `verified` flag — `false` means queued but not yet confirmed in a fresh export, not failure. Edits need the task's full record in the delta log (added by this server or changed in MLO since the endpoint took over); see [`../docs/tools.md`](../docs/tools.md) and [`../docs/mcp-cloud.md`](../docs/mcp-cloud.md), including the one-time proxy wiring that routes the app's sync here. The server also sends a connection-time `instructions` guide teaching agents these conventions.
 
-Task ids are path-based (`1.2.3`) and shift when the tree changes — the server re-exports before every mutation, and `get_task` also reports each task's stable internal GUID (recovered from the `.ml` binary; recurring tasks may lack one).
+Task ids are path-based (`1.2.3`) and shift when the tree changes — the server re-exports before every mutation, and `get_task` also reports each task's stable internal GUID. Recovery uses the `.ml` binary/XML first and an unambiguous logged cloud path second; duplicate sibling captions can remain unresolved.
 
 ## Tests & direct tool runs
 

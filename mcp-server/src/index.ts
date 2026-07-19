@@ -23,6 +23,8 @@ Task ids are PATH-BASED ("1.2.3" = position in the tree) and shift whenever the 
 Treat them as valid only for immediate follow-up calls; after any write (or if MLO was used
 interactively), re-run list_tasks/search_tasks before using ids again. Never store path ids.
 add_task takes a parent GUID (\`parentUid\`, from get_task) instead of a path id.
+add_tasks creates up to 50 tasks atomically; local \`key\` values connect its
+\`parentKey\` and \`dependsOnKeys\` outline/dependency references.
 
 ### How writes work
 Writes never touch the data file. Each write queues a sync delta on the local cloud endpoint
@@ -36,16 +38,19 @@ one bad id and nothing is queued.
 - update_task / complete_task / uncomplete_task need the task's full record in the delta
   log — available once a task was added by this server or changed in MLO since the local
   endpoint took over. Otherwise make the change in the MLO app.
-- update_task cannot edit booleans (IsProject, Starred, Hide*), Flag, Places, or
-  dependencies yet; date edits on recurring tasks are refused (the series would desync).
+- add_task/update_task support Folder, Project, Starred, visibility/sequential
+  booleans, existing Flag assignment, and existing contexts (Places).
+- update_task replaces dependencies through \`dependsOnIds\` (path ids resolved
+  atomically to GUIDs); date edits on recurring tasks are refused (the series would desync).
 - complete_task refuses recurring tasks — completing in MLO generates the next occurrence.
-- delete_task removes each task AND its whole subtree; it needs recoverable GUIDs for the
-  full subtree.
+- delete_task removes each task AND its whole subtree; it needs binary/XML or
+  unambiguous logged-path GUID recovery for the full subtree.
 
 ### Field conventions
 - Dates are local ISO without timezone ("2026-08-01T15:00:00").
 - Importance/Effort are 0–200 (100 = normal).
-- Contexts are MLO "Places" (@Office); currently read-only (list_contexts, search filters).
+- Contexts are MLO "Places" (@Office); pass existing captions in \`Places\` after
+  consulting list_contexts. On update, \`Places\` is the complete replacement set.
 
 ### Completion
 complete_task marks done (projects get ProjectStatus too); uncomplete_task reopens.

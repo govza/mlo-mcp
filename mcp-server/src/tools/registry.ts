@@ -3,6 +3,7 @@ import { listTasksTool } from "./list-tasks.js";
 import { searchTasksTool } from "./search-tasks.js";
 import { getTaskTool } from "./get-task.js";
 import { addTaskTool } from "./add-task.js";
+import { addTasksTool } from "./add-tasks.js";
 import { updateTaskTool } from "./update-task.js";
 import { completeTaskTool } from "./complete-task.js";
 import { uncompleteTaskTool } from "./uncomplete-task.js";
@@ -17,6 +18,7 @@ export const allTools: MloTool[] = [
   searchTasksTool,
   getTaskTool,
   addTaskTool,
+  addTasksTool,
   updateTaskTool,
   completeTaskTool,
   uncompleteTaskTool,
