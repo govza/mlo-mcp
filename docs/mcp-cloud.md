@@ -129,9 +129,10 @@ State lives next to the data file, default `<MLO_DATA_FILE>.mcp-cloud\`:
 
 ## Configuration
 
+The local sync endpoint always starts alongside the MCP server.
+
 | Env var | Default | Meaning |
 |---|---|---|
-| `MLO_CLOUD_MODE` | `0` | `1` starts the local sync endpoint alongside the MCP server |
 | `MLO_CLOUD_HOST` | `127.0.0.1` | bind address (loopback only by design) |
 | `MLO_CLOUD_PORT` | `8080` | listen port |
 | `MLO_CLOUD_STATE_DIR` | `<dataFile>.mcp-cloud` | delta log + state location |
@@ -144,8 +145,8 @@ State lives next to the data file, default `<MLO_DATA_FILE>.mcp-cloud\`:
   the task appeared via a fresh export.
 - `cloud_status` — read-only mirror of `GET /v1/status`.
 
-The long-term goal is to route the existing write tools through this path when
-`MLO_CLOUD_MODE=1`; `cloud_add_task` is the vertical slice proving the loop.
+The long-term goal is to route the existing write tools through this path;
+`cloud_add_task` is the vertical slice proving the loop.
 
 ## Open questions (do not hard-code answers)
 

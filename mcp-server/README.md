@@ -30,12 +30,16 @@ claude mcp add mlo -e MLO_DATA_FILE=D:\path\to\your.ml -- node D:\dev\projects\o
 
 | Variable | Required | Default | Meaning |
 |---|---|---|---|
-| `MLO_DATA_FILE` | yes | — | The `.ml` profile the server operates on |
+| `MLO_DATA_FILE` | yes¹ | — | The `.ml` profile the server operates on |
 | `MLO_EXE_PATH` | no | Program Files path above | mlo.exe location |
 | `MLO_EXPORT_DIR` | no | `%TEMP%\mlo-mcp` | Scratch dir for XML exports |
 | `MLO_CACHE_STALE_MS` | no | `30000` | Task-tree cache lifetime |
 | `MLO_AUTO_RESTART_GUI` | no | `1` | Close + relaunch a running MLO app around writes; `0` = refuse writes while it runs |
 | `MLO_RELAUNCH_STYLE` | no | `minimized` | How MLO comes back after a write: `minimized` (no window pop / focus steal; combines with MLO's "Minimize to system tray" option to be fully invisible), `normal`, or `none` (leave it closed) |
+
+¹ In a repo checkout, `MLO_DATA_FILE` may be omitted — it defaults to the demo
+profile at `profile/profile.ml`, so `pnpm dev` / `pnpm tool` work out of the box.
+Installs from npm (no `profile/` shipped) still require it.
 
 ## Tools
 

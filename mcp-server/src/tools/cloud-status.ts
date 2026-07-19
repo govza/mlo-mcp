@@ -8,7 +8,6 @@ export const cloudStatusTool = defineTool({
   description: "Report local cloud endpoint configuration, cursor, and delta counts.",
   inputSchema: {},
   outputSchema: {
-    enabled: z.boolean(),
     host: z.string(),
     port: z.number(),
     cursor: z.string(),
@@ -23,13 +22,12 @@ export const cloudStatusTool = defineTool({
       ctx.cloudState.pendingFor("app"),
     ]);
     const result = {
-      enabled: ctx.config.cloudMode,
       host: ctx.config.cloudHost,
       port: ctx.config.cloudPort,
       cursor: cursorToDecimalString(cursor),
       entries,
       pendingForApp,
     };
-    return textResult(`Cloud ${result.enabled ? "enabled" : "disabled"}; cursor ${result.cursor}; ${result.pendingForApp} pending for app.`, result);
+    return textResult(`Cloud endpoint ${result.host}:${result.port}; cursor ${result.cursor}; ${result.pendingForApp} pending for app.`, result);
   },
 });

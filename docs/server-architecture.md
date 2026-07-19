@@ -8,8 +8,9 @@ TypeScript MCP server (`mcp-server/`) over stdio. Node 22, pnpm, ESM, strict TS;
 src/
   index.ts          McpServer wiring (registers tools/registry.ts, server
                     instructions string), stdio transport
-  config.ts         env config (MLO_DATA_FILE required; MLO_EXE_PATH, MLO_EXPORT_DIR,
-                    MLO_CACHE_STALE_MS, MLO_AUTO_RESTART_GUI)
+  config.ts         env config (MLO_DATA_FILE, defaulting to profile/profile.ml in repo
+                    checkouts; MLO_EXE_PATH, MLO_EXPORT_DIR, MLO_CACHE_STALE_MS,
+                    MLO_AUTO_RESTART_GUI)
   mlo-cli.ts        mlo.exe invocation: Delphi quoting, timeouts, exit-code mapping,
                     both locks, GUI close/relaunch, isMloRunning
   xml.ts            parse/build (fast-xml-parser), RawTaskNode, canonical field order

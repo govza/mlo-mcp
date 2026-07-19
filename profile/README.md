@@ -7,9 +7,9 @@ to publish. It has two jobs:
 - **Source fixture for the real-exe tests:** the `mlo` test project
   (`pnpm test:mlo`) copies it to a temp directory per run and never touches the
   original (`mcp-server/test/mlo/helpers.ts`).
-- **Development data file:** the locally registered MCP server points its
-  `MLO_DATA_FILE` here, so agent sessions exercise the demo tree instead of a
-  real profile.
+- **Development data file:** when `MLO_DATA_FILE` is unset, the server defaults
+  to this file in repo checkouts (`mcp-server/src/config.ts`), so `pnpm dev` and
+  agent sessions exercise the demo tree instead of a real profile.
 
 `export.xml` is the reference `-saveXML` export of `profile.ml` — the
 ground-truth example of the XML schema documented in `docs/xml-format.md`.
