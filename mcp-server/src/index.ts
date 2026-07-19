@@ -9,7 +9,7 @@ import { log } from "./log.js";
 import { allTools } from "./tools/registry.js";
 import { registerTool } from "./tools/shared.js";
 import { CloudState } from "./cloud/state.js";
-import { startCloudServer, type CloudServerHandle } from "./cloud/server.js";
+import { startOrAttachCloudServer, type CloudServerHandle } from "./cloud/server.js";
 
 /** Connection-time usage guide shown to the LLM (MCP `instructions`). */
 const INSTRUCTIONS = `
@@ -62,7 +62,9 @@ async function main(): Promise<void> {
   const store = new MloStore(config);
   const cloudState = new CloudState(config.cloudStateDir);
   const ctx = { config, store, cloudState };
-  const cloudServer = await startCloudServer({ host: config.cloudHost, port: config.cloudPort, stateDir: config.cloudStateDir, state: cloudState });
+  // undefined = another session already serves the endpoint; this one shares
+  // the delta log via CloudState's cross-process locking and needs no listener.
+  const cloudServer = await startOrAttachCloudServer({ host: config.cloudHost, port: config.cloudPort, stateDir: config.cloudStateDir, state: cloudState });
 
   const server = new McpServer({ name: "mlo-mcp", version: "0.2.0" }, { instructions: INSTRUCTIONS });
   for (const tool of allTools) registerTool(server, tool, ctx);
@@ -71,7 +73,7 @@ async function main(): Promise<void> {
   log(`ready — data file: ${config.dataFile}`);
   watchOwnBuild(cloudServer);
   const shutdown = async () => {
-    await cloudServer.stop();
+    await cloudServer?.stop();
   };
   process.once("SIGINT", () => void shutdown().finally(() => process.exit(0)));
   process.once("SIGTERM", () => void shutdown().finally(() => process.exit(0)));
@@ -83,7 +85,7 @@ async function main(): Promise<void> {
  * file; when a rebuild changes it, exit cleanly while idle so the client
  * respawns the current code on the next tool call.
  */
-function watchOwnBuild(cloudServer: CloudServerHandle): void {
+function watchOwnBuild(cloudServer: CloudServerHandle | undefined): void {
   const entry = fileURLToPath(import.meta.url);
   let startMtime: number | undefined;
   const timer = setInterval(async () => {
@@ -92,7 +94,7 @@ function watchOwnBuild(cloudServer: CloudServerHandle): void {
       startMtime ??= mtime;
       if (mtime !== startMtime && !isMloBusy()) {
         log("server build changed on disk — exiting so the client restarts the new version");
-        await cloudServer.stop();
+        await cloudServer?.stop();
         process.exit(0);
       }
     } catch {

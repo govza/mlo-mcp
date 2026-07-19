@@ -30,8 +30,21 @@ export class MloStore {
     if (!fresh && this.snap && Date.now() - this.snap.at < this.config.cacheStaleMs) {
       return this.snap;
     }
-    // coalesce concurrent refreshes
-    this.pending ??= this.refresh().finally(() => (this.pending = undefined));
+    // fresh=true must not coalesce onto an in-flight refresh: its export may
+    // have started before the caller's mutation and would read as pre-change.
+    if (fresh) this.pending = undefined;
+    if (!this.pending) {
+      const promise: Promise<Snapshot> = this.refresh()
+        .then((snapshot) => {
+          // a superseded refresh must not overwrite a newer snapshot
+          if (this.pending === promise) this.snap = snapshot;
+          return snapshot;
+        })
+        .finally(() => {
+          if (this.pending === promise) this.pending = undefined;
+        });
+      this.pending = promise;
+    }
     return this.pending;
   }
 
@@ -45,11 +58,11 @@ export class MloStore {
     } catch (e) {
       log(`GUID extraction failed (continuing without GUIDs): ${(e as Error).message}`);
     }
-    this.snap = { xml, doc, tasks, guidCount, at: Date.now() };
-    return this.snap;
+    return { xml, doc, tasks, guidCount, at: Date.now() };
   }
 
   invalidate(): void {
     this.snap = undefined;
+    this.pending = undefined;
   }
 }

@@ -1,6 +1,7 @@
 import { cursorToDecimalString, parseCursor, type CloudCursor } from "./cursor.js";
 import type { SectionedCsv } from "./csv.js";
 import { unpackEnvelope } from "./envelope.js";
+import { DEFAULT_CLOUD_PORT } from "./server.js";
 
 export interface CloudClientOptions { baseUrl?: string; client?: string }
 export interface CloudStatus { cursor: string; entries: { mcp: number; app: number }; pendingForApp: number }
@@ -11,7 +12,7 @@ export class CloudClient {
   readonly baseUrl: string;
   readonly client: string;
   constructor(options: CloudClientOptions = {}) {
-    this.baseUrl = (options.baseUrl ?? "http://127.0.0.1:8080").replace(/\/$/, "");
+    this.baseUrl = (options.baseUrl ?? `http://127.0.0.1:${DEFAULT_CLOUD_PORT}`).replace(/\/$/, "");
     this.client = options.client ?? "mlo-app";
   }
   status(): Promise<CloudStatus> { return this.request<CloudStatus>("/v1/status"); }

@@ -4,7 +4,7 @@ import path from "node:path";
 import http from "node:http";
 import net from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
-import { startCloudServer, type CloudServerHandle } from "../../src/cloud/server.js";
+import { startCloudServer, startOrAttachCloudServer, type CloudServerHandle } from "../../src/cloud/server.js";
 import { buildTaskAddDelta } from "../../src/cloud/delta.js";
 import { packEnvelope, unpackEnvelope } from "../../src/cloud/envelope.js";
 
@@ -27,6 +27,27 @@ describe("cloud HTTP server", () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-bind-")); dirs.push(dir);
     await expect(startCloudServer({ host: "0.0.0.0", port: 0, stateDir: dir }))
       .rejects.toThrow("must bind to a loopback host");
+  });
+
+  it("attaches instead of failing when the port is held by another mlo-mcp endpoint", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-attach-")); dirs.push(dir);
+    const first = await startCloudServer({ host: "127.0.0.1", port: 0, stateDir: dir }); handles.push(first);
+    const second = await startOrAttachCloudServer({ host: "127.0.0.1", port: first.port, stateDir: dir });
+    expect(second).toBeUndefined();
+  });
+
+  it("still fails when the port is held by something that is not a cloud endpoint", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-attach-other-")); dirs.push(dir);
+    const other = http.createServer((_request, response) => { response.writeHead(200); response.end("not mlo"); });
+    await new Promise<void>((resolve) => other.listen(0, "127.0.0.1", resolve));
+    const address = other.address();
+    if (!address || typeof address === "string") throw new Error("missing address");
+    try {
+      await expect(startOrAttachCloudServer({ host: "127.0.0.1", port: address.port, stateDir: dir }))
+        .rejects.toThrow(/EADDRINUSE/);
+    } finally {
+      await new Promise<void>((resolve, reject) => other.close((error) => error ? reject(error) : resolve()));
+    }
   });
 
   it("intercepts supported vendor SOAP operations instead of forwarding credentials", async () => {

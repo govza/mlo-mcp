@@ -2,7 +2,7 @@ import { z } from "zod";
 import { cursorToDecimalString } from "../cloud/cursor.js";
 import { buildTaskAddDelta, generateGuid, mergeDeltas } from "../cloud/delta.js";
 import { packEnvelope } from "../cloud/envelope.js";
-import { knownCloudProjection, rowValue, type NamedCloudObject } from "../cloud/log-projection.js";
+import { knownCloudProjection, resolveNamed, rowValue } from "../cloud/log-projection.js";
 import { quickSync } from "../mlo-cli.js";
 import { flatten } from "../task-tree.js";
 import type { TaskNode } from "../types.js";
@@ -27,13 +27,6 @@ const BatchTask = z.object({
   dependsOnUids: z.array(z.string()).max(25).optional().describe("GUIDs of existing tasks that this task waits for"),
 });
 type BatchTaskSpec = z.infer<typeof BatchTask>;
-
-function resolveNamed(caption: string, objects: readonly NamedCloudObject[], kind: string): string {
-  const matches = objects.filter((object) => object.caption.toLocaleLowerCase() === caption.toLocaleLowerCase());
-  if (matches.length === 0) throw new Error(`unknown ${kind} "${caption}" — use an existing ${kind}`);
-  if (matches.length > 1) throw new Error(`ambiguous ${kind} "${caption}" — ${matches.length} definitions have that caption`);
-  return matches[0]!.uid;
-}
 
 function validateGraph(specs: readonly BatchTaskSpec[], byKey: Map<string, BatchTaskSpec>): void {
   for (const spec of specs) {
@@ -71,6 +64,32 @@ function countSignatures(tasks: readonly TaskNode[]): Map<string, number> {
   const result = new Map<string, number>();
   for (const task of flatten([...tasks])) result.set(signature(task), (result.get(signature(task)) ?? 0) + 1);
   return result;
+}
+
+/**
+ * Verify adds by comparing exports from before and after QuickSync. Queued
+ * GUIDs found in the fresh export prove the whole outline; the binary GUID
+ * annotator is best-effort though, so fall back to per-signature
+ * (caption+note) count increases — a pre-existing duplicate caption alone
+ * never counts as success, and captions are not required to be unique.
+ */
+export function wasOutlineAdded(
+  before: readonly TaskNode[] | undefined,
+  after: readonly TaskNode[],
+  specs: ReadonlyArray<{ caption: string; note?: string }>,
+  uids: readonly string[],
+): boolean {
+  const afterGuids = new Set(flatten([...after]).map((task) => task.Guid?.toUpperCase()).filter(Boolean));
+  if (uids.every((uid) => afterGuids.has(uid.toUpperCase()))) return true;
+  if (!before) return false;
+  const beforeCounts = countSignatures(before);
+  const afterCounts = countSignatures(after);
+  const requested = new Map<string, number>();
+  for (const spec of specs) {
+    const key = signature({ Caption: spec.caption, Note: spec.note });
+    requested.set(key, (requested.get(key) ?? 0) + 1);
+  }
+  return [...requested].every(([key, count]) => (afterCounts.get(key) ?? 0) - (beforeCounts.get(key) ?? 0) >= count);
 }
 
 export const addTasksTool = defineTool({
@@ -147,6 +166,7 @@ export const addTasksTool = defineTool({
     });
     const cursor = cursorToDecimalString(await ctx.cloudState.append("mcp", packEnvelope(mergeDeltas(documents))));
     const resultTasks = tasks.map((spec) => ({ key: spec.key, uid: uids.get(spec.key)! }));
+    const queued = tasks.length === 1 ? "1 task was queued" : `${tasks.length} tasks were queued atomically`;
     let verified = false;
     let message: string;
     try {
@@ -154,25 +174,16 @@ export const addTasksTool = defineTool({
       ctx.store.invalidate();
       try {
         const after = (await ctx.store.getSnapshot(true)).tasks;
-        const afterFlat = flatten(after);
-        const afterGuids = new Set(afterFlat.map((task) => task.Guid?.toUpperCase()).filter(Boolean));
-        verified = resultTasks.every(({ uid }) => afterGuids.has(uid));
-        if (!verified && before) {
-          const beforeCounts = countSignatures(before);
-          const afterCounts = countSignatures(after);
-          const requested = new Map<string, number>();
-          for (const spec of tasks) requested.set(signature({ Caption: spec.caption, Note: spec.note }), (requested.get(signature({ Caption: spec.caption, Note: spec.note })) ?? 0) + 1);
-          verified = [...requested].every(([key, count]) => (afterCounts.get(key) ?? 0) - (beforeCounts.get(key) ?? 0) >= count);
-        }
+        verified = wasOutlineAdded(before, after, tasks, resultTasks.map(({ uid }) => uid));
         message = verified
-          ? `${tasks.length} tasks were queued atomically and verified in a fresh MLO export.`
-          : `${tasks.length} tasks were queued atomically, but a fresh export does not confirm the whole outline yet.`;
+          ? `${queued} and verified in a fresh MLO export.`
+          : `${queued}, but a fresh export does not confirm ${tasks.length === 1 ? "it" : "the whole outline"} yet.`;
       } catch (error) {
-        message = `${tasks.length} tasks were queued atomically, but verification failed: ${error instanceof Error ? error.message : String(error)}`;
+        message = `${queued}, but verification failed: ${error instanceof Error ? error.message : String(error)}`;
       }
     } catch (error) {
       ctx.store.invalidate();
-      message = `${tasks.length} tasks were queued atomically for the next session, but QuickSync failed: ${error instanceof Error ? error.message : String(error)}`;
+      message = `${queued} for the next session, but QuickSync failed: ${error instanceof Error ? error.message : String(error)}`;
     }
     return textResult(message, { tasks: resultTasks, cursor, verified, message });
   },

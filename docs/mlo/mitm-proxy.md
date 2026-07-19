@@ -6,7 +6,7 @@ debugging only. Do not capture a personal profile or commit capture files.
 
 ## Prefer the local endpoint's delta log
 
-When MLO is already configured to use mcp-cloud at `127.0.0.1:8080`, no MITM
+When MLO is already configured to use mcp-cloud at `127.0.0.1:8181`, no MITM
 tool is needed to reverse-engineer an app-side field change. The endpoint
 terminates `ApplyModificationsBytesEx` locally and stores the exact uploaded ZIP
 as an `origin:"app"` entry in `messages/` (or `MLO_CLOUD_STATE_DIR`):
@@ -39,12 +39,12 @@ controlled edit to the vendor service.
 ## Local configuration
 
 The forward proxy listens on `127.0.0.1:8888`. This is deliberately separate
-from the local cloud server, which defaults to `127.0.0.1:8080`.
+from the local cloud server, which defaults to `127.0.0.1:8181`.
 
 The cloud server's own proxy also writes the same credential-safe structural
 summaries for plain-HTTP vendor sync traffic (to
 `<stateDir>/soap-summary.jsonl`, see [mcp-cloud.md](../mcp-cloud.md)), so routing
-MLO through `127.0.0.1:8080` needs no mitmproxy at all unless the sync
+MLO through `127.0.0.1:8181` needs no mitmproxy at all unless the sync
 operations turn out to be TLS-tunneled — a vendor-host `CONNECT` in that log is
 the signal that full mitmproxy interception with the CA certificate is needed.
 
@@ -92,7 +92,7 @@ directory.
 
 ## Reproduce and inspect
 
-1. Start the local MCP cloud server on port `8080` if the scenario needs it.
+1. Start the local MCP cloud server on port `8181` if the scenario needs it.
 2. Start mitmdump on port `8888`.
 3. Route only the disposable MLO development profile through the proxy.
 4. Trigger one `-QuickSync` operation.

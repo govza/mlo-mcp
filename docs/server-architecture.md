@@ -45,6 +45,8 @@ arrays) as ONE delta; batches are atomic (any bad id aborts before anything is q
 1. **In-process**: a promise-chain mutex serializes every mlo.exe invocation within one server.
 2. **Cross-process**: a lock *directory* next to the data file (`<file>.ml.mcp-lock`, atomic `mkdir`, stale-broken after 3 min) serializes invocations across multiple server processes — one per Claude session. Reentrant within a process via a held-flag. (The cloud delta log has its own lock directory in the state dir — see mcp-cloud.md.)
 
+Only the first session binds the cloud endpoint's port (default 8181); later sessions detect a healthy mlo-mcp endpoint there and attach — they run no listener and share the delta log through the state-dir lock.
+
 Why: MLO invocations racing each other trigger a modal "file is locked by another process" dialog and hang forever.
 
 ## Reads

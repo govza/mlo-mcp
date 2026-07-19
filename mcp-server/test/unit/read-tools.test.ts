@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { collectVisible } from "../../src/task-tree.js";
+import { collectVisible, searchTasks } from "../../src/task-tree.js";
 import { listTasksTool } from "../../src/tools/list-tasks.js";
 import { searchTasksTool } from "../../src/tools/search-tasks.js";
 import type { ToolContext } from "../../src/tools/shared.js";
@@ -74,6 +74,40 @@ describe("list_tasks", () => {
     expect(structured.tasks).toHaveLength(4);
     expect(structured.total).toBe(4);
     expect((res.content[0] as { text: string }).text).not.toContain("showing");
+  });
+});
+
+describe("searchTasks filters", () => {
+  /** Importance is MLO's 0–200 scale; tasks at the normal 100 omit the element entirely. */
+  const tasks = [
+    task("1", "normal implicit"),
+    task("2", "below normal", { Importance: 50 }),
+    task("3", "critical", { Importance: 175, Starred: true }),
+    task("4", "errand", { Places: ["@Town"], DueDateTime: "2026-07-21T09:00:00" }),
+    task("5", "someday", { DueDateTime: "2026-09-01T00:00:00" }),
+  ];
+
+  it("treats a task without explicit Importance as normal (100)", () => {
+    const captions = searchTasks(tasks, { minImportance: 100 }).map((t) => t.Caption);
+    expect(captions).toEqual(["normal implicit", "critical", "errand", "someday"]);
+  });
+
+  it("filters above normal on the 0–200 scale", () => {
+    expect(searchTasks(tasks, { minImportance: 150 }).map((t) => t.Caption)).toEqual(["critical"]);
+  });
+
+  it("matches contexts with or without the leading @", () => {
+    expect(searchTasks(tasks, { context: "town" }).map((t) => t.Caption)).toEqual(["errand"]);
+    expect(searchTasks(tasks, { context: "@Town" }).map((t) => t.Caption)).toEqual(["errand"]);
+  });
+
+  it("applies strict due-date bounds", () => {
+    expect(searchTasks(tasks, { dueBefore: "2026-08-01" }).map((t) => t.Caption)).toEqual(["errand"]);
+    expect(searchTasks(tasks, { dueAfter: "2026-07-21T09:00:00" }).map((t) => t.Caption)).toEqual(["someday"]);
+  });
+
+  it("filters starred tasks", () => {
+    expect(searchTasks(tasks, { starred: true }).map((t) => t.Caption)).toEqual(["critical"]);
   });
 });
 

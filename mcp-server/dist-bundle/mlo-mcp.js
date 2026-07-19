@@ -23197,599 +23197,30 @@ var StdioServerTransport = class {
 };
 
 // src/config.ts
-import path from "node:path";
+import path3 from "node:path";
 import os from "node:os";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-var DEFAULT_EXE = "C:\\Program Files (x86)\\MyLifeOrganized.net\\MLO\\mlo.exe";
-var DEV_PROFILE = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "..",
-  "profile",
-  "profile.ml"
-);
-var DEV_CLOUD_STATE_DIR = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "..",
-  "messages"
-);
-function resolveDataFile() {
-  if (process.env.MLO_DATA_FILE) return process.env.MLO_DATA_FILE;
-  if (existsSync(DEV_PROFILE)) return DEV_PROFILE;
-  throw new Error(
-    "MLO_DATA_FILE environment variable is required. Set it to the path of your .ml data file."
-  );
+
+// src/cloud/server.ts
+import http from "node:http";
+import https from "node:https";
+import net from "node:net";
+
+// src/cloud/cursor.ts
+var ZERO_CURSOR = 0n;
+function cursorToDecimalString(value) {
+  return value.toString(10);
 }
-function loadConfig() {
-  const dataFile = resolveDataFile();
-  const cloudPort = Number(process.env.MLO_CLOUD_PORT ?? "8080");
-  if (!Number.isInteger(cloudPort) || cloudPort < 0 || cloudPort > 65535) {
-    throw new Error("MLO_CLOUD_PORT must be an integer from 0 through 65535");
-  }
-  return {
-    mloExePath: process.env.MLO_EXE_PATH ?? DEFAULT_EXE,
-    dataFile,
-    exportDir: process.env.MLO_EXPORT_DIR ?? path.join(os.tmpdir(), "mlo-mcp"),
-    cacheStaleMs: Number(process.env.MLO_CACHE_STALE_MS) || 3e4,
-    // Only needed when the capture inbox is NOT MLO's own <Inbox> node (e.g. a
-    // hand-made "Входящие" folder). MLO itself hardcodes the caption "<Inbox>"
-    // in every UI language, so most profiles need no override.
-    inboxCaption: process.env.MLO_INBOX_CAPTION || void 0,
-    cloudHost: process.env.MLO_CLOUD_HOST ?? "127.0.0.1",
-    cloudPort,
-    cloudStateDir: process.env.MLO_CLOUD_STATE_DIR ?? DEV_CLOUD_STATE_DIR
-  };
+function parseCursor(value) {
+  if (!/^[0-9]+$/.test(value)) throw new Error(`invalid cloud cursor: "${value}"`);
+  const parsed = BigInt(value);
+  if (parsed > 9223372036854775807n) throw new Error(`cloud cursor exceeds signed 64-bit range: "${value}"`);
+  return parsed;
 }
 
-// src/mlo-cli.ts
-import { spawn } from "node:child_process";
-import { promises as fs } from "node:fs";
-import path2 from "node:path";
-var EXIT_MESSAGES = {
-  1: "invalid command-line argument",
-  2: "target file already exists (mlo.exe -saveXML/-saveML never overwrite)",
-  3: "error writing target file",
-  100: "unspecified MLO error"
-};
-var MloError = class extends Error {
-  constructor(message, exitCode) {
-    super(message);
-    this.exitCode = exitCode;
-    this.name = "MloError";
-  }
-  exitCode;
-};
-var chain = Promise.resolve();
-function withMloLock(fn) {
-  const next = chain.then(fn, fn);
-  chain = next.catch(() => void 0);
-  return next;
-}
-var fileLockHeld = false;
-function isMloBusy() {
-  return fileLockHeld;
-}
-async function withFileLock(config2, fn) {
-  if (fileLockHeld) return fn();
-  const lockDir = `${config2.dataFile}.mcp-lock`;
-  const deadline = Date.now() + 9e4;
-  for (; ; ) {
-    try {
-      await fs.mkdir(lockDir);
-      break;
-    } catch {
-      try {
-        const st = await fs.stat(lockDir);
-        if (Date.now() - st.mtimeMs > 18e4) {
-          await fs.rm(lockDir, { recursive: true, force: true });
-          continue;
-        }
-      } catch {
-        continue;
-      }
-      if (Date.now() > deadline) {
-        throw new MloError(
-          `another mlo-mcp process has been using the data file for over 90s (lock: ${lockDir}). If no other session is actually running MLO operations, delete that directory.`
-        );
-      }
-      await sleep(500);
-    }
-  }
-  fileLockHeld = true;
-  try {
-    return await fn();
-  } finally {
-    fileLockHeld = false;
-    await fs.rm(lockDir, { recursive: true, force: true });
-  }
-}
-function withMloFileLock(config2, fn) {
-  return withMloLock(() => withFileLock(config2, fn));
-}
-function delphiQuote(arg) {
-  if (arg.length > 0 && !/[\s"]/.test(arg)) return arg;
-  return `"${arg.replaceAll('"', '""')}"`;
-}
-function execMlo(config2, args, timeoutMs) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(config2.mloExePath, [...args, "-console"].map(delphiQuote), {
-      timeout: timeoutMs,
-      windowsHide: true,
-      killSignal: "SIGKILL",
-      windowsVerbatimArguments: true,
-      // with verbatim arguments the exe path itself must be quoted in the
-      // command line, or its spaces shift every parameter the child sees
-      argv0: delphiQuote(config2.mloExePath),
-      stdio: "ignore"
-    });
-    child.on("error", (err2) => {
-      if (err2.code === "ENOENT") {
-        reject(new MloError(`mlo.exe not found at "${config2.mloExePath}". Set MLO_EXE_PATH to the correct location.`));
-      } else {
-        reject(new MloError(`failed to run mlo.exe: ${err2.message}`));
-      }
-    });
-    child.on("exit", (code, signal) => {
-      if (signal) {
-        reject(
-          new MloError(
-            `mlo.exe did not finish within ${timeoutMs / 1e3}s and was killed. This happens when MLO opens a modal dialog (e.g. an invalid -task GUID while the GUI is running).`
-          )
-        );
-      } else if (code === 0) {
-        resolve();
-      } else {
-        const detail = EXIT_MESSAGES[code ?? -1] ?? "unknown exit code";
-        reject(new MloError(`mlo.exe exited with code ${code}: ${detail}`, code ?? void 0));
-      }
-    });
-  });
-}
-var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function ensureDataFile(config2) {
-  try {
-    await fs.access(config2.dataFile);
-  } catch {
-    throw new MloError(`MLO_DATA_FILE not found at "${config2.dataFile}"`);
-  }
-}
-var exportCounter = 0;
-function exportXml(config2, taskGuid) {
-  return withMloFileLock(config2, async () => {
-    await ensureDataFile(config2);
-    await fs.mkdir(config2.exportDir, { recursive: true });
-    const target = path2.join(config2.exportDir, `export-${process.pid}-${++exportCounter}.xml`);
-    await fs.rm(target, { force: true });
-    const args = [config2.dataFile];
-    if (taskGuid) args.push(`-task=${taskGuid}`);
-    args.push(`-saveXML=${target}`);
-    try {
-      await execMlo(config2, args, 3e4);
-      return await fs.readFile(target, "utf8");
-    } finally {
-      await fs.rm(target, { force: true });
-    }
-  });
-}
-function quickSync(config2) {
-  return withMloFileLock(config2, async () => {
-    await ensureDataFile(config2);
-    await execMlo(config2, [config2.dataFile, "-QuickSync"], 12e4);
-  });
-}
-function readDataFile(config2) {
-  return fs.readFile(config2.dataFile);
-}
-
-// src/xml.ts
-var import_fast_xml_parser = __toESM(require_fxp(), 1);
-var SHARED_OPTIONS = {
-  ignoreAttributes: false,
-  attributeNamePrefix: "@_",
-  processEntities: true
-};
-var parser = new import_fast_xml_parser.XMLParser({
-  ...SHARED_OPTIONS,
-  trimValues: false,
-  parseTagValue: false,
-  parseAttributeValue: false,
-  isArray: (name) => name === "TaskNode" || name === "Place" || name === "TaskPlace" || name === "UID"
-});
-var builder = new import_fast_xml_parser.XMLBuilder({
-  ...SHARED_OPTIONS,
-  format: true,
-  indentBy: "  ",
-  suppressEmptyNode: true,
-  suppressBooleanAttributes: false
-});
-function dropWhitespaceText(value) {
-  if (Array.isArray(value)) {
-    for (const v of value) dropWhitespaceText(v);
-  } else if (value && typeof value === "object") {
-    const obj = value;
-    if (typeof obj["#text"] === "string" && obj["#text"].trim() === "") {
-      delete obj["#text"];
-    }
-    for (const v of Object.values(obj)) dropWhitespaceText(v);
-  }
-}
-function parseMloXml(xml2) {
-  const doc = parser.parse(xml2);
-  const rootList = doc["MyLifeOrganized-xml"]?.TaskTree?.TaskNode;
-  if (!rootList || rootList.length === 0) {
-    throw new Error("not a MyLifeOrganized XML export: missing MyLifeOrganized-xml/TaskTree/TaskNode");
-  }
-  dropWhitespaceText(doc);
-  return doc;
-}
-function rootNode(doc) {
-  return doc["MyLifeOrganized-xml"].TaskTree.TaskNode[0];
-}
-
-// src/task-tree.ts
-function delphiBool(v) {
-  return v === void 0 ? void 0 : v === "-1";
-}
-function num(v) {
-  return v === void 0 || v === "" ? void 0 : Number(v);
-}
-function toModel(raw, id, parentPath, depth) {
-  const path5 = [...parentPath, raw["@_Caption"]];
-  const node = {
-    id,
-    Guid: raw.IDD,
-    Caption: raw["@_Caption"],
-    Note: raw.Note,
-    Importance: num(raw.Importance),
-    Effort: num(raw.Effort),
-    DueDateTime: raw.DueDateTime,
-    StartDateTime: raw.StartDateTime,
-    CompletionDateTime: raw.CompletionDateTime,
-    IsProject: delphiBool(raw.IsProject),
-    ProjectStatus: num(raw.ProjectStatus),
-    Starred: delphiBool(raw.Starred),
-    Flag: raw.Flag,
-    Places: raw.Places?.Place ?? [],
-    EstimateMin: num(raw.EstimateMin),
-    EstimateMax: num(raw.EstimateMax),
-    TheGoal: num(raw.TheGoal),
-    HideInToDo: delphiBool(raw.HideInToDo),
-    HideInToDoThisTask: delphiBool(raw.HideInToDoThisTask),
-    ScheduleType: num(raw.ScheduleType),
-    LeadTime: num(raw.LeadTime),
-    CompleteSubTasksInOrder: delphiBool(raw.CompleteSubTasksInOrder),
-    DependsOn: raw.Dependency?.UID ?? [],
-    Children: [],
-    Path: path5,
-    Depth: depth
-  };
-  node.Children = (raw.TaskNode ?? []).map((c, i2) => toModel(c, `${id}.${i2 + 1}`, path5, depth + 1));
-  return node;
-}
-function buildTaskTree(doc) {
-  return (rootNode(doc).TaskNode ?? []).map((c, i2) => toModel(c, String(i2 + 1), [], 0));
-}
-function flatten(tasks) {
-  const out = [];
-  const walk = (list) => {
-    for (const t of list) {
-      out.push(t);
-      walk(t.Children);
-    }
-  };
-  walk(tasks);
-  return out;
-}
-function findById(tasks, id) {
-  return flatten(tasks).find((t) => t.id === id);
-}
-var INBOX_CAPTIONS = ["<Inbox>", "Inbox"];
-function looksLikeInbox(t) {
-  return t.Depth === 0 && INBOX_CAPTIONS.includes(t.Caption);
-}
-function searchTasks(tasks, f) {
-  const q = f.query?.toLowerCase();
-  const ctx = f.context?.replace(/^@/, "").toLowerCase();
-  return flatten(tasks).filter((t) => {
-    if (q && !t.Caption.toLowerCase().includes(q) && !(t.Note ?? "").toLowerCase().includes(q)) return false;
-    if (ctx && !t.Places.some((p) => p.replace(/^@/, "").toLowerCase() === ctx)) return false;
-    if (f.dueBefore && !(t.DueDateTime && t.DueDateTime < f.dueBefore)) return false;
-    if (f.dueAfter && !(t.DueDateTime && t.DueDateTime > f.dueAfter)) return false;
-    if (f.starred !== void 0 && (t.Starred ?? false) !== f.starred) return false;
-    if (f.completed !== void 0 && Boolean(t.CompletionDateTime) !== f.completed) return false;
-    if (f.isProject !== void 0 && (t.IsProject ?? false) !== f.isProject) return false;
-    if (f.flag && t.Flag !== f.flag) return false;
-    if (f.minImportance !== void 0 && (t.Importance ?? 50) < f.minImportance) return false;
-    return true;
-  });
-}
-function renderLine(t) {
-  const marks = [];
-  if (looksLikeInbox(t)) marks.push("[inbox]");
-  if (t.CompletionDateTime) marks.push("[done]");
-  if (t.IsProject) marks.push("[project]");
-  if (t.Starred) marks.push("[*]");
-  if (t.Flag) marks.push(`[flag:${t.Flag}]`);
-  if (t.Importance !== void 0 && t.Importance !== 50) marks.push(`[imp:${t.Importance}]`);
-  if (t.DueDateTime) marks.push(`due:${t.DueDateTime}`);
-  if (t.DependsOn.length) marks.push(`[waits-on:${t.DependsOn.length}]`);
-  if (t.Places.length) marks.push(t.Places.join(","));
-  return `[${t.id}] ${t.Caption}${marks.length ? " " + marks.join(" ") : ""}`;
-}
-function collectVisible(tasks, opts = {}) {
-  const out = [];
-  const walk = (list, depth) => {
-    for (const t of list) {
-      if (!opts.includeCompleted && t.CompletionDateTime) continue;
-      if (opts.maxDepth !== void 0 && depth >= opts.maxDepth) continue;
-      out.push({ task: t, depth });
-      walk(t.Children, depth + 1);
-    }
-  };
-  walk(tasks, 0);
-  return out;
-}
-function renderVisible(entries, format = "tree") {
-  if (!entries.length) return "(no tasks)";
-  return entries.map((e) => (format === "flat" ? "" : "  ".repeat(e.depth)) + renderLine(e.task)).join("\n");
-}
-
-// src/guids.ts
-import { inflateRawSync } from "node:zlib";
-var GUID_PREFIX = Buffer.from([100, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]);
-function inflateDataFile(ml) {
-  const zipStart = ml.indexOf(Buffer.from([80, 75, 3, 4]));
-  if (zipStart === -1) throw new Error("not an MLO data file: no ZIP entry found");
-  const fnLen = ml.readUInt16LE(zipStart + 26);
-  const extraLen = ml.readUInt16LE(zipStart + 28);
-  const compSize = ml.readUInt32LE(zipStart + 18);
-  const start = zipStart + 30 + fnLen + extraLen;
-  return inflateRawSync(ml.subarray(start, start + compSize));
-}
-function formatGuid(b) {
-  const h = (x2) => x2.toString(16).padStart(2, "0");
-  return "{" + (h(b[3]) + h(b[2]) + h(b[1]) + h(b[0]) + "-" + h(b[5]) + h(b[4]) + "-" + h(b[7]) + h(b[6]) + "-" + h(b[8]) + h(b[9]) + "-" + [...b.subarray(10, 16)].map(h).join("")).toUpperCase() + "}";
-}
-function annotateGuids(mlFile, tasks) {
-  const raw = inflateDataFile(mlFile);
-  const wrap = (t) => ({ task: t, children: t.Children.map(wrap) });
-  const roots = tasks.map(wrap);
-  const preList = [];
-  const postList = [];
-  const walk = (n) => {
-    preList.push(n);
-    for (const c of n.children) walk(c);
-    postList.push(n);
-  };
-  roots.forEach(walk);
-  let cursor = 0;
-  for (const n of preList) {
-    const needle = Buffer.from(n.task.Caption, "utf8");
-    if (needle.length === 0) continue;
-    let idx = raw.indexOf(needle, cursor);
-    while (idx !== -1 && (idx < 4 || raw.readUInt32LE(idx - 4) !== needle.length)) {
-      idx = raw.indexOf(needle, idx + 1);
-    }
-    if (idx === -1) continue;
-    n.capOff = idx;
-    cursor = idx + needle.length;
-  }
-  for (let i2 = 0; i2 < preList.length; i2++) {
-    const lastDesc = (function last(n) {
-      return n.children.length ? last(n.children[n.children.length - 1]) : n;
-    })(preList[i2]);
-    const nextIdx = preList.indexOf(lastDesc) + 1;
-    let bound = raw.length;
-    for (let j = nextIdx; j < preList.length; j++) {
-      if (preList[j].capOff !== void 0) {
-        bound = preList[j].capOff;
-        break;
-      }
-    }
-    preList[i2].endBound = bound;
-  }
-  const guidOffs = [];
-  let g = raw.indexOf(GUID_PREFIX);
-  while (g !== -1) {
-    guidOffs.push(g + GUID_PREFIX.length);
-    g = raw.indexOf(GUID_PREFIX, g + 1);
-  }
-  let gi = 0;
-  let assigned = 0;
-  for (const n of postList) {
-    if (n.capOff === void 0) continue;
-    if (gi < guidOffs.length && guidOffs[gi] > n.capOff && guidOffs[gi] < n.endBound) {
-      n.task.Guid ??= formatGuid(raw.subarray(guidOffs[gi], guidOffs[gi] + 16));
-      gi++;
-      assigned++;
-    }
-  }
-  return assigned;
-}
-
-// src/log.ts
-function log(message) {
-  process.stderr.write(`[mlo-mcp] ${message}
-`);
-}
-
-// src/store.ts
-var MloStore = class {
-  constructor(config2) {
-    this.config = config2;
-  }
-  config;
-  snap;
-  pending;
-  async getSnapshot(fresh = false) {
-    if (!fresh && this.snap && Date.now() - this.snap.at < this.config.cacheStaleMs) {
-      return this.snap;
-    }
-    this.pending ??= this.refresh().finally(() => this.pending = void 0);
-    return this.pending;
-  }
-  async refresh() {
-    const xml2 = await exportXml(this.config);
-    const doc = parseMloXml(xml2);
-    const tasks = buildTaskTree(doc);
-    let guidCount = 0;
-    try {
-      guidCount = annotateGuids(await readDataFile(this.config), tasks);
-    } catch (e) {
-      log(`GUID extraction failed (continuing without GUIDs): ${e.message}`);
-    }
-    this.snap = { xml: xml2, doc, tasks, guidCount, at: Date.now() };
-    return this.snap;
-  }
-  invalidate() {
-    this.snap = void 0;
-  }
-};
-
-// src/tools/shared.ts
-function defineTool(tool) {
-  return tool;
-}
-function registerTool(server, tool, ctx) {
-  server.registerTool(
-    tool.name,
-    {
-      title: tool.title,
-      description: tool.description,
-      inputSchema: tool.inputSchema,
-      outputSchema: tool.outputSchema,
-      annotations: tool.annotations
-    },
-    guard(tool.name, (args) => tool.execute(args, ctx))
-  );
-}
-var DEFAULT_RESULT_LIMIT = 200;
-var TaskSummaryShape = {
-  id: external_exports.string().describe('Path-based id ("1.2.3"); stable only until the tree changes'),
-  Guid: external_exports.string().optional().describe("Internal MLO GUID (stable), when recoverable"),
-  Caption: external_exports.string(),
-  completed: external_exports.boolean(),
-  IsProject: external_exports.boolean().optional(),
-  Starred: external_exports.boolean().optional(),
-  DueDateTime: external_exports.string().optional(),
-  StartDateTime: external_exports.string().optional(),
-  Importance: external_exports.number().optional().describe("0\u2013200; 100 = normal (omitted in MLO's XML); -iN entry maps to (N-1)*50"),
-  Flag: external_exports.string().optional(),
-  Places: external_exports.array(external_exports.string()).describe("Contexts, e.g. @Office"),
-  parentPath: external_exports.string().describe("Captions of ancestors joined with ' > '")
-};
-var TaskSummarySchema = external_exports.object(TaskSummaryShape);
-function toSummary(t) {
-  return {
-    id: t.id,
-    Guid: t.Guid,
-    Caption: t.Caption,
-    completed: Boolean(t.CompletionDateTime),
-    IsProject: t.IsProject || void 0,
-    Starred: t.Starred || void 0,
-    DueDateTime: t.DueDateTime,
-    StartDateTime: t.StartDateTime,
-    Importance: t.Importance,
-    Flag: t.Flag,
-    Places: t.Places,
-    parentPath: t.Path.slice(0, -1).join(" > ")
-  };
-}
-function textResult(text, structuredContent) {
-  return { content: [{ type: "text", text }], ...structuredContent ? { structuredContent } : {} };
-}
-function errorResult(message) {
-  return { isError: true, content: [{ type: "text", text: message }] };
-}
-function guard(name, fn) {
-  return async (...args) => {
-    try {
-      return await fn(...args);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      log(`${name} failed: ${message}`);
-      return errorResult(`${name} failed: ${message}`);
-    }
-  };
-}
-function nowIso() {
-  const d = /* @__PURE__ */ new Date();
-  const p = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-}
-
-// src/tools/list-tasks.ts
-var listTasksTool = defineTool({
-  name: "list_tasks",
-  title: "List tasks",
-  description: `List the MyLifeOrganized task tree (or a subtree). Returns a text outline plus structured task data. Ids are path-based ("1.2.3") and shift when the tree changes \u2014 treat them as valid only for immediate follow-up calls. On large profiles, narrow with parentId/maxDepth instead of raising limit (default ${DEFAULT_RESULT_LIMIT}).`,
-  inputSchema: {
-    format: external_exports.enum(["tree", "flat"]).optional().describe("tree (indented outline, default) or flat"),
-    includeCompleted: external_exports.boolean().optional().describe("Include completed tasks (default false)"),
-    parentId: external_exports.string().optional().describe("Only list the subtree under this task id"),
-    maxDepth: external_exports.number().int().min(1).optional().describe("Limit outline depth"),
-    limit: external_exports.number().int().min(1).optional().describe(`Max tasks to return (default ${DEFAULT_RESULT_LIMIT}); the output notes when truncated`)
-  },
-  outputSchema: {
-    tasks: external_exports.array(TaskSummarySchema),
-    total: external_exports.number().describe("Visible tasks before the limit was applied")
-  },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  async execute({ format, includeCompleted, parentId, maxDepth, limit }, ctx) {
-    const snap = await ctx.store.getSnapshot();
-    let tasks = snap.tasks;
-    if (parentId) {
-      const parent = findById(snap.tasks, parentId);
-      if (!parent) return errorResult(`no task with id "${parentId}" \u2014 call list_tasks or search_tasks first`);
-      tasks = parent.Children;
-    }
-    const entries = collectVisible(tasks, { includeCompleted, maxDepth });
-    const shown = entries.slice(0, limit ?? DEFAULT_RESULT_LIMIT);
-    let text = renderVisible(shown, format);
-    if (shown.length < entries.length) {
-      text += `
-\u2026 showing ${shown.length} of ${entries.length} tasks \u2014 narrow with parentId/maxDepth or raise limit`;
-    }
-    return textResult(text, { tasks: shown.map((e) => toSummary(e.task)), total: entries.length });
-  }
-});
-
-// src/tools/search-tasks.ts
-var searchTasksTool = defineTool({
-  name: "search_tasks",
-  title: "Search tasks",
-  description: "Search tasks by text, context, due-date range, star, completion, project flag or MLO flag.",
-  inputSchema: {
-    query: external_exports.string().optional().describe("Case-insensitive substring matched against caption and note"),
-    context: external_exports.string().optional().describe('Context name, e.g. "@Office" or "Office"'),
-    dueBefore: external_exports.string().optional().describe("ISO date(-time): tasks due strictly before this"),
-    dueAfter: external_exports.string().optional().describe("ISO date(-time): tasks due strictly after this"),
-    starred: external_exports.boolean().optional(),
-    completed: external_exports.boolean().optional().describe("Default: both; true = only completed; false = only open"),
-    isProject: external_exports.boolean().optional(),
-    flag: external_exports.string().optional().describe('Exact flag name, e.g. "Green Flag"'),
-    minImportance: external_exports.number().min(0).max(100).optional(),
-    limit: external_exports.number().int().min(1).optional().describe(`Max tasks to return (default ${DEFAULT_RESULT_LIMIT}); the output notes when truncated`)
-  },
-  outputSchema: {
-    tasks: external_exports.array(TaskSummarySchema),
-    total: external_exports.number().describe("Matching tasks before the limit was applied")
-  },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  async execute({ limit, ...filters }, ctx) {
-    const snap = await ctx.store.getSnapshot();
-    const matches = searchTasks(snap.tasks, filters);
-    const shown = matches.slice(0, limit ?? DEFAULT_RESULT_LIMIT);
-    let text = shown.length ? shown.map((t) => `${renderLine(t)}  (${t.Path.slice(0, -1).join(" > ") || "top level"})`).join("\n") : "no matching tasks";
-    if (shown.length < matches.length) {
-      text += `
-\u2026 showing ${shown.length} of ${matches.length} matches \u2014 narrow the filters or raise limit`;
-    }
-    return textResult(text, { tasks: shown.map(toSummary), total: matches.length });
-  }
-});
+// src/cloud/delta.ts
+import { randomUUID } from "node:crypto";
 
 // src/cloud/csv.ts
 function parseRecords(input) {
@@ -23886,7 +23317,6 @@ function findSection(document, name) {
 }
 
 // src/cloud/delta.ts
-import { randomUUID } from "node:crypto";
 var FILE_VERSION = "3";
 var PROGRAM_VERSION = "6.1.3";
 var EDITION = "MLO-Windows";
@@ -25130,22 +24560,1317 @@ function unpackEnvelope(bytes) {
   return document;
 }
 
-// src/cloud/cursor.ts
-var ZERO_CURSOR = 0n;
-function cursorToDecimalString(value) {
-  return value.toString(10);
+// src/cloud/state.ts
+import { promises as fs } from "node:fs";
+import path from "node:path";
+var CloudState = class {
+  constructor(stateDir) {
+    this.stateDir = stateDir;
+  }
+  stateDir;
+  cursor = ZERO_CURSOR;
+  entries = [];
+  lastPull = {};
+  lastFinalized;
+  chain = Promise.resolve();
+  async load() {
+    await fs.mkdir(this.stateDir, { recursive: true });
+    this.cursor = ZERO_CURSOR;
+    this.entries = [];
+    this.lastPull = {};
+    this.lastFinalized = void 0;
+    try {
+      const parsed = JSON.parse(await fs.readFile(path.join(this.stateDir, "state.json"), "utf8"));
+      this.cursor = parseCursor(parsed.highWater);
+      this.entries = parsed.entries;
+      this.lastPull = parsed.lastPull ?? {};
+      this.lastFinalized = parsed.lastFinalized;
+      for (const entry of this.entries) parseCursor(entry.cursor);
+    } catch (error2) {
+      if (error2.code !== "ENOENT") throw error2;
+    }
+  }
+  async withStateLock(operation) {
+    const lockDir = path.join(this.stateDir, ".state-lock");
+    const deadline = Date.now() + 1e4;
+    await fs.mkdir(this.stateDir, { recursive: true });
+    for (; ; ) {
+      try {
+        await fs.mkdir(lockDir);
+        break;
+      } catch (error2) {
+        if (error2.code !== "EEXIST") throw error2;
+        try {
+          const stat = await fs.stat(lockDir);
+          if (Date.now() - stat.mtimeMs > 3e4) {
+            await fs.rm(lockDir, { recursive: true, force: true });
+            continue;
+          }
+        } catch {
+          continue;
+        }
+        if (Date.now() >= deadline) throw new Error(`timed out waiting for cloud state lock: ${lockDir}`);
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+    }
+    try {
+      return await operation();
+    } finally {
+      await fs.rm(lockDir, { recursive: true, force: true });
+    }
+  }
+  serialize(operation) {
+    const run = () => this.withStateLock(async () => {
+      await this.load();
+      return operation();
+    });
+    const next = this.chain.then(run, run);
+    this.chain = next.catch(() => void 0);
+    return next;
+  }
+  read(operation) {
+    const run = async () => {
+      await this.load();
+      return operation();
+    };
+    const next = this.chain.then(run, run);
+    this.chain = next.catch(() => void 0);
+    return next;
+  }
+  async append(origin, zipBytes) {
+    return this.serialize(async () => {
+      let cursor = this.cursor + 1n;
+      let file = `delta-${cursorToDecimalString(cursor)}.zip`;
+      while (await fs.stat(path.join(this.stateDir, file)).then(() => true, () => false)) {
+        cursor = cursor + 1n;
+        file = `delta-${cursorToDecimalString(cursor)}.zip`;
+      }
+      await this.atomicWrite(path.join(this.stateDir, file), zipBytes);
+      this.cursor = cursor;
+      this.entries.push({ cursor: cursorToDecimalString(cursor), origin, file });
+      await this.writeState();
+      return cursor;
+    });
+  }
+  async entriesAfter(cursor, excludeOrigin) {
+    return this.read(async () => {
+      const selected = this.entries.filter((entry) => parseCursor(entry.cursor) > cursor && entry.origin !== excludeOrigin);
+      return Promise.all(selected.map(async (entry) => ({
+        cursor: parseCursor(entry.cursor),
+        origin: entry.origin,
+        file: entry.file,
+        bytes: await fs.readFile(path.join(this.stateDir, entry.file))
+      })));
+    });
+  }
+  async highWater() {
+    return this.read(() => this.cursor);
+  }
+  /**
+   * Adopt the cursor already stored by an MLO profile on its first local pull.
+   *
+   * A profile that previously used the vendor service can arrive with a cursor
+   * far above a fresh local state's zero. Pending local entries must be moved
+   * above that baseline or MLO will consider them old. Entry filenames are
+   * intentionally left unchanged; the index is authoritative and this keeps
+   * the rebase atomic with the state-file write.
+   */
+  async adoptInitialBaseline(origin, baseline) {
+    await this.serialize(async () => {
+      if (baseline <= this.cursor) return;
+      if (this.lastPull[origin] !== void 0 || this.entries.some((entry) => entry.origin === origin)) {
+        throw new Error("client cursor is newer than an initialized local cloud state");
+      }
+      for (const entry of this.entries) {
+        entry.cursor = cursorToDecimalString(parseCursor(entry.cursor) + baseline);
+      }
+      this.cursor = this.cursor + baseline;
+      await this.writeState();
+    });
+  }
+  /** Record the cursor an origin accepted from a pull (only ever advances). */
+  async recordPull(origin, cursor) {
+    await this.serialize(async () => {
+      const previous = this.lastPull[origin];
+      if (previous !== void 0 && parseCursor(previous) >= cursor) return;
+      this.lastPull[origin] = cursorToDecimalString(cursor);
+      await this.writeState();
+    });
+  }
+  async lastPullCursor(origin) {
+    return this.read(() => {
+      const value = this.lastPull[origin];
+      return value === void 0 ? ZERO_CURSOR : parseCursor(value);
+    });
+  }
+  /** Entries authored by others that `origin` has not pulled yet. */
+  async pendingFor(origin) {
+    return this.read(() => {
+      const value = this.lastPull[origin];
+      const cursor = value === void 0 ? ZERO_CURSOR : parseCursor(value);
+      return this.entries.filter((entry) => parseCursor(entry.cursor) > cursor && entry.origin !== origin).length;
+    });
+  }
+  async counts() {
+    return this.read(() => ({
+      mcp: this.entries.filter((entry) => entry.origin === "mcp").length,
+      app: this.entries.filter((entry) => entry.origin === "app").length
+    }));
+  }
+  async finalize() {
+    await this.serialize(async () => {
+      this.lastFinalized = (/* @__PURE__ */ new Date()).toISOString();
+      await this.writeState();
+    });
+  }
+  async flush() {
+    await this.serialize(() => this.writeState());
+  }
+  async writeState() {
+    const value = {
+      highWater: cursorToDecimalString(this.cursor),
+      entries: this.entries,
+      ...Object.keys(this.lastPull).length ? { lastPull: this.lastPull } : {},
+      ...this.lastFinalized ? { lastFinalized: this.lastFinalized } : {}
+    };
+    await this.atomicWrite(path.join(this.stateDir, "state.json"), new TextEncoder().encode(`${JSON.stringify(value, null, 2)}
+`));
+  }
+  async atomicWrite(target, bytes) {
+    const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
+    await fs.writeFile(temporary, bytes);
+    await fs.rename(temporary, target);
+  }
+};
+
+// src/cloud/sync-observer.ts
+import { promises as fs2 } from "node:fs";
+import path2 from "node:path";
+import zlib from "node:zlib";
+
+// src/log.ts
+function log(message) {
+  process.stderr.write(`[mlo-mcp] ${message}
+`);
 }
-function parseCursor(value) {
-  if (!/^[0-9]+$/.test(value)) throw new Error(`invalid cloud cursor: "${value}"`);
-  const parsed = BigInt(value);
-  if (parsed > 9223372036854775807n) throw new Error(`cloud cursor exceeds signed 64-bit range: "${value}"`);
-  return parsed;
+
+// src/cloud/sync-observer.ts
+var VENDOR_SYNC_HOST = "sync.mylifeorganized.net";
+var SUMMARY_FILE = "soap-summary.jsonl";
+var SENSITIVE = /pass|credential|token|secret|session|cookie|email|user|login/i;
+var BODY = /<(?:[\w.-]+:)?Body(?:\s[^>]*)?>([\s\S]*?)<\/(?:[\w.-]+:)?Body\s*>/i;
+var TAG = /<(?!\/)(?:[\w.-]+:)?([\w.-]+)(?:\s[^>]*)?>/gi;
+var CAPTURE_LIMIT = 4 * 1024 * 1024;
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+function operationShape(xml2) {
+  const body = BODY.exec(xml2)?.[1] ?? "";
+  const first = body.matchAll(TAG).next().value;
+  if (!first) return { operation: "<unknown>", fields: [] };
+  const operation = first[1];
+  const rest = body.slice(first.index + first[0].length);
+  const close = new RegExp(`</(?:[\\w.-]+:)?${escapeRegExp(operation)}\\s*>`, "i").exec(rest);
+  const inner = close ? rest.slice(0, close.index) : rest;
+  const fields = [];
+  for (const match of inner.matchAll(TAG)) if (!fields.includes(match[1])) fields.push(match[1]);
+  return { operation, fields };
+}
+function maskSensitiveField(field2) {
+  return SENSITIVE.test(field2) ? "<sensitive-field>" : field2;
+}
+function decodeBody(chunks, contentEncoding) {
+  const raw = Buffer.concat(chunks);
+  try {
+    const encoding = (contentEncoding ?? "").toLowerCase();
+    if (encoding.includes("gzip")) return zlib.gunzipSync(raw).toString("utf8");
+    if (encoding.includes("deflate")) {
+      try {
+        return zlib.inflateSync(raw).toString("utf8");
+      } catch {
+        return zlib.inflateRawSync(raw).toString("utf8");
+      }
+    }
+    return raw.toString("utf8");
+  } catch {
+    return "";
+  }
+}
+var SyncExchange = class {
+  constructor(observer, method, url, requestHeaders) {
+    this.observer = observer;
+    this.method = method;
+    this.url = url;
+    this.requestHeaders = requestHeaders;
+  }
+  observer;
+  method;
+  url;
+  requestHeaders;
+  requestChunks = [];
+  responseChunks = [];
+  requestSize = 0;
+  responseSize = 0;
+  truncated = false;
+  add(chunks, size, chunk) {
+    if (size + chunk.length > CAPTURE_LIMIT) {
+      this.truncated = true;
+      return size;
+    }
+    chunks.push(chunk);
+    return size + chunk.length;
+  }
+  addRequestChunk(chunk) {
+    this.requestSize = this.add(this.requestChunks, this.requestSize, chunk);
+  }
+  addResponseChunk(chunk) {
+    this.responseSize = this.add(this.responseChunks, this.responseSize, chunk);
+  }
+  finish(status, responseHeaders) {
+    const contentType = responseHeaders["content-type"] ?? "";
+    if (contentType.includes("xml")) {
+      const request = operationShape(decodeBody(this.requestChunks, this.requestHeaders["content-encoding"]));
+      const response = operationShape(decodeBody(this.responseChunks, responseHeaders["content-encoding"]));
+      this.observer.append({
+        kind: "soap",
+        operation: request.operation,
+        soapAction: String(this.requestHeaders.soapaction ?? "").replace(/^"|"$/g, ""),
+        requestFields: request.fields,
+        status,
+        responseOperation: response.operation,
+        responseFields: response.fields.map(maskSensitiveField),
+        ...this.truncated ? { truncated: true } : {}
+      });
+    } else {
+      this.observer.append({
+        kind: "http",
+        method: this.method,
+        path: this.url.pathname,
+        ...this.url.search ? { queryKeys: [...this.url.searchParams.keys()] } : {},
+        status,
+        contentType
+      });
+    }
+  }
+};
+var SyncObserver = class {
+  constructor(stateDir, host = VENDOR_SYNC_HOST) {
+    this.stateDir = stateDir;
+    this.host = host;
+  }
+  stateDir;
+  host;
+  announcedConnect = false;
+  matches(hostname2) {
+    return hostname2.toLowerCase() === this.host.toLowerCase();
+  }
+  /**
+   * A CONNECT to the sync host means the app tunnels sync over TLS, so the
+   * plain-HTTP observer sees nothing — that fact itself is the finding
+   * (docs/mlo/mitm-proxy.md covers TLS interception).
+   */
+  recordConnect(host, port) {
+    if (!this.announcedConnect) {
+      this.announcedConnect = true;
+      log(`sync observer: HTTPS CONNECT to ${host}:${port} \u2014 vendor sync is TLS-tunneled; see docs/mlo/mitm-proxy.md`);
+    }
+    this.append({ kind: "connect", target: `${host}:${port}` });
+  }
+  begin(method, url, requestHeaders) {
+    return new SyncExchange(this, method, url, requestHeaders);
+  }
+  append(record2) {
+    const line = `${JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), ...record2 })}
+`;
+    void fs2.mkdir(this.stateDir, { recursive: true }).then(() => fs2.appendFile(path2.join(this.stateDir, SUMMARY_FILE), line)).catch((error2) => log(`sync observer write failed: ${error2 instanceof Error ? error2.message : String(error2)}`));
+  }
+};
+
+// src/cloud/soap.ts
+var import_fast_xml_parser = __toESM(require_fxp(), 1);
+var SOAP_NAMESPACE = "http://schemas.xmlsoap.org/soap/envelope/";
+var MLO_NAMESPACE = "http://www.mylifeorganized.net/";
+var SOAP_OPERATIONS = [
+  "GetModificationsBytesEx",
+  "ApplyModificationsBytesEx",
+  "ReleaseSyncSessionBytes"
+];
+var OPERATIONS = new Set(SOAP_OPERATIONS);
+var parser = new import_fast_xml_parser.XMLParser({
+  removeNSPrefix: true,
+  ignoreAttributes: true,
+  parseTagValue: false,
+  trimValues: true,
+  processEntities: true
+});
+function escapeXml(value) {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;");
+}
+function envelope(operation, fields) {
+  const xml2 = `<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="${SOAP_NAMESPACE}"><soap:Body><${operation}Response xmlns="${MLO_NAMESPACE}">${fields}</${operation}Response></soap:Body></soap:Envelope>`;
+  return new TextEncoder().encode(xml2);
+}
+function field(name, value) {
+  return `<${name}>${escapeXml(value)}</${name}>`;
+}
+function successFields(operation, extra = "") {
+  return field(`${operation}Result`, "true") + extra;
+}
+function failureFields(operation, error2, extra = "") {
+  return field(`${operation}Result`, "false") + field("errorMessage", error2) + extra;
+}
+function parseFields(xml2, expected) {
+  const document = parser.parse(xml2);
+  const envelopeNode = document.Envelope;
+  if (!envelopeNode || typeof envelopeNode !== "object") throw new Error("SOAP Envelope is missing");
+  const body = envelopeNode.Body;
+  if (!body || typeof body !== "object") throw new Error("SOAP Body is missing");
+  const operation = body[expected];
+  if (operation === void 0) throw new Error(`SOAP Body does not contain ${expected}`);
+  if (operation === "") return {};
+  if (!operation || typeof operation !== "object" || Array.isArray(operation)) {
+    throw new Error(`${expected} fields are invalid`);
+  }
+  return operation;
+}
+function requiredText(fields, name) {
+  const value = fields[name];
+  if (typeof value !== "string" || value.length === 0) throw new Error(`${name} is required`);
+  return value;
+}
+function decodeBase64(value) {
+  const compact = value.replace(/\s+/g, "");
+  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(compact)) {
+    throw new Error("data must be valid base64");
+  }
+  return Buffer.from(compact, "base64");
+}
+function prepareMcpDeltaForMlo(document) {
+  const tasks = findSection(document, "TodoItems");
+  if (tasks) {
+    for (const [column, value] of Object.entries(NEW_TASK_DEFAULTS)) {
+      const index = tasks.header.indexOf(column);
+      if (index >= 0) {
+        for (const row of tasks.rows) if (!row[index]) row[index] = value;
+      }
+    }
+  }
+  return document;
+}
+function soapOperationFromAction(action) {
+  const value = Array.isArray(action) ? action[0] : action;
+  if (!value) return void 0;
+  const normalized = value.trim().replace(/^"|"$/g, "");
+  const name = normalized.slice(normalized.lastIndexOf("/") + 1);
+  return OPERATIONS.has(name) ? name : void 0;
+}
+async function handleSoapOperation(state, operation, xml2) {
+  const fields = parseFields(xml2, operation);
+  if (operation === "GetModificationsBytesEx") {
+    const baseline = parseCursor(requiredText(fields, "newerThan"));
+    await state.adoptInitialBaseline("app", baseline);
+    const entries = await state.entriesAfter(baseline, "app");
+    const cursor = entries.length ? entries.at(-1).cursor : await state.highWater();
+    await state.recordPull("app", cursor);
+    const documents = entries.map((entry) => {
+      const document2 = unpackEnvelope(entry.bytes);
+      return entry.origin === "mcp" ? prepareMcpDeltaForMlo(document2) : document2;
+    });
+    const document = entries.length ? mergeDeltas(documents) : mergeDeltas([]);
+    const data = field("data", Buffer.from(packEnvelope(document)).toString("base64"));
+    return envelope(operation, successFields(operation, field("maxVersion", cursorToDecimalString(cursor)) + data));
+  }
+  if (operation === "ApplyModificationsBytesEx") {
+    const baseline = parseCursor(requiredText(fields, "lastSyncTimestamp"));
+    await state.adoptInitialBaseline("app", baseline);
+    const highWater = await state.highWater();
+    if (baseline > highWater) {
+      return envelope(operation, failureFields(
+        operation,
+        "lastSyncTimestamp is newer than the server high-water cursor",
+        field("newServerTimeStamp", cursorToDecimalString(highWater))
+      ));
+    }
+    const encoded = fields.data;
+    if (encoded !== void 0 && typeof encoded !== "string") {
+      return envelope(operation, failureFields(
+        operation,
+        "data must be base64 text",
+        field("newServerTimeStamp", cursorToDecimalString(highWater))
+      ));
+    }
+    let cursor = highWater;
+    if (encoded) {
+      try {
+        const bytes = decodeBase64(encoded);
+        unpackEnvelope(bytes);
+        cursor = await state.append("app", bytes);
+      } catch (error2) {
+        return envelope(operation, failureFields(
+          operation,
+          error2 instanceof Error ? error2.message : String(error2),
+          field("newServerTimeStamp", cursorToDecimalString(highWater))
+        ));
+      }
+    }
+    return envelope(operation, successFields(operation, field("newServerTimeStamp", cursorToDecimalString(cursor))));
+  }
+  await state.finalize();
+  return envelope(operation, successFields(operation));
+}
+function soapFault(message) {
+  const xml2 = `<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="${SOAP_NAMESPACE}"><soap:Body><soap:Fault>` + field("faultcode", "soap:Client") + field("faultstring", message) + `</soap:Fault></soap:Body></soap:Envelope>`;
+  return new TextEncoder().encode(xml2);
+}
+
+// src/cloud/server.ts
+var BODY_LIMIT = 32 * 1024 * 1024;
+var DEFAULT_CLOUD_PORT = 8181;
+function json(response, status, body) {
+  response.writeHead(status, { "content-type": "application/json; charset=utf-8" });
+  response.end(JSON.stringify(body));
+}
+async function readBytes(request) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of request) {
+    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    size += bytes.length;
+    if (size > BODY_LIMIT) throw Object.assign(new Error("request body exceeds 32 MiB"), { status: 413 });
+    chunks.push(bytes);
+  }
+  return Buffer.concat(chunks);
+}
+async function readJson(request) {
+  const bytes = await readBytes(request);
+  try {
+    const value = JSON.parse(bytes.toString("utf8"));
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error();
+    return value;
+  } catch {
+    throw Object.assign(new Error("request body must be a JSON object"), { status: 400 });
+  }
+}
+function xml(response, status, body) {
+  response.writeHead(status, {
+    "content-type": "text/xml; charset=utf-8",
+    "content-length": body.byteLength
+  });
+  response.end(body);
+}
+function requiredString(body, name) {
+  if (typeof body[name] !== "string") throw Object.assign(new Error(`${name} must be a string`), { status: 400 });
+  return body[name];
+}
+function decodeEnvelope(value) {
+  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {
+    throw Object.assign(new Error("envelope must be valid base64"), { status: 400 });
+  }
+  return Buffer.from(value, "base64");
+}
+function clientOrigin(client) {
+  return client === "mlo-app" ? "app" : "mcp";
+}
+function isAbsoluteRequestTarget(target) {
+  return /^https?:\/\//i.test(target);
+}
+async function interceptVendorSoap(request, response, state, observer) {
+  if (request.method !== "POST") return false;
+  let target;
+  try {
+    target = new URL(request.url ?? "");
+  } catch {
+    return false;
+  }
+  if (!observer.matches(target.hostname) || !/\/MLOInetSync\.asmx$/i.test(target.pathname)) return false;
+  const operation = soapOperationFromAction(request.headers.soapaction);
+  if (!operation) return false;
+  const requestBytes = await readBytes(request);
+  const exchange = observer.begin(request.method, target, request.headers);
+  exchange.addRequestChunk(requestBytes);
+  let responseBytes;
+  let status = 200;
+  try {
+    responseBytes = await handleSoapOperation(state, operation, requestBytes.toString("utf8"));
+  } catch (error2) {
+    status = 500;
+    responseBytes = soapFault(error2 instanceof Error ? error2.message : String(error2));
+  }
+  exchange.addResponseChunk(Buffer.from(responseBytes));
+  exchange.finish(status, { "content-type": "text/xml; charset=utf-8" });
+  xml(response, status, responseBytes);
+  return true;
+}
+function forwardRequest(request, response, observer) {
+  let target;
+  try {
+    target = new URL(request.url ?? "");
+  } catch {
+    json(response, 400, { error: "invalid proxy request target" });
+    return;
+  }
+  const transport = target.protocol === "https:" ? https : target.protocol === "http:" ? http : void 0;
+  if (!transport) {
+    json(response, 400, { error: "unsupported proxy protocol" });
+    return;
+  }
+  const exchange = observer.matches(target.hostname) ? observer.begin(request.method ?? "GET", target, request.headers) : void 0;
+  const headers = { ...request.headers, host: target.host };
+  delete headers["proxy-connection"];
+  const upstream = transport.request(target, { method: request.method, headers }, (upstreamResponse) => {
+    response.writeHead(upstreamResponse.statusCode ?? 502, upstreamResponse.statusMessage, upstreamResponse.headers);
+    if (exchange) {
+      upstreamResponse.on("data", (chunk) => exchange.addResponseChunk(chunk));
+      upstreamResponse.on("end", () => exchange.finish(upstreamResponse.statusCode, upstreamResponse.headers));
+    }
+    upstreamResponse.pipe(response);
+  });
+  upstream.on("error", (error2) => {
+    if (!response.headersSent) json(response, 502, { error: `proxy request failed: ${error2.message}` });
+    else response.destroy(error2);
+  });
+  request.on("aborted", () => upstream.destroy());
+  if (exchange) request.on("data", (chunk) => exchange.addRequestChunk(chunk));
+  request.pipe(upstream);
+}
+function tunnelConnect(request, client, head, observer) {
+  const separator = (request.url ?? "").lastIndexOf(":");
+  const host = separator > 0 ? request.url.slice(0, separator) : "";
+  const port = Number(separator > 0 ? request.url.slice(separator + 1) : "");
+  if (!host || !Number.isInteger(port) || port < 1 || port > 65535) {
+    client.end("HTTP/1.1 400 Bad Request\r\n\r\n");
+    return;
+  }
+  if (observer.matches(host)) observer.recordConnect(host, port);
+  const upstream = net.connect(port, host);
+  upstream.once("connect", () => {
+    client.write("HTTP/1.1 200 Connection Established\r\n\r\n");
+    if (head.length) upstream.write(head);
+    upstream.pipe(client);
+    client.pipe(upstream);
+  });
+  upstream.once("error", () => client.end("HTTP/1.1 502 Bad Gateway\r\n\r\n"));
+  client.once("error", () => upstream.destroy());
+}
+async function startCloudServer(options) {
+  const host = options.host ?? "127.0.0.1";
+  if (host !== "localhost" && host !== "::1" && !/^127(?:\.\d{1,3}){3}$/.test(host)) {
+    throw new Error(`MLO cloud server must bind to a loopback host (received "${host}")`);
+  }
+  const state = options.state ?? new CloudState(options.stateDir);
+  const observer = new SyncObserver(options.stateDir, options.observeHost);
+  const server = http.createServer(async (request, response) => {
+    try {
+      if (isAbsoluteRequestTarget(request.url ?? "")) {
+        if (await interceptVendorSoap(request, response, state, observer)) return;
+        forwardRequest(request, response, observer);
+        return;
+      }
+      const url = new URL(request.url ?? "/", "http://localhost");
+      if (request.method === "GET" && url.pathname === "/v1/status") {
+        const [highWater, counts, pendingForApp] = await Promise.all([
+          state.highWater(),
+          state.counts(),
+          state.pendingFor("app")
+        ]);
+        json(response, 200, { cursor: cursorToDecimalString(highWater), entries: counts, pendingForApp });
+        return;
+      }
+      if (request.method !== "POST" || !["/v1/pull", "/v1/push", "/v1/finalize"].includes(url.pathname)) {
+        json(response, 404, { error: "not found" });
+        return;
+      }
+      const body = await readJson(request);
+      const client = requiredString(body, "client");
+      if (url.pathname === "/v1/pull") {
+        const cursor = parseCursor(requiredString(body, "cursor"));
+        const origin = clientOrigin(client);
+        const entries = await state.entriesAfter(cursor, origin);
+        if (!entries.length) {
+          const highWater = await state.highWater();
+          await state.recordPull(origin, highWater);
+          json(response, 200, { cursor: cursorToDecimalString(highWater) });
+        } else {
+          const merged = mergeDeltas(entries.map((entry) => unpackEnvelope(entry.bytes)));
+          const returned = entries.at(-1).cursor;
+          await state.recordPull(origin, returned);
+          json(response, 200, {
+            cursor: cursorToDecimalString(returned),
+            envelope: Buffer.from(packEnvelope(merged)).toString("base64")
+          });
+        }
+        return;
+      }
+      if (url.pathname === "/v1/push") {
+        const baseline = parseCursor(requiredString(body, "baseline"));
+        if (baseline > await state.highWater()) {
+          json(response, 409, { error: "baseline is newer than the server high-water cursor" });
+          return;
+        }
+        const bytes = decodeEnvelope(requiredString(body, "envelope"));
+        try {
+          unpackEnvelope(bytes);
+        } catch (error2) {
+          throw Object.assign(error2, { status: 400 });
+        }
+        const cursor = await state.append(clientOrigin(client), bytes);
+        json(response, 200, { cursor: cursorToDecimalString(cursor) });
+        return;
+      }
+      await state.finalize();
+      json(response, 200, { ok: true });
+    } catch (error2) {
+      const status = typeof error2.status === "number" ? error2.status : 500;
+      json(response, status, { error: error2 instanceof Error ? error2.message : String(error2) });
+    }
+  });
+  server.on("connect", (request, socket, head) => tunnelConnect(request, socket, head, observer));
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(options.port ?? DEFAULT_CLOUD_PORT, host, () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+  const address = server.address();
+  const port = typeof address === "object" && address ? address.port : options.port ?? DEFAULT_CLOUD_PORT;
+  log(`cloud server listening on http://${host}:${port}`);
+  return {
+    server,
+    state,
+    host,
+    port,
+    async stop() {
+      await state.flush();
+      await new Promise((resolve, reject) => server.close((error2) => error2 ? reject(error2) : resolve()));
+      log("cloud server stopped");
+    }
+  };
+}
+async function startOrAttachCloudServer(options) {
+  try {
+    return await startCloudServer(options);
+  } catch (error2) {
+    if (error2.code !== "EADDRINUSE") throw error2;
+    const host = options.host ?? "127.0.0.1";
+    const port = options.port ?? DEFAULT_CLOUD_PORT;
+    try {
+      const response = await fetch(`http://${host}:${port}/v1/status`, { signal: AbortSignal.timeout(2e3) });
+      const body = await response.json();
+      if (response.ok && typeof body.cursor === "string" && typeof body.entries === "object") {
+        log(`port ${port} already serves an mlo-mcp cloud endpoint \u2014 attaching to its shared state dir`);
+        return void 0;
+      }
+    } catch {
+    }
+    throw error2;
+  }
+}
+
+// src/config.ts
+var DEFAULT_EXE = "C:\\Program Files (x86)\\MyLifeOrganized.net\\MLO\\mlo.exe";
+var DEV_PROFILE = path3.resolve(
+  path3.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "profile",
+  "profile.ml"
+);
+var DEV_CLOUD_STATE_DIR = path3.resolve(
+  path3.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "messages"
+);
+function resolveDataFile() {
+  if (process.env.MLO_DATA_FILE) return process.env.MLO_DATA_FILE;
+  if (existsSync(DEV_PROFILE)) return DEV_PROFILE;
+  throw new Error(
+    "MLO_DATA_FILE environment variable is required. Set it to the path of your .ml data file."
+  );
+}
+function loadConfig() {
+  const dataFile = resolveDataFile();
+  const cloudPort = Number(process.env.MLO_CLOUD_PORT ?? String(DEFAULT_CLOUD_PORT));
+  if (!Number.isInteger(cloudPort) || cloudPort < 0 || cloudPort > 65535) {
+    throw new Error("MLO_CLOUD_PORT must be an integer from 0 through 65535");
+  }
+  return {
+    mloExePath: process.env.MLO_EXE_PATH ?? DEFAULT_EXE,
+    dataFile,
+    exportDir: process.env.MLO_EXPORT_DIR ?? path3.join(os.tmpdir(), "mlo-mcp"),
+    cacheStaleMs: Number(process.env.MLO_CACHE_STALE_MS) || 3e4,
+    // Only needed when the capture inbox is NOT MLO's own <Inbox> node (e.g. a
+    // hand-made "Входящие" folder). MLO itself hardcodes the caption "<Inbox>"
+    // in every UI language, so most profiles need no override.
+    inboxCaption: process.env.MLO_INBOX_CAPTION || void 0,
+    cloudHost: process.env.MLO_CLOUD_HOST ?? "127.0.0.1",
+    cloudPort,
+    cloudStateDir: process.env.MLO_CLOUD_STATE_DIR ?? DEV_CLOUD_STATE_DIR
+  };
+}
+
+// src/mlo-cli.ts
+import { spawn } from "node:child_process";
+import { promises as fs3 } from "node:fs";
+import path4 from "node:path";
+var EXIT_MESSAGES = {
+  1: "invalid command-line argument",
+  2: "target file already exists (mlo.exe -saveXML/-saveML never overwrite)",
+  3: "error writing target file",
+  100: "unspecified MLO error"
+};
+var MloError = class extends Error {
+  constructor(message, exitCode) {
+    super(message);
+    this.exitCode = exitCode;
+    this.name = "MloError";
+  }
+  exitCode;
+};
+var chain = Promise.resolve();
+function withMloLock(fn) {
+  const next = chain.then(fn, fn);
+  chain = next.catch(() => void 0);
+  return next;
+}
+var fileLockHeld = false;
+function isMloBusy() {
+  return fileLockHeld;
+}
+async function withFileLock(config2, fn) {
+  if (fileLockHeld) return fn();
+  const lockDir = `${config2.dataFile}.mcp-lock`;
+  const deadline = Date.now() + 9e4;
+  for (; ; ) {
+    try {
+      await fs3.mkdir(lockDir);
+      break;
+    } catch {
+      try {
+        const st = await fs3.stat(lockDir);
+        if (Date.now() - st.mtimeMs > 18e4) {
+          await fs3.rm(lockDir, { recursive: true, force: true });
+          continue;
+        }
+      } catch {
+        continue;
+      }
+      if (Date.now() > deadline) {
+        throw new MloError(
+          `another mlo-mcp process has been using the data file for over 90s (lock: ${lockDir}). If no other session is actually running MLO operations, delete that directory.`
+        );
+      }
+      await sleep(500);
+    }
+  }
+  fileLockHeld = true;
+  try {
+    return await fn();
+  } finally {
+    fileLockHeld = false;
+    await fs3.rm(lockDir, { recursive: true, force: true });
+  }
+}
+function withMloFileLock(config2, fn) {
+  return withMloLock(() => withFileLock(config2, fn));
+}
+function delphiQuote(arg) {
+  if (arg.length > 0 && !/[\s"]/.test(arg)) return arg;
+  return `"${arg.replaceAll('"', '""')}"`;
+}
+function execMlo(config2, args, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(config2.mloExePath, [...args, "-console"].map(delphiQuote), {
+      timeout: timeoutMs,
+      windowsHide: true,
+      killSignal: "SIGKILL",
+      windowsVerbatimArguments: true,
+      // with verbatim arguments the exe path itself must be quoted in the
+      // command line, or its spaces shift every parameter the child sees
+      argv0: delphiQuote(config2.mloExePath),
+      stdio: "ignore"
+    });
+    child.on("error", (err2) => {
+      if (err2.code === "ENOENT") {
+        reject(new MloError(`mlo.exe not found at "${config2.mloExePath}". Set MLO_EXE_PATH to the correct location.`));
+      } else {
+        reject(new MloError(`failed to run mlo.exe: ${err2.message}`));
+      }
+    });
+    child.on("exit", (code, signal) => {
+      if (signal) {
+        reject(
+          new MloError(
+            `mlo.exe did not finish within ${timeoutMs / 1e3}s and was killed. This happens when MLO opens a modal dialog (e.g. an invalid -task GUID while the GUI is running).`
+          )
+        );
+      } else if (code === 0) {
+        resolve();
+      } else {
+        const detail = EXIT_MESSAGES[code ?? -1] ?? "unknown exit code";
+        reject(new MloError(`mlo.exe exited with code ${code}: ${detail}`, code ?? void 0));
+      }
+    });
+  });
+}
+var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function ensureDataFile(config2) {
+  try {
+    await fs3.access(config2.dataFile);
+  } catch {
+    throw new MloError(`MLO_DATA_FILE not found at "${config2.dataFile}"`);
+  }
+}
+var exportCounter = 0;
+function exportXml(config2, taskGuid) {
+  return withMloFileLock(config2, async () => {
+    await ensureDataFile(config2);
+    await fs3.mkdir(config2.exportDir, { recursive: true });
+    const target = path4.join(config2.exportDir, `export-${process.pid}-${++exportCounter}.xml`);
+    await fs3.rm(target, { force: true });
+    const args = [config2.dataFile];
+    if (taskGuid) args.push(`-task=${taskGuid}`);
+    args.push(`-saveXML=${target}`);
+    try {
+      await execMlo(config2, args, 3e4);
+      return await fs3.readFile(target, "utf8");
+    } finally {
+      await fs3.rm(target, { force: true });
+    }
+  });
+}
+function quickSync(config2) {
+  return withMloFileLock(config2, async () => {
+    await ensureDataFile(config2);
+    await execMlo(config2, [config2.dataFile, "-QuickSync"], 12e4);
+  });
+}
+function readDataFile(config2) {
+  return fs3.readFile(config2.dataFile);
+}
+
+// src/xml.ts
+var import_fast_xml_parser2 = __toESM(require_fxp(), 1);
+var SHARED_OPTIONS = {
+  ignoreAttributes: false,
+  attributeNamePrefix: "@_",
+  processEntities: true
+};
+var parser2 = new import_fast_xml_parser2.XMLParser({
+  ...SHARED_OPTIONS,
+  trimValues: false,
+  parseTagValue: false,
+  parseAttributeValue: false,
+  isArray: (name) => name === "TaskNode" || name === "Place" || name === "TaskPlace" || name === "UID"
+});
+var builder = new import_fast_xml_parser2.XMLBuilder({
+  ...SHARED_OPTIONS,
+  format: true,
+  indentBy: "  ",
+  suppressEmptyNode: true,
+  suppressBooleanAttributes: false
+});
+function dropWhitespaceText(value) {
+  if (Array.isArray(value)) {
+    for (const v of value) dropWhitespaceText(v);
+  } else if (value && typeof value === "object") {
+    const obj = value;
+    if (typeof obj["#text"] === "string" && obj["#text"].trim() === "") {
+      delete obj["#text"];
+    }
+    for (const v of Object.values(obj)) dropWhitespaceText(v);
+  }
+}
+function parseMloXml(xml2) {
+  const doc = parser2.parse(xml2);
+  const rootList = doc["MyLifeOrganized-xml"]?.TaskTree?.TaskNode;
+  if (!rootList || rootList.length === 0) {
+    throw new Error("not a MyLifeOrganized XML export: missing MyLifeOrganized-xml/TaskTree/TaskNode");
+  }
+  dropWhitespaceText(doc);
+  return doc;
+}
+function rootNode(doc) {
+  return doc["MyLifeOrganized-xml"].TaskTree.TaskNode[0];
+}
+
+// src/task-tree.ts
+function delphiBool(v) {
+  return v === void 0 ? void 0 : v === "-1";
+}
+function num(v) {
+  return v === void 0 || v === "" ? void 0 : Number(v);
+}
+function toModel(raw, id, parentPath, depth) {
+  const path5 = [...parentPath, raw["@_Caption"]];
+  const node = {
+    id,
+    Guid: raw.IDD,
+    Caption: raw["@_Caption"],
+    Note: raw.Note,
+    Importance: num(raw.Importance),
+    Effort: num(raw.Effort),
+    DueDateTime: raw.DueDateTime,
+    StartDateTime: raw.StartDateTime,
+    CompletionDateTime: raw.CompletionDateTime,
+    IsProject: delphiBool(raw.IsProject),
+    ProjectStatus: num(raw.ProjectStatus),
+    Starred: delphiBool(raw.Starred),
+    Flag: raw.Flag,
+    Places: raw.Places?.Place ?? [],
+    EstimateMin: num(raw.EstimateMin),
+    EstimateMax: num(raw.EstimateMax),
+    TheGoal: num(raw.TheGoal),
+    HideInToDo: delphiBool(raw.HideInToDo),
+    HideInToDoThisTask: delphiBool(raw.HideInToDoThisTask),
+    ScheduleType: num(raw.ScheduleType),
+    LeadTime: num(raw.LeadTime),
+    CompleteSubTasksInOrder: delphiBool(raw.CompleteSubTasksInOrder),
+    DependsOn: raw.Dependency?.UID ?? [],
+    Children: [],
+    Path: path5,
+    Depth: depth
+  };
+  node.Children = (raw.TaskNode ?? []).map((c, i2) => toModel(c, `${id}.${i2 + 1}`, path5, depth + 1));
+  return node;
+}
+function buildTaskTree(doc) {
+  return (rootNode(doc).TaskNode ?? []).map((c, i2) => toModel(c, String(i2 + 1), [], 0));
+}
+function flatten(tasks) {
+  const out = [];
+  const walk = (list) => {
+    for (const t of list) {
+      out.push(t);
+      walk(t.Children);
+    }
+  };
+  walk(tasks);
+  return out;
+}
+function findById(tasks, id) {
+  return flatten(tasks).find((t) => t.id === id);
+}
+var INBOX_CAPTIONS = ["<Inbox>", "Inbox"];
+function looksLikeInbox(t) {
+  return t.Depth === 0 && INBOX_CAPTIONS.includes(t.Caption);
+}
+function searchTasks(tasks, f) {
+  const q = f.query?.toLowerCase();
+  const ctx = f.context?.replace(/^@/, "").toLowerCase();
+  return flatten(tasks).filter((t) => {
+    if (q && !t.Caption.toLowerCase().includes(q) && !(t.Note ?? "").toLowerCase().includes(q)) return false;
+    if (ctx && !t.Places.some((p) => p.replace(/^@/, "").toLowerCase() === ctx)) return false;
+    if (f.dueBefore && !(t.DueDateTime && t.DueDateTime < f.dueBefore)) return false;
+    if (f.dueAfter && !(t.DueDateTime && t.DueDateTime > f.dueAfter)) return false;
+    if (f.starred !== void 0 && (t.Starred ?? false) !== f.starred) return false;
+    if (f.completed !== void 0 && Boolean(t.CompletionDateTime) !== f.completed) return false;
+    if (f.isProject !== void 0 && (t.IsProject ?? false) !== f.isProject) return false;
+    if (f.flag && t.Flag !== f.flag) return false;
+    if (f.minImportance !== void 0 && (t.Importance ?? 100) < f.minImportance) return false;
+    return true;
+  });
+}
+function renderLine(t) {
+  const marks = [];
+  if (looksLikeInbox(t)) marks.push("[inbox]");
+  if (t.CompletionDateTime) marks.push("[done]");
+  if (t.IsProject) marks.push("[project]");
+  if (t.Starred) marks.push("[*]");
+  if (t.Flag) marks.push(`[flag:${t.Flag}]`);
+  if (t.Importance !== void 0 && t.Importance !== 100) marks.push(`[imp:${t.Importance}]`);
+  if (t.DueDateTime) marks.push(`due:${t.DueDateTime}`);
+  if (t.DependsOn.length) marks.push(`[waits-on:${t.DependsOn.length}]`);
+  if (t.Places.length) marks.push(t.Places.join(","));
+  return `[${t.id}] ${t.Caption}${marks.length ? " " + marks.join(" ") : ""}`;
+}
+function collectVisible(tasks, opts = {}) {
+  const out = [];
+  const walk = (list, depth) => {
+    for (const t of list) {
+      if (!opts.includeCompleted && t.CompletionDateTime) continue;
+      if (opts.maxDepth !== void 0 && depth >= opts.maxDepth) continue;
+      out.push({ task: t, depth });
+      walk(t.Children, depth + 1);
+    }
+  };
+  walk(tasks, 0);
+  return out;
+}
+function renderVisible(entries, format = "tree") {
+  if (!entries.length) return "(no tasks)";
+  return entries.map((e) => (format === "flat" ? "" : "  ".repeat(e.depth)) + renderLine(e.task)).join("\n");
+}
+
+// src/guids.ts
+import { inflateRawSync } from "node:zlib";
+var GUID_PREFIX = Buffer.from([100, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]);
+function inflateDataFile(ml) {
+  const zipStart = ml.indexOf(Buffer.from([80, 75, 3, 4]));
+  if (zipStart === -1) throw new Error("not an MLO data file: no ZIP entry found");
+  const fnLen = ml.readUInt16LE(zipStart + 26);
+  const extraLen = ml.readUInt16LE(zipStart + 28);
+  const compSize = ml.readUInt32LE(zipStart + 18);
+  const start = zipStart + 30 + fnLen + extraLen;
+  return inflateRawSync(ml.subarray(start, start + compSize));
+}
+function formatGuid(b) {
+  const h = (x2) => x2.toString(16).padStart(2, "0");
+  return "{" + (h(b[3]) + h(b[2]) + h(b[1]) + h(b[0]) + "-" + h(b[5]) + h(b[4]) + "-" + h(b[7]) + h(b[6]) + "-" + h(b[8]) + h(b[9]) + "-" + [...b.subarray(10, 16)].map(h).join("")).toUpperCase() + "}";
+}
+function annotateGuids(mlFile, tasks) {
+  const raw = inflateDataFile(mlFile);
+  const wrap = (t) => ({ task: t, children: t.Children.map(wrap) });
+  const roots = tasks.map(wrap);
+  const preList = [];
+  const postList = [];
+  const walk = (n) => {
+    preList.push(n);
+    for (const c of n.children) walk(c);
+    postList.push(n);
+  };
+  roots.forEach(walk);
+  let cursor = 0;
+  for (const n of preList) {
+    const needle = Buffer.from(n.task.Caption, "utf8");
+    if (needle.length === 0) continue;
+    let idx = raw.indexOf(needle, cursor);
+    while (idx !== -1 && (idx < 4 || raw.readUInt32LE(idx - 4) !== needle.length)) {
+      idx = raw.indexOf(needle, idx + 1);
+    }
+    if (idx === -1) continue;
+    n.capOff = idx;
+    cursor = idx + needle.length;
+  }
+  for (let i2 = 0; i2 < preList.length; i2++) {
+    const lastDesc = (function last(n) {
+      return n.children.length ? last(n.children[n.children.length - 1]) : n;
+    })(preList[i2]);
+    const nextIdx = preList.indexOf(lastDesc) + 1;
+    let bound = raw.length;
+    for (let j = nextIdx; j < preList.length; j++) {
+      if (preList[j].capOff !== void 0) {
+        bound = preList[j].capOff;
+        break;
+      }
+    }
+    preList[i2].endBound = bound;
+  }
+  const guidOffs = [];
+  let g = raw.indexOf(GUID_PREFIX);
+  while (g !== -1) {
+    guidOffs.push(g + GUID_PREFIX.length);
+    g = raw.indexOf(GUID_PREFIX, g + 1);
+  }
+  let gi = 0;
+  let assigned = 0;
+  for (const n of postList) {
+    if (n.capOff === void 0) continue;
+    if (gi < guidOffs.length && guidOffs[gi] > n.capOff && guidOffs[gi] < n.endBound) {
+      n.task.Guid ??= formatGuid(raw.subarray(guidOffs[gi], guidOffs[gi] + 16));
+      gi++;
+      assigned++;
+    }
+  }
+  return assigned;
+}
+
+// src/store.ts
+var MloStore = class {
+  constructor(config2) {
+    this.config = config2;
+  }
+  config;
+  snap;
+  pending;
+  async getSnapshot(fresh = false) {
+    if (!fresh && this.snap && Date.now() - this.snap.at < this.config.cacheStaleMs) {
+      return this.snap;
+    }
+    if (fresh) this.pending = void 0;
+    if (!this.pending) {
+      const promise = this.refresh().then((snapshot) => {
+        if (this.pending === promise) this.snap = snapshot;
+        return snapshot;
+      }).finally(() => {
+        if (this.pending === promise) this.pending = void 0;
+      });
+      this.pending = promise;
+    }
+    return this.pending;
+  }
+  async refresh() {
+    const xml2 = await exportXml(this.config);
+    const doc = parseMloXml(xml2);
+    const tasks = buildTaskTree(doc);
+    let guidCount = 0;
+    try {
+      guidCount = annotateGuids(await readDataFile(this.config), tasks);
+    } catch (e) {
+      log(`GUID extraction failed (continuing without GUIDs): ${e.message}`);
+    }
+    return { xml: xml2, doc, tasks, guidCount, at: Date.now() };
+  }
+  invalidate() {
+    this.snap = void 0;
+    this.pending = void 0;
+  }
+};
+
+// src/tools/shared.ts
+function defineTool(tool) {
+  return tool;
+}
+function registerTool(server, tool, ctx) {
+  server.registerTool(
+    tool.name,
+    {
+      title: tool.title,
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+      outputSchema: tool.outputSchema,
+      annotations: tool.annotations
+    },
+    guard(tool.name, (args) => tool.execute(args, ctx))
+  );
+}
+var DEFAULT_RESULT_LIMIT = 200;
+var TaskSummaryShape = {
+  id: external_exports.string().describe('Path-based id ("1.2.3"); stable only until the tree changes'),
+  Guid: external_exports.string().optional().describe("Internal MLO GUID (stable), when recoverable"),
+  Caption: external_exports.string(),
+  completed: external_exports.boolean(),
+  IsProject: external_exports.boolean().optional(),
+  Starred: external_exports.boolean().optional(),
+  DueDateTime: external_exports.string().optional(),
+  StartDateTime: external_exports.string().optional(),
+  Importance: external_exports.number().optional().describe("0\u2013200; 100 = normal (omitted in MLO's XML); -iN entry maps to (N-1)*50"),
+  Flag: external_exports.string().optional(),
+  Places: external_exports.array(external_exports.string()).describe("Contexts, e.g. @Office"),
+  parentPath: external_exports.string().describe("Captions of ancestors joined with ' > '")
+};
+var TaskSummarySchema = external_exports.object(TaskSummaryShape);
+function toSummary(t) {
+  return {
+    id: t.id,
+    Guid: t.Guid,
+    Caption: t.Caption,
+    completed: Boolean(t.CompletionDateTime),
+    IsProject: t.IsProject || void 0,
+    Starred: t.Starred || void 0,
+    DueDateTime: t.DueDateTime,
+    StartDateTime: t.StartDateTime,
+    Importance: t.Importance,
+    Flag: t.Flag,
+    Places: t.Places,
+    parentPath: t.Path.slice(0, -1).join(" > ")
+  };
+}
+function textResult(text, structuredContent) {
+  return { content: [{ type: "text", text }], ...structuredContent ? { structuredContent } : {} };
+}
+function errorResult(message) {
+  return { isError: true, content: [{ type: "text", text: message }] };
+}
+function guard(name, fn) {
+  return async (...args) => {
+    try {
+      return await fn(...args);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      log(`${name} failed: ${message}`);
+      return errorResult(`${name} failed: ${message}`);
+    }
+  };
+}
+function nowIso() {
+  const d = /* @__PURE__ */ new Date();
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+// src/tools/list-tasks.ts
+var listTasksTool = defineTool({
+  name: "list_tasks",
+  title: "List tasks",
+  description: `List the MyLifeOrganized task tree (or a subtree). Returns a text outline plus structured task data. Ids are path-based ("1.2.3") and shift when the tree changes \u2014 treat them as valid only for immediate follow-up calls. On large profiles, narrow with parentId/maxDepth instead of raising limit (default ${DEFAULT_RESULT_LIMIT}).`,
+  inputSchema: {
+    format: external_exports.enum(["tree", "flat"]).optional().describe("tree (indented outline, default) or flat"),
+    includeCompleted: external_exports.boolean().optional().describe("Include completed tasks (default false)"),
+    parentId: external_exports.string().optional().describe("Only list the subtree under this task id"),
+    maxDepth: external_exports.number().int().min(1).optional().describe("Limit outline depth"),
+    limit: external_exports.number().int().min(1).optional().describe(`Max tasks to return (default ${DEFAULT_RESULT_LIMIT}); the output notes when truncated`)
+  },
+  outputSchema: {
+    tasks: external_exports.array(TaskSummarySchema),
+    total: external_exports.number().describe("Visible tasks before the limit was applied")
+  },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  async execute({ format, includeCompleted, parentId, maxDepth, limit }, ctx) {
+    const snap = await ctx.store.getSnapshot();
+    let tasks = snap.tasks;
+    if (parentId) {
+      const parent = findById(snap.tasks, parentId);
+      if (!parent) return errorResult(`no task with id "${parentId}" \u2014 call list_tasks or search_tasks first`);
+      tasks = parent.Children;
+    }
+    const entries = collectVisible(tasks, { includeCompleted, maxDepth });
+    const shown = entries.slice(0, limit ?? DEFAULT_RESULT_LIMIT);
+    let text = renderVisible(shown, format);
+    if (shown.length < entries.length) {
+      text += `
+\u2026 showing ${shown.length} of ${entries.length} tasks \u2014 narrow with parentId/maxDepth or raise limit`;
+    }
+    return textResult(text, { tasks: shown.map((e) => toSummary(e.task)), total: entries.length });
+  }
+});
+
+// src/tools/search-tasks.ts
+var searchTasksTool = defineTool({
+  name: "search_tasks",
+  title: "Search tasks",
+  description: "Search tasks by text, context, due-date range, star, completion, project flag or MLO flag.",
+  inputSchema: {
+    query: external_exports.string().optional().describe("Case-insensitive substring matched against caption and note"),
+    context: external_exports.string().optional().describe('Context name, e.g. "@Office" or "Office"'),
+    dueBefore: external_exports.string().optional().describe("ISO date(-time): tasks due strictly before this"),
+    dueAfter: external_exports.string().optional().describe("ISO date(-time): tasks due strictly after this"),
+    starred: external_exports.boolean().optional(),
+    completed: external_exports.boolean().optional().describe("Default: both; true = only completed; false = only open"),
+    isProject: external_exports.boolean().optional(),
+    flag: external_exports.string().optional().describe('Exact flag name, e.g. "Green Flag"'),
+    minImportance: external_exports.number().min(0).max(200).optional().describe("0\u2013200; 100 = normal, which is what tasks without an explicit Importance count as"),
+    limit: external_exports.number().int().min(1).optional().describe(`Max tasks to return (default ${DEFAULT_RESULT_LIMIT}); the output notes when truncated`)
+  },
+  outputSchema: {
+    tasks: external_exports.array(TaskSummarySchema),
+    total: external_exports.number().describe("Matching tasks before the limit was applied")
+  },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  async execute({ limit, ...filters }, ctx) {
+    const snap = await ctx.store.getSnapshot();
+    const matches = searchTasks(snap.tasks, filters);
+    const shown = matches.slice(0, limit ?? DEFAULT_RESULT_LIMIT);
+    let text = shown.length ? shown.map((t) => `${renderLine(t)}  (${t.Path.slice(0, -1).join(" > ") || "top level"})`).join("\n") : "no matching tasks";
+    if (shown.length < matches.length) {
+      text += `
+\u2026 showing ${shown.length} of ${matches.length} matches \u2014 narrow the filters or raise limit`;
+    }
+    return textResult(text, { tasks: shown.map(toSummary), total: matches.length });
+  }
+});
 
 // src/cloud/log-projection.ts
 function rowValue(known, column) {
   const index = known.header.indexOf(column);
   return index < 0 ? "" : known.row[index] ?? "";
+}
+function resolveNamed(caption, objects, kind) {
+  const matches = objects.filter((object3) => object3.caption.toLocaleLowerCase() === caption.toLocaleLowerCase());
+  if (matches.length === 0) throw new Error(`unknown ${kind} "${caption}" \u2014 use an existing ${kind}`);
+  if (matches.length > 1) throw new Error(`ambiguous ${kind} "${caption}" \u2014 ${matches.length} definitions have that caption`);
+  return matches[0].uid;
 }
 function resolveTaskUid(task, rows) {
   let parentUid = "";
@@ -25280,126 +26005,6 @@ var getTaskTool = defineTool({
   }
 });
 
-// src/tools/add-task.ts
-function matchesInput(task, caption, note) {
-  return task.Caption === caption && (note === void 0 || task.Note === note);
-}
-function resolveNamed(caption, objects, kind) {
-  const matches = objects.filter((object3) => object3.caption.toLocaleLowerCase() === caption.toLocaleLowerCase());
-  if (matches.length === 0) throw new Error(`unknown ${kind} "${caption}" \u2014 use an existing ${kind}`);
-  if (matches.length > 1) throw new Error(`ambiguous ${kind} "${caption}" \u2014 ${matches.length} definitions have that caption`);
-  return matches[0].uid;
-}
-function matchesRequestedFields(task, args) {
-  if (args.IsProject !== void 0 && (task.IsProject ?? false) !== args.IsProject) return false;
-  if (args.Starred !== void 0 && (task.Starred ?? false) !== args.Starred) return false;
-  if (args.Folder !== void 0 && (task.HideInToDoThisTask ?? false) !== args.Folder) return false;
-  if (args.HideInToDo !== void 0 && (task.HideInToDo ?? false) !== args.HideInToDo) return false;
-  if (args.CompleteSubTasksInOrder !== void 0 && (task.CompleteSubTasksInOrder ?? false) !== args.CompleteSubTasksInOrder) return false;
-  if (args.Flag !== void 0 && (task.Flag ?? "").toLocaleLowerCase() !== args.Flag.toLocaleLowerCase()) return false;
-  if (args.Places !== void 0) {
-    const expected = args.Places.map((place) => place.toLocaleLowerCase()).sort();
-    const actual = task.Places.map((place) => place.toLocaleLowerCase()).sort();
-    if (JSON.stringify(actual) !== JSON.stringify(expected)) return false;
-  }
-  if (args.dependsOnUids !== void 0) {
-    const expected = args.dependsOnUids.map((uid) => uid.toUpperCase()).sort();
-    const actual = task.DependsOn.map((uid) => uid.toUpperCase()).sort();
-    if (JSON.stringify(actual) !== JSON.stringify(expected)) return false;
-  }
-  return true;
-}
-function wasTaskAdded(before, after, caption, note, queuedUid) {
-  const beforeMatches = flatten(before).filter((task) => matchesInput(task, caption, note));
-  const afterMatches = flatten(after).filter((task) => matchesInput(task, caption, note));
-  return afterMatches.some((task) => task.Guid?.toUpperCase() === queuedUid) || afterMatches.length > beforeMatches.length;
-}
-var addTaskTool = defineTool({
-  name: "add_task",
-  title: "Add a task",
-  description: "Queue a full task delta, trigger QuickSync, and verify whether MLO applied it.",
-  inputSchema: {
-    caption: external_exports.string().min(1),
-    note: external_exports.string().optional(),
-    dueDateTime: external_exports.string().optional(),
-    startDateTime: external_exports.string().optional(),
-    parentUid: external_exports.string().optional(),
-    IsProject: external_exports.boolean().optional(),
-    Starred: external_exports.boolean().optional(),
-    Folder: external_exports.boolean().optional().describe("Hide only this task from To-Do views; children remain eligible"),
-    HideInToDo: external_exports.boolean().optional().describe("Hide this task and its whole branch from To-Do views"),
-    CompleteSubTasksInOrder: external_exports.boolean().optional(),
-    Flag: external_exports.string().optional().describe("Existing flag caption"),
-    Places: external_exports.array(external_exports.string().min(1)).max(25).optional().describe("Existing context captions"),
-    dependsOnUids: external_exports.array(external_exports.string()).max(25).optional().describe("Stable GUIDs of existing tasks this new task waits for (from get_task)")
-  },
-  outputSchema: {
-    uid: external_exports.string(),
-    cursor: external_exports.string(),
-    verified: external_exports.boolean(),
-    message: external_exports.string()
-  },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-  async execute(args, ctx) {
-    const uid = generateGuid();
-    const timestamp = nowIso();
-    const uniquePlaces = [...new Set((args.Places ?? []).map((place) => place.toLocaleLowerCase()))];
-    if (uniquePlaces.length !== (args.Places ?? []).length) throw new Error("duplicate context in Places");
-    const dependencyUids = [...new Set((args.dependsOnUids ?? []).map((uid2) => uid2.toUpperCase()))];
-    if (dependencyUids.length !== (args.dependsOnUids ?? []).length) throw new Error("duplicate GUID in dependsOnUids");
-    const needsLookups = args.Flag !== void 0 || args.Places !== void 0 || args.Starred === true;
-    const cloud = needsLookups ? await knownCloudProjection(ctx.cloudState) : void 0;
-    const flagUid = args.Flag !== void 0 ? resolveNamed(args.Flag, cloud.flags, "flag") : void 0;
-    const placeUids = args.Places?.map((place) => resolveNamed(place, cloud.places, "context"));
-    const starredOrderIndex = args.Starred === true ? String(Math.max(0, ...[...cloud.starredOrderByTask.values()].map(Number).filter(Number.isFinite)) + 500) : void 0;
-    let beforeTasks;
-    try {
-      beforeTasks = (await ctx.store.getSnapshot(true)).tasks;
-    } catch {
-    }
-    const delta = buildTaskAddDelta({
-      uid,
-      caption: args.caption,
-      createdDate: timestamp,
-      lastModified: timestamp,
-      ...args.parentUid ? { parentUid: args.parentUid } : {},
-      ...args.note !== void 0 ? { note: args.note } : {},
-      ...args.dueDateTime !== void 0 ? { dueDateTime: args.dueDateTime } : {},
-      ...args.startDateTime !== void 0 ? { startDateTime: args.startDateTime } : {},
-      ...args.IsProject !== void 0 ? { isProject: args.IsProject } : {},
-      ...args.Starred !== void 0 ? { starred: args.Starred } : {},
-      ...args.Folder !== void 0 ? { hideInToDoThisTask: args.Folder } : {},
-      ...args.HideInToDo !== void 0 ? { hideInToDo: args.HideInToDo } : {},
-      ...args.CompleteSubTasksInOrder !== void 0 ? { completeInOrder: args.CompleteSubTasksInOrder } : {},
-      ...flagUid !== void 0 ? { flagUid } : {},
-      ...placeUids !== void 0 ? { placeUids } : {},
-      ...args.dependsOnUids !== void 0 ? { dependencyUids } : {},
-      ...starredOrderIndex !== void 0 ? { starredOrderIndex } : {}
-    });
-    const cursor = cursorToDecimalString(await ctx.cloudState.append("mcp", packEnvelope(delta)));
-    let verified = false;
-    let message;
-    try {
-      await quickSync(ctx.config);
-      ctx.store.invalidate();
-      try {
-        const snapshot = await ctx.store.getSnapshot(true);
-        const candidates = flatten(snapshot.tasks).filter(
-          (task) => (task.Guid?.toUpperCase() === uid || matchesInput(task, args.caption, args.note)) && matchesRequestedFields(task, args)
-        );
-        verified = beforeTasks ? wasTaskAdded(beforeTasks, candidates, args.caption, args.note, uid) : candidates.length > 0;
-        message = verified ? "Task was queued and verified in a fresh MLO export." : "Task was queued, but no newly added matching task was present in the fresh export after QuickSync.";
-      } catch (error2) {
-        message = `Task was queued, but verification failed: ${error2 instanceof Error ? error2.message : String(error2)}`;
-      }
-    } catch (error2) {
-      ctx.store.invalidate();
-      message = `Task was queued for the next session, but QuickSync failed: ${error2 instanceof Error ? error2.message : String(error2)}`;
-    }
-    return textResult(message, { uid, cursor, verified, message });
-  }
-});
-
 // src/tools/add-tasks.ts
 var BatchTask = external_exports.object({
   key: external_exports.string().min(1).describe("Unique local key used by parentKey/dependsOnKeys within this call"),
@@ -25419,12 +26024,6 @@ var BatchTask = external_exports.object({
   dependsOnKeys: external_exports.array(external_exports.string()).max(25).optional().describe("Local keys in this batch that this task waits for"),
   dependsOnUids: external_exports.array(external_exports.string()).max(25).optional().describe("GUIDs of existing tasks that this task waits for")
 });
-function resolveNamed2(caption, objects, kind) {
-  const matches = objects.filter((object3) => object3.caption.toLocaleLowerCase() === caption.toLocaleLowerCase());
-  if (matches.length === 0) throw new Error(`unknown ${kind} "${caption}" \u2014 use an existing ${kind}`);
-  if (matches.length > 1) throw new Error(`ambiguous ${kind} "${caption}" \u2014 ${matches.length} definitions have that caption`);
-  return matches[0].uid;
-}
 function validateGraph(specs, byKey) {
   for (const spec of specs) {
     if (spec.parentKey !== void 0 && spec.parentUid !== void 0) {
@@ -25459,6 +26058,19 @@ function countSignatures(tasks) {
   const result = /* @__PURE__ */ new Map();
   for (const task of flatten([...tasks])) result.set(signature(task), (result.get(signature(task)) ?? 0) + 1);
   return result;
+}
+function wasOutlineAdded(before, after, specs, uids) {
+  const afterGuids = new Set(flatten([...after]).map((task) => task.Guid?.toUpperCase()).filter(Boolean));
+  if (uids.every((uid) => afterGuids.has(uid.toUpperCase()))) return true;
+  if (!before) return false;
+  const beforeCounts = countSignatures(before);
+  const afterCounts = countSignatures(after);
+  const requested = /* @__PURE__ */ new Map();
+  for (const spec of specs) {
+    const key = signature({ Caption: spec.caption, Note: spec.note });
+    requested.set(key, (requested.get(key) ?? 0) + 1);
+  }
+  return [...requested].every(([key, count]) => (afterCounts.get(key) ?? 0) - (beforeCounts.get(key) ?? 0) >= count);
 }
 var addTasksTool = defineTool({
   name: "add_tasks",
@@ -25524,14 +26136,15 @@ var addTasksTool = defineTool({
         ...spec.Folder !== void 0 ? { hideInToDoThisTask: spec.Folder } : {},
         ...spec.HideInToDo !== void 0 ? { hideInToDo: spec.HideInToDo } : {},
         ...spec.CompleteSubTasksInOrder !== void 0 ? { completeInOrder: spec.CompleteSubTasksInOrder } : {},
-        ...spec.Flag !== void 0 ? { flagUid: resolveNamed2(spec.Flag, cloud.flags, "flag") } : {},
-        ...spec.Places !== void 0 ? { placeUids: spec.Places.map((place) => resolveNamed2(place, cloud.places, "context")) } : {},
+        ...spec.Flag !== void 0 ? { flagUid: resolveNamed(spec.Flag, cloud.flags, "flag") } : {},
+        ...spec.Places !== void 0 ? { placeUids: spec.Places.map((place) => resolveNamed(place, cloud.places, "context")) } : {},
         ...dependencyUids.length ? { dependencyUids } : {},
         ...starOrder !== void 0 ? { starredOrderIndex: starOrder } : {}
       });
     });
     const cursor = cursorToDecimalString(await ctx.cloudState.append("mcp", packEnvelope(mergeDeltas(documents))));
     const resultTasks = tasks.map((spec) => ({ key: spec.key, uid: uids.get(spec.key) }));
+    const queued = tasks.length === 1 ? "1 task was queued" : `${tasks.length} tasks were queued atomically`;
     let verified = false;
     let message;
     try {
@@ -25539,25 +26152,52 @@ var addTasksTool = defineTool({
       ctx.store.invalidate();
       try {
         const after = (await ctx.store.getSnapshot(true)).tasks;
-        const afterFlat = flatten(after);
-        const afterGuids = new Set(afterFlat.map((task) => task.Guid?.toUpperCase()).filter(Boolean));
-        verified = resultTasks.every(({ uid }) => afterGuids.has(uid));
-        if (!verified && before) {
-          const beforeCounts = countSignatures(before);
-          const afterCounts = countSignatures(after);
-          const requested = /* @__PURE__ */ new Map();
-          for (const spec of tasks) requested.set(signature({ Caption: spec.caption, Note: spec.note }), (requested.get(signature({ Caption: spec.caption, Note: spec.note })) ?? 0) + 1);
-          verified = [...requested].every(([key, count]) => (afterCounts.get(key) ?? 0) - (beforeCounts.get(key) ?? 0) >= count);
-        }
-        message = verified ? `${tasks.length} tasks were queued atomically and verified in a fresh MLO export.` : `${tasks.length} tasks were queued atomically, but a fresh export does not confirm the whole outline yet.`;
+        verified = wasOutlineAdded(before, after, tasks, resultTasks.map(({ uid }) => uid));
+        message = verified ? `${queued} and verified in a fresh MLO export.` : `${queued}, but a fresh export does not confirm ${tasks.length === 1 ? "it" : "the whole outline"} yet.`;
       } catch (error2) {
-        message = `${tasks.length} tasks were queued atomically, but verification failed: ${error2 instanceof Error ? error2.message : String(error2)}`;
+        message = `${queued}, but verification failed: ${error2 instanceof Error ? error2.message : String(error2)}`;
       }
     } catch (error2) {
       ctx.store.invalidate();
-      message = `${tasks.length} tasks were queued atomically for the next session, but QuickSync failed: ${error2 instanceof Error ? error2.message : String(error2)}`;
+      message = `${queued} for the next session, but QuickSync failed: ${error2 instanceof Error ? error2.message : String(error2)}`;
     }
     return textResult(message, { tasks: resultTasks, cursor, verified, message });
+  }
+});
+
+// src/tools/add-task.ts
+var addTaskTool = defineTool({
+  name: "add_task",
+  title: "Add a task",
+  description: "Queue a full task delta, trigger QuickSync, and verify whether MLO applied it.",
+  inputSchema: {
+    caption: external_exports.string().min(1),
+    note: external_exports.string().optional(),
+    dueDateTime: external_exports.string().optional(),
+    startDateTime: external_exports.string().optional(),
+    parentUid: external_exports.string().optional(),
+    IsProject: external_exports.boolean().optional(),
+    Starred: external_exports.boolean().optional(),
+    Folder: external_exports.boolean().optional().describe("Hide only this task from To-Do views; children remain eligible"),
+    HideInToDo: external_exports.boolean().optional().describe("Hide this task and its whole branch from To-Do views"),
+    CompleteSubTasksInOrder: external_exports.boolean().optional(),
+    Flag: external_exports.string().optional().describe("Existing flag caption"),
+    Places: external_exports.array(external_exports.string().min(1)).max(25).optional().describe("Existing context captions"),
+    dependsOnUids: external_exports.array(external_exports.string()).max(25).optional().describe("Stable GUIDs of existing tasks this new task waits for (from get_task)")
+  },
+  outputSchema: {
+    uid: external_exports.string(),
+    cursor: external_exports.string(),
+    verified: external_exports.boolean(),
+    message: external_exports.string()
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  async execute(args, ctx) {
+    const result = await addTasksTool.execute({ tasks: [{ key: args.caption, ...args }] }, ctx);
+    const structured = result.structuredContent;
+    if (result.isError || !structured) return result;
+    const { cursor, verified, message } = structured;
+    return textResult(message, { uid: structured.tasks[0].uid, cursor, verified, message });
   }
 });
 
@@ -25752,12 +26392,6 @@ function verifiesUpdate(task, spec, move, resolved = {}) {
   if (move) return move.destCaption ? task.Path.at(-2) === move.destCaption : task.Path.length === 1;
   return true;
 }
-function resolveNamed3(caption, objects, kind) {
-  const matches = objects.filter((object3) => object3.caption.toLocaleLowerCase() === caption.toLocaleLowerCase());
-  if (matches.length === 0) throw new Error(`unknown ${kind} "${caption}" \u2014 use an existing ${kind}`);
-  if (matches.length > 1) throw new Error(`ambiguous ${kind} "${caption}" \u2014 ${matches.length} definitions have that caption`);
-  return matches[0].uid;
-}
 function nextStarredIndex(cloud) {
   const values = [...cloud.starredOrderByTask.values()].map(Number).filter(Number.isFinite);
   return (values.length ? Math.max(...values) : 0) + 500;
@@ -25797,11 +26431,11 @@ var updateTaskTool = defineTool({
         let starIndex = nextStarredIndex(cloud);
         for (const { id, task } of targets) {
           const spec = specs.get(id);
-          if (spec.Flag !== void 0 && spec.Flag !== "") flagUids.set(id, resolveNamed3(spec.Flag, cloud.flags, "flag"));
+          if (spec.Flag !== void 0 && spec.Flag !== "") flagUids.set(id, resolveNamed(spec.Flag, cloud.flags, "flag"));
           if (spec.Places !== void 0) {
             const unique = [...new Set(spec.Places.map((place) => place.toLocaleLowerCase()))];
             if (unique.length !== spec.Places.length) throw new Error(`duplicate context in Places for [${id}] "${task.Caption}"`);
-            placeUids.set(id, spec.Places.map((place) => resolveNamed3(place, cloud.places, "context")));
+            placeUids.set(id, spec.Places.map((place) => resolveNamed(place, cloud.places, "context")));
           }
           if (spec.dependsOnIds !== void 0) {
             const unique = [...new Set(spec.dependsOnIds)];
@@ -26116,690 +26750,6 @@ var allTools = [
   cloudStatusTool
 ];
 
-// src/cloud/state.ts
-import { promises as fs2 } from "node:fs";
-import path3 from "node:path";
-var CloudState = class {
-  constructor(stateDir) {
-    this.stateDir = stateDir;
-  }
-  stateDir;
-  cursor = ZERO_CURSOR;
-  entries = [];
-  lastPull = {};
-  lastFinalized;
-  chain = Promise.resolve();
-  async load() {
-    await fs2.mkdir(this.stateDir, { recursive: true });
-    this.cursor = ZERO_CURSOR;
-    this.entries = [];
-    this.lastPull = {};
-    this.lastFinalized = void 0;
-    try {
-      const parsed = JSON.parse(await fs2.readFile(path3.join(this.stateDir, "state.json"), "utf8"));
-      this.cursor = parseCursor(parsed.highWater);
-      this.entries = parsed.entries;
-      this.lastPull = parsed.lastPull ?? {};
-      this.lastFinalized = parsed.lastFinalized;
-      for (const entry of this.entries) parseCursor(entry.cursor);
-    } catch (error2) {
-      if (error2.code !== "ENOENT") throw error2;
-    }
-  }
-  async withStateLock(operation) {
-    const lockDir = path3.join(this.stateDir, ".state-lock");
-    const deadline = Date.now() + 1e4;
-    await fs2.mkdir(this.stateDir, { recursive: true });
-    for (; ; ) {
-      try {
-        await fs2.mkdir(lockDir);
-        break;
-      } catch (error2) {
-        if (error2.code !== "EEXIST") throw error2;
-        try {
-          const stat = await fs2.stat(lockDir);
-          if (Date.now() - stat.mtimeMs > 3e4) {
-            await fs2.rm(lockDir, { recursive: true, force: true });
-            continue;
-          }
-        } catch {
-          continue;
-        }
-        if (Date.now() >= deadline) throw new Error(`timed out waiting for cloud state lock: ${lockDir}`);
-        await new Promise((resolve) => setTimeout(resolve, 25));
-      }
-    }
-    try {
-      return await operation();
-    } finally {
-      await fs2.rm(lockDir, { recursive: true, force: true });
-    }
-  }
-  serialize(operation) {
-    const run = () => this.withStateLock(async () => {
-      await this.load();
-      return operation();
-    });
-    const next = this.chain.then(run, run);
-    this.chain = next.catch(() => void 0);
-    return next;
-  }
-  read(operation) {
-    const run = async () => {
-      await this.load();
-      return operation();
-    };
-    const next = this.chain.then(run, run);
-    this.chain = next.catch(() => void 0);
-    return next;
-  }
-  async append(origin, zipBytes) {
-    return this.serialize(async () => {
-      let cursor = this.cursor + 1n;
-      let file = `delta-${cursorToDecimalString(cursor)}.zip`;
-      while (await fs2.stat(path3.join(this.stateDir, file)).then(() => true, () => false)) {
-        cursor = cursor + 1n;
-        file = `delta-${cursorToDecimalString(cursor)}.zip`;
-      }
-      await this.atomicWrite(path3.join(this.stateDir, file), zipBytes);
-      this.cursor = cursor;
-      this.entries.push({ cursor: cursorToDecimalString(cursor), origin, file });
-      await this.writeState();
-      return cursor;
-    });
-  }
-  async entriesAfter(cursor, excludeOrigin) {
-    return this.read(async () => {
-      const selected = this.entries.filter((entry) => parseCursor(entry.cursor) > cursor && entry.origin !== excludeOrigin);
-      return Promise.all(selected.map(async (entry) => ({
-        cursor: parseCursor(entry.cursor),
-        origin: entry.origin,
-        file: entry.file,
-        bytes: await fs2.readFile(path3.join(this.stateDir, entry.file))
-      })));
-    });
-  }
-  async highWater() {
-    return this.read(() => this.cursor);
-  }
-  /**
-   * Adopt the cursor already stored by an MLO profile on its first local pull.
-   *
-   * A profile that previously used the vendor service can arrive with a cursor
-   * far above a fresh local state's zero. Pending local entries must be moved
-   * above that baseline or MLO will consider them old. Entry filenames are
-   * intentionally left unchanged; the index is authoritative and this keeps
-   * the rebase atomic with the state-file write.
-   */
-  async adoptInitialBaseline(origin, baseline) {
-    await this.serialize(async () => {
-      if (baseline <= this.cursor) return;
-      if (this.lastPull[origin] !== void 0 || this.entries.some((entry) => entry.origin === origin)) {
-        throw new Error("client cursor is newer than an initialized local cloud state");
-      }
-      for (const entry of this.entries) {
-        entry.cursor = cursorToDecimalString(parseCursor(entry.cursor) + baseline);
-      }
-      this.cursor = this.cursor + baseline;
-      await this.writeState();
-    });
-  }
-  /** Record the cursor an origin accepted from a pull (only ever advances). */
-  async recordPull(origin, cursor) {
-    await this.serialize(async () => {
-      const previous = this.lastPull[origin];
-      if (previous !== void 0 && parseCursor(previous) >= cursor) return;
-      this.lastPull[origin] = cursorToDecimalString(cursor);
-      await this.writeState();
-    });
-  }
-  async lastPullCursor(origin) {
-    return this.read(() => {
-      const value = this.lastPull[origin];
-      return value === void 0 ? ZERO_CURSOR : parseCursor(value);
-    });
-  }
-  /** Entries authored by others that `origin` has not pulled yet. */
-  async pendingFor(origin) {
-    return this.read(() => {
-      const value = this.lastPull[origin];
-      const cursor = value === void 0 ? ZERO_CURSOR : parseCursor(value);
-      return this.entries.filter((entry) => parseCursor(entry.cursor) > cursor && entry.origin !== origin).length;
-    });
-  }
-  async counts() {
-    return this.read(() => ({
-      mcp: this.entries.filter((entry) => entry.origin === "mcp").length,
-      app: this.entries.filter((entry) => entry.origin === "app").length
-    }));
-  }
-  async finalize() {
-    await this.serialize(async () => {
-      this.lastFinalized = (/* @__PURE__ */ new Date()).toISOString();
-      await this.writeState();
-    });
-  }
-  async flush() {
-    await this.serialize(() => this.writeState());
-  }
-  async writeState() {
-    const value = {
-      highWater: cursorToDecimalString(this.cursor),
-      entries: this.entries,
-      ...Object.keys(this.lastPull).length ? { lastPull: this.lastPull } : {},
-      ...this.lastFinalized ? { lastFinalized: this.lastFinalized } : {}
-    };
-    await this.atomicWrite(path3.join(this.stateDir, "state.json"), new TextEncoder().encode(`${JSON.stringify(value, null, 2)}
-`));
-  }
-  async atomicWrite(target, bytes) {
-    const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
-    await fs2.writeFile(temporary, bytes);
-    await fs2.rename(temporary, target);
-  }
-};
-
-// src/cloud/server.ts
-import http from "node:http";
-import https from "node:https";
-import net from "node:net";
-
-// src/cloud/sync-observer.ts
-import { promises as fs3 } from "node:fs";
-import path4 from "node:path";
-import zlib from "node:zlib";
-var VENDOR_SYNC_HOST = "sync.mylifeorganized.net";
-var SUMMARY_FILE = "soap-summary.jsonl";
-var SENSITIVE = /pass|credential|token|secret|session|cookie|email|user|login/i;
-var BODY = /<(?:[\w.-]+:)?Body(?:\s[^>]*)?>([\s\S]*?)<\/(?:[\w.-]+:)?Body\s*>/i;
-var TAG = /<(?!\/)(?:[\w.-]+:)?([\w.-]+)(?:\s[^>]*)?>/gi;
-var CAPTURE_LIMIT = 4 * 1024 * 1024;
-function escapeRegExp(text) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-function operationShape(xml2) {
-  const body = BODY.exec(xml2)?.[1] ?? "";
-  const first = body.matchAll(TAG).next().value;
-  if (!first) return { operation: "<unknown>", fields: [] };
-  const operation = first[1];
-  const rest = body.slice(first.index + first[0].length);
-  const close = new RegExp(`</(?:[\\w.-]+:)?${escapeRegExp(operation)}\\s*>`, "i").exec(rest);
-  const inner = close ? rest.slice(0, close.index) : rest;
-  const fields = [];
-  for (const match of inner.matchAll(TAG)) if (!fields.includes(match[1])) fields.push(match[1]);
-  return { operation, fields };
-}
-function maskSensitiveField(field2) {
-  return SENSITIVE.test(field2) ? "<sensitive-field>" : field2;
-}
-function decodeBody(chunks, contentEncoding) {
-  const raw = Buffer.concat(chunks);
-  try {
-    const encoding = (contentEncoding ?? "").toLowerCase();
-    if (encoding.includes("gzip")) return zlib.gunzipSync(raw).toString("utf8");
-    if (encoding.includes("deflate")) {
-      try {
-        return zlib.inflateSync(raw).toString("utf8");
-      } catch {
-        return zlib.inflateRawSync(raw).toString("utf8");
-      }
-    }
-    return raw.toString("utf8");
-  } catch {
-    return "";
-  }
-}
-var SyncExchange = class {
-  constructor(observer, method, url, requestHeaders) {
-    this.observer = observer;
-    this.method = method;
-    this.url = url;
-    this.requestHeaders = requestHeaders;
-  }
-  observer;
-  method;
-  url;
-  requestHeaders;
-  requestChunks = [];
-  responseChunks = [];
-  requestSize = 0;
-  responseSize = 0;
-  truncated = false;
-  add(chunks, size, chunk) {
-    if (size + chunk.length > CAPTURE_LIMIT) {
-      this.truncated = true;
-      return size;
-    }
-    chunks.push(chunk);
-    return size + chunk.length;
-  }
-  addRequestChunk(chunk) {
-    this.requestSize = this.add(this.requestChunks, this.requestSize, chunk);
-  }
-  addResponseChunk(chunk) {
-    this.responseSize = this.add(this.responseChunks, this.responseSize, chunk);
-  }
-  finish(status, responseHeaders) {
-    const contentType = responseHeaders["content-type"] ?? "";
-    if (contentType.includes("xml")) {
-      const request = operationShape(decodeBody(this.requestChunks, this.requestHeaders["content-encoding"]));
-      const response = operationShape(decodeBody(this.responseChunks, responseHeaders["content-encoding"]));
-      this.observer.append({
-        kind: "soap",
-        operation: request.operation,
-        soapAction: String(this.requestHeaders.soapaction ?? "").replace(/^"|"$/g, ""),
-        requestFields: request.fields,
-        status,
-        responseOperation: response.operation,
-        responseFields: response.fields.map(maskSensitiveField),
-        ...this.truncated ? { truncated: true } : {}
-      });
-    } else {
-      this.observer.append({
-        kind: "http",
-        method: this.method,
-        path: this.url.pathname,
-        ...this.url.search ? { queryKeys: [...this.url.searchParams.keys()] } : {},
-        status,
-        contentType
-      });
-    }
-  }
-};
-var SyncObserver = class {
-  constructor(stateDir, host = VENDOR_SYNC_HOST) {
-    this.stateDir = stateDir;
-    this.host = host;
-  }
-  stateDir;
-  host;
-  announcedConnect = false;
-  matches(hostname2) {
-    return hostname2.toLowerCase() === this.host.toLowerCase();
-  }
-  /**
-   * A CONNECT to the sync host means the app tunnels sync over TLS, so the
-   * plain-HTTP observer sees nothing — that fact itself is the finding
-   * (docs/mlo/mitm-proxy.md covers TLS interception).
-   */
-  recordConnect(host, port) {
-    if (!this.announcedConnect) {
-      this.announcedConnect = true;
-      log(`sync observer: HTTPS CONNECT to ${host}:${port} \u2014 vendor sync is TLS-tunneled; see docs/mlo/mitm-proxy.md`);
-    }
-    this.append({ kind: "connect", target: `${host}:${port}` });
-  }
-  begin(method, url, requestHeaders) {
-    return new SyncExchange(this, method, url, requestHeaders);
-  }
-  append(record2) {
-    const line = `${JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), ...record2 })}
-`;
-    void fs3.mkdir(this.stateDir, { recursive: true }).then(() => fs3.appendFile(path4.join(this.stateDir, SUMMARY_FILE), line)).catch((error2) => log(`sync observer write failed: ${error2 instanceof Error ? error2.message : String(error2)}`));
-  }
-};
-
-// src/cloud/soap.ts
-var import_fast_xml_parser2 = __toESM(require_fxp(), 1);
-var SOAP_NAMESPACE = "http://schemas.xmlsoap.org/soap/envelope/";
-var MLO_NAMESPACE = "http://www.mylifeorganized.net/";
-var SOAP_OPERATIONS = [
-  "GetModificationsBytesEx",
-  "ApplyModificationsBytesEx",
-  "ReleaseSyncSessionBytes"
-];
-var OPERATIONS = new Set(SOAP_OPERATIONS);
-var parser2 = new import_fast_xml_parser2.XMLParser({
-  removeNSPrefix: true,
-  ignoreAttributes: true,
-  parseTagValue: false,
-  trimValues: true,
-  processEntities: true
-});
-function escapeXml(value) {
-  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;");
-}
-function envelope(operation, fields) {
-  const xml2 = `<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="${SOAP_NAMESPACE}"><soap:Body><${operation}Response xmlns="${MLO_NAMESPACE}">${fields}</${operation}Response></soap:Body></soap:Envelope>`;
-  return new TextEncoder().encode(xml2);
-}
-function field(name, value) {
-  return `<${name}>${escapeXml(value)}</${name}>`;
-}
-function successFields(operation, extra = "") {
-  return field(`${operation}Result`, "true") + extra;
-}
-function failureFields(operation, error2, extra = "") {
-  return field(`${operation}Result`, "false") + field("errorMessage", error2) + extra;
-}
-function parseFields(xml2, expected) {
-  const document = parser2.parse(xml2);
-  const envelopeNode = document.Envelope;
-  if (!envelopeNode || typeof envelopeNode !== "object") throw new Error("SOAP Envelope is missing");
-  const body = envelopeNode.Body;
-  if (!body || typeof body !== "object") throw new Error("SOAP Body is missing");
-  const operation = body[expected];
-  if (operation === void 0) throw new Error(`SOAP Body does not contain ${expected}`);
-  if (operation === "") return {};
-  if (!operation || typeof operation !== "object" || Array.isArray(operation)) {
-    throw new Error(`${expected} fields are invalid`);
-  }
-  return operation;
-}
-function requiredText(fields, name) {
-  const value = fields[name];
-  if (typeof value !== "string" || value.length === 0) throw new Error(`${name} is required`);
-  return value;
-}
-function decodeBase64(value) {
-  const compact = value.replace(/\s+/g, "");
-  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(compact)) {
-    throw new Error("data must be valid base64");
-  }
-  return Buffer.from(compact, "base64");
-}
-function prepareMcpDeltaForMlo(document) {
-  const tasks = findSection(document, "TodoItems");
-  if (tasks) {
-    for (const [column, value] of Object.entries(NEW_TASK_DEFAULTS)) {
-      const index = tasks.header.indexOf(column);
-      if (index >= 0) {
-        for (const row of tasks.rows) if (!row[index]) row[index] = value;
-      }
-    }
-  }
-  return document;
-}
-function soapOperationFromAction(action) {
-  const value = Array.isArray(action) ? action[0] : action;
-  if (!value) return void 0;
-  const normalized = value.trim().replace(/^"|"$/g, "");
-  const name = normalized.slice(normalized.lastIndexOf("/") + 1);
-  return OPERATIONS.has(name) ? name : void 0;
-}
-async function handleSoapOperation(state, operation, xml2) {
-  const fields = parseFields(xml2, operation);
-  if (operation === "GetModificationsBytesEx") {
-    const baseline = parseCursor(requiredText(fields, "newerThan"));
-    await state.adoptInitialBaseline("app", baseline);
-    const entries = await state.entriesAfter(baseline, "app");
-    const cursor = entries.length ? entries.at(-1).cursor : await state.highWater();
-    await state.recordPull("app", cursor);
-    const documents = entries.map((entry) => {
-      const document2 = unpackEnvelope(entry.bytes);
-      return entry.origin === "mcp" ? prepareMcpDeltaForMlo(document2) : document2;
-    });
-    const document = entries.length ? mergeDeltas(documents) : mergeDeltas([]);
-    const data = field("data", Buffer.from(packEnvelope(document)).toString("base64"));
-    return envelope(operation, successFields(operation, field("maxVersion", cursorToDecimalString(cursor)) + data));
-  }
-  if (operation === "ApplyModificationsBytesEx") {
-    const baseline = parseCursor(requiredText(fields, "lastSyncTimestamp"));
-    await state.adoptInitialBaseline("app", baseline);
-    const highWater = await state.highWater();
-    if (baseline > highWater) {
-      return envelope(operation, failureFields(
-        operation,
-        "lastSyncTimestamp is newer than the server high-water cursor",
-        field("newServerTimeStamp", cursorToDecimalString(highWater))
-      ));
-    }
-    const encoded = fields.data;
-    if (encoded !== void 0 && typeof encoded !== "string") {
-      return envelope(operation, failureFields(
-        operation,
-        "data must be base64 text",
-        field("newServerTimeStamp", cursorToDecimalString(highWater))
-      ));
-    }
-    let cursor = highWater;
-    if (encoded) {
-      try {
-        const bytes = decodeBase64(encoded);
-        unpackEnvelope(bytes);
-        cursor = await state.append("app", bytes);
-      } catch (error2) {
-        return envelope(operation, failureFields(
-          operation,
-          error2 instanceof Error ? error2.message : String(error2),
-          field("newServerTimeStamp", cursorToDecimalString(highWater))
-        ));
-      }
-    }
-    return envelope(operation, successFields(operation, field("newServerTimeStamp", cursorToDecimalString(cursor))));
-  }
-  await state.finalize();
-  return envelope(operation, successFields(operation));
-}
-function soapFault(message) {
-  const xml2 = `<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="${SOAP_NAMESPACE}"><soap:Body><soap:Fault>` + field("faultcode", "soap:Client") + field("faultstring", message) + `</soap:Fault></soap:Body></soap:Envelope>`;
-  return new TextEncoder().encode(xml2);
-}
-
-// src/cloud/server.ts
-var BODY_LIMIT = 32 * 1024 * 1024;
-function json(response, status, body) {
-  response.writeHead(status, { "content-type": "application/json; charset=utf-8" });
-  response.end(JSON.stringify(body));
-}
-async function readBytes(request) {
-  const chunks = [];
-  let size = 0;
-  for await (const chunk of request) {
-    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-    size += bytes.length;
-    if (size > BODY_LIMIT) throw Object.assign(new Error("request body exceeds 32 MiB"), { status: 413 });
-    chunks.push(bytes);
-  }
-  return Buffer.concat(chunks);
-}
-async function readJson(request) {
-  const bytes = await readBytes(request);
-  try {
-    const value = JSON.parse(bytes.toString("utf8"));
-    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error();
-    return value;
-  } catch {
-    throw Object.assign(new Error("request body must be a JSON object"), { status: 400 });
-  }
-}
-function xml(response, status, body) {
-  response.writeHead(status, {
-    "content-type": "text/xml; charset=utf-8",
-    "content-length": body.byteLength
-  });
-  response.end(body);
-}
-function requiredString(body, name) {
-  if (typeof body[name] !== "string") throw Object.assign(new Error(`${name} must be a string`), { status: 400 });
-  return body[name];
-}
-function decodeEnvelope(value) {
-  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {
-    throw Object.assign(new Error("envelope must be valid base64"), { status: 400 });
-  }
-  return Buffer.from(value, "base64");
-}
-function clientOrigin(client) {
-  return client === "mlo-app" ? "app" : "mcp";
-}
-function isAbsoluteRequestTarget(target) {
-  return /^https?:\/\//i.test(target);
-}
-async function interceptVendorSoap(request, response, state, observer) {
-  if (request.method !== "POST") return false;
-  let target;
-  try {
-    target = new URL(request.url ?? "");
-  } catch {
-    return false;
-  }
-  if (!observer.matches(target.hostname) || !/\/MLOInetSync\.asmx$/i.test(target.pathname)) return false;
-  const operation = soapOperationFromAction(request.headers.soapaction);
-  if (!operation) return false;
-  const requestBytes = await readBytes(request);
-  const exchange = observer.begin(request.method, target, request.headers);
-  exchange.addRequestChunk(requestBytes);
-  let responseBytes;
-  let status = 200;
-  try {
-    responseBytes = await handleSoapOperation(state, operation, requestBytes.toString("utf8"));
-  } catch (error2) {
-    status = 500;
-    responseBytes = soapFault(error2 instanceof Error ? error2.message : String(error2));
-  }
-  exchange.addResponseChunk(Buffer.from(responseBytes));
-  exchange.finish(status, { "content-type": "text/xml; charset=utf-8" });
-  xml(response, status, responseBytes);
-  return true;
-}
-function forwardRequest(request, response, observer) {
-  let target;
-  try {
-    target = new URL(request.url ?? "");
-  } catch {
-    json(response, 400, { error: "invalid proxy request target" });
-    return;
-  }
-  const transport = target.protocol === "https:" ? https : target.protocol === "http:" ? http : void 0;
-  if (!transport) {
-    json(response, 400, { error: "unsupported proxy protocol" });
-    return;
-  }
-  const exchange = observer.matches(target.hostname) ? observer.begin(request.method ?? "GET", target, request.headers) : void 0;
-  const headers = { ...request.headers, host: target.host };
-  delete headers["proxy-connection"];
-  const upstream = transport.request(target, { method: request.method, headers }, (upstreamResponse) => {
-    response.writeHead(upstreamResponse.statusCode ?? 502, upstreamResponse.statusMessage, upstreamResponse.headers);
-    if (exchange) {
-      upstreamResponse.on("data", (chunk) => exchange.addResponseChunk(chunk));
-      upstreamResponse.on("end", () => exchange.finish(upstreamResponse.statusCode, upstreamResponse.headers));
-    }
-    upstreamResponse.pipe(response);
-  });
-  upstream.on("error", (error2) => {
-    if (!response.headersSent) json(response, 502, { error: `proxy request failed: ${error2.message}` });
-    else response.destroy(error2);
-  });
-  request.on("aborted", () => upstream.destroy());
-  if (exchange) request.on("data", (chunk) => exchange.addRequestChunk(chunk));
-  request.pipe(upstream);
-}
-function tunnelConnect(request, client, head, observer) {
-  const separator = (request.url ?? "").lastIndexOf(":");
-  const host = separator > 0 ? request.url.slice(0, separator) : "";
-  const port = Number(separator > 0 ? request.url.slice(separator + 1) : "");
-  if (!host || !Number.isInteger(port) || port < 1 || port > 65535) {
-    client.end("HTTP/1.1 400 Bad Request\r\n\r\n");
-    return;
-  }
-  if (observer.matches(host)) observer.recordConnect(host, port);
-  const upstream = net.connect(port, host);
-  upstream.once("connect", () => {
-    client.write("HTTP/1.1 200 Connection Established\r\n\r\n");
-    if (head.length) upstream.write(head);
-    upstream.pipe(client);
-    client.pipe(upstream);
-  });
-  upstream.once("error", () => client.end("HTTP/1.1 502 Bad Gateway\r\n\r\n"));
-  client.once("error", () => upstream.destroy());
-}
-async function startCloudServer(options) {
-  const host = options.host ?? "127.0.0.1";
-  if (host !== "localhost" && host !== "::1" && !/^127(?:\.\d{1,3}){3}$/.test(host)) {
-    throw new Error(`MLO cloud server must bind to a loopback host (received "${host}")`);
-  }
-  const state = options.state ?? new CloudState(options.stateDir);
-  const observer = new SyncObserver(options.stateDir, options.observeHost);
-  const server = http.createServer(async (request, response) => {
-    try {
-      if (isAbsoluteRequestTarget(request.url ?? "")) {
-        if (await interceptVendorSoap(request, response, state, observer)) return;
-        forwardRequest(request, response, observer);
-        return;
-      }
-      const url = new URL(request.url ?? "/", "http://localhost");
-      if (request.method === "GET" && url.pathname === "/v1/status") {
-        const [highWater, counts, pendingForApp] = await Promise.all([
-          state.highWater(),
-          state.counts(),
-          state.pendingFor("app")
-        ]);
-        json(response, 200, { cursor: cursorToDecimalString(highWater), entries: counts, pendingForApp });
-        return;
-      }
-      if (request.method !== "POST" || !["/v1/pull", "/v1/push", "/v1/finalize"].includes(url.pathname)) {
-        json(response, 404, { error: "not found" });
-        return;
-      }
-      const body = await readJson(request);
-      const client = requiredString(body, "client");
-      if (url.pathname === "/v1/pull") {
-        const cursor = parseCursor(requiredString(body, "cursor"));
-        const origin = clientOrigin(client);
-        const entries = await state.entriesAfter(cursor, origin);
-        if (!entries.length) {
-          const highWater = await state.highWater();
-          await state.recordPull(origin, highWater);
-          json(response, 200, { cursor: cursorToDecimalString(highWater) });
-        } else {
-          const merged = mergeDeltas(entries.map((entry) => unpackEnvelope(entry.bytes)));
-          const returned = entries.at(-1).cursor;
-          await state.recordPull(origin, returned);
-          json(response, 200, {
-            cursor: cursorToDecimalString(returned),
-            envelope: Buffer.from(packEnvelope(merged)).toString("base64")
-          });
-        }
-        return;
-      }
-      if (url.pathname === "/v1/push") {
-        const baseline = parseCursor(requiredString(body, "baseline"));
-        if (baseline > await state.highWater()) {
-          json(response, 409, { error: "baseline is newer than the server high-water cursor" });
-          return;
-        }
-        const bytes = decodeEnvelope(requiredString(body, "envelope"));
-        try {
-          unpackEnvelope(bytes);
-        } catch (error2) {
-          throw Object.assign(error2, { status: 400 });
-        }
-        const cursor = await state.append(clientOrigin(client), bytes);
-        json(response, 200, { cursor: cursorToDecimalString(cursor) });
-        return;
-      }
-      await state.finalize();
-      json(response, 200, { ok: true });
-    } catch (error2) {
-      const status = typeof error2.status === "number" ? error2.status : 500;
-      json(response, status, { error: error2 instanceof Error ? error2.message : String(error2) });
-    }
-  });
-  server.on("connect", (request, socket, head) => tunnelConnect(request, socket, head, observer));
-  await new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(options.port ?? 8080, host, () => {
-      server.off("error", reject);
-      resolve();
-    });
-  });
-  const address = server.address();
-  const port = typeof address === "object" && address ? address.port : options.port ?? 8080;
-  log(`cloud server listening on http://${host}:${port}`);
-  return {
-    server,
-    state,
-    host,
-    port,
-    async stop() {
-      await state.flush();
-      await new Promise((resolve, reject) => server.close((error2) => error2 ? reject(error2) : resolve()));
-      log("cloud server stopped");
-    }
-  };
-}
-
 // src/index.ts
 var INSTRUCTIONS = `
 ## MyLifeOrganized (MLO) task management
@@ -26850,14 +26800,14 @@ async function main() {
   const store = new MloStore(config2);
   const cloudState = new CloudState(config2.cloudStateDir);
   const ctx = { config: config2, store, cloudState };
-  const cloudServer = await startCloudServer({ host: config2.cloudHost, port: config2.cloudPort, stateDir: config2.cloudStateDir, state: cloudState });
+  const cloudServer = await startOrAttachCloudServer({ host: config2.cloudHost, port: config2.cloudPort, stateDir: config2.cloudStateDir, state: cloudState });
   const server = new McpServer({ name: "mlo-mcp", version: "0.2.0" }, { instructions: INSTRUCTIONS });
   for (const tool of allTools) registerTool(server, tool, ctx);
   await server.connect(new StdioServerTransport());
   log(`ready \u2014 data file: ${config2.dataFile}`);
   watchOwnBuild(cloudServer);
   const shutdown = async () => {
-    await cloudServer.stop();
+    await cloudServer?.stop();
   };
   process.once("SIGINT", () => void shutdown().finally(() => process.exit(0)));
   process.once("SIGTERM", () => void shutdown().finally(() => process.exit(0)));
@@ -26871,7 +26821,7 @@ function watchOwnBuild(cloudServer) {
       startMtime ??= mtime;
       if (mtime !== startMtime && !isMloBusy()) {
         log("server build changed on disk \u2014 exiting so the client restarts the new version");
-        await cloudServer.stop();
+        await cloudServer?.stop();
         process.exit(0);
       }
     } catch {

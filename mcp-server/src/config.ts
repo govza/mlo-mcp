@@ -2,6 +2,7 @@ import path from "node:path";
 import os from "node:os";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { DEFAULT_CLOUD_PORT } from "./cloud/server.js";
 import type { MloConfig } from "./types.js";
 
 const DEFAULT_EXE = "C:\\Program Files (x86)\\MyLifeOrganized.net\\MLO\\mlo.exe";
@@ -40,7 +41,7 @@ function resolveDataFile(): string {
 export function loadConfig(): MloConfig {
   const dataFile = resolveDataFile();
 
-  const cloudPort = Number(process.env.MLO_CLOUD_PORT ?? "8080");
+  const cloudPort = Number(process.env.MLO_CLOUD_PORT ?? String(DEFAULT_CLOUD_PORT));
   if (!Number.isInteger(cloudPort) || cloudPort < 0 || cloudPort > 65535) {
     throw new Error("MLO_CLOUD_PORT must be an integer from 0 through 65535");
   }

@@ -3,7 +3,7 @@
 `mcp-cloud` is the server's write path (it replaced the retired
 file-replacement pipeline that closed the GUI and swapped the `.ml` file): the
 MCP server *is* the cloud. It runs a local sync
-endpoint on `127.0.0.1:8080`; the app's cloud-sync client connects to it, pulls
+endpoint on `127.0.0.1:8181`; the app's cloud-sync client connects to it, pulls
 our deltas, and applies them through MLO's own merge logic. We trigger a session
 with the already-verified `mlo.exe -QuickSync`.
 
@@ -63,7 +63,7 @@ client implements this document.
 
 ## MLO SOAP compatibility adapter
 
-When MLO uses `127.0.0.1:8080` as its HTTP proxy, requests for the vendor sync
+When MLO uses `127.0.0.1:8181` as its HTTP proxy, requests for the vendor sync
 host arrive in absolute form. mcp-cloud intercepts only `POST` requests to the
 vendor `MLOInetSync.asmx` path with one of these SOAP actions:
 
@@ -82,7 +82,7 @@ refuses to bind to a non-loopback address.
 
 ## Wire contract (HTTP/1.1, JSON)
 
-Bound to `127.0.0.1` only (configurable host/port, default port `8080`). All
+Bound to `127.0.0.1` only (configurable host/port, default port `8181`). All
 bodies are `application/json; charset=utf-8`. Envelopes travel as base64-encoded
 ZIP bytes. Cursors are decimal strings.
 
@@ -177,12 +177,16 @@ State lives in the repository's git-ignored `messages\` directory by default:
 
 ## Configuration
 
-The local sync endpoint always starts alongside the MCP server.
+The local sync endpoint always starts alongside the MCP server. When the port
+is already held by another mlo-mcp session's endpoint (probed via
+`GET /v1/status`), the new session *attaches* instead: it runs without its own
+listener and shares the delta log through the state directory's cross-process
+locking. Any other process on the port is still a startup error.
 
 | Env var | Default | Meaning |
 |---|---|---|
 | `MLO_CLOUD_HOST` | `127.0.0.1` | bind address (loopback only by design) |
-| `MLO_CLOUD_PORT` | `8080` | listen port |
+| `MLO_CLOUD_PORT` | `8181` | listen port |
 | `MLO_CLOUD_STATE_DIR` | `<repo>\messages` | message log + state location |
 
 ## MCP tool surface

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { resolveTaskUid, rowValue, type KnownCloudProjection, type KnownRow, type NamedCloudObject } from "../cloud/log-projection.js";
+import { resolveNamed, resolveTaskUid, rowValue, type KnownCloudProjection, type KnownRow } from "../cloud/log-projection.js";
 import { flatten, findById } from "../task-tree.js";
 import { csvTruthy, runCloudRowUpdate, type CloudRowTarget } from "./row-update.js";
 import { defineTool } from "./shared.js";
@@ -123,13 +123,6 @@ export function verifiesUpdate(
   }
   if (move) return move.destCaption ? task.Path.at(-2) === move.destCaption : task.Path.length === 1;
   return true;
-}
-
-function resolveNamed(caption: string, objects: readonly NamedCloudObject[], kind: string): string {
-  const matches = objects.filter((object) => object.caption.toLocaleLowerCase() === caption.toLocaleLowerCase());
-  if (matches.length === 0) throw new Error(`unknown ${kind} "${caption}" — use an existing ${kind}`);
-  if (matches.length > 1) throw new Error(`ambiguous ${kind} "${caption}" — ${matches.length} definitions have that caption`);
-  return matches[0]!.uid;
 }
 
 function nextStarredIndex(cloud: KnownCloudProjection): number {

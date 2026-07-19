@@ -11,6 +11,9 @@ import { log } from "../log.js";
 
 const BODY_LIMIT = 32 * 1024 * 1024;
 
+/** Default listen port; off the crowded 8080 so dev servers don't collide with it. */
+export const DEFAULT_CLOUD_PORT = 8181;
+
 export interface CloudServerOptions {
   host?: string;
   port?: number;
@@ -240,10 +243,10 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
   server.on("connect", (request, socket, head) => tunnelConnect(request, socket as net.Socket, head, observer));
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
-    server.listen(options.port ?? 8080, host, () => { server.off("error", reject); resolve(); });
+    server.listen(options.port ?? DEFAULT_CLOUD_PORT, host, () => { server.off("error", reject); resolve(); });
   });
   const address = server.address();
-  const port = typeof address === "object" && address ? address.port : options.port ?? 8080;
+  const port = typeof address === "object" && address ? address.port : options.port ?? DEFAULT_CLOUD_PORT;
   log(`cloud server listening on http://${host}:${port}`);
   return {
     server, state, host, port,
@@ -257,4 +260,32 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
 
 export function stopCloudServer(handle: CloudServerHandle): Promise<void> {
   return handle.stop();
+}
+
+/**
+ * One session serves the HTTP endpoint; further sessions share the same delta
+ * log through CloudState's cross-process locking and need no listener of
+ * their own. When the port is held by a healthy mlo-mcp endpoint, return
+ * undefined ("attached") instead of failing startup; any other listener on
+ * the port is still a hard error.
+ */
+export async function startOrAttachCloudServer(options: CloudServerOptions): Promise<CloudServerHandle | undefined> {
+  try {
+    return await startCloudServer(options);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EADDRINUSE") throw error;
+    const host = options.host ?? "127.0.0.1";
+    const port = options.port ?? DEFAULT_CLOUD_PORT;
+    try {
+      const response = await fetch(`http://${host}:${port}/v1/status`, { signal: AbortSignal.timeout(2000) });
+      const body = await response.json() as { cursor?: unknown; entries?: unknown };
+      if (response.ok && typeof body.cursor === "string" && typeof body.entries === "object") {
+        log(`port ${port} already serves an mlo-mcp cloud endpoint — attaching to its shared state dir`);
+        return undefined;
+      }
+    } catch {
+      /* the port holder is not a cloud endpoint — report the original conflict */
+    }
+    throw error;
+  }
 }

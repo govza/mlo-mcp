@@ -139,6 +139,7 @@ export interface SearchFilters {
   completed?: boolean;
   isProject?: boolean;
   flag?: string;
+  /** 0–200 scale; a task without an explicit Importance counts as 100 (normal). */
   minImportance?: number;
 }
 
@@ -154,7 +155,7 @@ export function searchTasks(tasks: TaskNode[], f: SearchFilters): TaskNode[] {
     if (f.completed !== undefined && Boolean(t.CompletionDateTime) !== f.completed) return false;
     if (f.isProject !== undefined && (t.IsProject ?? false) !== f.isProject) return false;
     if (f.flag && t.Flag !== f.flag) return false;
-    if (f.minImportance !== undefined && (t.Importance ?? 50) < f.minImportance) return false;
+    if (f.minImportance !== undefined && (t.Importance ?? 100) < f.minImportance) return false;
     return true;
   });
 }
@@ -167,7 +168,7 @@ export function renderLine(t: TaskNode): string {
   if (t.IsProject) marks.push("[project]");
   if (t.Starred) marks.push("[*]");
   if (t.Flag) marks.push(`[flag:${t.Flag}]`);
-  if (t.Importance !== undefined && t.Importance !== 50) marks.push(`[imp:${t.Importance}]`);
+  if (t.Importance !== undefined && t.Importance !== 100) marks.push(`[imp:${t.Importance}]`);
   if (t.DueDateTime) marks.push(`due:${t.DueDateTime}`);
   if (t.DependsOn.length) marks.push(`[waits-on:${t.DependsOn.length}]`);
   if (t.Places.length) marks.push(t.Places.join(","));

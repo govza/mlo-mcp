@@ -15,7 +15,8 @@ export const searchTasksTool = defineTool({
     completed: z.boolean().optional().describe("Default: both; true = only completed; false = only open"),
     isProject: z.boolean().optional(),
     flag: z.string().optional().describe('Exact flag name, e.g. "Green Flag"'),
-    minImportance: z.number().min(0).max(100).optional(),
+    minImportance: z.number().min(0).max(200).optional()
+      .describe("0–200; 100 = normal, which is what tasks without an explicit Importance count as"),
     limit: z
       .number()
       .int()

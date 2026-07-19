@@ -29,6 +29,14 @@ export function rowValue(known: KnownRow, column: string): string {
   return index < 0 ? "" : known.row[index] ?? "";
 }
 
+/** Resolve a Place/Flag caption (case-insensitive, must be unambiguous) to its UID. */
+export function resolveNamed(caption: string, objects: readonly NamedCloudObject[], kind: string): string {
+  const matches = objects.filter((object) => object.caption.toLocaleLowerCase() === caption.toLocaleLowerCase());
+  if (matches.length === 0) throw new Error(`unknown ${kind} "${caption}" — use an existing ${kind}`);
+  if (matches.length > 1) throw new Error(`ambiguous ${kind} "${caption}" — ${matches.length} definitions have that caption`);
+  return matches[0]!.uid;
+}
+
 /** Resolve by caption/ParentUID path; duplicate sibling captions stay ambiguous. */
 export function resolveTaskUid(task: TaskNode, rows: ReadonlyMap<string, KnownRow>): string | undefined {
   let parentUid = "";

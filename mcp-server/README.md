@@ -35,7 +35,7 @@ claude mcp add mlo -e MLO_DATA_FILE=D:\path\to\your.ml -- node D:\dev\projects\o
 | `MLO_EXPORT_DIR` | no | `%TEMP%\mlo-mcp` | Scratch dir for XML exports |
 | `MLO_CACHE_STALE_MS` | no | `30000` | Task-tree cache lifetime |
 | `MLO_CLOUD_HOST` | no | `127.0.0.1` | Local sync endpoint bind address (loopback only by design) |
-| `MLO_CLOUD_PORT` | no | `8080` | Local sync endpoint port (`0` = random) |
+| `MLO_CLOUD_PORT` | no | `8181` | Local sync endpoint port (`0` = random); MLO profiles configured against the old 8080 default need their sync URL/proxy updated |
 | `MLO_CLOUD_STATE_DIR` | no | `<repo>\messages` | Delta log + sync state location |
 
 ¹ In a repo checkout, `MLO_DATA_FILE` may be omitted — it defaults to the demo
