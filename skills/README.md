@@ -33,14 +33,25 @@ compose: the weekly review opens by running inbox processing; inbox processing
 ends by offering the two-minute-rule items back to you.
 
 The workflow skills auto-trigger from conversation, and can be invoked
-explicitly as `/inbox`, `/weekly`, `/mind` (personal copies) or namespaced
-`/mlo:inbox`, `/mlo:weekly`, `/mlo:mind` when installed via the plugin.
+explicitly in Claude Code as `/inbox`, `/weekly`, `/mind` (namespaced
+`/mlo:inbox` etc. when installed via the plugin). Codex invokes skills
+differently: type `$inbox` or pick from the `/skills` browser (Codex `/`
+commands are prompt files, a separate mechanism).
 
 ## Install
 
+The standard route is the open [agent-skills CLI](https://github.com/vercel-labs/skills),
+which installs into Claude Code, Codex, and any other SKILL.md-capable agent
+in one command (on Windows add `--copy` unless developer mode is enabled —
+symlinking requires it):
+
+```powershell
+npx skills add govza/mlo-mcp    # update: npx skills update · remove: npx skills remove
+```
+
 Installing the repo as a Claude Code plugin (see the [root README](../README.md))
-ships all skills automatically. To customize them — which is the point — copy
-them to your **personal** skills directory instead, so your edits survive plugin
+also ships all skills. To customize them — which is the point — copy
+them to your **personal** skills directory instead, so your edits survive
 updates and apply in every project:
 
 ```powershell

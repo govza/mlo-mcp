@@ -2,7 +2,7 @@
 
 MCP server that lets AI agents manage tasks in the **MyLifeOrganized** (MLO) Windows desktop app, driving `mlo.exe`'s command line — no cloud API involved.
 
-Full reference documentation lives in [`../docs/`](../docs/README.md): the mlo.exe CLI, the XML and `.ml` binary formats, and the server architecture. An example Claude Code skill that layers GTD conventions on top of these tools (the server itself is methodology-neutral) is in [`../skills/conventions/`](../skills/README.md).
+Full reference documentation lives in [`../docs/`](../docs/README.md): the mlo.exe CLI, the XML and `.ml` binary formats, and the server architecture. Customizable skills that layer GTD workflows on top of these tools (the server itself is methodology-neutral) are in [`../skills/`](../skills/README.md).
 
 **Installing the server as a user?** See the [root README](../README.md) — end users need only Node, not pnpm: the repo ships a committed self-contained bundle (`dist-bundle/mlo-mcp.js`) usable from any MCP client. This file covers development.
 

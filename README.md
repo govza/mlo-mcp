@@ -5,7 +5,7 @@ MCP server for the **MyLifeOrganized** (MLO) Windows desktop app. AI agents (Cla
 - 10 tools: list/search/get tasks, contexts, add/update/complete/uncomplete/delete (all writes batched & atomic), QuickSync
 - Writes go through a verified rewrite pipeline: export → edit XML → re-import → verify, with a timestamped backup next to your data file and automatic restore on mismatch
 - If the MLO app is open, writes close it gracefully (it saves on close) and relaunch it minimized afterwards
-- Ships a customizable [GTD-conventions skill](skills/README.md) for Claude Code
+- Ships four customizable [GTD skills](skills/README.md) (`/mind`, `/inbox`, `/weekly` + standing conventions) for any SKILL.md-capable agent
 
 ## Requirements
 
@@ -53,6 +53,16 @@ The plugin reads `MLO_DATA_FILE` from your environment — set it once, user-lev
 [Environment]::SetEnvironmentVariable("MLO_DATA_FILE", "C:\path\to\your.ml", "User")
 ```
 
+### Skills (any agent)
+
+The GTD skills install with the open [agent-skills CLI](https://github.com/vercel-labs/skills) — one command covers Claude Code, Codex, Cursor, and the rest of the SKILL.md ecosystem:
+
+```powershell
+npx skills add govza/mlo-mcp    # update: npx skills update · remove: npx skills remove
+```
+
+Claude Code users who install the plugin above get the skills bundled with it instead. See [`skills/`](skills/README.md) for what they do and how to customize them.
+
 ### From a clone (no npx)
 
 ```powershell
@@ -70,7 +80,7 @@ claude mcp add mlo -e MLO_DATA_FILE=C:\path\to\your.ml -- node C:\path\to\mlo-mc
 |---|---|
 | [`mcp-server/`](mcp-server/README.md) | Tools reference, configuration, development, tests |
 | [`docs/`](docs/README.md) | The reverse-engineered mlo.exe CLI, XML & `.ml` binary formats, server architecture, MLO task model |
-| [`skills/`](skills/README.md) | Customizable Claude Code skill for GTD conventions |
+| [`skills/`](skills/README.md) | Customizable GTD skills (Claude Code, Codex, any SKILL.md-capable agent) |
 
 Everything in `docs/` was verified empirically against MLO 15.x on Windows — MLO's CLI is largely undocumented, so the quirk catalog there is the map of what actually works.
 
