@@ -4,10 +4,12 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { MloConfig, TaskNode } from "../types.js";
 import type { MloStore } from "../store.js";
 import { log } from "../log.js";
+import type { CloudState } from "../cloud/state.js";
 
 export interface ToolContext {
   config: MloConfig;
   store: MloStore;
+  cloudState: CloudState;
 }
 
 /** All four hints are mandatory so every tool states its contract explicitly. */

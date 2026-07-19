@@ -41,4 +41,8 @@ export interface MloConfig {
   relaunchStyle: "minimized" | "normal" | "none";
   /** Caption of the top-level task acting as the capture inbox, overriding <Inbox>/Inbox detection. */
   inboxCaption?: string;
+  cloudMode: boolean;
+  cloudHost: string;
+  cloudPort: number;
+  cloudStateDir: string;
 }

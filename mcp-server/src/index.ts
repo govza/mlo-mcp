@@ -8,6 +8,8 @@ import { MloStore } from "./store.js";
 import { log } from "./log.js";
 import { allTools } from "./tools/registry.js";
 import { registerTool } from "./tools/shared.js";
+import { CloudState } from "./cloud/state.js";
+import { startCloudServer, type CloudServerHandle } from "./cloud/server.js";
 
 /** Connection-time usage guide shown to the LLM (MCP `instructions`). */
 const INSTRUCTIONS = `
@@ -52,14 +54,24 @@ sync runs the profile's cloud/Wi-Fi QuickSync.
 async function main(): Promise<void> {
   const config = loadConfig();
   const store = new MloStore(config);
-  const ctx = { config, store };
+  const cloudState = new CloudState(config.cloudStateDir);
+  const ctx = { config, store, cloudState };
+  let cloudServer: CloudServerHandle | undefined;
+  if (config.cloudMode) {
+    cloudServer = await startCloudServer({ host: config.cloudHost, port: config.cloudPort, stateDir: config.cloudStateDir, state: cloudState });
+  }
 
   const server = new McpServer({ name: "mlo-mcp", version: "0.2.0" }, { instructions: INSTRUCTIONS });
   for (const tool of allTools) registerTool(server, tool, ctx);
 
   await server.connect(new StdioServerTransport());
   log(`ready — data file: ${config.dataFile}`);
-  watchOwnBuild();
+  watchOwnBuild(cloudServer);
+  const shutdown = async () => {
+    if (cloudServer) await cloudServer.stop();
+  };
+  process.once("SIGINT", () => void shutdown().finally(() => process.exit(0)));
+  process.once("SIGTERM", () => void shutdown().finally(() => process.exit(0)));
 }
 
 /**
@@ -68,7 +80,7 @@ async function main(): Promise<void> {
  * file; when a rebuild changes it, exit cleanly while idle so the client
  * respawns the current code on the next tool call.
  */
-function watchOwnBuild(): void {
+function watchOwnBuild(cloudServer?: CloudServerHandle): void {
   const entry = fileURLToPath(import.meta.url);
   let startMtime: number | undefined;
   const timer = setInterval(async () => {
@@ -77,6 +89,7 @@ function watchOwnBuild(): void {
       startMtime ??= mtime;
       if (mtime !== startMtime && !isMloBusy()) {
         log("server build changed on disk — exiting so the client restarts the new version");
+        if (cloudServer) await cloudServer.stop();
         process.exit(0);
       }
     } catch {

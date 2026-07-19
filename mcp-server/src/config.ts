@@ -12,6 +12,10 @@ export function loadConfig(): MloConfig {
     );
   }
 
+  const cloudPort = Number(process.env.MLO_CLOUD_PORT ?? "8080");
+  if (!Number.isInteger(cloudPort) || cloudPort < 0 || cloudPort > 65535) {
+    throw new Error("MLO_CLOUD_PORT must be an integer from 0 through 65535");
+  }
   return {
     mloExePath: process.env.MLO_EXE_PATH ?? DEFAULT_EXE,
     dataFile,
@@ -30,5 +34,9 @@ export function loadConfig(): MloConfig {
     // hand-made "Входящие" folder). MLO itself hardcodes the caption "<Inbox>"
     // in every UI language, so most profiles need no override.
     inboxCaption: process.env.MLO_INBOX_CAPTION || undefined,
+    cloudMode: ["1", "true", "yes"].includes((process.env.MLO_CLOUD_MODE ?? "0").toLowerCase()),
+    cloudHost: process.env.MLO_CLOUD_HOST ?? "127.0.0.1",
+    cloudPort,
+    cloudStateDir: process.env.MLO_CLOUD_STATE_DIR ?? `${dataFile}.mcp-cloud`,
   };
 }

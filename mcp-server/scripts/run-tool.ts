@@ -10,6 +10,7 @@ import { z } from "zod";
 import { loadConfig } from "../src/config.js";
 import { MloStore } from "../src/store.js";
 import { allTools } from "../src/tools/registry.js";
+import { CloudState } from "../src/cloud/state.js";
 
 const [name, json] = process.argv.slice(2);
 
@@ -28,7 +29,7 @@ if (!tool) {
 }
 
 const config = loadConfig();
-const ctx = { config, store: new MloStore(config) };
+const ctx = { config, store: new MloStore(config), cloudState: new CloudState(config.cloudStateDir) };
 const args = z.object(tool.inputSchema).parse(JSON.parse(json ?? "{}"));
 
 const result = await tool.execute(args, ctx);
