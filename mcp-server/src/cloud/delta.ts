@@ -104,6 +104,39 @@ export function buildTaskDeleteDelta(uids: readonly string[]): SectionedCsv {
   return document;
 }
 
+export interface TaskRowUpdate {
+  header: readonly string[];
+  row: readonly string[];
+  patch: Readonly<Record<string, string>>;
+}
+
+/**
+ * Project known full rows with column patches into one update delta. The
+ * source rows must be complete records (latest log row per UID) — MLO merges
+ * a TodoItems row as a full-record replacement, so any column missing from
+ * the source becomes a blank value in the profile.
+ */
+export function buildTaskUpdatesDelta(updates: readonly TaskRowUpdate[]): SectionedCsv {
+  const document = createDeltaSkeleton();
+  const section = findSection(document, "TodoItems")!;
+  for (const update of updates) {
+    for (const column of update.header) if (!section.header.includes(column)) section.header.push(column);
+  }
+  for (const update of updates) {
+    const row = section.header.map((column) => {
+      const index = update.header.indexOf(column);
+      return index < 0 ? "" : update.row[index] ?? "";
+    });
+    for (const [column, value] of Object.entries(update.patch)) {
+      const index = section.header.indexOf(column);
+      if (index < 0) throw new Error(`unknown TodoItems column "${column}"`);
+      row[index] = value;
+    }
+    section.rows.push(row);
+  }
+  return document;
+}
+
 const KEYS: Record<string, string[]> = {
   Places: ["UID"],
   PlaceRelations: ["PlaceUID", "ParentPlaceUID"],

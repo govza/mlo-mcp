@@ -10,6 +10,8 @@ import { deleteTaskTool } from "./delete-task.js";
 import { listContextsTool } from "./list-contexts.js";
 import { syncTool } from "./sync.js";
 import { cloudAddTaskTool } from "./cloud-add-task.js";
+import { cloudCompleteTaskTool } from "./cloud-complete-task.js";
+import { cloudUncompleteTaskTool } from "./cloud-uncomplete-task.js";
 import { cloudDeleteTaskTool } from "./cloud-delete-task.js";
 import { cloudStatusTool } from "./cloud-status.js";
 
@@ -26,6 +28,8 @@ export const allTools: MloTool[] = [
   listContextsTool,
   syncTool,
   cloudAddTaskTool,
+  cloudCompleteTaskTool,
+  cloudUncompleteTaskTool,
   cloudDeleteTaskTool,
   cloudStatusTool,
 ] as MloTool[];

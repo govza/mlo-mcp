@@ -191,6 +191,16 @@ The local sync endpoint always starts alongside the MCP server.
   `CreatedDate`/`LastModified` in MLO's zone-free ISO form), appends it to the
   log as an `origin:"mcp"` delta, triggers `mlo.exe -QuickSync`, then verifies
   the task appeared via a fresh export.
+- `cloud_complete_task` / `cloud_uncomplete_task` — full-row updates that set
+  or clear `CompletionDateTime` (and flip `ProjectStatus` for projects). A
+  changed object must travel as a complete 82-column record, and the XML
+  export cannot supply one (it lacks `CreatedDate`/`LastModified`/`ItemIndex`,
+  recurrence internals, reminders, color coding), so the row is sourced from
+  the delta log itself: the latest full row per UID across both origins.
+  Tasks with no such row fail atomically toward the native tools; coverage
+  grows as tasks flow through the log. `cloud_complete_task` refuses
+  recurring tasks — a full-row rewrite would bypass MLO's next-occurrence
+  generation.
 - `cloud_delete_task` — resolves path-based ids to GUIDs and appends ONE
   `origin:"mcp"` delta with `TodoItems.Deleted` tombstones for every selected
   task *and all of its descendants* (whether MLO cascades a bare parent
