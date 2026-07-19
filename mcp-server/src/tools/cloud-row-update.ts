@@ -18,11 +18,13 @@ export interface CloudRowTarget {
 export interface CloudRowUpdatePlan {
   /** Leads the human message: "<verb> of [1] "x" was queued …" */
   verb: string;
+  /** Runs once after target resolution, before guards — e.g. to resolve move destinations against the same snapshot. */
+  prepare?(before: TaskNode[], targets: CloudRowTarget[]): void;
   /** Throw to abort the whole batch before anything is queued. */
   guard?(target: CloudRowTarget): void;
   patchFor(target: CloudRowTarget, now: string): Record<string, string>;
   /** Post-QuickSync check on the target as found by GUID in a fresh export. */
-  verified(task: TaskNode): boolean;
+  verified(task: TaskNode, target: CloudRowTarget): boolean;
 }
 
 /**
@@ -61,6 +63,7 @@ export async function runCloudRowUpdate(
     }
     return { id, task, uid, known };
   });
+  plan.prepare?.(before, targets);
   for (const target of targets) plan.guard?.(target);
 
   const now = nowIso();
@@ -78,9 +81,9 @@ export async function runCloudRowUpdate(
     try {
       const after = flatten((await ctx.store.getSnapshot(true)).tasks);
       const byGuid = new Map(after.filter((task) => task.Guid).map((task) => [task.Guid!.toUpperCase(), task]));
-      verified = uids.every((uid) => {
-        const task = byGuid.get(uid);
-        return task !== undefined && plan.verified(task);
+      verified = targets.every((target) => {
+        const task = byGuid.get(target.uid);
+        return task !== undefined && plan.verified(task, target);
       });
       message = verified
         ? `${plan.verb} of ${described} was queued and verified in a fresh MLO export.`

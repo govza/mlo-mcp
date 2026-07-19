@@ -191,6 +191,14 @@ The local sync endpoint always starts alongside the MCP server.
   `CreatedDate`/`LastModified` in MLO's zone-free ISO form), appends it to the
   log as an `origin:"mcp"` delta, triggers `mlo.exe -QuickSync`, then verifies
   the task appeared via a fresh export.
+- `cloud_update_task` — batched full-row field edits (caption, note, dates,
+  importance/effort/estimates, project status, goal) and re-parenting moves
+  via `ParentUID`. Sourced from the delta log like the completion tools.
+  Deliberately unsupported until their wire encoding is observed in a real
+  app delta: boolean columns (the CSV true-value — `1` vs Delphi `-1` — has
+  never been captured), `FlagUID` resolution, and Places/dependency relation
+  edits (no `TodoItemPlaces.Deleted` section exists, so removal semantics are
+  unknown). Date edits on recurring tasks are refused.
 - `cloud_complete_task` / `cloud_uncomplete_task` — full-row updates that set
   or clear `CompletionDateTime` (and flip `ProjectStatus` for projects). A
   changed object must travel as a complete 82-column record, and the XML
