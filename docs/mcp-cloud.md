@@ -7,6 +7,12 @@ endpoint on `127.0.0.1:8080`; the app's cloud-sync client connects to it, pulls
 our deltas, and applies them through MLO's own merge logic. We trigger a session
 with the already-verified `mlo.exe -QuickSync`.
 
+The same listener can be configured as MLO's HTTP proxy during development.
+Only origin-form requests to the local `/v1/*` API are handled by mcp-cloud;
+unrelated absolute-form HTTP requests are forwarded unchanged, and HTTPS
+`CONNECT` requests are tunneled end-to-end. This lets initial vendor login and
+WSDL discovery proceed without exposing credentials to mcp-cloud.
+
 The **data plane** (envelope bytes, CSV sections, cursor semantics) is fixed by
 [cloud-sync.md](cloud-sync.md) and is not renegotiable here. The **wire contract**
 below is ours to define — the vendor's field and operation names were

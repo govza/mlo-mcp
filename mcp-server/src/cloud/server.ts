@@ -1,4 +1,6 @@
 import http, { type IncomingMessage, type ServerResponse } from "node:http";
+import https from "node:https";
+import net from "node:net";
 import { cursorToDecimalString, parseCursor } from "./cursor.js";
 import { mergeDeltas } from "./delta.js";
 import { packEnvelope, unpackEnvelope } from "./envelope.js";
@@ -61,11 +63,65 @@ function clientOrigin(client: string): DeltaOrigin {
   return client === "mlo-app" ? "app" : "mcp";
 }
 
+function isAbsoluteRequestTarget(target: string): boolean {
+  return /^https?:\/\//i.test(target);
+}
+
+function forwardRequest(request: IncomingMessage, response: ServerResponse): void {
+  let target: URL;
+  try {
+    target = new URL(request.url ?? "");
+  } catch {
+    json(response, 400, { error: "invalid proxy request target" });
+    return;
+  }
+  const transport = target.protocol === "https:" ? https : target.protocol === "http:" ? http : undefined;
+  if (!transport) {
+    json(response, 400, { error: "unsupported proxy protocol" });
+    return;
+  }
+  const headers: http.OutgoingHttpHeaders = { ...request.headers, host: target.host };
+  delete headers["proxy-connection"];
+  const upstream = transport.request(target, { method: request.method, headers }, (upstreamResponse) => {
+    response.writeHead(upstreamResponse.statusCode ?? 502, upstreamResponse.statusMessage, upstreamResponse.headers);
+    upstreamResponse.pipe(response);
+  });
+  upstream.on("error", (error) => {
+    if (!response.headersSent) json(response, 502, { error: `proxy request failed: ${error.message}` });
+    else response.destroy(error);
+  });
+  request.on("aborted", () => upstream.destroy());
+  request.pipe(upstream);
+}
+
+function tunnelConnect(request: IncomingMessage, client: net.Socket, head: Buffer): void {
+  const separator = (request.url ?? "").lastIndexOf(":");
+  const host = separator > 0 ? request.url!.slice(0, separator) : "";
+  const port = Number(separator > 0 ? request.url!.slice(separator + 1) : "");
+  if (!host || !Number.isInteger(port) || port < 1 || port > 65535) {
+    client.end("HTTP/1.1 400 Bad Request\r\n\r\n");
+    return;
+  }
+  const upstream = net.connect(port, host);
+  upstream.once("connect", () => {
+    client.write("HTTP/1.1 200 Connection Established\r\n\r\n");
+    if (head.length) upstream.write(head);
+    upstream.pipe(client);
+    client.pipe(upstream);
+  });
+  upstream.once("error", () => client.end("HTTP/1.1 502 Bad Gateway\r\n\r\n"));
+  client.once("error", () => upstream.destroy());
+}
+
 export async function startCloudServer(options: CloudServerOptions): Promise<CloudServerHandle> {
   const host = options.host ?? "127.0.0.1";
   const state = options.state ?? new CloudState(options.stateDir);
   const server = http.createServer(async (request, response) => {
     try {
+      if (isAbsoluteRequestTarget(request.url ?? "")) {
+        forwardRequest(request, response);
+        return;
+      }
       const url = new URL(request.url ?? "/", "http://localhost");
       if (request.method === "GET" && url.pathname === "/v1/status") {
         const [highWater, counts, pendingForApp] = await Promise.all([
@@ -119,6 +175,7 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
       json(response, status, { error: error instanceof Error ? error.message : String(error) });
     }
   });
+  server.on("connect", tunnelConnect);
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
     server.listen(options.port ?? 8080, host, () => { server.off("error", reject); resolve(); });

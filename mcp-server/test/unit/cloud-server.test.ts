@@ -1,6 +1,8 @@
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import http from "node:http";
+import net from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import { startCloudServer, type CloudServerHandle } from "../../src/cloud/server.js";
 import { buildTaskAddDelta } from "../../src/cloud/delta.js";
@@ -21,6 +23,49 @@ async function post(handle: CloudServerHandle, route: string, body: unknown) {
 }
 
 describe("cloud HTTP server", () => {
+  it("passes unrelated HTTP requests and CONNECT tunnels through", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-proxy-")); dirs.push(dir);
+    const upstream = http.createServer((request, response) => {
+      response.writeHead(201, { "x-upstream": "yes" });
+      response.end(`${request.method} ${request.url}`);
+    });
+    await new Promise<void>((resolve) => upstream.listen(0, "127.0.0.1", resolve));
+    const upstreamAddress = upstream.address();
+    if (!upstreamAddress || typeof upstreamAddress === "string") throw new Error("missing upstream address");
+    const handle = await startCloudServer({ host: "127.0.0.1", port: 0, stateDir: dir }); handles.push(handle);
+
+    const proxied = await new Promise<{ status: number; header?: string; body: string }>((resolve, reject) => {
+      const request = http.request({
+        host: handle.host, port: handle.port, method: "GET",
+        path: `http://127.0.0.1:${upstreamAddress.port}/mlo/MLOInetSync.asmx?WSDL`,
+      }, (response) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+        response.on("end", () => resolve({ status: response.statusCode!, header: response.headers["x-upstream"] as string, body: Buffer.concat(chunks).toString() }));
+      });
+      request.on("error", reject); request.end();
+    });
+    expect(proxied).toEqual({ status: 201, header: "yes", body: "GET /mlo/MLOInetSync.asmx?WSDL" });
+
+    const tunneled = await new Promise<string>((resolve, reject) => {
+      const socket = net.connect(handle.port, handle.host, () => {
+        socket.write(`CONNECT 127.0.0.1:${upstreamAddress.port} HTTP/1.1\r\nHost: 127.0.0.1:${upstreamAddress.port}\r\n\r\n`);
+      });
+      let data = "";
+      socket.on("data", (chunk) => {
+        data += chunk.toString();
+        if (data.includes("200 Connection Established") && !data.includes("x-upstream")) {
+          socket.write("GET /login HTTP/1.1\r\nHost: upstream\r\nConnection: close\r\n\r\n");
+        }
+        if (data.includes("GET /login")) resolve(data);
+      });
+      socket.on("error", reject);
+    });
+    expect(tunneled).toContain("200 Connection Established");
+    expect(tunneled).toContain("GET /login");
+    await new Promise<void>((resolve, reject) => upstream.close((error) => error ? reject(error) : resolve()));
+  });
+
   it("implements pull, push validation, filtering, and cursor rules", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-server-")); dirs.push(dir);
     const handle = await startCloudServer({ host: "127.0.0.1", port: 0, stateDir: dir }); handles.push(handle);
