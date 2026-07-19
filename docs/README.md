@@ -6,6 +6,7 @@ MCP server (this project):
 
 | Document | Contents |
 |---|---|
+| [tools.md](tools.md) | The MCP tool surface: what each tool is for, guarantees, native vs cloud variants and when to use which (schemas: `pnpm tools`) |
 | [server-architecture.md](server-architecture.md) | How the MCP server is built: locking, write pipeline, GUI auto-restart, tool design |
 | [mcp-cloud.md](mcp-cloud.md) | The local cloud-sync endpoint: wire contract, delta log, merge rules, how the app gets wired to it via MLO's proxy setting |
 
