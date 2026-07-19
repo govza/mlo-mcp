@@ -4,7 +4,7 @@ import type { TaskNode } from "./types.js";
 /**
  * Recover per-task GUIDs from the .ml binary (they are absent from XML exports).
  *
- * Verified structure (see docs/ml-binary-format.md):
+ * Verified structure (see docs/mlo/ml-binary-format.md):
  * - .ml = "MyLifeDataFile2\0" header, then a PK entry ("ZIPDATA") of raw-deflate data.
  * - Inside, task records serialize the tree recursively: each node writes its
  *   caption (uint32-LE length + UTF-8) on entry — pre-order — and a footer

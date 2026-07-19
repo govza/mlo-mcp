@@ -11,7 +11,7 @@ from the local cloud server, which defaults to `127.0.0.1:8080`.
 
 The cloud server's own proxy also writes the same credential-safe structural
 summaries for plain-HTTP vendor sync traffic (to
-`<stateDir>/soap-summary.jsonl`, see [mcp-cloud.md](mcp-cloud.md)), so routing
+`<stateDir>/soap-summary.jsonl`, see [mcp-cloud.md](../mcp-cloud.md)), so routing
 MLO through `127.0.0.1:8080` needs no mitmproxy at all unless the sync
 operations turn out to be TLS-tunneled — a vendor-host `CONNECT` in that log is
 the signal that full mitmproxy interception with the CA certificate is needed.

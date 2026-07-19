@@ -28,7 +28,7 @@ Getting from here to "QuickSync applies our deltas" is a two-step plan:
    shapes the vendor's field-name-free docs deliberately omit. A `CONNECT` to
    the sync host is recorded too — that would mean the app tunnels sync over
    TLS, plain-HTTP observation sees nothing, and one
-   [mitmproxy](mitm-proxy.md) session with its CA certificate is needed for
+   [mitmproxy](mlo/mitm-proxy.md) session with its CA certificate is needed for
    this step instead.
 2. **Terminate locally.** With the shapes known, mcp-cloud answers those sync
    operations itself — serving pulls from and appending pushes to the delta
@@ -37,7 +37,7 @@ Getting from here to "QuickSync applies our deltas" is a two-step plan:
    below; mitmproxy is never part of this runtime path.
 
 The **data plane** (envelope bytes, CSV sections, cursor semantics) is fixed by
-[cloud-sync.md](cloud-sync.md) and is not renegotiable here. The **wire contract**
+[cloud-sync.md](mlo/cloud-sync.md) and is not renegotiable here. The **wire contract**
 below is ours to define — the vendor's field and operation names were
 intentionally never part of the implementation contract — and the app-side
 client implements this document.

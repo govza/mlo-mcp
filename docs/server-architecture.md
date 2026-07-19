@@ -15,7 +15,7 @@ src/
                     both locks, GUI close/relaunch, isMloRunning
   xml.ts            parse/build (fast-xml-parser), RawTaskNode, canonical field order
   task-tree.ts      RawTaskNode → TaskNode model, path ids, find/flatten/search/render
-  guids.ts          Caption→GUID recovery from the .ml binary (see ml-binary-format.md)
+  guids.ts          Caption→GUID recovery from the .ml binary (see mlo/ml-binary-format.md)
   store.ts          cached snapshot: export → parse → tree → GUID annotation
   write-pipeline.ts the file-replacement write (below)
   tools/*.ts        one declarative MloTool per file (shared.ts: contract +
@@ -63,7 +63,7 @@ lock (both) → [GUI running? close it gracefully] → fresh export → mutate p
 |---|---|---|
 | No parser needs; fields/parent/subtasks, or GUI open | **XML insert** via write pipeline | exact caption, fields, placement; subtree (`subtasks` outline) atomic |
 | Bare caption, no GUI running | `-AddSubtask` IPC | exact caption, top level, fast (no restart) |
-| NL date / urgency / parseText | `-Parse` | best-effort (see mlo-cli.md); result verified from a re-export and the task **relocated** if the GUI's selected row hijacked placement |
+| NL date / urgency / parseText | `-Parse` | best-effort (see mlo/mlo-cli.md); result verified from a re-export and the task **relocated** if the GUI's selected row hijacked placement |
 
 ## Error handling & safety conventions
 

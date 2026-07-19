@@ -12,7 +12,7 @@ to publish. It has two jobs:
   agent sessions exercise the demo tree instead of a real profile.
 
 `export.xml` is the reference `-saveXML` export of `profile.ml` — the
-ground-truth example of the XML schema documented in `docs/xml-format.md`.
+ground-truth example of the XML schema documented in `docs/mlo/xml-format.md`.
 `mcp-server/test/fixtures/export.xml` is a copy of it used by the unit tests.
 
 Some tests assert specific demo captions ("Business and Career",

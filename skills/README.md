@@ -70,6 +70,6 @@ focused on MLO/task-management wording. If your GTD differs structurally
 (different inbox location, no someday/maybe branch, starred-next-action policy),
 change the relevant Default line rather than fighting the process text.
 
-Background reading for extending them: [`../docs/mlo-task-model.md`](../docs/mlo-task-model.md)
+Background reading for extending them: [`../docs/mlo/mlo-task-model.md`](../docs/mlo/mlo-task-model.md)
 (MLO's task model and GTD concepts — outline vs. to-do list, computed priority,
 visibility flags) and the tool list in [`../mcp-server/README.md`](../mcp-server/README.md).

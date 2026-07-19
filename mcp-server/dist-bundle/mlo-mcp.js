@@ -26418,12 +26418,12 @@ var SyncObserver = class {
   /**
    * A CONNECT to the sync host means the app tunnels sync over TLS, so the
    * plain-HTTP observer sees nothing — that fact itself is the finding
-   * (docs/mitm-proxy.md covers TLS interception).
+   * (docs/mlo/mitm-proxy.md covers TLS interception).
    */
   recordConnect(host, port) {
     if (!this.announcedConnect) {
       this.announcedConnect = true;
-      log(`sync observer: HTTPS CONNECT to ${host}:${port} \u2014 vendor sync is TLS-tunneled; see docs/mitm-proxy.md`);
+      log(`sync observer: HTTPS CONNECT to ${host}:${port} \u2014 vendor sync is TLS-tunneled; see docs/mlo/mitm-proxy.md`);
     }
     this.append({ kind: "connect", target: `${host}:${port}` });
   }
