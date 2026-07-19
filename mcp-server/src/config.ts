@@ -19,6 +19,16 @@ const DEV_PROFILE = path.resolve(
   "profile.ml"
 );
 
+// Keep generated cloud messages out of profile/ and in one repo-local,
+// git-ignored directory. Packaged installs can override this as usual with
+// MLO_CLOUD_STATE_DIR.
+const DEV_CLOUD_STATE_DIR = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "messages"
+);
+
 function resolveDataFile(): string {
   if (process.env.MLO_DATA_FILE) return process.env.MLO_DATA_FILE;
   if (existsSync(DEV_PROFILE)) return DEV_PROFILE;
@@ -54,6 +64,6 @@ export function loadConfig(): MloConfig {
     inboxCaption: process.env.MLO_INBOX_CAPTION || undefined,
     cloudHost: process.env.MLO_CLOUD_HOST ?? "127.0.0.1",
     cloudPort,
-    cloudStateDir: process.env.MLO_CLOUD_STATE_DIR ?? `${dataFile}.mcp-cloud`,
+    cloudStateDir: process.env.MLO_CLOUD_STATE_DIR ?? DEV_CLOUD_STATE_DIR,
   };
 }

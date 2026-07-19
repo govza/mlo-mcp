@@ -13,6 +13,7 @@
     "test:unit": "vitest run --project unit",
     "test:mlo": "vitest run --project mlo",
     "tool": "tsx scripts/run-tool.ts",
+    "tools": "tsx scripts/tools.ts",
     "cloud": "tsx scripts/cloud-client.ts"
   },
   "dependencies": {

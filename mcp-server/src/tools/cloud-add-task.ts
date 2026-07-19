@@ -5,6 +5,32 @@ import { cursorToDecimalString } from "../cloud/cursor.js";
 import { quickSync } from "../mlo-cli.js";
 import { flatten } from "../task-tree.js";
 import { defineTool, nowIso, textResult } from "./shared.js";
+import type { TaskNode } from "../types.js";
+
+function matchesInput(task: TaskNode, caption: string, note: string | undefined): boolean {
+  return task.Caption === caption && (note === undefined || task.Note === note);
+}
+
+/**
+ * Verify an add by comparing exports from before and after QuickSync.
+ *
+ * MLO's binary GUID annotator is not reliable enough to be the sole check for
+ * a newly merged row, and captions are not unique. A count increase for the
+ * exact user-visible values proves that this session added another task even
+ * when an older task has the same caption.
+ */
+export function wasTaskAdded(
+  before: TaskNode[],
+  after: TaskNode[],
+  caption: string,
+  note: string | undefined,
+  queuedUid: string,
+): boolean {
+  const beforeMatches = flatten(before).filter((task) => matchesInput(task, caption, note));
+  const afterMatches = flatten(after).filter((task) => matchesInput(task, caption, note));
+  return afterMatches.some((task) => task.Guid?.toUpperCase() === queuedUid)
+    || afterMatches.length > beforeMatches.length;
+}
 
 export const cloudAddTaskTool = defineTool({
   name: "cloud_add_task",
@@ -27,6 +53,13 @@ export const cloudAddTaskTool = defineTool({
   async execute(args, ctx) {
     const uid = generateGuid();
     const timestamp = nowIso();
+    let beforeTasks: TaskNode[] | undefined;
+    try {
+      beforeTasks = (await ctx.store.getSnapshot(true)).tasks;
+    } catch {
+      // Queueing must remain available even if the pre-sync export fails. In
+      // that case verification falls back to the generated UID only.
+    }
     const delta = buildTaskAddDelta({
       uid,
       caption: args.caption,
@@ -45,10 +78,12 @@ export const cloudAddTaskTool = defineTool({
       ctx.store.invalidate();
       try {
         const snapshot = await ctx.store.getSnapshot(true);
-        verified = flatten(snapshot.tasks).some((task) => task.Caption === args.caption);
+        verified = beforeTasks
+          ? wasTaskAdded(beforeTasks, snapshot.tasks, args.caption, args.note, uid)
+          : flatten(snapshot.tasks).some((task) => task.Guid?.toUpperCase() === uid);
         message = verified
           ? "Task was queued and verified in a fresh MLO export."
-          : "Task was queued, but it was not present in the fresh export; the app may not yet be wired to this endpoint.";
+          : "Task was queued, but no newly added matching task was present in the fresh export after QuickSync.";
       } catch (error) {
         message = `Task was queued, but verification failed: ${error instanceof Error ? error.message : String(error)}`;
       }

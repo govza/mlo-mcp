@@ -3231,8 +3231,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path5) {
-      let input = path5;
+    function removeDotSegments(path6) {
+      let input = path6;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3484,8 +3484,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path5, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path5 && path5 !== "/" ? path5 : void 0;
+        const [path6, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path6 && path6 !== "/" ? path6 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -6878,12 +6878,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs5, exportName) {
+    function addFormats(ajv, list, fs6, exportName) {
       var _a2;
       var _b2;
       (_a2 = (_b2 = ajv.opts.code).formats) !== null && _a2 !== void 0 ? _a2 : _b2.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs5[f]);
+        ajv.addFormat(f, fs6[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -8530,7 +8530,7 @@ var require_XMLParser = __commonJS({
     var OrderedObjParser = require_OrderedObjParser();
     var { prettify } = require_node2json();
     var validator = require_validator();
-    var XMLParser2 = class {
+    var XMLParser3 = class {
       constructor(options) {
         this.externalEntities = {};
         this.options = buildOptions(options);
@@ -8577,7 +8577,7 @@ var require_XMLParser = __commonJS({
         }
       }
     };
-    module.exports = XMLParser2;
+    module.exports = XMLParser3;
   }
 });
 
@@ -8970,10 +8970,10 @@ var require_fxp = __commonJS({
   "node_modules/.pnpm/fast-xml-parser@4.5.7/node_modules/fast-xml-parser/src/fxp.js"(exports, module) {
     "use strict";
     var validator = require_validator();
-    var XMLParser2 = require_XMLParser();
+    var XMLParser3 = require_XMLParser();
     var XMLBuilder2 = require_json2xml();
     module.exports = {
-      XMLParser: XMLParser2,
+      XMLParser: XMLParser3,
       XMLValidator: validator,
       XMLBuilder: XMLBuilder2
     };
@@ -8981,7 +8981,7 @@ var require_fxp = __commonJS({
 });
 
 // src/index.ts
-import { promises as fs4 } from "node:fs";
+import { promises as fs5 } from "node:fs";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/external.js
@@ -9462,8 +9462,8 @@ function getErrorMap() {
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path5, errorMaps, issueData } = params;
-  const fullPath = [...path5, ...issueData.path || []];
+  const { data, path: path6, errorMaps, issueData } = params;
+  const fullPath = [...path6, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -9579,11 +9579,11 @@ var errorUtil;
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path5, key) {
+  constructor(parent, value, path6, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path5;
+    this._path = path6;
     this._key = key;
   }
   get path() {
@@ -13220,10 +13220,10 @@ function assignProp(target, prop, value) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path5) {
-  if (!path5)
+function getElementAtPath(obj, path6) {
+  if (!path6)
     return obj;
-  return path5.reduce((acc, key) => acc?.[key], obj);
+  return path6.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -13543,11 +13543,11 @@ function aborted(x2, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path5, issues) {
+function prefixIssues(path6, issues) {
   return issues.map((iss) => {
     var _a2;
     (_a2 = iss).path ?? (_a2.path = []);
-    iss.path.unshift(path5);
+    iss.path.unshift(path6);
     return iss;
   });
 }
@@ -14769,10 +14769,10 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
     const shape = def.shape;
     const propValues = {};
     for (const key in shape) {
-      const field = shape[key]._zod;
-      if (field.values) {
+      const field2 = shape[key]._zod;
+      if (field2.values) {
         propValues[key] ?? (propValues[key] = /* @__PURE__ */ new Set());
-        for (const v of field.values)
+        for (const v of field2.values)
           propValues[key].add(v);
       }
     }
@@ -22579,11 +22579,11 @@ var McpServer = class {
       return EMPTY_COMPLETION_RESULT;
     }
     const promptShape = getObjectShape(prompt.argsSchema);
-    const field = promptShape?.[request.params.argument.name];
-    if (!isCompletable(field)) {
+    const field2 = promptShape?.[request.params.argument.name];
+    if (!isCompletable(field2)) {
       return EMPTY_COMPLETION_RESULT;
     }
-    const completer = getCompleter(field);
+    const completer = getCompleter(field2);
     if (!completer) {
       return EMPTY_COMPLETION_RESULT;
     }
@@ -22856,8 +22856,8 @@ var McpServer = class {
     };
     this._registeredPrompts[name] = registeredPrompt;
     if (argsSchema) {
-      const hasCompletable = Object.values(argsSchema).some((field) => {
-        const inner = field instanceof ZodOptional ? field._def?.innerType : field;
+      const hasCompletable = Object.values(argsSchema).some((field2) => {
+        const inner = field2 instanceof ZodOptional ? field2._def?.innerType : field2;
         return isCompletable(inner);
       });
       if (hasCompletable) {
@@ -23066,9 +23066,9 @@ function promptArgumentsFromSchema(schema) {
   const shape = getObjectShape(schema);
   if (!shape)
     return [];
-  return Object.entries(shape).map(([name, field]) => {
-    const description = getSchemaDescription(field);
-    const isOptional = isSchemaOptional(field);
+  return Object.entries(shape).map(([name, field2]) => {
+    const description = getSchemaDescription(field2);
+    const isOptional = isSchemaOptional(field2);
     return {
       name,
       description,
@@ -23209,6 +23209,12 @@ var DEV_PROFILE = path.resolve(
   "profile",
   "profile.ml"
 );
+var DEV_CLOUD_STATE_DIR = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "messages"
+);
 function resolveDataFile() {
   if (process.env.MLO_DATA_FILE) return process.env.MLO_DATA_FILE;
   if (existsSync(DEV_PROFILE)) return DEV_PROFILE;
@@ -23240,7 +23246,7 @@ function loadConfig() {
     inboxCaption: process.env.MLO_INBOX_CAPTION || void 0,
     cloudHost: process.env.MLO_CLOUD_HOST ?? "127.0.0.1",
     cloudPort,
-    cloudStateDir: process.env.MLO_CLOUD_STATE_DIR ?? `${dataFile}.mcp-cloud`
+    cloudStateDir: process.env.MLO_CLOUD_STATE_DIR ?? DEV_CLOUD_STATE_DIR
   };
 }
 
@@ -23497,8 +23503,8 @@ function dropWhitespaceText(value) {
     for (const v of Object.values(obj)) dropWhitespaceText(v);
   }
 }
-function parseMloXml(xml) {
-  const doc = parser.parse(xml);
+function parseMloXml(xml2) {
+  const doc = parser.parse(xml2);
   const rootList = doc["MyLifeOrganized-xml"]?.TaskTree?.TaskNode;
   if (!rootList || rootList.length === 0) {
     throw new Error("not a MyLifeOrganized XML export: missing MyLifeOrganized-xml/TaskTree/TaskNode");
@@ -23564,7 +23570,7 @@ function num(v) {
   return v === void 0 || v === "" ? void 0 : Number(v);
 }
 function toModel(raw, id, parentPath, depth) {
-  const path5 = [...parentPath, raw["@_Caption"]];
+  const path6 = [...parentPath, raw["@_Caption"]];
   const node = {
     id,
     Guid: raw.IDD,
@@ -23590,10 +23596,10 @@ function toModel(raw, id, parentPath, depth) {
     CompleteSubTasksInOrder: delphiBool(raw.CompleteSubTasksInOrder),
     DependsOn: raw.Dependency?.UID ?? [],
     Children: [],
-    Path: path5,
+    Path: path6,
     Depth: depth
   };
-  node.Children = (raw.TaskNode ?? []).map((c, i2) => toModel(c, `${id}.${i2 + 1}`, path5, depth + 1));
+  node.Children = (raw.TaskNode ?? []).map((c, i2) => toModel(c, `${id}.${i2 + 1}`, path6, depth + 1));
   return node;
 }
 function buildTaskTree(doc) {
@@ -23791,8 +23797,8 @@ var MloStore = class {
     return this.pending;
   }
   async refresh() {
-    const xml = await exportXml(this.config);
-    const doc = parseMloXml(xml);
+    const xml2 = await exportXml(this.config);
+    const doc = parseMloXml(xml2);
     const tasks = buildTaskTree(doc);
     let guidCount = 0;
     try {
@@ -23800,7 +23806,7 @@ var MloStore = class {
     } catch (e) {
       log(`GUID extraction failed (continuing without GUIDs): ${e.message}`);
     }
-    this.snap = { xml, doc, tasks, guidCount, at: Date.now() };
+    this.snap = { xml: xml2, doc, tasks, guidCount, at: Date.now() };
     return this.snap;
   }
   invalidate() {
@@ -24743,7 +24749,7 @@ import { randomUUID as randomUUID2 } from "node:crypto";
 function parseRecords(input) {
   const records = [];
   let record2 = [];
-  let field = "";
+  let field2 = "";
   let quoted = false;
   let afterQuote = false;
   for (let i2 = 0; i2 < input.length; i2++) {
@@ -24751,45 +24757,45 @@ function parseRecords(input) {
     if (quoted) {
       if (ch === '"') {
         if (input[i2 + 1] === '"') {
-          field += '"';
+          field2 += '"';
           i2++;
         } else {
           quoted = false;
           afterQuote = true;
         }
-      } else field += ch;
+      } else field2 += ch;
       continue;
     }
     if (afterQuote) {
       if (ch === ",") {
-        record2.push(field);
-        field = "";
+        record2.push(field2);
+        field2 = "";
         afterQuote = false;
       } else if (ch === "\r" || ch === "\n") {
-        record2.push(field);
+        record2.push(field2);
         records.push(record2);
         record2 = [];
-        field = "";
+        field2 = "";
         afterQuote = false;
         if (ch === "\r" && input[i2 + 1] === "\n") i2++;
       } else throw new Error("invalid CSV character after closing quote");
     } else if (ch === '"') {
-      if (field.length) throw new Error("invalid quote in unquoted CSV field");
+      if (field2.length) throw new Error("invalid quote in unquoted CSV field");
       quoted = true;
     } else if (ch === ",") {
-      record2.push(field);
-      field = "";
+      record2.push(field2);
+      field2 = "";
     } else if (ch === "\r" || ch === "\n") {
-      record2.push(field);
+      record2.push(field2);
       records.push(record2);
       record2 = [];
-      field = "";
+      field2 = "";
       if (ch === "\r" && input[i2 + 1] === "\n") i2++;
-    } else field += ch;
+    } else field2 += ch;
   }
   if (quoted) throw new Error("unterminated quoted CSV field");
-  if (afterQuote || field.length || record2.length) {
-    record2.push(field);
+  if (afterQuote || field2.length || record2.length) {
+    record2.push(field2);
     records.push(record2);
   }
   return records;
@@ -24851,6 +24857,27 @@ var SECTION_HEADERS = [
   ["TodoItems.Deleted", ["TodoItemUID"]],
   ["TodoView.ManualOrdering.Starred", ["UID", "ItemIndex"]]
 ];
+var NEW_TASK_DEFAULTS = {
+  ItemIndex: "100",
+  Importance: "100",
+  Urgency: "100",
+  HideInToDo: "0",
+  HideInToDoThisTask: "0",
+  ScheduleType: "0",
+  EstimateMin: "0",
+  EstimateMax: "0",
+  ReviewEvery: "1",
+  ReviewRecurrenceType: "1",
+  CompleteInOrder: "0",
+  Effort: "50",
+  IsProject: "0",
+  ProjectStatus: "0",
+  DependOper: "0",
+  DependPostpone: "0",
+  GoalFor: "0",
+  Starred: "0",
+  ccUseCustomColorCoding: "0"
+};
 function createDeltaSkeleton() {
   return {
     sections: SECTION_HEADERS.map(([name, header]) => ({
@@ -24876,11 +24903,14 @@ function buildTaskAddDelta(input) {
   const set = (column, value) => {
     if (value !== void 0) row[TODO_ITEMS_HEADER.indexOf(column)] = value;
   };
+  for (const [column, value] of Object.entries(NEW_TASK_DEFAULTS)) set(column, value);
   set("UID", normalizeGuid(input.uid));
   set("ParentUID", input.parentUid ? normalizeGuid(input.parentUid) : "");
+  set("ItemIndex", input.itemIndex ?? NEW_TASK_DEFAULTS.ItemIndex);
   set("Caption", input.caption);
   set("DueDateTime", input.dueDateTime);
   set("StartDateTime", input.startDateTime);
+  if (input.dueDateTime || input.startDateTime) set("ScheduleType", "1");
   set("CreatedDate", input.createdDate);
   set("LastModified", input.lastModified);
   set("Note", input.note);
@@ -25972,6 +26002,14 @@ function parseCursor(value) {
 }
 
 // src/tools/cloud-add-task.ts
+function matchesInput(task, caption, note) {
+  return task.Caption === caption && (note === void 0 || task.Note === note);
+}
+function wasTaskAdded(before, after, caption, note, queuedUid) {
+  const beforeMatches = flatten(before).filter((task) => matchesInput(task, caption, note));
+  const afterMatches = flatten(after).filter((task) => matchesInput(task, caption, note));
+  return afterMatches.some((task) => task.Guid?.toUpperCase() === queuedUid) || afterMatches.length > beforeMatches.length;
+}
 var cloudAddTaskTool = defineTool({
   name: "cloud_add_task",
   title: "Add task through local cloud sync",
@@ -25993,6 +26031,11 @@ var cloudAddTaskTool = defineTool({
   async execute(args, ctx) {
     const uid = generateGuid();
     const timestamp = nowIso();
+    let beforeTasks;
+    try {
+      beforeTasks = (await ctx.store.getSnapshot(true)).tasks;
+    } catch {
+    }
     const delta = buildTaskAddDelta({
       uid,
       caption: args.caption,
@@ -26011,8 +26054,8 @@ var cloudAddTaskTool = defineTool({
       ctx.store.invalidate();
       try {
         const snapshot = await ctx.store.getSnapshot(true);
-        verified = flatten(snapshot.tasks).some((task) => task.Caption === args.caption);
-        message = verified ? "Task was queued and verified in a fresh MLO export." : "Task was queued, but it was not present in the fresh export; the app may not yet be wired to this endpoint.";
+        verified = beforeTasks ? wasTaskAdded(beforeTasks, snapshot.tasks, args.caption, args.note, uid) : flatten(snapshot.tasks).some((task) => task.Guid?.toUpperCase() === uid);
+        message = verified ? "Task was queued and verified in a fresh MLO export." : "Task was queued, but no newly added matching task was present in the fresh export after QuickSync.";
       } catch (error2) {
         message = `Task was queued, but verification failed: ${error2 instanceof Error ? error2.message : String(error2)}`;
       }
@@ -26079,17 +26122,17 @@ var CloudState = class {
     this.stateDir = stateDir;
   }
   stateDir;
-  loaded;
   cursor = ZERO_CURSOR;
   entries = [];
   lastPull = {};
   lastFinalized;
   chain = Promise.resolve();
-  ensureLoaded() {
-    return this.loaded ??= this.load();
-  }
   async load() {
     await fs3.mkdir(this.stateDir, { recursive: true });
+    this.cursor = ZERO_CURSOR;
+    this.entries = [];
+    this.lastPull = {};
+    this.lastFinalized = void 0;
     try {
       const parsed = JSON.parse(await fs3.readFile(path4.join(this.stateDir, "state.json"), "utf8"));
       this.cursor = parseCursor(parsed.highWater);
@@ -26101,16 +26144,61 @@ var CloudState = class {
       if (error2.code !== "ENOENT") throw error2;
     }
   }
+  async withStateLock(operation) {
+    const lockDir = path4.join(this.stateDir, ".state-lock");
+    const deadline = Date.now() + 1e4;
+    await fs3.mkdir(this.stateDir, { recursive: true });
+    for (; ; ) {
+      try {
+        await fs3.mkdir(lockDir);
+        break;
+      } catch (error2) {
+        if (error2.code !== "EEXIST") throw error2;
+        try {
+          const stat = await fs3.stat(lockDir);
+          if (Date.now() - stat.mtimeMs > 3e4) {
+            await fs3.rm(lockDir, { recursive: true, force: true });
+            continue;
+          }
+        } catch {
+          continue;
+        }
+        if (Date.now() >= deadline) throw new Error(`timed out waiting for cloud state lock: ${lockDir}`);
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+    }
+    try {
+      return await operation();
+    } finally {
+      await fs3.rm(lockDir, { recursive: true, force: true });
+    }
+  }
   serialize(operation) {
-    const next = this.chain.then(operation, operation);
+    const run = () => this.withStateLock(async () => {
+      await this.load();
+      return operation();
+    });
+    const next = this.chain.then(run, run);
+    this.chain = next.catch(() => void 0);
+    return next;
+  }
+  read(operation) {
+    const run = async () => {
+      await this.load();
+      return operation();
+    };
+    const next = this.chain.then(run, run);
     this.chain = next.catch(() => void 0);
     return next;
   }
   async append(origin, zipBytes) {
     return this.serialize(async () => {
-      await this.ensureLoaded();
-      const cursor = this.cursor + 1n;
-      const file = `delta-${cursorToDecimalString(cursor)}.zip`;
+      let cursor = this.cursor + 1n;
+      let file = `delta-${cursorToDecimalString(cursor)}.zip`;
+      while (await fs3.stat(path4.join(this.stateDir, file)).then(() => true, () => false)) {
+        cursor = cursor + 1n;
+        file = `delta-${cursorToDecimalString(cursor)}.zip`;
+      }
       await this.atomicWrite(path4.join(this.stateDir, file), zipBytes);
       this.cursor = cursor;
       this.entries.push({ cursor: cursorToDecimalString(cursor), origin, file });
@@ -26119,23 +26207,44 @@ var CloudState = class {
     });
   }
   async entriesAfter(cursor, excludeOrigin) {
-    await this.ensureLoaded();
-    const selected = this.entries.filter((entry) => parseCursor(entry.cursor) > cursor && entry.origin !== excludeOrigin);
-    return Promise.all(selected.map(async (entry) => ({
-      cursor: parseCursor(entry.cursor),
-      origin: entry.origin,
-      file: entry.file,
-      bytes: await fs3.readFile(path4.join(this.stateDir, entry.file))
-    })));
+    return this.read(async () => {
+      const selected = this.entries.filter((entry) => parseCursor(entry.cursor) > cursor && entry.origin !== excludeOrigin);
+      return Promise.all(selected.map(async (entry) => ({
+        cursor: parseCursor(entry.cursor),
+        origin: entry.origin,
+        file: entry.file,
+        bytes: await fs3.readFile(path4.join(this.stateDir, entry.file))
+      })));
+    });
   }
   async highWater() {
-    await this.ensureLoaded();
-    return this.cursor;
+    return this.read(() => this.cursor);
+  }
+  /**
+   * Adopt the cursor already stored by an MLO profile on its first local pull.
+   *
+   * A profile that previously used the vendor service can arrive with a cursor
+   * far above a fresh local state's zero. Pending local entries must be moved
+   * above that baseline or MLO will consider them old. Entry filenames are
+   * intentionally left unchanged; the index is authoritative and this keeps
+   * the rebase atomic with the state-file write.
+   */
+  async adoptInitialBaseline(origin, baseline) {
+    await this.serialize(async () => {
+      if (baseline <= this.cursor) return;
+      if (this.lastPull[origin] !== void 0 || this.entries.some((entry) => entry.origin === origin)) {
+        throw new Error("client cursor is newer than an initialized local cloud state");
+      }
+      for (const entry of this.entries) {
+        entry.cursor = cursorToDecimalString(parseCursor(entry.cursor) + baseline);
+      }
+      this.cursor = this.cursor + baseline;
+      await this.writeState();
+    });
   }
   /** Record the cursor an origin accepted from a pull (only ever advances). */
   async recordPull(origin, cursor) {
     await this.serialize(async () => {
-      await this.ensureLoaded();
       const previous = this.lastPull[origin];
       if (previous !== void 0 && parseCursor(previous) >= cursor) return;
       this.lastPull[origin] = cursorToDecimalString(cursor);
@@ -26143,32 +26252,33 @@ var CloudState = class {
     });
   }
   async lastPullCursor(origin) {
-    await this.ensureLoaded();
-    const value = this.lastPull[origin];
-    return value === void 0 ? ZERO_CURSOR : parseCursor(value);
+    return this.read(() => {
+      const value = this.lastPull[origin];
+      return value === void 0 ? ZERO_CURSOR : parseCursor(value);
+    });
   }
   /** Entries authored by others that `origin` has not pulled yet. */
   async pendingFor(origin) {
-    return (await this.entriesAfter(await this.lastPullCursor(origin), origin)).length;
+    return this.read(() => {
+      const value = this.lastPull[origin];
+      const cursor = value === void 0 ? ZERO_CURSOR : parseCursor(value);
+      return this.entries.filter((entry) => parseCursor(entry.cursor) > cursor && entry.origin !== origin).length;
+    });
   }
   async counts() {
-    await this.ensureLoaded();
-    return {
+    return this.read(() => ({
       mcp: this.entries.filter((entry) => entry.origin === "mcp").length,
       app: this.entries.filter((entry) => entry.origin === "app").length
-    };
+    }));
   }
   async finalize() {
     await this.serialize(async () => {
-      await this.ensureLoaded();
       this.lastFinalized = (/* @__PURE__ */ new Date()).toISOString();
       await this.writeState();
     });
   }
   async flush() {
-    await this.chain;
-    await this.ensureLoaded();
-    await this.writeState();
+    await this.serialize(() => this.writeState());
   }
   async writeState() {
     const value = {
@@ -26191,12 +26301,286 @@ var CloudState = class {
 import http from "node:http";
 import https from "node:https";
 import net from "node:net";
+
+// src/cloud/sync-observer.ts
+import { promises as fs4 } from "node:fs";
+import path5 from "node:path";
+import zlib from "node:zlib";
+var VENDOR_SYNC_HOST = "sync.mylifeorganized.net";
+var SUMMARY_FILE = "soap-summary.jsonl";
+var SENSITIVE = /pass|credential|token|secret|session|cookie|email|user|login/i;
+var BODY = /<(?:[\w.-]+:)?Body(?:\s[^>]*)?>([\s\S]*?)<\/(?:[\w.-]+:)?Body\s*>/i;
+var TAG = /<(?!\/)(?:[\w.-]+:)?([\w.-]+)(?:\s[^>]*)?>/gi;
+var CAPTURE_LIMIT = 4 * 1024 * 1024;
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function operationShape(xml2) {
+  const body = BODY.exec(xml2)?.[1] ?? "";
+  const first = body.matchAll(TAG).next().value;
+  if (!first) return { operation: "<unknown>", fields: [] };
+  const operation = first[1];
+  const rest = body.slice(first.index + first[0].length);
+  const close = new RegExp(`</(?:[\\w.-]+:)?${escapeRegExp(operation)}\\s*>`, "i").exec(rest);
+  const inner = close ? rest.slice(0, close.index) : rest;
+  const fields = [];
+  for (const match of inner.matchAll(TAG)) if (!fields.includes(match[1])) fields.push(match[1]);
+  return { operation, fields };
+}
+function maskSensitiveField(field2) {
+  return SENSITIVE.test(field2) ? "<sensitive-field>" : field2;
+}
+function decodeBody(chunks, contentEncoding) {
+  const raw = Buffer.concat(chunks);
+  try {
+    const encoding = (contentEncoding ?? "").toLowerCase();
+    if (encoding.includes("gzip")) return zlib.gunzipSync(raw).toString("utf8");
+    if (encoding.includes("deflate")) {
+      try {
+        return zlib.inflateSync(raw).toString("utf8");
+      } catch {
+        return zlib.inflateRawSync(raw).toString("utf8");
+      }
+    }
+    return raw.toString("utf8");
+  } catch {
+    return "";
+  }
+}
+var SyncExchange = class {
+  constructor(observer, method, url, requestHeaders) {
+    this.observer = observer;
+    this.method = method;
+    this.url = url;
+    this.requestHeaders = requestHeaders;
+  }
+  observer;
+  method;
+  url;
+  requestHeaders;
+  requestChunks = [];
+  responseChunks = [];
+  requestSize = 0;
+  responseSize = 0;
+  truncated = false;
+  add(chunks, size, chunk) {
+    if (size + chunk.length > CAPTURE_LIMIT) {
+      this.truncated = true;
+      return size;
+    }
+    chunks.push(chunk);
+    return size + chunk.length;
+  }
+  addRequestChunk(chunk) {
+    this.requestSize = this.add(this.requestChunks, this.requestSize, chunk);
+  }
+  addResponseChunk(chunk) {
+    this.responseSize = this.add(this.responseChunks, this.responseSize, chunk);
+  }
+  finish(status, responseHeaders) {
+    const contentType = responseHeaders["content-type"] ?? "";
+    if (contentType.includes("xml")) {
+      const request = operationShape(decodeBody(this.requestChunks, this.requestHeaders["content-encoding"]));
+      const response = operationShape(decodeBody(this.responseChunks, responseHeaders["content-encoding"]));
+      this.observer.append({
+        kind: "soap",
+        operation: request.operation,
+        soapAction: String(this.requestHeaders.soapaction ?? "").replace(/^"|"$/g, ""),
+        requestFields: request.fields,
+        status,
+        responseOperation: response.operation,
+        responseFields: response.fields.map(maskSensitiveField),
+        ...this.truncated ? { truncated: true } : {}
+      });
+    } else {
+      this.observer.append({
+        kind: "http",
+        method: this.method,
+        path: this.url.pathname,
+        ...this.url.search ? { queryKeys: [...this.url.searchParams.keys()] } : {},
+        status,
+        contentType
+      });
+    }
+  }
+};
+var SyncObserver = class {
+  constructor(stateDir, host = VENDOR_SYNC_HOST) {
+    this.stateDir = stateDir;
+    this.host = host;
+  }
+  stateDir;
+  host;
+  announcedConnect = false;
+  matches(hostname2) {
+    return hostname2.toLowerCase() === this.host.toLowerCase();
+  }
+  /**
+   * A CONNECT to the sync host means the app tunnels sync over TLS, so the
+   * plain-HTTP observer sees nothing — that fact itself is the finding
+   * (docs/mitm-proxy.md covers TLS interception).
+   */
+  recordConnect(host, port) {
+    if (!this.announcedConnect) {
+      this.announcedConnect = true;
+      log(`sync observer: HTTPS CONNECT to ${host}:${port} \u2014 vendor sync is TLS-tunneled; see docs/mitm-proxy.md`);
+    }
+    this.append({ kind: "connect", target: `${host}:${port}` });
+  }
+  begin(method, url, requestHeaders) {
+    return new SyncExchange(this, method, url, requestHeaders);
+  }
+  append(record2) {
+    const line = `${JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), ...record2 })}
+`;
+    void fs4.mkdir(this.stateDir, { recursive: true }).then(() => fs4.appendFile(path5.join(this.stateDir, SUMMARY_FILE), line)).catch((error2) => log(`sync observer write failed: ${error2 instanceof Error ? error2.message : String(error2)}`));
+  }
+};
+
+// src/cloud/soap.ts
+var import_fast_xml_parser2 = __toESM(require_fxp(), 1);
+var SOAP_NAMESPACE = "http://schemas.xmlsoap.org/soap/envelope/";
+var MLO_NAMESPACE = "http://www.mylifeorganized.net/";
+var SOAP_OPERATIONS = [
+  "GetModificationsBytesEx",
+  "ApplyModificationsBytesEx",
+  "ReleaseSyncSessionBytes"
+];
+var OPERATIONS = new Set(SOAP_OPERATIONS);
+var parser2 = new import_fast_xml_parser2.XMLParser({
+  removeNSPrefix: true,
+  ignoreAttributes: true,
+  parseTagValue: false,
+  trimValues: true,
+  processEntities: true
+});
+function escapeXml(value) {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;");
+}
+function envelope(operation, fields) {
+  const xml2 = `<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="${SOAP_NAMESPACE}"><soap:Body><${operation}Response xmlns="${MLO_NAMESPACE}">${fields}</${operation}Response></soap:Body></soap:Envelope>`;
+  return new TextEncoder().encode(xml2);
+}
+function field(name, value) {
+  return `<${name}>${escapeXml(value)}</${name}>`;
+}
+function successFields(operation, extra = "") {
+  return field(`${operation}Result`, "true") + extra;
+}
+function failureFields(operation, error2, extra = "") {
+  return field(`${operation}Result`, "false") + field("errorMessage", error2) + extra;
+}
+function parseFields(xml2, expected) {
+  const document = parser2.parse(xml2);
+  const envelopeNode = document.Envelope;
+  if (!envelopeNode || typeof envelopeNode !== "object") throw new Error("SOAP Envelope is missing");
+  const body = envelopeNode.Body;
+  if (!body || typeof body !== "object") throw new Error("SOAP Body is missing");
+  const operation = body[expected];
+  if (operation === void 0) throw new Error(`SOAP Body does not contain ${expected}`);
+  if (operation === "") return {};
+  if (!operation || typeof operation !== "object" || Array.isArray(operation)) {
+    throw new Error(`${expected} fields are invalid`);
+  }
+  return operation;
+}
+function requiredText(fields, name) {
+  const value = fields[name];
+  if (typeof value !== "string" || value.length === 0) throw new Error(`${name} is required`);
+  return value;
+}
+function decodeBase64(value) {
+  const compact = value.replace(/\s+/g, "");
+  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(compact)) {
+    throw new Error("data must be valid base64");
+  }
+  return Buffer.from(compact, "base64");
+}
+function prepareMcpDeltaForMlo(document) {
+  const tasks = findSection(document, "TodoItems");
+  if (tasks) {
+    for (const [column, value] of Object.entries(NEW_TASK_DEFAULTS)) {
+      const index = tasks.header.indexOf(column);
+      if (index >= 0) {
+        for (const row of tasks.rows) if (!row[index]) row[index] = value;
+      }
+    }
+  }
+  return document;
+}
+function soapOperationFromAction(action) {
+  const value = Array.isArray(action) ? action[0] : action;
+  if (!value) return void 0;
+  const normalized = value.trim().replace(/^"|"$/g, "");
+  const name = normalized.slice(normalized.lastIndexOf("/") + 1);
+  return OPERATIONS.has(name) ? name : void 0;
+}
+async function handleSoapOperation(state, operation, xml2) {
+  const fields = parseFields(xml2, operation);
+  if (operation === "GetModificationsBytesEx") {
+    const baseline = parseCursor(requiredText(fields, "newerThan"));
+    await state.adoptInitialBaseline("app", baseline);
+    const entries = await state.entriesAfter(baseline, "app");
+    const cursor = entries.length ? entries.at(-1).cursor : await state.highWater();
+    await state.recordPull("app", cursor);
+    const documents = entries.map((entry) => {
+      const document2 = unpackEnvelope(entry.bytes);
+      return entry.origin === "mcp" ? prepareMcpDeltaForMlo(document2) : document2;
+    });
+    const document = entries.length ? mergeDeltas(documents) : mergeDeltas([]);
+    const data = field("data", Buffer.from(packEnvelope(document)).toString("base64"));
+    return envelope(operation, successFields(operation, field("maxVersion", cursorToDecimalString(cursor)) + data));
+  }
+  if (operation === "ApplyModificationsBytesEx") {
+    const baseline = parseCursor(requiredText(fields, "lastSyncTimestamp"));
+    await state.adoptInitialBaseline("app", baseline);
+    const highWater = await state.highWater();
+    if (baseline > highWater) {
+      return envelope(operation, failureFields(
+        operation,
+        "lastSyncTimestamp is newer than the server high-water cursor",
+        field("newServerTimeStamp", cursorToDecimalString(highWater))
+      ));
+    }
+    const encoded = fields.data;
+    if (encoded !== void 0 && typeof encoded !== "string") {
+      return envelope(operation, failureFields(
+        operation,
+        "data must be base64 text",
+        field("newServerTimeStamp", cursorToDecimalString(highWater))
+      ));
+    }
+    let cursor = highWater;
+    if (encoded) {
+      try {
+        const bytes = decodeBase64(encoded);
+        unpackEnvelope(bytes);
+        cursor = await state.append("app", bytes);
+      } catch (error2) {
+        return envelope(operation, failureFields(
+          operation,
+          error2 instanceof Error ? error2.message : String(error2),
+          field("newServerTimeStamp", cursorToDecimalString(highWater))
+        ));
+      }
+    }
+    return envelope(operation, successFields(operation, field("newServerTimeStamp", cursorToDecimalString(cursor))));
+  }
+  await state.finalize();
+  return envelope(operation, successFields(operation));
+}
+function soapFault(message) {
+  const xml2 = `<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="${SOAP_NAMESPACE}"><soap:Body><soap:Fault>` + field("faultcode", "soap:Client") + field("faultstring", message) + `</soap:Fault></soap:Body></soap:Envelope>`;
+  return new TextEncoder().encode(xml2);
+}
+
+// src/cloud/server.ts
 var BODY_LIMIT = 32 * 1024 * 1024;
 function json(response, status, body) {
   response.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   response.end(JSON.stringify(body));
 }
-async function readJson(request) {
+async function readBytes(request) {
   const chunks = [];
   let size = 0;
   for await (const chunk of request) {
@@ -26205,13 +26589,24 @@ async function readJson(request) {
     if (size > BODY_LIMIT) throw Object.assign(new Error("request body exceeds 32 MiB"), { status: 413 });
     chunks.push(bytes);
   }
+  return Buffer.concat(chunks);
+}
+async function readJson(request) {
+  const bytes = await readBytes(request);
   try {
-    const value = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    const value = JSON.parse(bytes.toString("utf8"));
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error();
     return value;
   } catch {
     throw Object.assign(new Error("request body must be a JSON object"), { status: 400 });
   }
+}
+function xml(response, status, body) {
+  response.writeHead(status, {
+    "content-type": "text/xml; charset=utf-8",
+    "content-length": body.byteLength
+  });
+  response.end(body);
 }
 function requiredString(body, name) {
   if (typeof body[name] !== "string") throw Object.assign(new Error(`${name} must be a string`), { status: 400 });
@@ -26229,7 +26624,34 @@ function clientOrigin(client) {
 function isAbsoluteRequestTarget(target) {
   return /^https?:\/\//i.test(target);
 }
-function forwardRequest(request, response) {
+async function interceptVendorSoap(request, response, state, observer) {
+  if (request.method !== "POST") return false;
+  let target;
+  try {
+    target = new URL(request.url ?? "");
+  } catch {
+    return false;
+  }
+  if (!observer.matches(target.hostname) || !/\/MLOInetSync\.asmx$/i.test(target.pathname)) return false;
+  const operation = soapOperationFromAction(request.headers.soapaction);
+  if (!operation) return false;
+  const requestBytes = await readBytes(request);
+  const exchange = observer.begin(request.method, target, request.headers);
+  exchange.addRequestChunk(requestBytes);
+  let responseBytes;
+  let status = 200;
+  try {
+    responseBytes = await handleSoapOperation(state, operation, requestBytes.toString("utf8"));
+  } catch (error2) {
+    status = 500;
+    responseBytes = soapFault(error2 instanceof Error ? error2.message : String(error2));
+  }
+  exchange.addResponseChunk(Buffer.from(responseBytes));
+  exchange.finish(status, { "content-type": "text/xml; charset=utf-8" });
+  xml(response, status, responseBytes);
+  return true;
+}
+function forwardRequest(request, response, observer) {
   let target;
   try {
     target = new URL(request.url ?? "");
@@ -26242,10 +26664,15 @@ function forwardRequest(request, response) {
     json(response, 400, { error: "unsupported proxy protocol" });
     return;
   }
+  const exchange = observer.matches(target.hostname) ? observer.begin(request.method ?? "GET", target, request.headers) : void 0;
   const headers = { ...request.headers, host: target.host };
   delete headers["proxy-connection"];
   const upstream = transport.request(target, { method: request.method, headers }, (upstreamResponse) => {
     response.writeHead(upstreamResponse.statusCode ?? 502, upstreamResponse.statusMessage, upstreamResponse.headers);
+    if (exchange) {
+      upstreamResponse.on("data", (chunk) => exchange.addResponseChunk(chunk));
+      upstreamResponse.on("end", () => exchange.finish(upstreamResponse.statusCode, upstreamResponse.headers));
+    }
     upstreamResponse.pipe(response);
   });
   upstream.on("error", (error2) => {
@@ -26253,9 +26680,10 @@ function forwardRequest(request, response) {
     else response.destroy(error2);
   });
   request.on("aborted", () => upstream.destroy());
+  if (exchange) request.on("data", (chunk) => exchange.addRequestChunk(chunk));
   request.pipe(upstream);
 }
-function tunnelConnect(request, client, head) {
+function tunnelConnect(request, client, head, observer) {
   const separator = (request.url ?? "").lastIndexOf(":");
   const host = separator > 0 ? request.url.slice(0, separator) : "";
   const port = Number(separator > 0 ? request.url.slice(separator + 1) : "");
@@ -26263,6 +26691,7 @@ function tunnelConnect(request, client, head) {
     client.end("HTTP/1.1 400 Bad Request\r\n\r\n");
     return;
   }
+  if (observer.matches(host)) observer.recordConnect(host, port);
   const upstream = net.connect(port, host);
   upstream.once("connect", () => {
     client.write("HTTP/1.1 200 Connection Established\r\n\r\n");
@@ -26275,11 +26704,16 @@ function tunnelConnect(request, client, head) {
 }
 async function startCloudServer(options) {
   const host = options.host ?? "127.0.0.1";
+  if (host !== "localhost" && host !== "::1" && !/^127(?:\.\d{1,3}){3}$/.test(host)) {
+    throw new Error(`MLO cloud server must bind to a loopback host (received "${host}")`);
+  }
   const state = options.state ?? new CloudState(options.stateDir);
+  const observer = new SyncObserver(options.stateDir, options.observeHost);
   const server = http.createServer(async (request, response) => {
     try {
       if (isAbsoluteRequestTarget(request.url ?? "")) {
-        forwardRequest(request, response);
+        if (await interceptVendorSoap(request, response, state, observer)) return;
+        forwardRequest(request, response, observer);
         return;
       }
       const url = new URL(request.url ?? "/", "http://localhost");
@@ -26340,7 +26774,7 @@ async function startCloudServer(options) {
       json(response, status, { error: error2 instanceof Error ? error2.message : String(error2) });
     }
   });
-  server.on("connect", tunnelConnect);
+  server.on("connect", (request, socket, head) => tunnelConnect(request, socket, head, observer));
   await new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(options.port ?? 8080, host, () => {
@@ -26425,7 +26859,7 @@ function watchOwnBuild(cloudServer) {
   let startMtime;
   const timer = setInterval(async () => {
     try {
-      const mtime = (await fs4.stat(entry)).mtimeMs;
+      const mtime = (await fs5.stat(entry)).mtimeMs;
       startMtime ??= mtime;
       if (mtime !== startMtime && !isMloBusy()) {
         log("server build changed on disk \u2014 exiting so the client restarts the new version");

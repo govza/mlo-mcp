@@ -5,6 +5,8 @@ import { cursorToDecimalString, parseCursor } from "./cursor.js";
 import { mergeDeltas } from "./delta.js";
 import { packEnvelope, unpackEnvelope } from "./envelope.js";
 import { CloudState, type DeltaOrigin } from "./state.js";
+import { SyncObserver } from "./sync-observer.js";
+import { handleSoapOperation, soapFault, soapOperationFromAction } from "./soap.js";
 import { log } from "../log.js";
 
 const BODY_LIMIT = 32 * 1024 * 1024;
@@ -14,6 +16,8 @@ export interface CloudServerOptions {
   port?: number;
   stateDir: string;
   state?: CloudState;
+  /** Hostname whose proxied traffic is structurally summarized (tests override the vendor default). */
+  observeHost?: string;
 }
 
 export interface CloudServerHandle {
@@ -29,7 +33,7 @@ function json(response: ServerResponse, status: number, body: unknown): void {
   response.end(JSON.stringify(body));
 }
 
-async function readJson(request: IncomingMessage): Promise<Record<string, unknown>> {
+async function readBytes(request: IncomingMessage): Promise<Buffer> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of request) {
@@ -38,13 +42,26 @@ async function readJson(request: IncomingMessage): Promise<Record<string, unknow
     if (size > BODY_LIMIT) throw Object.assign(new Error("request body exceeds 32 MiB"), { status: 413 });
     chunks.push(bytes);
   }
+  return Buffer.concat(chunks);
+}
+
+async function readJson(request: IncomingMessage): Promise<Record<string, unknown>> {
+  const bytes = await readBytes(request);
   try {
-    const value = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    const value = JSON.parse(bytes.toString("utf8"));
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error();
     return value as Record<string, unknown>;
   } catch {
     throw Object.assign(new Error("request body must be a JSON object"), { status: 400 });
   }
+}
+
+function xml(response: ServerResponse, status: number, body: Uint8Array): void {
+  response.writeHead(status, {
+    "content-type": "text/xml; charset=utf-8",
+    "content-length": body.byteLength,
+  });
+  response.end(body);
 }
 
 function requiredString(body: Record<string, unknown>, name: string): string {
@@ -67,7 +84,38 @@ function isAbsoluteRequestTarget(target: string): boolean {
   return /^https?:\/\//i.test(target);
 }
 
-function forwardRequest(request: IncomingMessage, response: ServerResponse): void {
+async function interceptVendorSoap(
+  request: IncomingMessage,
+  response: ServerResponse,
+  state: CloudState,
+  observer: SyncObserver,
+): Promise<boolean> {
+  if (request.method !== "POST") return false;
+  let target: URL;
+  try { target = new URL(request.url ?? ""); }
+  catch { return false; }
+  if (!observer.matches(target.hostname) || !/\/MLOInetSync\.asmx$/i.test(target.pathname)) return false;
+  const operation = soapOperationFromAction(request.headers.soapaction);
+  if (!operation) return false;
+
+  const requestBytes = await readBytes(request);
+  const exchange = observer.begin(request.method, target, request.headers);
+  exchange.addRequestChunk(requestBytes);
+  let responseBytes: Uint8Array;
+  let status = 200;
+  try {
+    responseBytes = await handleSoapOperation(state, operation, requestBytes.toString("utf8"));
+  } catch (error) {
+    status = 500;
+    responseBytes = soapFault(error instanceof Error ? error.message : String(error));
+  }
+  exchange.addResponseChunk(Buffer.from(responseBytes));
+  exchange.finish(status, { "content-type": "text/xml; charset=utf-8" });
+  xml(response, status, responseBytes);
+  return true;
+}
+
+function forwardRequest(request: IncomingMessage, response: ServerResponse, observer: SyncObserver): void {
   let target: URL;
   try {
     target = new URL(request.url ?? "");
@@ -80,10 +128,17 @@ function forwardRequest(request: IncomingMessage, response: ServerResponse): voi
     json(response, 400, { error: "unsupported proxy protocol" });
     return;
   }
+  const exchange = observer.matches(target.hostname)
+    ? observer.begin(request.method ?? "GET", target, request.headers)
+    : undefined;
   const headers: http.OutgoingHttpHeaders = { ...request.headers, host: target.host };
   delete headers["proxy-connection"];
   const upstream = transport.request(target, { method: request.method, headers }, (upstreamResponse) => {
     response.writeHead(upstreamResponse.statusCode ?? 502, upstreamResponse.statusMessage, upstreamResponse.headers);
+    if (exchange) {
+      upstreamResponse.on("data", (chunk: Buffer) => exchange.addResponseChunk(chunk));
+      upstreamResponse.on("end", () => exchange.finish(upstreamResponse.statusCode, upstreamResponse.headers));
+    }
     upstreamResponse.pipe(response);
   });
   upstream.on("error", (error) => {
@@ -91,10 +146,11 @@ function forwardRequest(request: IncomingMessage, response: ServerResponse): voi
     else response.destroy(error);
   });
   request.on("aborted", () => upstream.destroy());
+  if (exchange) request.on("data", (chunk: Buffer) => exchange.addRequestChunk(chunk));
   request.pipe(upstream);
 }
 
-function tunnelConnect(request: IncomingMessage, client: net.Socket, head: Buffer): void {
+function tunnelConnect(request: IncomingMessage, client: net.Socket, head: Buffer, observer: SyncObserver): void {
   const separator = (request.url ?? "").lastIndexOf(":");
   const host = separator > 0 ? request.url!.slice(0, separator) : "";
   const port = Number(separator > 0 ? request.url!.slice(separator + 1) : "");
@@ -102,6 +158,7 @@ function tunnelConnect(request: IncomingMessage, client: net.Socket, head: Buffe
     client.end("HTTP/1.1 400 Bad Request\r\n\r\n");
     return;
   }
+  if (observer.matches(host)) observer.recordConnect(host, port);
   const upstream = net.connect(port, host);
   upstream.once("connect", () => {
     client.write("HTTP/1.1 200 Connection Established\r\n\r\n");
@@ -115,11 +172,16 @@ function tunnelConnect(request: IncomingMessage, client: net.Socket, head: Buffe
 
 export async function startCloudServer(options: CloudServerOptions): Promise<CloudServerHandle> {
   const host = options.host ?? "127.0.0.1";
+  if (host !== "localhost" && host !== "::1" && !/^127(?:\.\d{1,3}){3}$/.test(host)) {
+    throw new Error(`MLO cloud server must bind to a loopback host (received "${host}")`);
+  }
   const state = options.state ?? new CloudState(options.stateDir);
+  const observer = new SyncObserver(options.stateDir, options.observeHost);
   const server = http.createServer(async (request, response) => {
     try {
       if (isAbsoluteRequestTarget(request.url ?? "")) {
-        forwardRequest(request, response);
+        if (await interceptVendorSoap(request, response, state, observer)) return;
+        forwardRequest(request, response, observer);
         return;
       }
       const url = new URL(request.url ?? "/", "http://localhost");
@@ -175,7 +237,7 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
       json(response, status, { error: error instanceof Error ? error.message : String(error) });
     }
   });
-  server.on("connect", tunnelConnect);
+  server.on("connect", (request, socket, head) => tunnelConnect(request, socket as net.Socket, head, observer));
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
     server.listen(options.port ?? 8080, host, () => { server.off("error", reject); resolve(); });

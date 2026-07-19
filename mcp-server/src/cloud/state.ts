@@ -21,7 +21,6 @@ interface StateFile {
 }
 
 export class CloudState {
-  private loaded?: Promise<void>;
   private cursor: CloudCursor = ZERO_CURSOR;
   private entries: StateIndexEntry[] = [];
   private lastPull: Partial<Record<DeltaOrigin, string>> = {};
@@ -30,12 +29,12 @@ export class CloudState {
 
   constructor(readonly stateDir: string) {}
 
-  private ensureLoaded(): Promise<void> {
-    return this.loaded ??= this.load();
-  }
-
   private async load(): Promise<void> {
     await fs.mkdir(this.stateDir, { recursive: true });
+    this.cursor = ZERO_CURSOR;
+    this.entries = [];
+    this.lastPull = {};
+    this.lastFinalized = undefined;
     try {
       const parsed = JSON.parse(await fs.readFile(path.join(this.stateDir, "state.json"), "utf8")) as StateFile;
       this.cursor = parseCursor(parsed.highWater);
@@ -48,17 +47,61 @@ export class CloudState {
     }
   }
 
+  private async withStateLock<T>(operation: () => Promise<T>): Promise<T> {
+    const lockDir = path.join(this.stateDir, ".state-lock");
+    const deadline = Date.now() + 10_000;
+    await fs.mkdir(this.stateDir, { recursive: true });
+    for (;;) {
+      try {
+        await fs.mkdir(lockDir);
+        break;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+        try {
+          const stat = await fs.stat(lockDir);
+          if (Date.now() - stat.mtimeMs > 30_000) {
+            await fs.rm(lockDir, { recursive: true, force: true });
+            continue;
+          }
+        } catch {
+          continue;
+        }
+        if (Date.now() >= deadline) throw new Error(`timed out waiting for cloud state lock: ${lockDir}`);
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+    }
+    try { return await operation(); }
+    finally { await fs.rm(lockDir, { recursive: true, force: true }); }
+  }
+
   private serialize<T>(operation: () => Promise<T>): Promise<T> {
-    const next = this.chain.then(operation, operation);
+    const run = () => this.withStateLock(async () => {
+      await this.load();
+      return operation();
+    });
+    const next = this.chain.then(run, run);
+    this.chain = next.catch(() => undefined);
+    return next;
+  }
+
+  private read<T>(operation: () => Promise<T> | T): Promise<T> {
+    const run = async () => {
+      await this.load();
+      return operation();
+    };
+    const next = this.chain.then(run, run);
     this.chain = next.catch(() => undefined);
     return next;
   }
 
   async append(origin: DeltaOrigin, zipBytes: Uint8Array): Promise<CloudCursor> {
     return this.serialize(async () => {
-      await this.ensureLoaded();
-      const cursor = (this.cursor + 1n) as CloudCursor;
-      const file = `delta-${cursorToDecimalString(cursor)}.zip`;
+      let cursor = (this.cursor + 1n) as CloudCursor;
+      let file = `delta-${cursorToDecimalString(cursor)}.zip`;
+      while (await fs.stat(path.join(this.stateDir, file)).then(() => true, () => false)) {
+        cursor = (cursor + 1n) as CloudCursor;
+        file = `delta-${cursorToDecimalString(cursor)}.zip`;
+      }
       await this.atomicWrite(path.join(this.stateDir, file), zipBytes);
       this.cursor = cursor;
       this.entries.push({ cursor: cursorToDecimalString(cursor), origin, file });
@@ -68,25 +111,47 @@ export class CloudState {
   }
 
   async entriesAfter(cursor: CloudCursor, excludeOrigin?: DeltaOrigin): Promise<DeltaEntry[]> {
-    await this.ensureLoaded();
-    const selected = this.entries.filter((entry) => parseCursor(entry.cursor) > cursor && entry.origin !== excludeOrigin);
-    return Promise.all(selected.map(async (entry) => ({
-      cursor: parseCursor(entry.cursor),
-      origin: entry.origin,
-      file: entry.file,
-      bytes: await fs.readFile(path.join(this.stateDir, entry.file)),
-    })));
+    return this.read(async () => {
+      const selected = this.entries.filter((entry) => parseCursor(entry.cursor) > cursor && entry.origin !== excludeOrigin);
+      return Promise.all(selected.map(async (entry) => ({
+        cursor: parseCursor(entry.cursor),
+        origin: entry.origin,
+        file: entry.file,
+        bytes: await fs.readFile(path.join(this.stateDir, entry.file)),
+      })));
+    });
   }
 
   async highWater(): Promise<CloudCursor> {
-    await this.ensureLoaded();
-    return this.cursor;
+    return this.read(() => this.cursor);
+  }
+
+  /**
+   * Adopt the cursor already stored by an MLO profile on its first local pull.
+   *
+   * A profile that previously used the vendor service can arrive with a cursor
+   * far above a fresh local state's zero. Pending local entries must be moved
+   * above that baseline or MLO will consider them old. Entry filenames are
+   * intentionally left unchanged; the index is authoritative and this keeps
+   * the rebase atomic with the state-file write.
+   */
+  async adoptInitialBaseline(origin: DeltaOrigin, baseline: CloudCursor): Promise<void> {
+    await this.serialize(async () => {
+      if (baseline <= this.cursor) return;
+      if (this.lastPull[origin] !== undefined || this.entries.some((entry) => entry.origin === origin)) {
+        throw new Error("client cursor is newer than an initialized local cloud state");
+      }
+      for (const entry of this.entries) {
+        entry.cursor = cursorToDecimalString((parseCursor(entry.cursor) + baseline) as CloudCursor);
+      }
+      this.cursor = (this.cursor + baseline) as CloudCursor;
+      await this.writeState();
+    });
   }
 
   /** Record the cursor an origin accepted from a pull (only ever advances). */
   async recordPull(origin: DeltaOrigin, cursor: CloudCursor): Promise<void> {
     await this.serialize(async () => {
-      await this.ensureLoaded();
       const previous = this.lastPull[origin];
       if (previous !== undefined && parseCursor(previous) >= cursor) return;
       this.lastPull[origin] = cursorToDecimalString(cursor);
@@ -95,36 +160,37 @@ export class CloudState {
   }
 
   async lastPullCursor(origin: DeltaOrigin): Promise<CloudCursor> {
-    await this.ensureLoaded();
-    const value = this.lastPull[origin];
-    return value === undefined ? ZERO_CURSOR : parseCursor(value);
+    return this.read(() => {
+      const value = this.lastPull[origin];
+      return value === undefined ? ZERO_CURSOR : parseCursor(value);
+    });
   }
 
   /** Entries authored by others that `origin` has not pulled yet. */
   async pendingFor(origin: DeltaOrigin): Promise<number> {
-    return (await this.entriesAfter(await this.lastPullCursor(origin), origin)).length;
+    return this.read(() => {
+      const value = this.lastPull[origin];
+      const cursor = value === undefined ? ZERO_CURSOR : parseCursor(value);
+      return this.entries.filter((entry) => parseCursor(entry.cursor) > cursor && entry.origin !== origin).length;
+    });
   }
 
   async counts(): Promise<{ mcp: number; app: number }> {
-    await this.ensureLoaded();
-    return {
+    return this.read(() => ({
       mcp: this.entries.filter((entry) => entry.origin === "mcp").length,
       app: this.entries.filter((entry) => entry.origin === "app").length,
-    };
+    }));
   }
 
   async finalize(): Promise<void> {
     await this.serialize(async () => {
-      await this.ensureLoaded();
       this.lastFinalized = new Date().toISOString();
       await this.writeState();
     });
   }
 
   async flush(): Promise<void> {
-    await this.chain;
-    await this.ensureLoaded();
-    await this.writeState();
+    await this.serialize(() => this.writeState());
   }
 
   private async writeState(): Promise<void> {

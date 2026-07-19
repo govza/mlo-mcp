@@ -7,11 +7,34 @@ endpoint on `127.0.0.1:8080`; the app's cloud-sync client connects to it, pulls
 our deltas, and applies them through MLO's own merge logic. We trigger a session
 with the already-verified `mlo.exe -QuickSync`.
 
-The same listener can be configured as MLO's HTTP proxy during development.
-Only origin-form requests to the local `/v1/*` API are handled by mcp-cloud;
-unrelated absolute-form HTTP requests are forwarded unchanged, and HTTPS
-`CONNECT` requests are tunneled end-to-end. This lets initial vendor login and
-WSDL discovery proceed without exposing credentials to mcp-cloud.
+MLO hardcodes the vendor sync URL (`sync.mylifeorganized.net`) — there is no
+custom-server setting — so the way the app's sync traffic reaches mcp-cloud at
+all is MLO's HTTP **proxy setting**, pointed at this same listener. That is the
+permanent wiring, not a debugging aid. Only origin-form requests to the local
+`/v1/*` API are handled by mcp-cloud; unrelated absolute-form HTTP requests are
+forwarded unchanged, the three supported sync operations are terminated
+locally, and HTTPS `CONNECT` requests are tunneled end-to-end. This lets initial
+vendor login and WSDL discovery proceed while sync payloads stay in the local
+delta log. Request bodies and credentials are never logged.
+
+Getting from here to "QuickSync applies our deltas" is a two-step plan:
+
+1. **Observe (one-time).** While proxying, traffic to the vendor sync host is
+   structurally summarized to `<stateDir>/soap-summary.jsonl` — the same
+   credential-safe shape as the mitmproxy addon
+   (`scripts/inspect-cloud-capture.py`): operation and field names, SOAP
+   actions, status codes; never field values. Credential-shaped response field
+   names are masked. One QuickSync through the proxy captures the request
+   shapes the vendor's field-name-free docs deliberately omit. A `CONNECT` to
+   the sync host is recorded too — that would mean the app tunnels sync over
+   TLS, plain-HTTP observation sees nothing, and one
+   [mitmproxy](mitm-proxy.md) session with its CA certificate is needed for
+   this step instead.
+2. **Terminate locally.** With the shapes known, mcp-cloud answers those sync
+   operations itself — serving pulls from and appending pushes to the delta
+   log below instead of forwarding — and the vendor service drops out of the
+   loop entirely. This adapter is implemented for the three operations listed
+   below; mitmproxy is never part of this runtime path.
 
 The **data plane** (envelope bytes, CSV sections, cursor semantics) is fixed by
 [cloud-sync.md](cloud-sync.md) and is not renegotiable here. The **wire contract**
@@ -33,6 +56,29 @@ client implements this document.
   cloud-sync.md's delete experiment). Clients must never assume `+1`.
 - A party never receives its own changes back: pull returns only entries whose
   `origin` differs from the caller.
+- On the first MLO pull, a fresh local state adopts the cursor already stored in
+  the profile. Pending local entries are rebased above it. This is a one-time
+  bridge from the old vendor cursor namespace; subsequent cursors are chosen
+  exclusively by mcp-cloud.
+
+## MLO SOAP compatibility adapter
+
+When MLO uses `127.0.0.1:8080` as its HTTP proxy, requests for the vendor sync
+host arrive in absolute form. mcp-cloud intercepts only `POST` requests to the
+vendor `MLOInetSync.asmx` path with one of these SOAP actions:
+
+| MLO operation | Local operation |
+|---|---|
+| `GetModificationsBytesEx` | Pull changes newer than `newerThan`; return `maxVersion` and optional base64 ZIP `data` |
+| `ApplyModificationsBytesEx` | Validate and append base64 ZIP `data` against `lastSyncTimestamp`; return `newServerTimeStamp` |
+| `ReleaseSyncSessionBytes` | Flush/finalize the local session |
+
+The login, password, session, encoding, and data-file identity fields are not
+used by the single-profile local endpoint. They are neither persisted nor
+forwarded for these intercepted calls. Unsupported SOAP actions, WSDL fetches,
+and unrelated proxy traffic retain the normal pass-through behavior. Because
+the adapter deliberately does not authenticate these three calls, the server
+refuses to bind to a non-loopback address.
 
 ## Wire contract (HTTP/1.1, JSON)
 
@@ -119,13 +165,15 @@ Applied newest-last over the selected entries:
 
 ## Persistence
 
-State lives next to the data file, default `<MLO_DATA_FILE>.mcp-cloud\`:
+State lives in the repository's git-ignored `messages\` directory by default:
 
 - `state.json` — high-water cursor (decimal string), log index
   (`cursor`, `origin`, filename), the last cursor each origin accepted from a
   pull (`lastPull`, which is what makes "pending for app" counts real), and
   last finalized session info.
 - `delta-<cursor>.zip` — one file per log entry, byte-exact as received/emitted.
+- `soap-summary.jsonl` — credential-safe structural summaries of proxied
+  vendor sync traffic (names only, never values; see the proxy section above).
 
 ## Configuration
 
@@ -135,7 +183,7 @@ The local sync endpoint always starts alongside the MCP server.
 |---|---|---|
 | `MLO_CLOUD_HOST` | `127.0.0.1` | bind address (loopback only by design) |
 | `MLO_CLOUD_PORT` | `8080` | listen port |
-| `MLO_CLOUD_STATE_DIR` | `<dataFile>.mcp-cloud` | delta log + state location |
+| `MLO_CLOUD_STATE_DIR` | `<repo>\messages` | message log + state location |
 
 ## MCP tool surface
 
@@ -151,6 +199,7 @@ The long-term goal is to route the existing write tools through this path;
 ## Open questions (do not hard-code answers)
 
 - `ItemIndex` semantics for server-authored rows (observed `125` for a fresh
-  root task); v1 leaves it empty and records what the app does with it.
+  root task and `100` in a canonical first-sync row); v1 emits `100`, matching
+  MLO's own plain root-task default.
 - Whether the app consumes cursor values it did not author monotonically per
   session or per connection — the vendor service skipped a value once.

@@ -22,6 +22,8 @@ src/
                     registerTool; registry.ts: the authoritative tool list)
 scripts/
   run-tool.ts       invoke any tool directly, no MCP client: `pnpm tool <name> '<json>'`
+  tool-catalog.ts   registry → readable catalog, typed from the zod schemas
+  tools.ts          browse it: `pnpm tools [<name>|--json]` (no MLO, no data file)
 ```
 
 Tools are declarative objects (`defineTool` in `tools/shared.ts`: name, schemas, all four

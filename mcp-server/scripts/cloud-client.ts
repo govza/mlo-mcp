@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { CloudClient, type CloudPullResult } from "../src/cloud/client.js";
 import { cursorToDecimalString, parseCursor, ZERO_CURSOR, type CloudCursor } from "../src/cloud/cursor.js";
 import { findSection, type SectionedCsv } from "../src/cloud/csv.js";
@@ -21,8 +22,12 @@ for (let index = 0; index < args.length;) {
   } else index++;
 }
 
-const stateDir = process.env.MLO_CLOUD_STATE_DIR
-  ?? (process.env.MLO_DATA_FILE ? `${process.env.MLO_DATA_FILE}.mcp-cloud` : path.resolve(".mcp-cloud"));
+const stateDir = process.env.MLO_CLOUD_STATE_DIR ?? path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "messages",
+);
 const cursorFile = path.join(stateDir, `client-${clientName.replace(/[^a-zA-Z0-9._-]/g, "_")}-cursor.json`);
 const cloud = new CloudClient({ baseUrl: process.env.MLO_CLOUD_BASE_URL, client: clientName });
 

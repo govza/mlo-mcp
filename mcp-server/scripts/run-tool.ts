@@ -1,8 +1,7 @@
 /**
  * Invoke any tool directly, no MCP client needed. Requires MLO_DATA_FILE in
- * the environment.
+ * the environment (`pnpm tools` browses the catalog without one).
  *
- *   pnpm tool --list
  *   pnpm tool list_tasks '{"format":"flat"}'
  *   pnpm tool add_task '{"caption":"Test task"}'
  */
@@ -11,20 +10,18 @@ import { loadConfig } from "../src/config.js";
 import { MloStore } from "../src/store.js";
 import { allTools } from "../src/tools/registry.js";
 import { CloudState } from "../src/cloud/state.js";
+import { renderList } from "./tool-catalog.js";
 
 const [name, json] = process.argv.slice(2);
 
 if (!name || name === "--list") {
-  for (const t of allTools) {
-    const params = Object.keys(t.inputSchema).join(", ") || "(no params)";
-    console.log(`${t.name.padEnd(18)} ${params}`);
-  }
+  console.log(renderList());
   process.exit(0);
 }
 
 const tool = allTools.find((t) => t.name === name);
 if (!tool) {
-  console.error(`unknown tool "${name}" — run with --list`);
+  console.error(`unknown tool "${name}" — run \`pnpm tools\` to see them all`);
   process.exit(1);
 }
 

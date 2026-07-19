@@ -68,9 +68,19 @@ Task ids are path-based (`1.2.3`) and shift when the tree changes — the server
 pnpm test:unit   # no MLO needed
 pnpm test:mlo    # requires MLO installed and the GUI closed; runs on a temp copy
 pnpm test        # both
+```
 
-pnpm tool --list                              # invoke any tool without an MCP client
-pnpm tool list_tasks '{"format":"flat"}'      # (requires MLO_DATA_FILE in the environment)
+`pnpm tools` prints the catalog — every tool an MCP client would see, grouped by
+kind, with parameters read straight off the zod schemas (so it cannot drift from
+the code). It needs neither MLO nor `MLO_DATA_FILE`:
+
+```powershell
+pnpm tools                 # all tools: one-line summary + params ("?" = optional)
+pnpm tools add_task        # one tool: full input/output schema, hints, a runnable example
+pnpm tools --json          # the same catalog as JSON
+
+pnpm tool list_tasks '{"format":"flat"}'   # actually call one (needs MLO_DATA_FILE)
+pnpm tool add_task '{"caption":"Test task"}'
 ```
 
 ## Known quirks (verified against MLO 15.x)

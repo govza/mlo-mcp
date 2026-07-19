@@ -21,6 +21,29 @@ export const SECTION_HEADERS = [
   ["TodoView.ManualOrdering.Starred", ["UID", "ItemIndex"]],
 ] as const;
 
+/** Canonical values emitted by MLO 6.1.3 for a new plain root task. */
+export const NEW_TASK_DEFAULTS: Readonly<Record<string, string>> = {
+  ItemIndex: "100",
+  Importance: "100",
+  Urgency: "100",
+  HideInToDo: "0",
+  HideInToDoThisTask: "0",
+  ScheduleType: "0",
+  EstimateMin: "0",
+  EstimateMax: "0",
+  ReviewEvery: "1",
+  ReviewRecurrenceType: "1",
+  CompleteInOrder: "0",
+  Effort: "50",
+  IsProject: "0",
+  ProjectStatus: "0",
+  DependOper: "0",
+  DependPostpone: "0",
+  GoalFor: "0",
+  Starred: "0",
+  ccUseCustomColorCoding: "0",
+};
+
 export function createDeltaSkeleton(): SectionedCsv {
   return {
     sections: SECTION_HEADERS.map(([name, header]) => ({
@@ -46,6 +69,7 @@ export function generateGuid(): string {
 export interface TaskAddDeltaInput {
   uid: string;
   parentUid?: string;
+  itemIndex?: string;
   caption: string;
   note?: string;
   dueDateTime?: string;
@@ -58,11 +82,14 @@ export function buildTaskAddDelta(input: TaskAddDeltaInput): SectionedCsv {
   const document = createDeltaSkeleton();
   const row = Array<string>(TODO_ITEMS_HEADER.length).fill("");
   const set = (column: string, value?: string) => { if (value !== undefined) row[TODO_ITEMS_HEADER.indexOf(column)] = value; };
+  for (const [column, value] of Object.entries(NEW_TASK_DEFAULTS)) set(column, value);
   set("UID", normalizeGuid(input.uid));
   set("ParentUID", input.parentUid ? normalizeGuid(input.parentUid) : "");
+  set("ItemIndex", input.itemIndex ?? NEW_TASK_DEFAULTS.ItemIndex);
   set("Caption", input.caption);
   set("DueDateTime", input.dueDateTime);
   set("StartDateTime", input.startDateTime);
+  if (input.dueDateTime || input.startDateTime) set("ScheduleType", "1");
   set("CreatedDate", input.createdDate);
   set("LastModified", input.lastModified);
   set("Note", input.note);

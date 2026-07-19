@@ -23,6 +23,44 @@ async function post(handle: CloudServerHandle, route: string, body: unknown) {
 }
 
 describe("cloud HTTP server", () => {
+  it("refuses non-loopback binding because the local SOAP adapter bypasses vendor authentication", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-bind-")); dirs.push(dir);
+    await expect(startCloudServer({ host: "0.0.0.0", port: 0, stateDir: dir }))
+      .rejects.toThrow("must bind to a loopback host");
+  });
+
+  it("intercepts supported vendor SOAP operations instead of forwarding credentials", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-soap-proxy-")); dirs.push(dir);
+    const handle = await startCloudServer({ host: "127.0.0.1", port: 0, stateDir: dir, observeHost: "127.0.0.1" });
+    handles.push(handle);
+    const delta = packEnvelope(buildTaskAddDelta({ uid: "{12345678-1234-1234-1234-123456789ABC}", caption: "queued", createdDate: "a", lastModified: "a" }));
+    await handle.state.append("mcp", delta);
+    const requestBody = `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body>` +
+      `<GetModificationsBytesEx xmlns="http://www.mylifeorganized.net/"><loginBytes>c2VjcmV0</loginBytes><newerThan>50</newerThan></GetModificationsBytesEx>` +
+      `</soap:Body></soap:Envelope>`;
+
+    const result = await new Promise<{ status: number; body: string }>((resolve, reject) => {
+      const request = http.request({
+        host: handle.host,
+        port: handle.port,
+        method: "POST",
+        path: "http://127.0.0.1:65530/mlo/MLOInetSync.asmx",
+        headers: { "content-type": "text/xml", soapaction: '"http://www.mylifeorganized.net/GetModificationsBytesEx"' },
+      }, (response) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+        response.on("end", () => resolve({ status: response.statusCode!, body: Buffer.concat(chunks).toString("utf8") }));
+      });
+      request.on("error", reject);
+      request.end(requestBody);
+    });
+
+    expect(result.status).toBe(200);
+    expect(result.body).toContain("<GetModificationsBytesExResult>true</GetModificationsBytesExResult>");
+    expect(result.body).toContain("<maxVersion>51</maxVersion>");
+    expect(result.body).not.toContain("c2VjcmV0");
+  });
+
   it("passes unrelated HTTP requests and CONNECT tunnels through", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-proxy-")); dirs.push(dir);
     const upstream = http.createServer((request, response) => {
