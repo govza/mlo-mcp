@@ -9,11 +9,6 @@ import { uncompleteTaskTool } from "./uncomplete-task.js";
 import { deleteTaskTool } from "./delete-task.js";
 import { listContextsTool } from "./list-contexts.js";
 import { syncTool } from "./sync.js";
-import { cloudAddTaskTool } from "./cloud-add-task.js";
-import { cloudUpdateTaskTool } from "./cloud-update-task.js";
-import { cloudCompleteTaskTool } from "./cloud-complete-task.js";
-import { cloudUncompleteTaskTool } from "./cloud-uncomplete-task.js";
-import { cloudDeleteTaskTool } from "./cloud-delete-task.js";
 import { cloudStatusTool } from "./cloud-status.js";
 
 /** Authoritative tool registry — index.ts and scripts/run-tool.ts both iterate this. */
@@ -28,10 +23,5 @@ export const allTools: MloTool[] = [
   deleteTaskTool,
   listContextsTool,
   syncTool,
-  cloudAddTaskTool,
-  cloudUpdateTaskTool,
-  cloudCompleteTaskTool,
-  cloudUncompleteTaskTool,
-  cloudDeleteTaskTool,
   cloudStatusTool,
 ] as MloTool[];

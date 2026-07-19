@@ -12,15 +12,15 @@ These are my standing preferences for how tasks in MLO should be managed. Anythi
 - **Context policy:** every actionable task gets a context. ALWAYS pick from the contexts that already exist in the profile — call `list_contexts` first (or reuse its result from earlier in the conversation). Create a NEW context only when I explicitly ask for one. Contexts are @-prefixed (`@Office`, `@Home`, `@Shopping`).
 <!-- Add more conventions here as they solidify, e.g.:
 - Capture policy: quick capture as bare top-level tasks; organize later.
-- Projects: multi-step outcomes become IsProject with a subtasks outline; sequential ones get CompleteSubTasksInOrder.
+- Projects: multi-step outcomes get their steps nested beneath them (add each with parentUid); IsProject/CompleteSubTasksInOrder are set in MLO.
 - Next actions: star exactly one next action per project.
 - Weekly review: list_tasks includeCompleted:false, walk projects top-down, confirm each has a next action.
 -->
 
 ## How to apply
 
-- Before assigning a context: `list_contexts` → choose the best existing match for where/how the action happens (errands → `@Shopping`, calls/desk work → `@Office`, home chores → `@Home`). Pass it via `add_task.contexts` or `Places` in an `update_task` entry (Places is a full-replacement list — include existing contexts you mean to keep).
-- Batch related changes into single calls (`add_task.tasks`, `update_task.updates`, `complete_task.ids`, …) — every separate write restarts the MLO app.
+- Context choice: `list_contexts` → the best existing match for where/how the action happens (errands → `@Shopping`, calls/desk work → `@Office`, home chores → `@Home`). The tools cannot WRITE contexts yet — note the intended context at the end of the task's Note (e.g. `context: @Office`) and tell me which tasks still need it set in MLO.
+- Batch related changes into single calls (`update_task.updates`, `complete_task.ids`, …) — batches travel as one sync delta and are atomic.
 - If no existing context fits, say so and ask whether to create one — do not silently invent contexts.
-- When I ask to "GTD-ify" or organize tasks: phrase captions as concrete next actions (verb-first), keep project structure in the outline (nesting, dependencies), and put reference material in the task's Note.
-- Tool mechanics (path-id freshness, app restarts around writes, backups) are covered by the tools' own descriptions — follow those; don't re-derive them here.
+- When I ask to "GTD-ify" or organize tasks: phrase captions as concrete next actions (verb-first), keep project structure in the outline (nesting via `parentUid` on add or `moveToParentId` on update), and put reference material in the task's Note.
+- Tool mechanics (path-id freshness, sync-delta queueing, `verified` semantics, coverage limits) are covered by the tools' own descriptions — follow those; don't re-derive them here.

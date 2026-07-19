@@ -138,97 +138,7 @@ function execMlo(config: MloConfig, args: string[], timeoutMs: number): Promise<
   });
 }
 
-/** True when any mlo.exe process is running (assumed to be the GUI holding the data file). */
-export function isMloRunning(): Promise<boolean> {
-  return new Promise((resolve) => {
-    execFile(
-      "tasklist",
-      ["/FI", "IMAGENAME eq mlo.exe", "/FO", "CSV", "/NH"],
-      { windowsHide: true, timeout: 10_000 },
-      (error, stdout) => resolve(!error && stdout.toLowerCase().includes("mlo.exe"))
-    );
-  });
-}
-
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-/**
- * Gracefully close the MLO GUI (taskkill without /F posts WM_CLOSE — the same
- * as clicking X, so MLO saves its data on the way out). Fails when a modal
- * dialog is blocking the app.
- */
-export async function closeMloGui(): Promise<void> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    await new Promise<void>((resolve) => {
-      execFile("taskkill", ["/IM", "mlo.exe"], { windowsHide: true, timeout: 10_000 }, () => resolve());
-    });
-    for (let i = 0; i < 10; i++) {
-      await sleep(700);
-      if (!(await isMloRunning())) return;
-    }
-  }
-  throw new MloError(
-    "could not close the MyLifeOrganized app — a dialog may be blocking it. " +
-      "Close MLO manually (including any popup) and retry."
-  );
-}
-
-/**
- * Relaunch the MLO GUI detached on the given data file (no -console: it must
- * stay open) and wait until it has finished loading. Returning before the GUI
- * owns the file is dangerous: the next CLI invocation would race it for the
- * .ml file and MLO pops a "file is locked by another process" dialog.
- */
-export async function launchMloGui(config: MloConfig): Promise<void> {
-  if (config.relaunchStyle === "minimized") {
-    // Launch through `start /min`: the SW_SHOWMINIMIZED startup hint keeps the
-    // window out of the user's face and does not steal focus. (Node cannot set
-    // STARTUPINFO.wShowWindow itself.) The empty "" is start's window title slot.
-    const child = spawn("cmd.exe", ["/c", "start", '""', "/min", delphiQuote(config.mloExePath), delphiQuote(config.dataFile)], {
-      windowsVerbatimArguments: true,
-      detached: true,
-      stdio: "ignore",
-      windowsHide: true,
-    });
-    child.unref();
-  } else {
-    const child = spawn(config.mloExePath, [delphiQuote(config.dataFile)], {
-      windowsVerbatimArguments: true,
-      argv0: delphiQuote(config.mloExePath),
-      detached: true,
-      stdio: "ignore",
-    });
-    child.unref();
-  }
-
-  // ready = a "...MyLifeOrganized" window title exists, OR MLO holds the data
-  // file (a minimized-to-tray window has no title, so probe the file lock too).
-  const deadline = Date.now() + 20_000;
-  while (Date.now() < deadline) {
-    await sleep(800);
-    const titleReady = await new Promise<boolean>((resolve) => {
-      execFile(
-        "tasklist",
-        ["/V", "/FO", "CSV", "/NH", "/FI", "IMAGENAME eq mlo.exe"],
-        { windowsHide: true, timeout: 10_000 },
-        (error, stdout) => resolve(!error && stdout.includes("MyLifeOrganized"))
-      );
-    });
-    if (titleReady || (await isDataFileLocked(config))) break;
-  }
-  await sleep(1500); // settle: let it finish acquiring file handles
-}
-
-/** True when another process (the MLO GUI) holds the data file open. */
-async function isDataFileLocked(config: MloConfig): Promise<boolean> {
-  try {
-    const handle = await fs.open(config.dataFile, "r+");
-    await handle.close();
-    return false;
-  } catch {
-    return true;
-  }
-}
 
 async function ensureDataFile(config: MloConfig): Promise<void> {
   try {
@@ -246,42 +156,20 @@ let exportCounter = 0;
  * WARNING: never pass `taskGuid` while the MLO GUI is running — it zooms the user's view.
  */
 export function exportXml(config: MloConfig, taskGuid?: string): Promise<string> {
-  return withMloFileLock(config, () => exportXmlUnlocked(config, taskGuid));
-}
-
-/** Lock-free variant for callers (write pipeline) that already hold both locks. */
-export async function exportXmlUnlocked(config: MloConfig, taskGuid?: string): Promise<string> {
-  await ensureDataFile(config);
-  await fs.mkdir(config.exportDir, { recursive: true });
-  const target = path.join(config.exportDir, `export-${process.pid}-${++exportCounter}.xml`);
-  await fs.rm(target, { force: true });
-  const args = [config.dataFile];
-  if (taskGuid) args.push(`-task=${taskGuid}`);
-  args.push(`-saveXML=${target}`);
-  try {
-    await execMlo(config, args, 30_000);
-    return await fs.readFile(target, "utf8");
-  } finally {
-    await fs.rm(target, { force: true });
-  }
-}
-
-export interface AddTaskOptions {
-  /** GUID of the parent task ({xxxxxxxx-…}); the new task becomes its subtask. */
-  parentGuid?: string;
-  /** Run the caption through MLO's input parser (-Parse): dates, @contexts, -i/-u switches… */
-  parse?: boolean;
-}
-
-/** Add a task via mlo.exe -AddSubtask. Returns nothing; re-export to see the result. */
-export function addTask(config: MloConfig, caption: string, options: AddTaskOptions = {}): Promise<void> {
   return withMloFileLock(config, async () => {
     await ensureDataFile(config);
+    await fs.mkdir(config.exportDir, { recursive: true });
+    const target = path.join(config.exportDir, `export-${process.pid}-${++exportCounter}.xml`);
+    await fs.rm(target, { force: true });
     const args = [config.dataFile];
-    if (options.parentGuid) args.push(`-task=${options.parentGuid}`);
-    args.push(`-AddSubtask=${caption}`);
-    if (options.parse) args.push("-Parse");
-    await execMlo(config, args, 30_000);
+    if (taskGuid) args.push(`-task=${taskGuid}`);
+    args.push(`-saveXML=${target}`);
+    try {
+      await execMlo(config, args, 30_000);
+      return await fs.readFile(target, "utf8");
+    } finally {
+      await fs.rm(target, { force: true });
+    }
   });
 }
 
@@ -291,20 +179,6 @@ export function quickSync(config: MloConfig): Promise<void> {
     await ensureDataFile(config);
     await execMlo(config, [config.dataFile, "-QuickSync"], 120_000);
   });
-}
-
-/**
- * Convert an XML export back into a .ml data file (mlo.exe <xml> -saveML=<ml>).
- * The target must not exist; it is pre-deleted here.
- */
-export function convertXmlToMl(config: MloConfig, xmlPath: string, mlPath: string): Promise<void> {
-  return withMloFileLock(config, () => convertXmlToMlUnlocked(config, xmlPath, mlPath));
-}
-
-/** Lock-free variant for callers (write pipeline) that already hold both locks. */
-export async function convertXmlToMlUnlocked(config: MloConfig, xmlPath: string, mlPath: string): Promise<void> {
-  await fs.rm(mlPath, { force: true });
-  await execMlo(config, [xmlPath, `-saveML=${mlPath}`], 30_000);
 }
 
 /** Read the raw .ml data file (for GUID extraction). */

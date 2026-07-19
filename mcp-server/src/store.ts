@@ -18,7 +18,7 @@ export interface Snapshot {
 /**
  * Cached view of the task tree. Every read tool goes through getSnapshot();
  * every mutation calls invalidate(). The cache only smooths bursts of reads —
- * mutations always re-export first (see write-pipeline).
+ * mutations always re-export first before resolving ids.
  */
 export class MloStore {
   private snap?: Snapshot;

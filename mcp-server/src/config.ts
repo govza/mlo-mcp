@@ -49,15 +49,6 @@ export function loadConfig(): MloConfig {
     dataFile,
     exportDir: process.env.MLO_EXPORT_DIR ?? path.join(os.tmpdir(), "mlo-mcp"),
     cacheStaleMs: Number(process.env.MLO_CACHE_STALE_MS) || 30_000,
-    // When a write needs the GUI gone, close it gracefully (it saves on close,
-    // same as clicking X), apply the change, and relaunch it on the same file.
-    // Set MLO_AUTO_RESTART_GUI=0 to refuse writes instead while MLO is open.
-    autoRestartGui: !["0", "false", "no"].includes((process.env.MLO_AUTO_RESTART_GUI ?? "1").toLowerCase()),
-    // "minimized" relaunches without popping a window into focus; "normal"
-    // restores the old behavior; "none" leaves MLO closed after writes.
-    relaunchStyle: (["minimized", "normal", "none"].includes((process.env.MLO_RELAUNCH_STYLE ?? "").toLowerCase())
-      ? (process.env.MLO_RELAUNCH_STYLE as string).toLowerCase()
-      : "minimized") as MloConfig["relaunchStyle"],
     // Only needed when the capture inbox is NOT MLO's own <Inbox> node (e.g. a
     // hand-made "Входящие" folder). MLO itself hardcodes the caption "<Inbox>"
     // in every UI language, so most profiles need no override.

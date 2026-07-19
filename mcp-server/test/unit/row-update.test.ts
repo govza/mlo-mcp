@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { buildTaskAddDelta, buildTaskDeleteDelta, buildTaskUpdatesDelta, TODO_ITEMS_HEADER } from "../../src/cloud/delta.js";
 import { findSection } from "../../src/cloud/csv.js";
 import { latestFullRows, rowValue, type KnownRow } from "../../src/cloud/log-projection.js";
-import { completionPatch, guardNotRecurring } from "../../src/tools/cloud-complete-task.js";
-import { reopenPatch } from "../../src/tools/cloud-uncomplete-task.js";
+import { completionPatch, guardNotRecurring } from "../../src/tools/complete-task.js";
+import { reopenPatch } from "../../src/tools/uncomplete-task.js";
 import type { TaskNode } from "../../src/types.js";
 
 const uid = "{12345678-1234-1234-1234-123456789ABC}";

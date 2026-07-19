@@ -19,8 +19,8 @@ backend.
   - **Someday/Maybe** → `list_tasks parentId:<someday-branch>`.
 - On large profiles review branch by branch (`parentId` + `maxDepth`) — the
   read tools cap results at 200 per call.
-- The end-of-review apply step uses minimal batched writes (each separate write
-  restarts the MLO app). Re-list before writing; path ids gathered during the
+- The end-of-review apply step uses minimal batched writes (batches travel as
+  one sync delta). Re-list before writing; path ids gathered during the
   review are stale by then.
 - Review log (if enabled in Defaults): append to the Note of a task captioned
   `Weekly Review` via `update_task`.

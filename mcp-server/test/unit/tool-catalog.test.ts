@@ -4,6 +4,7 @@ import { allTools } from "../../src/tools/registry.js";
 import { addTaskTool } from "../../src/tools/add-task.js";
 import { getTaskTool } from "../../src/tools/get-task.js";
 import { deleteTaskTool } from "../../src/tools/delete-task.js";
+import { updateTaskTool } from "../../src/tools/update-task.js";
 
 describe("tool catalog", () => {
   it("covers every registered tool", () => {
@@ -18,18 +19,17 @@ describe("tool catalog", () => {
 
   it("reads types, requiredness and descriptions off the zod schemas", () => {
     const input = toolInfo(addTaskTool).input;
-    const importance = input.find((f) => f.name === "importance")!;
-    expect(importance).toMatchObject({ type: "int 1-5", required: false });
-    expect(importance.description).toContain("3 = normal");
-    expect(input.find((f) => f.name === "contexts")!.type).toBe("string[]");
+    expect(input.find((f) => f.name === "caption")!.required).toBe(true);
+    expect(input.find((f) => f.name === "dueDateTime")!.required).toBe(false);
+    expect(toolInfo(deleteTaskTool).input.find((f) => f.name === "ids")!.description).toContain("Path-based");
     expect(toolInfo(getTaskTool).input.find((f) => f.name === "id")!.required).toBe(true);
   });
 
   it("expands one level of object/array params so batch entries are visible", () => {
-    const tasks = toolInfo(addTaskTool, true).input.find((f) => f.name === "tasks")!;
-    expect(tasks.type).toBe("object[] (1-25)");
-    expect(tasks.fields?.map((f) => f.name)).toContain("caption");
-    expect(tasks.fields?.find((f) => f.name === "caption")!.required).toBe(true);
+    const updates = toolInfo(updateTaskTool, true).input.find((f) => f.name === "updates")!;
+    expect(updates.type).toBe("object[] (1-25)");
+    expect(updates.fields?.map((f) => f.name)).toContain("Caption");
+    expect(updates.fields?.find((f) => f.name === "id")!.required).toBe(true);
   });
 
   it("lists every tool name under a kind heading", () => {
@@ -41,9 +41,5 @@ describe("tool catalog", () => {
   it("renders detail for each tool and refuses unknown names", () => {
     for (const tool of allTools) expect(renderDetail(tool.name)).toContain(tool.title);
     expect(renderDetail("nope")).toBeUndefined();
-  });
-
-  it("keeps the indentation of outline examples embedded in descriptions", () => {
-    expect(renderDetail("add_task")).toMatch(/\n\s+Main set\n\s{2,}Intervals/);
   });
 });

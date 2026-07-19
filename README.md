@@ -2,9 +2,8 @@
 
 MCP server for the **MyLifeOrganized** (MLO) Windows desktop app. AI agents (Claude Code, Codex, Cursor, Claude Desktop — anything that speaks MCP over stdio) manage your MLO task tree by driving `mlo.exe`'s undocumented command line locally. No cloud API, no account, your data never leaves the machine.
 
-- 10 tools: list/search/get tasks, contexts, add/update/complete/uncomplete/delete (all writes batched & atomic), QuickSync
-- Writes go through a verified rewrite pipeline: export → edit XML → re-import → verify, with a timestamped backup next to your data file and automatic restore on mismatch
-- If the MLO app is open, writes close it gracefully (it saves on close) and relaunch it minimized afterwards
+- 11 tools: list/search/get tasks, contexts, add/update/complete/uncomplete/delete (writes batched & atomic), QuickSync, cloud status
+- Writes never touch your data file: the server runs a local cloud-sync endpoint, queues changes as sync deltas, and MLO's **own** merge logic applies them via QuickSync — the app keeps running, and the append-only delta log is the durable record of every change (see [docs/mcp-cloud.md](docs/mcp-cloud.md), including the one-time proxy wiring that routes the app's sync to the local endpoint)
 - Ships four customizable [GTD skills](skills/README.md) (`/mind`, `/inbox`, `/weekly` + standing conventions) for any SKILL.md-capable agent
 
 ## Requirements
@@ -14,7 +13,7 @@ MCP server for the **MyLifeOrganized** (MLO) Windows desktop app. AI agents (Cla
 
 ## Install
 
-The only required setting is `MLO_DATA_FILE` — the path to your `.ml` profile. **Try it against a copy of your profile first** if you're cautious; the server also keeps a `.bak-*` backup next to the file for every write.
+The only required setting is `MLO_DATA_FILE` — the path to your `.ml` profile. **Try it against a copy of your profile first** if you're cautious; writes are applied by MLO's own sync merge, and every change is kept as a delta in the local message log.
 
 ### Any MCP client (via npx, straight from GitHub — no npm registry)
 
@@ -72,7 +71,7 @@ claude mcp add mlo -e MLO_DATA_FILE=C:\path\to\your.ml -- node C:\path\to\mlo-mc
 
 ### Configuration
 
-`MLO_DATA_FILE` is required; optional vars (`MLO_EXE_PATH`, `MLO_AUTO_RESTART_GUI`, `MLO_RELAUNCH_STYLE`, …) are documented in [`mcp-server/README.md`](mcp-server/README.md).
+`MLO_DATA_FILE` is required; optional vars (`MLO_EXE_PATH`, `MLO_CLOUD_PORT`, `MLO_CLOUD_STATE_DIR`, …) are documented in [`mcp-server/README.md`](mcp-server/README.md).
 
 ## Documentation
 

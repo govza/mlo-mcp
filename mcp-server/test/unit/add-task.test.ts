@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TaskNode } from "../../src/types.js";
-import { wasTaskAdded } from "../../src/tools/cloud-add-task.js";
+import { wasTaskAdded } from "../../src/tools/add-task.js";
 
 function task(caption: string, guid: string, note?: string): TaskNode {
   return {
@@ -16,7 +16,7 @@ function task(caption: string, guid: string, note?: string): TaskNode {
   };
 }
 
-describe("cloud_add_task verification", () => {
+describe("add_task verification", () => {
   it("does not treat a pre-existing duplicate caption as a successful add", () => {
     const existing = task("duplicate", "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}");
     expect(wasTaskAdded([existing], [existing], "duplicate", undefined, "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}"))

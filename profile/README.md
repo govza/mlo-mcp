@@ -25,5 +25,5 @@ first; `-saveXML` never overwrites, so delete the targets):
 Copy-Item export.xml ..\mcp-server\test\fixtures\export.xml
 ```
 
-`profile.ml.bak-*` files are write-pipeline backups (the MCP server drops one
-next to the data file on every write). They are git-ignored and safe to delete.
+`profile.ml.bak-*` files are backups left by the retired file-replacement
+write pipeline. They are git-ignored and safe to delete.

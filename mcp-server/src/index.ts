@@ -16,39 +16,40 @@ const INSTRUCTIONS = `
 ## MyLifeOrganized (MLO) task management
 
 MLO is an OUTLINER: tasks live in one deep tree, and deep nesting is idiomatic. Prefer placing
-tasks under parents (parentId, subtasks outlines) over flat top-level lists.
+tasks under parents over flat top-level lists.
 
 ### Ids
 Task ids are PATH-BASED ("1.2.3" = position in the tree) and shift whenever the tree changes.
 Treat them as valid only for immediate follow-up calls; after any write (or if MLO was used
-interactively), re-run list_tasks/search_tasks before using ids again. Never store ids.
+interactively), re-run list_tasks/search_tasks before using ids again. Never store path ids.
+add_task takes a parent GUID (\`parentUid\`, from get_task) instead of a path id.
 
-### Writes are expensive — batch them
-Every write rewrites the data file and, if the MLO app is open, closes and relaunches it.
-Always group related changes into ONE call:
-- add_task: \`tasks\` array (up to 25, each with own parent/fields) and/or a \`subtasks\` outline per task
-- update_task: \`updates\` array (up to 25 field edits/moves in one write)
-- complete_task / uncomplete_task / delete_task: \`ids\` arrays
-Each write keeps a timestamped backup next to the data file; batches are atomic (one bad id → no change).
+### How writes work
+Writes never touch the data file. Each write queues a sync delta on the local cloud endpoint
+and triggers MLO's QuickSync; MLO's own merge logic applies it, and the app keeps running.
+The result's \`verified\` flag says whether a fresh export confirmed the change — \`false\`
+means "queued, not applied yet", not failure; MLO applies it on its next sync session.
+Batch tools (\`ids\`/\`updates\` arrays) send the whole batch as ONE delta and are atomic:
+one bad id and nothing is queued.
+
+### Coverage limits (fail fast, nothing queued)
+- update_task / complete_task / uncomplete_task need the task's full record in the delta
+  log — available once a task was added by this server or changed in MLO since the local
+  endpoint took over. Otherwise make the change in the MLO app.
+- update_task cannot edit booleans (IsProject, Starred, Hide*), Flag, Places, or
+  dependencies yet; date edits on recurring tasks are refused (the series would desync).
+- complete_task refuses recurring tasks — completing in MLO generates the next occurrence.
+- delete_task removes each task AND its whole subtree; it needs recoverable GUIDs for the
+  full subtree.
 
 ### Field conventions
-- Contexts are MLO "Places" (@Office, @Home). Run list_contexts first and reuse existing ones.
-  update_task's Places is a FULL-replacement list.
-- Importance/Effort are stored 0–200 (100 = normal); add_task takes a 1–5 scale instead.
 - Dates are local ISO without timezone ("2026-08-01T15:00:00").
-- RECURRING tasks: their pattern lives in Recurrence fields the tools do not edit. Overwriting
-  DueDateTime on a recurring task can desync the series — get_task first, and prefer letting MLO
-  handle recurrence.
-- add_task's natural-language dates/urgency/parseText use MLO's best-effort rapid-entry parser;
-  everything else is written exactly. Batch mode is exact-only.
-- add_task without a parentId files the task into the profile's capture inbox — the top-level
-  "<Inbox>" node (same caption in every MLO language; list_tasks marks it [inbox]). Pass
-  parentId "root" for a deliberate top-level task. No inbox node → top level, and the result
-  says so.
+- Importance/Effort are 0–200 (100 = normal).
+- Contexts are MLO "Places" (@Office); currently read-only (list_contexts, search filters).
 
 ### Completion
 complete_task marks done (projects get ProjectStatus too); uncomplete_task reopens.
-sync runs the profile's cloud/Wi-Fi QuickSync.
+sync runs the profile's QuickSync; cloud_status shows the local endpoint's cursor and log.
 `.trim();
 
 async function main(): Promise<void> {

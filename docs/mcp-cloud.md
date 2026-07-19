@@ -1,8 +1,8 @@
 # mcp-cloud: local cloud-sync endpoint for the MLO app
 
-`mcp-cloud` inverts the fragile file-replacement write pipeline (see
-[server-architecture.md](server-architecture.md)): instead of closing the GUI and
-swapping the `.ml` file, the MCP server *is* the cloud. It runs a local sync
+`mcp-cloud` is the server's write path (it replaced the retired
+file-replacement pipeline that closed the GUI and swapped the `.ml` file): the
+MCP server *is* the cloud. It runs a local sync
 endpoint on `127.0.0.1:8080`; the app's cloud-sync client connects to it, pulls
 our deltas, and applies them through MLO's own merge logic. We trigger a session
 with the already-verified `mlo.exe -QuickSync`.
@@ -187,11 +187,14 @@ The local sync endpoint always starts alongside the MCP server.
 
 ## MCP tool surface
 
-- `cloud_add_task` — builds a full `TodoItems` row (fresh braced uppercase GUID,
-  `CreatedDate`/`LastModified` in MLO's zone-free ISO form), appends it to the
-  log as an `origin:"mcp"` delta, triggers `mlo.exe -QuickSync`, then verifies
-  the task appeared via a fresh export.
-- `cloud_update_task` — batched full-row field edits (caption, note, dates,
+This endpoint is the server's **only** write path — every MCP write tool
+appends `origin:"mcp"` deltas here and triggers `mlo.exe -QuickSync`
+([tools.md](tools.md) defines the surface):
+
+- `add_task` — builds a full `TodoItems` row (fresh braced uppercase GUID,
+  `CreatedDate`/`LastModified` in MLO's zone-free ISO form), appends it, then
+  verifies the task appeared via a fresh export.
+- `update_task` — batched full-row field edits (caption, note, dates,
   importance/effort/estimates, project status, goal) and re-parenting moves
   via `ParentUID`. Sourced from the delta log like the completion tools.
   Deliberately unsupported until their wire encoding is observed in a real
@@ -199,28 +202,24 @@ The local sync endpoint always starts alongside the MCP server.
   never been captured), `FlagUID` resolution, and Places/dependency relation
   edits (no `TodoItemPlaces.Deleted` section exists, so removal semantics are
   unknown). Date edits on recurring tasks are refused.
-- `cloud_complete_task` / `cloud_uncomplete_task` — full-row updates that set
-  or clear `CompletionDateTime` (and flip `ProjectStatus` for projects). A
-  changed object must travel as a complete 82-column record, and the XML
-  export cannot supply one (it lacks `CreatedDate`/`LastModified`/`ItemIndex`,
+- `complete_task` / `uncomplete_task` — full-row updates that set or clear
+  `CompletionDateTime` (and flip `ProjectStatus` for projects). A changed
+  object must travel as a complete 82-column record, and the XML export
+  cannot supply one (it lacks `CreatedDate`/`LastModified`/`ItemIndex`,
   recurrence internals, reminders, color coding), so the row is sourced from
   the delta log itself: the latest full row per UID across both origins.
-  Tasks with no such row fail atomically toward the native tools; coverage
-  grows as tasks flow through the log. `cloud_complete_task` refuses
+  Tasks with no such row fail atomically (make the change in the MLO app);
+  coverage grows as tasks flow through the log. `complete_task` refuses
   recurring tasks — a full-row rewrite would bypass MLO's next-occurrence
   generation.
-- `cloud_delete_task` — resolves path-based ids to GUIDs and appends ONE
-  `origin:"mcp"` delta with `TodoItems.Deleted` tombstones for every selected
-  task *and all of its descendants* (whether MLO cascades a bare parent
-  tombstone to children is unverified — cloud-sync.md's delete experiment used
-  a childless task — and extra tombstones union-merge harmlessly), triggers
-  `mlo.exe -QuickSync`, then verifies the GUIDs are gone from a fresh export.
-  Fails atomically when any task in a selected subtree has no recoverable
-  GUID (fall back to `delete_task`).
+- `delete_task` — resolves path-based ids to GUIDs and appends ONE delta with
+  `TodoItems.Deleted` tombstones for every selected task *and all of its
+  descendants* (whether MLO cascades a bare parent tombstone to children is
+  unverified — cloud-sync.md's delete experiment used a childless task — and
+  extra tombstones union-merge harmlessly), then verifies the GUIDs are gone
+  from a fresh export. Fails atomically when any task in a selected subtree
+  has no recoverable GUID.
 - `cloud_status` — read-only mirror of `GET /v1/status`.
-
-The long-term goal is to route the existing write tools through this path;
-`cloud_add_task` is the vertical slice proving the loop.
 
 ## Open questions (do not hard-code answers)
 

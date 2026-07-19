@@ -48,7 +48,7 @@ export async function runCloudRowUpdate(
   const noGuid = resolved.filter(({ task }) => !task.Guid);
   if (noGuid.length > 0) {
     const list = noGuid.map(({ id, task }) => `[${id}] "${task.Caption}"`).join(", ");
-    throw new Error(`no recoverable GUID for ${list} — nothing was queued; use the native (non-cloud) tool for this batch`);
+    throw new Error(`no recoverable GUID for ${list} — nothing was queued; make this change in the MLO app`);
   }
   const rows = await knownFullRows(ctx.cloudState);
   const targets: CloudRowTarget[] = resolved.map(({ id, task }) => {
@@ -58,7 +58,7 @@ export async function runCloudRowUpdate(
       throw new Error(
         `no full record for [${id}] "${task.Caption}" in the delta log — the cloud path can only rewrite tasks it has ` +
           "seen a complete row for (added via a cloud tool, or changed in MLO since the local endpoint took over); " +
-          "nothing was queued; use the native (non-cloud) tool for this batch"
+          "nothing was queued; make this change in the MLO app"
       );
     }
     return { id, task, uid, known };

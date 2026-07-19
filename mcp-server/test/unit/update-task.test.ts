@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { TODO_ITEMS_HEADER } from "../../src/cloud/delta.js";
 import type { KnownRow } from "../../src/cloud/log-projection.js";
-import { updatePatch, verifiesUpdate } from "../../src/tools/cloud-update-task.js";
+import { updatePatch, verifiesUpdate } from "../../src/tools/update-task.js";
 import type { TaskNode } from "../../src/types.js";
 
 function knownRow(values: Record<string, string>): KnownRow {
@@ -9,7 +9,7 @@ function knownRow(values: Record<string, string>): KnownRow {
   return { header, row: header.map((column) => values[column] ?? "") };
 }
 
-describe("cloud_update_task patch mapping", () => {
+describe("update_task patch mapping", () => {
   it("maps provided fields to columns and always stamps LastModified", () => {
     const patch = updatePatch({ id: "1", Caption: "new", Importance: 150, TheGoal: 2 }, knownRow({}), "T");
     expect(patch).toEqual({ LastModified: "T", Caption: "new", Importance: "150", GoalFor: "2" });
@@ -29,7 +29,7 @@ describe("cloud_update_task patch mapping", () => {
   });
 });
 
-describe("cloud_update_task verification", () => {
+describe("update_task verification", () => {
   const base: TaskNode = {
     id: "1", Caption: "c", Places: [], DependsOn: [], Children: [], Path: ["parent", "c"], Depth: 1,
   };

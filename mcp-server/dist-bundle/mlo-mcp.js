@@ -3231,8 +3231,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path6) {
-      let input = path6;
+    function removeDotSegments(path5) {
+      let input = path5;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3484,8 +3484,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path6, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path6 && path6 !== "/" ? path6 : void 0;
+        const [path5, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path5 && path5 !== "/" ? path5 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -6878,12 +6878,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs6, exportName) {
+    function addFormats(ajv, list, fs5, exportName) {
       var _a2;
       var _b2;
       (_a2 = (_b2 = ajv.opts.code).formats) !== null && _a2 !== void 0 ? _a2 : _b2.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs6[f]);
+        ajv.addFormat(f, fs5[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -8981,7 +8981,7 @@ var require_fxp = __commonJS({
 });
 
 // src/index.ts
-import { promises as fs5 } from "node:fs";
+import { promises as fs4 } from "node:fs";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/external.js
@@ -9462,8 +9462,8 @@ function getErrorMap() {
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path6, errorMaps, issueData } = params;
-  const fullPath = [...path6, ...issueData.path || []];
+  const { data, path: path5, errorMaps, issueData } = params;
+  const fullPath = [...path5, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -9579,11 +9579,11 @@ var errorUtil;
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path6, key) {
+  constructor(parent, value, path5, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path6;
+    this._path = path5;
     this._key = key;
   }
   get path() {
@@ -13220,10 +13220,10 @@ function assignProp(target, prop, value) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path6) {
-  if (!path6)
+function getElementAtPath(obj, path5) {
+  if (!path5)
     return obj;
-  return path6.reduce((acc, key) => acc?.[key], obj);
+  return path5.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -13543,11 +13543,11 @@ function aborted(x2, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path6, issues) {
+function prefixIssues(path5, issues) {
   return issues.map((iss) => {
     var _a2;
     (_a2 = iss).path ?? (_a2.path = []);
-    iss.path.unshift(path6);
+    iss.path.unshift(path5);
     return iss;
   });
 }
@@ -23233,13 +23233,6 @@ function loadConfig() {
     dataFile,
     exportDir: process.env.MLO_EXPORT_DIR ?? path.join(os.tmpdir(), "mlo-mcp"),
     cacheStaleMs: Number(process.env.MLO_CACHE_STALE_MS) || 3e4,
-    // When a write needs the GUI gone, close it gracefully (it saves on close,
-    // same as clicking X), apply the change, and relaunch it on the same file.
-    // Set MLO_AUTO_RESTART_GUI=0 to refuse writes instead while MLO is open.
-    autoRestartGui: !["0", "false", "no"].includes((process.env.MLO_AUTO_RESTART_GUI ?? "1").toLowerCase()),
-    // "minimized" relaunches without popping a window into focus; "normal"
-    // restores the old behavior; "none" leaves MLO closed after writes.
-    relaunchStyle: ["minimized", "normal", "none"].includes((process.env.MLO_RELAUNCH_STYLE ?? "").toLowerCase()) ? process.env.MLO_RELAUNCH_STYLE.toLowerCase() : "minimized",
     // Only needed when the capture inbox is NOT MLO's own <Inbox> node (e.g. a
     // hand-made "Входящие" folder). MLO itself hardcodes the caption "<Inbox>"
     // in every UI language, so most profiles need no override.
@@ -23251,7 +23244,7 @@ function loadConfig() {
 }
 
 // src/mlo-cli.ts
-import { execFile, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import { promises as fs } from "node:fs";
 import path2 from "node:path";
 var EXIT_MESSAGES = {
@@ -23354,73 +23347,7 @@ function execMlo(config2, args, timeoutMs) {
     });
   });
 }
-function isMloRunning() {
-  return new Promise((resolve) => {
-    execFile(
-      "tasklist",
-      ["/FI", "IMAGENAME eq mlo.exe", "/FO", "CSV", "/NH"],
-      { windowsHide: true, timeout: 1e4 },
-      (error2, stdout) => resolve(!error2 && stdout.toLowerCase().includes("mlo.exe"))
-    );
-  });
-}
 var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function closeMloGui() {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    await new Promise((resolve) => {
-      execFile("taskkill", ["/IM", "mlo.exe"], { windowsHide: true, timeout: 1e4 }, () => resolve());
-    });
-    for (let i2 = 0; i2 < 10; i2++) {
-      await sleep(700);
-      if (!await isMloRunning()) return;
-    }
-  }
-  throw new MloError(
-    "could not close the MyLifeOrganized app \u2014 a dialog may be blocking it. Close MLO manually (including any popup) and retry."
-  );
-}
-async function launchMloGui(config2) {
-  if (config2.relaunchStyle === "minimized") {
-    const child = spawn("cmd.exe", ["/c", "start", '""', "/min", delphiQuote(config2.mloExePath), delphiQuote(config2.dataFile)], {
-      windowsVerbatimArguments: true,
-      detached: true,
-      stdio: "ignore",
-      windowsHide: true
-    });
-    child.unref();
-  } else {
-    const child = spawn(config2.mloExePath, [delphiQuote(config2.dataFile)], {
-      windowsVerbatimArguments: true,
-      argv0: delphiQuote(config2.mloExePath),
-      detached: true,
-      stdio: "ignore"
-    });
-    child.unref();
-  }
-  const deadline = Date.now() + 2e4;
-  while (Date.now() < deadline) {
-    await sleep(800);
-    const titleReady = await new Promise((resolve) => {
-      execFile(
-        "tasklist",
-        ["/V", "/FO", "CSV", "/NH", "/FI", "IMAGENAME eq mlo.exe"],
-        { windowsHide: true, timeout: 1e4 },
-        (error2, stdout) => resolve(!error2 && stdout.includes("MyLifeOrganized"))
-      );
-    });
-    if (titleReady || await isDataFileLocked(config2)) break;
-  }
-  await sleep(1500);
-}
-async function isDataFileLocked(config2) {
-  try {
-    const handle = await fs.open(config2.dataFile, "r+");
-    await handle.close();
-    return false;
-  } catch {
-    return true;
-  }
-}
 async function ensureDataFile(config2) {
   try {
     await fs.access(config2.dataFile);
@@ -23430,31 +23357,20 @@ async function ensureDataFile(config2) {
 }
 var exportCounter = 0;
 function exportXml(config2, taskGuid) {
-  return withMloFileLock(config2, () => exportXmlUnlocked(config2, taskGuid));
-}
-async function exportXmlUnlocked(config2, taskGuid) {
-  await ensureDataFile(config2);
-  await fs.mkdir(config2.exportDir, { recursive: true });
-  const target = path2.join(config2.exportDir, `export-${process.pid}-${++exportCounter}.xml`);
-  await fs.rm(target, { force: true });
-  const args = [config2.dataFile];
-  if (taskGuid) args.push(`-task=${taskGuid}`);
-  args.push(`-saveXML=${target}`);
-  try {
-    await execMlo(config2, args, 3e4);
-    return await fs.readFile(target, "utf8");
-  } finally {
-    await fs.rm(target, { force: true });
-  }
-}
-function addTask(config2, caption, options = {}) {
   return withMloFileLock(config2, async () => {
     await ensureDataFile(config2);
+    await fs.mkdir(config2.exportDir, { recursive: true });
+    const target = path2.join(config2.exportDir, `export-${process.pid}-${++exportCounter}.xml`);
+    await fs.rm(target, { force: true });
     const args = [config2.dataFile];
-    if (options.parentGuid) args.push(`-task=${options.parentGuid}`);
-    args.push(`-AddSubtask=${caption}`);
-    if (options.parse) args.push("-Parse");
-    await execMlo(config2, args, 3e4);
+    if (taskGuid) args.push(`-task=${taskGuid}`);
+    args.push(`-saveXML=${target}`);
+    try {
+      await execMlo(config2, args, 3e4);
+      return await fs.readFile(target, "utf8");
+    } finally {
+      await fs.rm(target, { force: true });
+    }
   });
 }
 function quickSync(config2) {
@@ -23462,10 +23378,6 @@ function quickSync(config2) {
     await ensureDataFile(config2);
     await execMlo(config2, [config2.dataFile, "-QuickSync"], 12e4);
   });
-}
-async function convertXmlToMlUnlocked(config2, xmlPath, mlPath) {
-  await fs.rm(mlPath, { force: true });
-  await execMlo(config2, [xmlPath, `-saveML=${mlPath}`], 3e4);
 }
 function readDataFile(config2) {
   return fs.readFile(config2.dataFile);
@@ -23515,52 +23427,6 @@ function parseMloXml(xml2) {
 function rootNode(doc) {
   return doc["MyLifeOrganized-xml"].TaskTree.TaskNode[0];
 }
-var FIELD_ORDER = [
-  "IDD",
-  "Note",
-  "Dependency",
-  "Importance",
-  "Effort",
-  "CompletionDateTime",
-  "DueDateTime",
-  "StartDateTime",
-  "IsProject",
-  "ProjectStatus",
-  "Starred",
-  "Flag",
-  "Places",
-  "EstimateMin",
-  "EstimateMax",
-  "TheGoal",
-  "HideInToDo",
-  "HideInToDoThisTask",
-  "ScheduleType",
-  "LeadTime",
-  "CompleteSubTasksInOrder"
-];
-function setRawField(node, key, value) {
-  if (value === void 0) {
-    delete node[key];
-  } else {
-    node[key] = value;
-  }
-  const children = node.TaskNode;
-  delete node.TaskNode;
-  const entries = Object.entries(node);
-  for (const k of Object.keys(node)) delete node[k];
-  const rank = (k) => {
-    if (k.startsWith("@_")) return -1;
-    const i2 = FIELD_ORDER.indexOf(k);
-    return i2 === -1 ? FIELD_ORDER.length : i2;
-  };
-  entries.sort((a, b) => rank(a[0]) - rank(b[0]));
-  for (const [k, v] of entries) node[k] = v;
-  if (children) node.TaskNode = children;
-}
-function buildMloXml(doc) {
-  const { "?xml": _decl, ...rest } = doc;
-  return '<?xml version="1.0" encoding="UTF-8"?>\n' + builder.build(rest);
-}
 
 // src/task-tree.ts
 function delphiBool(v) {
@@ -23570,7 +23436,7 @@ function num(v) {
   return v === void 0 || v === "" ? void 0 : Number(v);
 }
 function toModel(raw, id, parentPath, depth) {
-  const path6 = [...parentPath, raw["@_Caption"]];
+  const path5 = [...parentPath, raw["@_Caption"]];
   const node = {
     id,
     Guid: raw.IDD,
@@ -23596,10 +23462,10 @@ function toModel(raw, id, parentPath, depth) {
     CompleteSubTasksInOrder: delphiBool(raw.CompleteSubTasksInOrder),
     DependsOn: raw.Dependency?.UID ?? [],
     Children: [],
-    Path: path6,
+    Path: path5,
     Depth: depth
   };
-  node.Children = (raw.TaskNode ?? []).map((c, i2) => toModel(c, `${id}.${i2 + 1}`, path6, depth + 1));
+  node.Children = (raw.TaskNode ?? []).map((c, i2) => toModel(c, `${id}.${i2 + 1}`, path5, depth + 1));
   return node;
 }
 function buildTaskTree(doc) {
@@ -23620,40 +23486,8 @@ function findById(tasks, id) {
   return flatten(tasks).find((t) => t.id === id);
 }
 var INBOX_CAPTIONS = ["<Inbox>", "Inbox"];
-function inboxCaptions(configCaption) {
-  return configCaption ? [configCaption, ...INBOX_CAPTIONS] : INBOX_CAPTIONS;
-}
 function looksLikeInbox(t) {
   return t.Depth === 0 && INBOX_CAPTIONS.includes(t.Caption);
-}
-function findInbox(tasks, configCaption) {
-  for (const cap of inboxCaptions(configCaption)) {
-    const hit = tasks.find((t) => t.Caption === cap);
-    if (hit) return hit;
-  }
-  return void 0;
-}
-function findRawInbox(doc, configCaption) {
-  const top = rootNode(doc).TaskNode ?? [];
-  for (const cap of inboxCaptions(configCaption)) {
-    const hit = top.find((n) => n["@_Caption"] === cap);
-    if (hit) return hit;
-  }
-  return void 0;
-}
-function findRawById(doc, id) {
-  const parts = id.split(".").map((p) => Number(p));
-  if (parts.length === 0 || parts.some((p) => !Number.isInteger(p) || p < 1)) return void 0;
-  let siblings = rootNode(doc).TaskNode ?? [];
-  let raw;
-  let index = -1;
-  for (let i2 = 0; i2 < parts.length; i2++) {
-    index = parts[i2] - 1;
-    raw = siblings[index];
-    if (!raw) return void 0;
-    if (i2 < parts.length - 1) siblings = raw.TaskNode ?? [];
-  }
-  return raw ? { raw, siblings, index } : void 0;
 }
 function searchTasks(tasks, f) {
   const q = f.query?.toLowerCase();
@@ -24022,728 +23856,8 @@ var getTaskTool = defineTool({
   }
 });
 
-// src/write-pipeline.ts
-import { promises as fs2 } from "node:fs";
-import path3 from "node:path";
-function replaceDataFile(config2, mutate, verify) {
-  return withMloFileLock(config2, async () => {
-    let guiRestarted = false;
-    if (await isMloRunning()) {
-      if (!config2.autoRestartGui) {
-        throw new MloError(
-          "The MyLifeOrganized app is running \u2014 it holds the data file in memory and would overwrite this change on its next save. Close MLO (including the tray icon) and retry, or unset MLO_AUTO_RESTART_GUI=0 to let the server restart MLO around writes."
-        );
-      }
-      log("closing the MLO GUI for a write (it will be relaunched)");
-      await closeMloGui();
-      guiRestarted = true;
-    }
-    try {
-      return await replaceClosed(config2, mutate, verify, guiRestarted);
-    } finally {
-      if (guiRestarted) {
-        if (config2.relaunchStyle === "none") {
-          log("MLO left closed after the write (MLO_RELAUNCH_STYLE=none)");
-        } else {
-          await launchMloGui(config2);
-          log(`relaunched the MLO GUI (${config2.relaunchStyle})`);
-        }
-      }
-    }
-  });
-}
-async function replaceClosed(config2, mutate, verify, guiRestarted) {
-  const doc = parseMloXml(await exportXmlUnlocked(config2));
-  mutate(doc);
-  await fs2.mkdir(config2.exportDir, { recursive: true });
-  const stamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
-  const tempXml = path3.join(config2.exportDir, `write-${stamp}.xml`);
-  const tempMl = path3.join(config2.exportDir, `write-${stamp}.ml`);
-  const backupPath = `${config2.dataFile}.bak-${stamp}`;
-  try {
-    await fs2.writeFile(tempXml, buildMloXml(doc), "utf8");
-    await convertXmlToMlUnlocked(config2, tempXml, tempMl);
-    await fs2.copyFile(config2.dataFile, backupPath);
-    await fs2.copyFile(tempMl, config2.dataFile);
-    const after = buildTaskTree(parseMloXml(await exportXmlUnlocked(config2)));
-    if (!verify(after)) {
-      await fs2.copyFile(backupPath, config2.dataFile);
-      throw new MloError(
-        `verification after write failed \u2014 the data file was restored from backup (${backupPath})`
-      );
-    }
-    log(`data file replaced; backup at ${backupPath}`);
-    return { backupPath, guiRestarted };
-  } finally {
-    await fs2.rm(tempXml, { force: true });
-    await fs2.rm(tempMl, { force: true });
-  }
-}
-
-// src/tools/add-task.ts
-function normalizeIso(s) {
-  const m = /^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2})(?::(\d{2}))?)?$/.exec(s.trim());
-  if (!m) return void 0;
-  return `${m[1]}T${m[2] ?? "00:00"}:${m[3] ?? "00"}`;
-}
-var scale5 = (n) => String((n - 1) * 50);
-function parseOutline(outline) {
-  const roots = [];
-  const stack = [];
-  for (const line of outline.split(/\r?\n/)) {
-    if (!line.trim()) continue;
-    const m = /^(\s*)(.*)$/.exec(line);
-    const depth = Math.floor(m[1].replaceAll("	", "  ").length / 2);
-    const node = { "@_Caption": m[2].trim() };
-    while (stack.length && stack[stack.length - 1].depth >= depth) stack.pop();
-    if (stack.length) {
-      (stack[stack.length - 1].node.TaskNode ??= []).push(node);
-    } else {
-      roots.push(node);
-    }
-    stack.push({ depth, node });
-  }
-  return roots;
-}
-function outlineCaptions(nodes) {
-  return nodes.flatMap((n) => [n["@_Caption"], ...outlineCaptions(n.TaskNode ?? [])]);
-}
-var XmlFields = {
-  note: external_exports.string().optional(),
-  startDate: external_exports.string().optional().describe("ISO only; ignored on the parser path"),
-  contexts: external_exports.array(external_exports.string()).optional().describe('Context names, e.g. ["@Office"]'),
-  importance: external_exports.number().int().min(1).max(5).optional().describe("1\u20135 (3 = normal; stored as (N-1)*50 on MLO's 0\u2013200 scale)"),
-  effort: external_exports.number().int().min(1).max(5).optional(),
-  starred: external_exports.boolean().optional(),
-  folder: external_exports.boolean().optional().describe("Create as a folder: the task itself is hidden from to-do views, its children still show (MLO -f)"),
-  flag: external_exports.string().optional().describe('e.g. "Green Flag"'),
-  subtasks: external_exports.string().optional().describe(
-    "Indented outline of subtasks created under the new task in the same write \u2014 one caption per line, 2 spaces (or 1 tab) deeper = one level deeper. Arbitrary depth. Example:\nWarm-up\nMain set\n  Intervals\n  Cooldown swim\nStretching"
-  )
-};
-var BatchEntry = external_exports.object({
-  caption: external_exports.string().min(1).describe("Task caption"),
-  parentId: external_exports.string().optional().describe(
-    `Place under this EXISTING task id; "root" forces top level. Default: the profile's <Inbox> node (top level if the profile has none). Batch entries cannot parent on each other \u2014 use one entry's subtasks outline to create a new tree`
-  ),
-  dueDate: external_exports.string().optional().describe('ISO only in batch mode ("2026-08-01" or "2026-08-01T15:00")'),
-  ...XmlFields
-});
-function buildNode({ entry, isoDue, isoStart, subtree }) {
-  const node = { "@_Caption": entry.caption };
-  if (entry.note) node.Note = entry.note;
-  if (entry.importance) node.Importance = scale5(entry.importance);
-  if (entry.effort) node.Effort = scale5(entry.effort);
-  if (isoDue || isoStart) {
-    if (isoDue) node.DueDateTime = isoDue;
-    node.StartDateTime = isoStart ?? isoDue;
-    node.LeadTime = "0";
-    node.ScheduleType = "1";
-  }
-  if (entry.starred) node.Starred = "-1";
-  if (entry.folder) node.HideInToDoThisTask = "-1";
-  if (entry.flag) node.Flag = entry.flag;
-  if (entry.contexts?.length) node.Places = { Place: entry.contexts.map((c) => c.startsWith("@") ? c : `@${c}`) };
-  if (subtree.length) node.TaskNode = subtree;
-  return node;
-}
-function verifyEntry(all, built) {
-  const hit = all.find(
-    (t) => t.Caption === built.entry.caption && (!built.parentCaption || t.Path.slice(0, -1).includes(built.parentCaption)) && (!built.isoDue || t.DueDateTime === built.isoDue)
-  );
-  if (!hit) return false;
-  const subtreeCaptions = new Set(flatten(hit.Children).map((t) => t.Caption));
-  return outlineCaptions(built.subtree).every((c) => subtreeCaptions.has(c));
-}
-async function executeBatch(entries, ctx) {
-  const built = [];
-  for (const entry of entries) {
-    const isoDue = entry.dueDate ? normalizeIso(entry.dueDate) : void 0;
-    if (entry.dueDate && !isoDue) {
-      return errorResult(
-        `entry "${entry.caption}": dueDate "${entry.dueDate}" is not ISO \u2014 batch mode is exact-XML only; use single-task mode for natural-language dates`
-      );
-    }
-    const isoStart = entry.startDate ? normalizeIso(entry.startDate) : void 0;
-    built.push({ entry, isoDue, isoStart, subtree: entry.subtasks ? parseOutline(entry.subtasks) : [] });
-  }
-  const snapBefore = await ctx.store.getSnapshot();
-  const inbox = findInbox(snapBefore.tasks, ctx.config.inboxCaption);
-  for (const b of built) {
-    if (b.entry.parentId === "root") continue;
-    if (!b.entry.parentId) {
-      if (inbox) {
-        b.toInbox = true;
-        b.parentCaption = inbox.Caption;
-      }
-      continue;
-    }
-    const parent = findById(snapBefore.tasks, b.entry.parentId);
-    if (!parent) return errorResult(`entry "${b.entry.caption}": no task with id "${b.entry.parentId}" \u2014 re-run list_tasks`);
-    b.parentCaption = parent.Caption;
-  }
-  const { guiRestarted, backupPath } = await replaceDataFile(
-    ctx.config,
-    (doc) => {
-      const inserts = built.map((b) => {
-        if (b.toInbox) {
-          const rawInbox = findRawInbox(doc, ctx.config.inboxCaption);
-          if (!rawInbox) throw new Error(`entry "${b.entry.caption}": the inbox node vanished between snapshot and write \u2014 retry`);
-          return { b, siblings: rawInbox.TaskNode ??= [] };
-        }
-        if (!b.entry.parentId || b.entry.parentId === "root") return { b, siblings: rootNode(doc).TaskNode ??= [] };
-        const found = findRawById(doc, b.entry.parentId);
-        if (!found) throw new Error(`entry "${b.entry.caption}": no task with id "${b.entry.parentId}" \u2014 re-run list_tasks`);
-        return { b, siblings: found.raw.TaskNode ??= [] };
-      });
-      for (const { b, siblings } of inserts) siblings.push(buildNode(b));
-    },
-    (after) => {
-      const all2 = flatten(after);
-      return built.every((b) => verifyEntry(all2, b));
-    }
-  );
-  ctx.store.invalidate();
-  const snap = await ctx.store.getSnapshot(true);
-  const all = flatten(snap.tasks);
-  const created = built.map(
-    (b) => all.filter((t) => t.Caption === b.entry.caption && (!b.parentCaption || t.Path.slice(0, -1).includes(b.parentCaption))).at(-1)
-  );
-  const lines = created.map((t, i2) => {
-    const b = built[i2];
-    if (!t) return `entry "${b.entry.caption}" written but not found in re-export`;
-    const where = b.toInbox ? "inbox" : b.parentCaption ? `under "${b.parentCaption}"` : b.entry.parentId === "root" ? "top level" : "top level \u2014 no inbox node found in this profile";
-    return `created [${t.id}] "${t.Caption}" (${where})`;
-  });
-  const restartNote = guiRestarted ? "\nMLO was closed for the write and relaunched" : "";
-  return textResult(`${built.length} tasks in one write (backup: ${backupPath}):
-${lines.join("\n")}${restartNote}`, {
-    tasks: created.filter(Boolean).map((t) => toSummary(t)),
-    placement: "batch",
-    method: "xml",
-    backupPath
-  });
-}
-var addTaskTool = defineTool({
-  name: "add_task",
-  title: "Add tasks",
-  description: "Create a task \u2014 or several in one write via `tasks` \u2014 optionally each with a whole subtree. MLO is an OUTLINER: deep nesting is idiomatic, so prefer parentId placement and the subtasks outline over flat top-level lists. Fields and placement are written exactly via the XML pipeline (if the MLO app is open it is closed gracefully \u2014 it saves on close \u2014 and relaunched afterwards); ALWAYS batch multiple adds into one call (`tasks` or subtasks outline) instead of calling per task. Without a parentId, tasks are filed into the profile's <Inbox> node for later processing (parentId \"root\" forces a deliberate top-level task). Only a natural-language dueDate, urgency or parseText route through MLO's best-effort rapid-entry parser (single-task mode only). Always check the reported result.",
-  inputSchema: {
-    caption: external_exports.string().min(1).optional().describe("Task caption (single-task mode; omit when using `tasks`)"),
-    parentId: external_exports.string().optional().describe(`Place the task under this task id; "root" forces top level (default: the profile's <Inbox> node, else top level)`),
-    dueDate: external_exports.string().optional().describe(`ISO ("2026-08-01" or "2026-08-01T15:00") is applied exactly; natural language ("tomorrow 3pm") goes through MLO's parser`),
-    urgency: external_exports.number().int().min(1).max(5).optional().describe("1\u20135; parser path only (no XML field)"),
-    parseText: external_exports.string().optional().describe('Raw MLO parser tail appended verbatim, e.g. "remind tomorrow 9am -h -p" \u2014 forces the parser path'),
-    ...XmlFields,
-    tasks: external_exports.array(BatchEntry).min(1).max(25).optional().describe(
-      "Batch mode: create up to 25 tasks (each with own parentId/fields/subtasks) in ONE data-file write. Exact-XML only (ISO dates, no urgency/parseText). Mutually exclusive with the single-task fields."
-    )
-  },
-  outputSchema: {
-    task: TaskSummarySchema.optional().describe("single-task mode"),
-    tasks: external_exports.array(TaskSummarySchema).optional().describe("batch mode"),
-    placement: external_exports.string(),
-    method: external_exports.enum(["xml", "parser"]),
-    backupPath: external_exports.string().optional().describe("batch mode: the data-file backup made for the write")
-  },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-  async execute(input, ctx) {
-    const { caption, parentId, note, dueDate, startDate, contexts, importance, urgency, effort, starred, folder, flag, parseText, subtasks, tasks } = input;
-    if (tasks) {
-      const singles = [caption, parentId, note, dueDate, startDate, contexts, importance, urgency, effort, starred, folder, flag, parseText, subtasks];
-      if (singles.some((v) => v !== void 0)) {
-        return errorResult("`tasks` is mutually exclusive with the single-task fields \u2014 put per-task fields inside each entry");
-      }
-      return executeBatch(tasks, ctx);
-    }
-    if (!caption) return errorResult("pass a caption (single task) or `tasks` (batch)");
-    const guiRunning = await isMloRunning();
-    const isoDue = dueDate ? normalizeIso(dueDate) : void 0;
-    const isoStart = startDate ? normalizeIso(startDate) : void 0;
-    const needsParser = Boolean(parseText) || Boolean(urgency) || dueDate !== void 0 && !isoDue;
-    const subtree = subtasks ? parseOutline(subtasks) : [];
-    if (subtree.length && needsParser) {
-      return errorResult(
-        "subtasks require the exact XML path \u2014 use an ISO dueDate and drop urgency/parseText, or create the parent first and add parser-based subtasks separately"
-      );
-    }
-    let parent;
-    let toInbox = false;
-    if (parentId && parentId !== "root") {
-      parent = findById((await ctx.store.getSnapshot()).tasks, parentId);
-      if (!parent) return errorResult(`no task with id "${parentId}" \u2014 re-run list_tasks and retry`);
-    } else if (!parentId) {
-      parent = findInbox((await ctx.store.getSnapshot()).tasks, ctx.config.inboxCaption);
-      toInbox = Boolean(parent);
-    }
-    const parentCaption = parent?.Caption;
-    let placement = toInbox ? "inbox" : parentCaption ? `under "${parentCaption}"` : parentId === "root" ? "top level" : "top level \u2014 no inbox node found in this profile";
-    let method;
-    const hasFields = Boolean(
-      note || isoDue || isoStart || contexts?.length || importance || effort || starred || folder || flag || parent
-    );
-    const useXmlPath = !needsParser && (guiRunning ? ctx.config.autoRestartGui : hasFields) || subtree.length > 0;
-    let guiRestarted = false;
-    if (useXmlPath) {
-      method = "xml";
-      const built = {
-        entry: { caption, note, contexts, importance, effort, starred, folder, flag },
-        isoDue,
-        isoStart,
-        parentCaption,
-        subtree
-      };
-      ({ guiRestarted } = await replaceDataFile(
-        ctx.config,
-        (doc) => {
-          let siblings;
-          if (toInbox) {
-            const rawInbox = findRawInbox(doc, ctx.config.inboxCaption);
-            if (!rawInbox) throw new Error("the inbox node vanished between snapshot and write \u2014 retry");
-            siblings = rawInbox.TaskNode ??= [];
-          } else if (parent && parentId) {
-            const found = findRawById(doc, parentId);
-            if (!found) throw new Error(`no task with id "${parentId}" \u2014 re-run list_tasks and retry`);
-            siblings = found.raw.TaskNode ??= [];
-          } else {
-            siblings = rootNode(doc).TaskNode ??= [];
-          }
-          siblings.push(buildNode(built));
-        },
-        (after) => verifyEntry(flatten(after), built)
-      ));
-    } else {
-      method = "parser";
-      const switches = [];
-      if (dueDate && !isoDue) switches.push(dueDate);
-      else if (isoDue) switches.push(isoDue.replace("T", " "));
-      if (contexts?.length) switches.push(contexts.map((c) => c.startsWith("@") ? c : `@${c}`).join("; "));
-      if (importance) switches.push(`-i${importance}`);
-      if (urgency) switches.push(`-u${urgency}`);
-      if (effort) switches.push(`-e${effort}`);
-      if (starred) switches.push("-star");
-      if (folder) switches.push("-f");
-      if (flag) switches.push(`-fl${flag}`);
-      if (parseText) switches.push(parseText);
-      let parentGuid;
-      if (parent) {
-        if (parent.Guid && !guiRunning) {
-          parentGuid = parent.Guid;
-          placement += " via GUID";
-        } else if (!toInbox) {
-          switches.push(`-to${parentCaption}`);
-          placement += " via name match";
-        }
-      }
-      const usesParser = switches.length > 0;
-      const arg = usesParser ? `"${caption}" ${switches.join(" ")}` : caption;
-      await addTask(ctx.config, arg, { parentGuid, parse: usesParser });
-    }
-    ctx.store.invalidate();
-    let snap = await ctx.store.getSnapshot(true);
-    let created = flatten(snap.tasks).filter((t) => t.Caption === caption || method === "parser" && t.Caption.startsWith(caption)).at(-1);
-    let relocated = false;
-    if (created && method === "parser") {
-      const actualParent = created.Path.at(-2);
-      const misplaced = parentCaption ? actualParent !== parentCaption : created.Path.length > 1;
-      if (misplaced) {
-        const movedCaption = created.Caption;
-        {
-          const findLastByCaption = (siblings, cap) => {
-            let hit;
-            for (let i2 = 0; i2 < siblings.length; i2++) {
-              const raw = siblings[i2];
-              if (raw["@_Caption"] === cap) hit = { siblings, index: i2, raw };
-              const deeper = findLastByCaption(raw.TaskNode ?? [], cap);
-              if (deeper) hit = deeper;
-            }
-            return hit;
-          };
-          await replaceDataFile(
-            ctx.config,
-            (doc) => {
-              const rootChildren = rootNode(doc).TaskNode ??= [];
-              const found = findLastByCaption(rootChildren, movedCaption);
-              if (!found) throw new Error("could not relocate the new task \u2014 it is missing from a fresh export");
-              found.siblings.splice(found.index, 1);
-              let destSiblings;
-              if (parentCaption) {
-                const dest = findLastByCaption(rootChildren, parentCaption);
-                if (!dest) throw new Error("could not find the requested parent to relocate the new task");
-                destSiblings = dest.raw.TaskNode ??= [];
-              } else {
-                destSiblings = rootChildren;
-              }
-              destSiblings.push(found.raw);
-            },
-            (after) => flatten(after).some(
-              (t) => t.Caption === movedCaption && (parentCaption ? t.Path.at(-2) === parentCaption : t.Path.length === 1)
-            )
-          );
-          relocated = true;
-          ctx.store.invalidate();
-          snap = await ctx.store.getSnapshot(true);
-          created = flatten(snap.tasks).filter((t) => t.Caption === movedCaption).at(-1);
-        }
-      }
-    }
-    const restartNote = (subtree.length ? ` with ${outlineCaptions(subtree).length} subtasks` : "") + (guiRestarted ? "; MLO was closed for the write and relaunched" : "") + (relocated ? "; the GUI had another task selected, so the new task was moved to the requested position" : "");
-    const text = created ? `created [${created.id}] "${created.Caption}" (${placement}, ${method}); parent path: ${created.Path.slice(0, -1).join(" > ") || "(top)"}${restartNote}` : `task submitted (${placement}, ${method}) but not found in re-export under caption "${caption}" \u2014 check list_tasks`;
-    return textResult(text, { task: created ? toSummary(created) : void 0, placement, method });
-  }
-});
-
-// src/tools/update-task.ts
-import { randomUUID } from "node:crypto";
-function applyField(raw, key, value) {
-  if (key === "Caption") {
-    raw["@_Caption"] = String(value);
-    return;
-  }
-  if (typeof value === "boolean") {
-    setRawField(raw, key, value ? "-1" : void 0);
-  } else if (typeof value === "number") {
-    setRawField(raw, key, String(value));
-  } else if (Array.isArray(value)) {
-    setRawField(raw, key, value.length ? { Place: value.map(String) } : void 0);
-  } else {
-    setRawField(raw, key, value === "" ? void 0 : String(value));
-  }
-}
-var UpdateEntry = external_exports.object({
-  id: external_exports.string().describe("Path-based task id"),
-  Caption: external_exports.string().min(1).optional(),
-  Note: external_exports.string().optional(),
-  Importance: external_exports.number().min(0).max(200).optional().describe("0\u2013200; 100 = normal"),
-  Effort: external_exports.number().min(0).max(200).optional(),
-  DueDateTime: external_exports.string().optional().describe(
-    'ISO like "2026-08-01T15:00:00"; "" clears. CAUTION on recurring tasks: the recurrence pattern (Recurrence fields) is not updated \u2014 overwriting the due date can desync the series. Check get_task first.'
-  ),
-  StartDateTime: external_exports.string().optional(),
-  CompletionDateTime: external_exports.string().optional().describe('"" reopens a completed task (or use uncomplete_task)'),
-  IsProject: external_exports.boolean().optional(),
-  ProjectStatus: external_exports.number().int().optional(),
-  Starred: external_exports.boolean().optional(),
-  Flag: external_exports.string().optional().describe('e.g. "Green Flag"; "" clears'),
-  Places: external_exports.array(external_exports.string()).optional().describe("Full replacement list of contexts"),
-  EstimateMin: external_exports.number().optional().describe("fractional days"),
-  EstimateMax: external_exports.number().optional(),
-  TheGoal: external_exports.number().int().min(0).max(3).optional().describe("0 none, 1 weekly, 2 monthly, 3 yearly"),
-  moveToParentId: external_exports.string().optional().describe('Re-parent: move this task (with its whole subtree) under the given task id; "" moves it to the top level'),
-  dependsOn: external_exports.array(external_exports.string()).optional().describe(
-    "Full replacement list of task ids this task depends on (waits for in to-do views); [] clears all dependencies"
-  ),
-  HideInToDo: external_exports.boolean().optional().describe("Hide this task AND its whole branch from to-do views"),
-  HideInToDoThisTask: external_exports.boolean().optional().describe("Folder behavior: hide only this task from to-do views, children still show (true = make folder, false = make normal task)"),
-  CompleteSubTasksInOrder: external_exports.boolean().optional()
-});
-var updateTaskTool = defineTool({
-  name: "update_task",
-  title: "Update tasks",
-  description: "Edit fields of one or more tasks by id. Only provided fields change; pass an empty string to clear a text field, false to clear a boolean, [] to clear contexts. All updates are applied in ONE write \u2014 batch related edits instead of calling per task, because every write rewrites the data file (timestamped backup kept) and restarts the MLO app if it is open. Atomic: one bad entry and nothing changes. All ids resolve against the tree as it is BEFORE the call \u2014 a moveToParentId in one entry cannot target a position created by another.",
-  inputSchema: {
-    updates: external_exports.array(UpdateEntry).min(1).max(25).describe("Per-task updates (max 25), applied in one write")
-  },
-  outputSchema: {
-    ok: external_exports.boolean(),
-    updated: external_exports.array(external_exports.object({ id: external_exports.string(), Caption: external_exports.string(), changes: external_exports.array(external_exports.string()) })),
-    backupPath: external_exports.string()
-  },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
-  async execute({ updates }, ctx) {
-    const idsSeen = /* @__PURE__ */ new Set();
-    const specs = updates.map(({ id, moveToParentId, dependsOn, ...fields }) => {
-      if (idsSeen.has(id)) throw new Error(`duplicate id "${id}" in updates \u2014 merge those entries into one`);
-      idsSeen.add(id);
-      const entries = Object.entries(fields).filter(([, v]) => v !== void 0);
-      const moving = moveToParentId !== void 0;
-      if (entries.length === 0 && !moving && dependsOn === void 0) {
-        throw new Error(`entry for id "${id}" has nothing to update \u2014 pass at least one field`);
-      }
-      return { id, moveToParentId, dependsOn, entries, moving };
-    });
-    const plans = [];
-    const { backupPath } = await replaceDataFile(
-      ctx.config,
-      (doc) => {
-        for (const { id, moveToParentId, dependsOn, entries, moving } of specs) {
-          const found = findRawById(doc, id);
-          if (!found) throw new Error(`no task with id "${id}" \u2014 ids shift when the tree changes; re-run list_tasks`);
-          plans.push({ id, found, fields: entries, moveToParentId, dependsOn, caption: "", moving, depCaptions: [] });
-        }
-        const destByEntry = /* @__PURE__ */ new Map();
-        for (const plan of plans) {
-          if (!plan.moving) continue;
-          if (plan.moveToParentId === "") {
-            destByEntry.set(plan, rootNode(doc).TaskNode ??= []);
-          } else {
-            const dest = findRawById(doc, plan.moveToParentId);
-            if (!dest) throw new Error(`no task with id "${plan.moveToParentId}" to move under \u2014 re-run list_tasks`);
-            destByEntry.set(plan, { dest });
-          }
-        }
-        const depTargets = /* @__PURE__ */ new Map();
-        for (const plan of plans) {
-          if (!plan.dependsOn?.length) continue;
-          depTargets.set(
-            plan,
-            plan.dependsOn.map((depId) => {
-              const target = findRawById(doc, depId);
-              if (!target) throw new Error(`dependsOn: no task with id "${depId}" \u2014 re-run list_tasks`);
-              if (target.raw === plan.found.raw) throw new Error("a task cannot depend on itself");
-              return target;
-            })
-          );
-        }
-        for (const plan of plans) {
-          for (const [k, v] of plan.fields) applyField(plan.found.raw, k, v);
-          plan.caption = plan.found.raw["@_Caption"];
-          if (plan.dependsOn !== void 0) {
-            if (plan.dependsOn.length === 0) {
-              delete plan.found.raw.Dependency;
-            } else {
-              const uids = [];
-              for (const target of depTargets.get(plan)) {
-                target.raw.IDD ??= `{${randomUUID().toUpperCase()}}`;
-                setRawField(target.raw, "IDD", target.raw.IDD);
-                uids.push(target.raw.IDD);
-                plan.depCaptions.push(target.raw["@_Caption"]);
-              }
-              setRawField(plan.found.raw, "Dependency", { UID: uids });
-            }
-          }
-        }
-        for (const plan of plans) {
-          if (!plan.moving) continue;
-          const dest = destByEntry.get(plan);
-          let destSiblings;
-          if (Array.isArray(dest)) {
-            destSiblings = dest;
-          } else {
-            const inOwnSubtree = (n) => n === dest.dest.raw || (n.TaskNode ?? []).some(inOwnSubtree);
-            if (inOwnSubtree(plan.found.raw)) {
-              throw new Error(`cannot move [${plan.id}] "${plan.caption}" into its own subtree`);
-            }
-            plan.destCaption = dest.dest.raw["@_Caption"];
-            destSiblings = dest.dest.raw.TaskNode ??= [];
-          }
-          plan.found.siblings.splice(plan.found.siblings.indexOf(plan.found.raw), 1);
-          destSiblings.push(plan.found.raw);
-        }
-      },
-      (after) => {
-        const all = flatten(after);
-        const anyMove = plans.some((p) => p.moving);
-        const byGuid = new Map(all.filter((t) => t.Guid).map((t) => [t.Guid, t.Caption]));
-        for (const plan of plans) {
-          const target = plan.moving ? all.find(
-            (t) => t.Caption === plan.caption && (plan.destCaption ? t.Path.at(-2) === plan.destCaption : t.Path.length === 1)
-          ) : anyMove ? all.find((t) => t.Caption === plan.caption) : findById(after, plan.id);
-          if (!target || target.Caption !== plan.caption) return false;
-          if (plan.dependsOn !== void 0) {
-            const resolved = target.DependsOn.map((uid) => byGuid.get(uid)).filter(Boolean);
-            if (resolved.length !== plan.dependsOn.length) return false;
-            if (!plan.depCaptions.every((c) => resolved.includes(c))) return false;
-          }
-        }
-        return true;
-      }
-    );
-    ctx.store.invalidate();
-    const updated = plans.map((plan) => {
-      const changes = plan.fields.map(([k]) => k);
-      if (plan.moving) changes.push(`moved ${plan.destCaption ? `under "${plan.destCaption}"` : "to top level"}`);
-      if (plan.dependsOn !== void 0) {
-        changes.push(
-          plan.dependsOn.length ? `depends on: ${plan.depCaptions.map((c) => `"${c}"`).join(", ")}` : "dependencies cleared"
-        );
-      }
-      return { id: plan.id, Caption: plan.caption, changes };
-    });
-    const text = updated.map((u) => `updated [${u.id}] "${u.Caption}": ${u.changes.join(", ")}`).join("\n");
-    return textResult(`${text}
-(backup: ${backupPath})`, { ok: true, updated, backupPath });
-  }
-});
-
-// src/tools/complete-task.ts
-var completeTaskTool = defineTool({
-  name: "complete_task",
-  title: "Complete tasks",
-  description: "Mark one or more tasks completed (sets CompletionDateTime; for projects also ProjectStatus). All ids are applied in ONE write \u2014 batch related completions instead of calling per task, because every write rewrites the data file (timestamped backup kept) and restarts the MLO app if it is open. The batch is atomic: one bad id and nothing is changed.",
-  inputSchema: {
-    ids: external_exports.array(external_exports.string()).min(1).max(50).describe("Path-based task ids from list_tasks/search_tasks")
-  },
-  outputSchema: {
-    ok: external_exports.boolean(),
-    completedAt: external_exports.string(),
-    completed: external_exports.array(external_exports.object({ id: external_exports.string(), Caption: external_exports.string() })),
-    backupPath: external_exports.string()
-  },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
-  async execute({ ids }, ctx) {
-    const unique = [...new Set(ids)];
-    const completedAt = nowIso();
-    const completed = [];
-    const { backupPath } = await replaceDataFile(
-      ctx.config,
-      (doc) => {
-        const found = unique.map((id) => {
-          const hit = findRawById(doc, id);
-          if (!hit) throw new Error(`no task with id "${id}" \u2014 ids shift when the tree changes; re-run list_tasks`);
-          return { id, hit };
-        });
-        for (const { id, hit } of found) {
-          completed.push({ id, Caption: hit.raw["@_Caption"] });
-          setRawField(hit.raw, "CompletionDateTime", completedAt);
-          if (hit.raw.IsProject === "-1") setRawField(hit.raw, "ProjectStatus", "3");
-        }
-      },
-      // completion changes no structure, so path ids stay valid in the re-export
-      (after) => unique.every((id) => findById(after, id)?.CompletionDateTime === completedAt)
-    );
-    ctx.store.invalidate();
-    const listText = completed.map((c) => `[${c.id}] "${c.Caption}"`).join(", ");
-    return textResult(`completed ${listText} at ${completedAt} (backup: ${backupPath})`, {
-      ok: true,
-      completedAt,
-      completed,
-      backupPath
-    });
-  }
-});
-
-// src/tools/uncomplete-task.ts
-var uncompleteTaskTool = defineTool({
-  name: "uncomplete_task",
-  title: "Reopen tasks",
-  description: "Reopen one or more completed tasks (clears CompletionDateTime; a project marked completed goes back to active). All ids are applied in ONE write \u2014 batch related reopens, because every write rewrites the data file (timestamped backup kept) and restarts the MLO app if it is open. Atomic: one bad id and nothing changes.",
-  inputSchema: {
-    ids: external_exports.array(external_exports.string()).min(1).max(50).describe("Path-based task ids from list_tasks/search_tasks (include completed tasks in the listing to see them)")
-  },
-  outputSchema: {
-    ok: external_exports.boolean(),
-    reopened: external_exports.array(external_exports.object({ id: external_exports.string(), Caption: external_exports.string() })),
-    backupPath: external_exports.string()
-  },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
-  async execute({ ids }, ctx) {
-    const unique = [...new Set(ids)];
-    const reopened = [];
-    const { backupPath } = await replaceDataFile(
-      ctx.config,
-      (doc) => {
-        const found = unique.map((id) => {
-          const hit = findRawById(doc, id);
-          if (!hit) throw new Error(`no task with id "${id}" \u2014 ids shift when the tree changes; re-run list_tasks`);
-          return { id, hit };
-        });
-        for (const { id, hit } of found) {
-          reopened.push({ id, Caption: hit.raw["@_Caption"] });
-          setRawField(hit.raw, "CompletionDateTime", void 0);
-          if (hit.raw.ProjectStatus === "3") setRawField(hit.raw, "ProjectStatus", void 0);
-        }
-      },
-      (after) => unique.every((id) => findById(after, id)?.CompletionDateTime === void 0)
-    );
-    ctx.store.invalidate();
-    const listText = reopened.map((c) => `[${c.id}] "${c.Caption}"`).join(", ");
-    return textResult(`reopened ${listText} (backup: ${backupPath})`, { ok: true, reopened, backupPath });
-  }
-});
-
-// src/tools/delete-task.ts
-var deleteTaskTool = defineTool({
-  name: "delete_task",
-  title: "Delete tasks",
-  description: "Permanently delete one or more tasks AND all of their subtasks. All ids are applied in ONE write \u2014 batch related deletions, because every write rewrites the data file (timestamped backup kept \u2014 restore it to undo) and restarts the MLO app if it is open. Atomic: one bad id and nothing is deleted.",
-  inputSchema: {
-    ids: external_exports.array(external_exports.string()).min(1).max(50).describe("Path-based task ids from list_tasks/search_tasks")
-  },
-  outputSchema: {
-    ok: external_exports.boolean(),
-    deleted: external_exports.array(external_exports.object({ id: external_exports.string(), Caption: external_exports.string(), subtasks: external_exports.number() })),
-    backupPath: external_exports.string()
-  },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
-  async execute({ ids }, ctx) {
-    const unique = [...new Set(ids)];
-    const deleted = [];
-    let expectedTotal = -1;
-    const countTree = (n) => (n.TaskNode ?? []).reduce((acc, c) => acc + 1 + countTree(c), 0);
-    const contains = (root, target) => (root.TaskNode ?? []).some((c) => c === target || contains(c, target));
-    const { backupPath } = await replaceDataFile(
-      ctx.config,
-      (doc) => {
-        const found = unique.map((id) => {
-          const hit = findRawById(doc, id);
-          if (!hit) throw new Error(`no task with id "${id}" \u2014 ids shift when the tree changes; re-run list_tasks`);
-          return { id, hit };
-        });
-        const roots = found.filter(({ hit }) => !found.some((o) => o.hit !== hit && contains(o.hit.raw, hit.raw)));
-        expectedTotal = countTree(rootNode(doc)) - roots.reduce((acc, { hit }) => acc + countTree(hit.raw) + 1, 0);
-        for (const { id, hit } of roots) {
-          deleted.push({ id, Caption: hit.raw["@_Caption"], subtasks: countTree(hit.raw) });
-          hit.siblings.splice(hit.siblings.indexOf(hit.raw), 1);
-        }
-      },
-      (after) => flatten(after).length === expectedTotal
-    );
-    ctx.store.invalidate();
-    const listText = deleted.map((d) => `[${d.id}] "${d.Caption}" (${d.subtasks} subtask${d.subtasks === 1 ? "" : "s"})`).join(", ");
-    return textResult(`deleted ${listText}; backup: ${backupPath}`, { ok: true, deleted, backupPath });
-  }
-});
-
-// src/tools/list-contexts.ts
-var listContextsTool = defineTool({
-  name: "list_contexts",
-  title: "List contexts",
-  description: "List the profile's contexts (MLO Places, e.g. @Office): the ones defined in the profile plus any referenced by tasks, with usage counts. Consult this before assigning contexts \u2014 reuse existing ones.",
-  inputSchema: {},
-  outputSchema: {
-    contexts: external_exports.array(
-      external_exports.object({
-        Caption: external_exports.string(),
-        defined: external_exports.boolean().describe("Declared in the profile's places list (may carry open-hours schedules)"),
-        tasksUsing: external_exports.number()
-      })
-    )
-  },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  async execute(_args, ctx) {
-    const snap = await ctx.store.getSnapshot();
-    const placesList = snap.doc["MyLifeOrganized-xml"].PlacesList;
-    const defined = (placesList?.TaskPlace ?? []).map((p) => p["@_Caption"]);
-    const usage = /* @__PURE__ */ new Map();
-    for (const t of flatten(snap.tasks)) {
-      for (const p of t.Places) usage.set(p, (usage.get(p) ?? 0) + 1);
-    }
-    const captions = [.../* @__PURE__ */ new Set([...defined, ...usage.keys()])];
-    const contexts = captions.map((Caption) => ({ Caption, defined: defined.includes(Caption), tasksUsing: usage.get(Caption) ?? 0 })).sort((a, b) => b.tasksUsing - a.tasksUsing || a.Caption.localeCompare(b.Caption));
-    const text = contexts.length ? contexts.map((c) => `${c.Caption}  (${c.tasksUsing} task${c.tasksUsing === 1 ? "" : "s"}${c.defined ? "" : ", not in places list"})`).join("\n") : "(no contexts defined)";
-    return textResult(text, { contexts });
-  }
-});
-
-// src/tools/sync.ts
-var syncTool = defineTool({
-  name: "sync",
-  title: "Sync profile",
-  description: "Run MLO QuickSync for the data file (cloud/Wi-Fi sync as configured in the profile).",
-  inputSchema: {},
-  outputSchema: { ok: external_exports.boolean() },
-  // openWorldHint: QuickSync talks to the MLO cloud / Wi-Fi sync endpoint.
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
-  async execute(_args, ctx) {
-    await quickSync(ctx.config);
-    ctx.store.invalidate();
-    return textResult("QuickSync finished", { ok: true });
-  }
-});
-
 // src/cloud/delta.ts
-import { randomUUID as randomUUID2 } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 // src/cloud/csv.ts
 function parseRecords(input) {
@@ -24895,7 +24009,7 @@ function normalizeGuid(uid) {
   return `{${raw.toUpperCase()}}`;
 }
 function generateGuid() {
-  return `{${randomUUID2().toUpperCase()}}`;
+  return `{${randomUUID().toUpperCase()}}`;
 }
 function buildTaskAddDelta(input) {
   const document = createDeltaSkeleton();
@@ -24915,6 +24029,32 @@ function buildTaskAddDelta(input) {
   set("LastModified", input.lastModified);
   set("Note", input.note);
   findSection(document, "TodoItems").rows.push(row);
+  return document;
+}
+function buildTaskDeleteDelta(uids) {
+  const document = createDeltaSkeleton();
+  const section = findSection(document, "TodoItems.Deleted");
+  for (const uid of uids) section.rows.push([normalizeGuid(uid)]);
+  return document;
+}
+function buildTaskUpdatesDelta(updates) {
+  const document = createDeltaSkeleton();
+  const section = findSection(document, "TodoItems");
+  for (const update of updates) {
+    for (const column of update.header) if (!section.header.includes(column)) section.header.push(column);
+  }
+  for (const update of updates) {
+    const row = section.header.map((column) => {
+      const index = update.header.indexOf(column);
+      return index < 0 ? "" : update.row[index] ?? "";
+    });
+    for (const [column, value] of Object.entries(update.patch)) {
+      const index = section.header.indexOf(column);
+      if (index < 0) throw new Error(`unknown TodoItems column "${column}"`);
+      row[index] = value;
+    }
+    section.rows.push(row);
+  }
   return document;
 }
 var KEYS = {
@@ -26001,7 +25141,7 @@ function parseCursor(value) {
   return parsed;
 }
 
-// src/tools/cloud-add-task.ts
+// src/tools/add-task.ts
 function matchesInput(task, caption, note) {
   return task.Caption === caption && (note === void 0 || task.Note === note);
 }
@@ -26010,9 +25150,9 @@ function wasTaskAdded(before, after, caption, note, queuedUid) {
   const afterMatches = flatten(after).filter((task) => matchesInput(task, caption, note));
   return afterMatches.some((task) => task.Guid?.toUpperCase() === queuedUid) || afterMatches.length > beforeMatches.length;
 }
-var cloudAddTaskTool = defineTool({
-  name: "cloud_add_task",
-  title: "Add task through local cloud sync",
+var addTaskTool = defineTool({
+  name: "add_task",
+  title: "Add a task",
   description: "Queue a full task delta, trigger QuickSync, and verify whether MLO applied it.",
   inputSchema: {
     caption: external_exports.string().min(1),
@@ -26067,6 +25207,390 @@ var cloudAddTaskTool = defineTool({
   }
 });
 
+// src/cloud/log-projection.ts
+function rowValue(known, column) {
+  const index = known.header.indexOf(column);
+  return index < 0 ? "" : known.row[index] ?? "";
+}
+function latestFullRows(documents) {
+  const merged = mergeDeltas(documents);
+  const section = findSection(merged, "TodoItems");
+  const uidIndex = section.header.indexOf("UID");
+  const rows = /* @__PURE__ */ new Map();
+  for (const row of section.rows) {
+    const uid = (row[uidIndex] ?? "").toUpperCase();
+    if (uid) rows.set(uid, { header: section.header, row });
+  }
+  return rows;
+}
+async function knownFullRows(state) {
+  const entries = await state.entriesAfter(ZERO_CURSOR);
+  return latestFullRows(entries.map((entry) => unpackEnvelope(entry.bytes)));
+}
+
+// src/tools/row-update.ts
+async function runCloudRowUpdate(ctx, ids, plan) {
+  const before = (await ctx.store.getSnapshot(true)).tasks;
+  const resolved = [...new Set(ids)].map((id) => {
+    const task = findById(before, id);
+    if (!task) throw new Error(`no task with id "${id}" \u2014 ids shift when the tree changes; re-run list_tasks`);
+    return { id, task };
+  });
+  const noGuid = resolved.filter(({ task }) => !task.Guid);
+  if (noGuid.length > 0) {
+    const list = noGuid.map(({ id, task }) => `[${id}] "${task.Caption}"`).join(", ");
+    throw new Error(`no recoverable GUID for ${list} \u2014 nothing was queued; make this change in the MLO app`);
+  }
+  const rows = await knownFullRows(ctx.cloudState);
+  const targets = resolved.map(({ id, task }) => {
+    const uid = task.Guid.toUpperCase();
+    const known = rows.get(uid);
+    if (!known) {
+      throw new Error(
+        `no full record for [${id}] "${task.Caption}" in the delta log \u2014 the cloud path can only rewrite tasks it has seen a complete row for (added via a cloud tool, or changed in MLO since the local endpoint took over); nothing was queued; make this change in the MLO app`
+      );
+    }
+    return { id, task, uid, known };
+  });
+  plan.prepare?.(before, targets);
+  for (const target of targets) plan.guard?.(target);
+  const now = nowIso();
+  const delta = buildTaskUpdatesDelta(
+    targets.map((target) => ({ header: target.known.header, row: target.known.row, patch: plan.patchFor(target, now) }))
+  );
+  const cursor = cursorToDecimalString(await ctx.cloudState.append("mcp", packEnvelope(delta)));
+  const described = targets.map(({ id, task }) => `[${id}] "${task.Caption}"`).join(", ");
+  const uids = targets.map((target) => target.uid);
+  let verified = false;
+  let message;
+  try {
+    await quickSync(ctx.config);
+    ctx.store.invalidate();
+    try {
+      const after = flatten((await ctx.store.getSnapshot(true)).tasks);
+      const byGuid = new Map(after.filter((task) => task.Guid).map((task) => [task.Guid.toUpperCase(), task]));
+      verified = targets.every((target) => {
+        const task = byGuid.get(target.uid);
+        return task !== void 0 && plan.verified(task, target);
+      });
+      message = verified ? `${plan.verb} of ${described} was queued and verified in a fresh MLO export.` : `${plan.verb} of ${described} was queued, but a fresh export after QuickSync does not confirm every task yet.`;
+    } catch (error2) {
+      message = `${plan.verb} of ${described} was queued, but verification failed: ${error2 instanceof Error ? error2.message : String(error2)}`;
+    }
+  } catch (error2) {
+    ctx.store.invalidate();
+    message = `${plan.verb} of ${described} was queued for the next session, but QuickSync failed: ${error2 instanceof Error ? error2.message : String(error2)}`;
+  }
+  return textResult(message, { uids, cursor, verified, message });
+}
+function csvTruthy(value) {
+  return value !== "" && value !== "0";
+}
+
+// src/tools/update-task.ts
+var CloudUpdateEntry = external_exports.object({
+  id: external_exports.string().describe("Path-based task id"),
+  Caption: external_exports.string().min(1).optional(),
+  Note: external_exports.string().optional().describe('"" clears'),
+  Importance: external_exports.number().min(0).max(200).optional().describe("0\u2013200; 100 = normal"),
+  Effort: external_exports.number().min(0).max(200).optional(),
+  DueDateTime: external_exports.string().optional().describe('ISO like "2026-08-01T15:00:00"; "" clears'),
+  StartDateTime: external_exports.string().optional(),
+  CompletionDateTime: external_exports.string().optional().describe('"" reopens (or use uncomplete_task)'),
+  ProjectStatus: external_exports.number().int().optional(),
+  EstimateMin: external_exports.number().optional().describe("fractional days"),
+  EstimateMax: external_exports.number().optional(),
+  TheGoal: external_exports.number().int().min(0).max(3).optional().describe("0 none, 1 weekly, 2 monthly, 3 yearly"),
+  moveToParentId: external_exports.string().optional().describe('Re-parent: move this task (with its whole subtree) under the given task id; "" moves it to the top level')
+});
+var STRING_COLUMNS = ["Caption", "Note", "DueDateTime", "StartDateTime", "CompletionDateTime"];
+var NUMBER_COLUMNS = [
+  ["Importance", "Importance"],
+  ["Effort", "Effort"],
+  ["ProjectStatus", "ProjectStatus"],
+  ["EstimateMin", "EstimateMin"],
+  ["EstimateMax", "EstimateMax"],
+  ["TheGoal", "GoalFor"]
+];
+function updatePatch(spec, known, now, move) {
+  const patch = { LastModified: now };
+  for (const column of STRING_COLUMNS) {
+    const value = spec[column];
+    if (value !== void 0) patch[column] = value;
+  }
+  for (const [field2, column] of NUMBER_COLUMNS) {
+    const value = spec[field2];
+    if (value !== void 0) patch[column] = String(value);
+  }
+  if (move) patch.ParentUID = move.parentUid;
+  if (spec.DueDateTime !== void 0 || spec.StartDateTime !== void 0) {
+    const due = spec.DueDateTime ?? rowValue(known, "DueDateTime");
+    const start = spec.StartDateTime ?? rowValue(known, "StartDateTime");
+    if (due === "" && start === "") patch.ScheduleType = "0";
+    else if (!csvTruthy(rowValue(known, "ScheduleType"))) patch.ScheduleType = "1";
+  }
+  return patch;
+}
+function verifiesUpdate(task, spec, move) {
+  if (spec.Caption !== void 0 && task.Caption !== spec.Caption) return false;
+  if (spec.Note !== void 0 && (task.Note ?? "") !== spec.Note) return false;
+  if (spec.DueDateTime !== void 0 && (task.DueDateTime ?? "") !== spec.DueDateTime) return false;
+  if (spec.StartDateTime !== void 0 && (task.StartDateTime ?? "") !== spec.StartDateTime) return false;
+  if (spec.CompletionDateTime !== void 0 && (task.CompletionDateTime ?? "") !== spec.CompletionDateTime) return false;
+  if (move) return move.destCaption ? task.Path.at(-2) === move.destCaption : task.Path.length === 1;
+  return true;
+}
+var updateTaskTool = defineTool({
+  name: "update_task",
+  title: "Update tasks",
+  description: 'Queue full-row field edits (and re-parenting moves) for one or more tasks, trigger QuickSync, and verify in a fresh export. Only provided fields change; "" clears a text field. The whole batch travels as ONE delta. Only works for tasks whose complete record is in the delta log (added by this server or changed in MLO since the local endpoint took over); date edits on recurring tasks are refused. Booleans (IsProject, Starred, Hide*), Flag, Places, and dependsOn cannot be edited yet (wire encoding unobserved) \u2014 make those changes in the MLO app.',
+  inputSchema: {
+    updates: external_exports.array(CloudUpdateEntry).min(1).max(25).describe("Per-task updates (max 25), applied in one delta")
+  },
+  outputSchema: {
+    uids: external_exports.array(external_exports.string()),
+    cursor: external_exports.string(),
+    verified: external_exports.boolean(),
+    message: external_exports.string()
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  execute({ updates }, ctx) {
+    const specs = /* @__PURE__ */ new Map();
+    for (const spec of updates) {
+      if (specs.has(spec.id)) throw new Error(`duplicate id "${spec.id}" in updates \u2014 merge those entries into one`);
+      const { id, moveToParentId, ...fields } = spec;
+      if (Object.values(fields).every((value) => value === void 0) && moveToParentId === void 0) {
+        throw new Error(`entry for id "${id}" has nothing to update \u2014 pass at least one field`);
+      }
+      specs.set(id, spec);
+    }
+    const moves = /* @__PURE__ */ new Map();
+    return runCloudRowUpdate(ctx, [...specs.keys()], {
+      verb: "Update",
+      prepare(before, targets) {
+        for (const { id, task } of targets) {
+          const moveTo = specs.get(id).moveToParentId;
+          if (moveTo === void 0) continue;
+          if (moveTo === "") {
+            moves.set(id, { parentUid: "" });
+            continue;
+          }
+          const dest = findById(before, moveTo);
+          if (!dest) throw new Error(`no task with id "${moveTo}" to move under \u2014 re-run list_tasks`);
+          if (flatten([task]).includes(dest)) {
+            throw new Error(`cannot move [${id}] "${task.Caption}" into its own subtree`);
+          }
+          if (!dest.Guid) {
+            throw new Error(
+              `no recoverable GUID for move destination [${moveTo}] "${dest.Caption}" \u2014 move the task in the MLO app`
+            );
+          }
+          moves.set(id, { parentUid: dest.Guid.toUpperCase(), destCaption: dest.Caption });
+        }
+      },
+      guard({ id, task, known }) {
+        const spec = specs.get(id);
+        const editsDates = spec.DueDateTime !== void 0 || spec.StartDateTime !== void 0 || spec.CompletionDateTime !== void 0;
+        if (editsDates && csvTruthy(rowValue(known, "RecType"))) {
+          throw new Error(
+            `[${id}] "${task.Caption}" is recurring \u2014 date edits through the cloud path can desync the series; nothing was queued; edit it in MLO instead`
+          );
+        }
+      },
+      patchFor: ({ id, known }, now) => updatePatch(specs.get(id), known, now, moves.get(id)),
+      verified: (task, { id }) => verifiesUpdate(task, specs.get(id), moves.get(id))
+    });
+  }
+});
+
+// src/tools/complete-task.ts
+function completionPatch(known, now) {
+  return {
+    CompletionDateTime: now,
+    LastModified: now,
+    ...csvTruthy(rowValue(known, "IsProject")) ? { ProjectStatus: "3" } : {}
+  };
+}
+function guardNotRecurring({ id, task, known }) {
+  const recType = rowValue(known, "RecType");
+  if (csvTruthy(recType)) {
+    throw new Error(
+      `[${id}] "${task.Caption}" is recurring (RecType ${recType}) \u2014 completing it through the cloud path would bypass MLO's recurrence generation; nothing was queued; complete it in MLO instead`
+    );
+  }
+}
+var completeTaskTool = defineTool({
+  name: "complete_task",
+  title: "Complete tasks",
+  description: "Queue full-row updates marking tasks completed (sets CompletionDateTime; for projects also ProjectStatus), trigger QuickSync, and verify in a fresh export. The whole batch travels as ONE delta. Only works for tasks whose complete record is in the delta log (added via a cloud tool or changed in MLO since the local endpoint took over) and refuses recurring tasks (complete those in MLO so the next occurrence is generated).",
+  inputSchema: {
+    ids: external_exports.array(external_exports.string()).min(1).max(50).describe("Path-based task ids from list_tasks/search_tasks")
+  },
+  outputSchema: {
+    uids: external_exports.array(external_exports.string()),
+    cursor: external_exports.string(),
+    verified: external_exports.boolean(),
+    message: external_exports.string()
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  execute({ ids }, ctx) {
+    return runCloudRowUpdate(ctx, ids, {
+      verb: "Completion",
+      guard: guardNotRecurring,
+      patchFor: ({ known }, now) => completionPatch(known, now),
+      verified: (task) => Boolean(task.CompletionDateTime)
+    });
+  }
+});
+
+// src/tools/uncomplete-task.ts
+function reopenPatch(known, now) {
+  return {
+    CompletionDateTime: "",
+    LastModified: now,
+    // complete paths set ProjectStatus 3 (completed); 0 = default/active
+    ...rowValue(known, "ProjectStatus") === "3" ? { ProjectStatus: "0" } : {}
+  };
+}
+var uncompleteTaskTool = defineTool({
+  name: "uncomplete_task",
+  title: "Reopen tasks",
+  description: "Queue full-row updates reopening completed tasks (clears CompletionDateTime; a completed project goes back to active), trigger QuickSync, and verify in a fresh export. The whole batch travels as ONE delta. Only works for tasks whose complete record is in the delta log (added via a cloud tool or changed in MLO since the local endpoint took over); otherwise nothing is queued \u2014 reopen such tasks in the MLO app.",
+  inputSchema: {
+    ids: external_exports.array(external_exports.string()).min(1).max(50).describe("Path-based task ids from list_tasks/search_tasks (include completed tasks in the listing to see them)")
+  },
+  outputSchema: {
+    uids: external_exports.array(external_exports.string()),
+    cursor: external_exports.string(),
+    verified: external_exports.boolean(),
+    message: external_exports.string()
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  execute({ ids }, ctx) {
+    return runCloudRowUpdate(ctx, ids, {
+      verb: "Reopening",
+      patchFor: ({ known }, now) => reopenPatch(known, now),
+      verified: (task) => !task.CompletionDateTime
+    });
+  }
+});
+
+// src/tools/delete-task.ts
+function collectTombstones(tasks, ids) {
+  const targets = [...new Set(ids)].map((id) => {
+    const task = findById(tasks, id);
+    if (!task) throw new Error(`no task with id "${id}" \u2014 ids shift when the tree changes; re-run list_tasks`);
+    return { id, task };
+  });
+  const uids = /* @__PURE__ */ new Set();
+  const missingGuid = /* @__PURE__ */ new Set();
+  for (const { task } of targets) {
+    for (const node of flatten([task])) {
+      if (node.Guid) uids.add(node.Guid.toUpperCase());
+      else missingGuid.add(node);
+    }
+  }
+  return { targets, uids: [...uids], missingGuid: [...missingGuid] };
+}
+function wereTasksDeleted(after, uids) {
+  const present = new Set(
+    flatten(after).map((task) => task.Guid?.toUpperCase()).filter((guid2) => guid2 !== void 0)
+  );
+  return uids.every((uid) => !present.has(uid.toUpperCase()));
+}
+var deleteTaskTool = defineTool({
+  name: "delete_task",
+  title: "Delete tasks",
+  description: "Queue tombstone deltas for one or more tasks AND all of their subtasks, trigger QuickSync, and verify they disappeared from a fresh export. The whole batch travels as ONE delta. Requires every task in the selected subtrees to have a recoverable GUID; otherwise nothing is queued \u2014 delete such tasks in the MLO app.",
+  inputSchema: {
+    ids: external_exports.array(external_exports.string()).min(1).max(50).describe("Path-based task ids from list_tasks/search_tasks")
+  },
+  outputSchema: {
+    uids: external_exports.array(external_exports.string()),
+    cursor: external_exports.string(),
+    verified: external_exports.boolean(),
+    message: external_exports.string()
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  async execute({ ids }, ctx) {
+    const before = (await ctx.store.getSnapshot(true)).tasks;
+    const { targets, uids, missingGuid } = collectTombstones(before, ids);
+    if (missingGuid.length > 0) {
+      const list = missingGuid.map((task) => `[${task.id}] "${task.Caption}"`).join(", ");
+      throw new Error(
+        `no recoverable GUID for ${list} \u2014 nothing was queued (a partial subtree tombstone could orphan children); delete these in the MLO app`
+      );
+    }
+    const delta = buildTaskDeleteDelta(uids);
+    const cursor = cursorToDecimalString(await ctx.cloudState.append("mcp", packEnvelope(delta)));
+    const described = targets.map(({ id, task }) => `[${id}] "${task.Caption}"`).join(", ");
+    let verified = false;
+    let message;
+    try {
+      await quickSync(ctx.config);
+      ctx.store.invalidate();
+      try {
+        const after = (await ctx.store.getSnapshot(true)).tasks;
+        verified = wereTasksDeleted(after, uids);
+        message = verified ? `Deletion of ${described} was queued and no tombstoned task remains in a fresh MLO export.` : `Deletion of ${described} was queued, but at least one tombstoned task is still present in the fresh export after QuickSync.`;
+      } catch (error2) {
+        message = `Deletion of ${described} was queued, but verification failed: ${error2 instanceof Error ? error2.message : String(error2)}`;
+      }
+    } catch (error2) {
+      ctx.store.invalidate();
+      message = `Deletion of ${described} was queued for the next session, but QuickSync failed: ${error2 instanceof Error ? error2.message : String(error2)}`;
+    }
+    return textResult(message, { uids, cursor, verified, message });
+  }
+});
+
+// src/tools/list-contexts.ts
+var listContextsTool = defineTool({
+  name: "list_contexts",
+  title: "List contexts",
+  description: "List the profile's contexts (MLO Places, e.g. @Office): the ones defined in the profile plus any referenced by tasks, with usage counts. Consult this before assigning contexts \u2014 reuse existing ones.",
+  inputSchema: {},
+  outputSchema: {
+    contexts: external_exports.array(
+      external_exports.object({
+        Caption: external_exports.string(),
+        defined: external_exports.boolean().describe("Declared in the profile's places list (may carry open-hours schedules)"),
+        tasksUsing: external_exports.number()
+      })
+    )
+  },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  async execute(_args, ctx) {
+    const snap = await ctx.store.getSnapshot();
+    const placesList = snap.doc["MyLifeOrganized-xml"].PlacesList;
+    const defined = (placesList?.TaskPlace ?? []).map((p) => p["@_Caption"]);
+    const usage = /* @__PURE__ */ new Map();
+    for (const t of flatten(snap.tasks)) {
+      for (const p of t.Places) usage.set(p, (usage.get(p) ?? 0) + 1);
+    }
+    const captions = [.../* @__PURE__ */ new Set([...defined, ...usage.keys()])];
+    const contexts = captions.map((Caption) => ({ Caption, defined: defined.includes(Caption), tasksUsing: usage.get(Caption) ?? 0 })).sort((a, b) => b.tasksUsing - a.tasksUsing || a.Caption.localeCompare(b.Caption));
+    const text = contexts.length ? contexts.map((c) => `${c.Caption}  (${c.tasksUsing} task${c.tasksUsing === 1 ? "" : "s"}${c.defined ? "" : ", not in places list"})`).join("\n") : "(no contexts defined)";
+    return textResult(text, { contexts });
+  }
+});
+
+// src/tools/sync.ts
+var syncTool = defineTool({
+  name: "sync",
+  title: "Sync profile",
+  description: "Run MLO QuickSync for the data file (cloud/Wi-Fi sync as configured in the profile).",
+  inputSchema: {},
+  outputSchema: { ok: external_exports.boolean() },
+  // openWorldHint: QuickSync talks to the MLO cloud / Wi-Fi sync endpoint.
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  async execute(_args, ctx) {
+    await quickSync(ctx.config);
+    ctx.store.invalidate();
+    return textResult("QuickSync finished", { ok: true });
+  }
+});
+
 // src/tools/cloud-status.ts
 var cloudStatusTool = defineTool({
   name: "cloud_status",
@@ -26110,13 +25634,12 @@ var allTools = [
   deleteTaskTool,
   listContextsTool,
   syncTool,
-  cloudAddTaskTool,
   cloudStatusTool
 ];
 
 // src/cloud/state.ts
-import { promises as fs3 } from "node:fs";
-import path4 from "node:path";
+import { promises as fs2 } from "node:fs";
+import path3 from "node:path";
 var CloudState = class {
   constructor(stateDir) {
     this.stateDir = stateDir;
@@ -26128,13 +25651,13 @@ var CloudState = class {
   lastFinalized;
   chain = Promise.resolve();
   async load() {
-    await fs3.mkdir(this.stateDir, { recursive: true });
+    await fs2.mkdir(this.stateDir, { recursive: true });
     this.cursor = ZERO_CURSOR;
     this.entries = [];
     this.lastPull = {};
     this.lastFinalized = void 0;
     try {
-      const parsed = JSON.parse(await fs3.readFile(path4.join(this.stateDir, "state.json"), "utf8"));
+      const parsed = JSON.parse(await fs2.readFile(path3.join(this.stateDir, "state.json"), "utf8"));
       this.cursor = parseCursor(parsed.highWater);
       this.entries = parsed.entries;
       this.lastPull = parsed.lastPull ?? {};
@@ -26145,19 +25668,19 @@ var CloudState = class {
     }
   }
   async withStateLock(operation) {
-    const lockDir = path4.join(this.stateDir, ".state-lock");
+    const lockDir = path3.join(this.stateDir, ".state-lock");
     const deadline = Date.now() + 1e4;
-    await fs3.mkdir(this.stateDir, { recursive: true });
+    await fs2.mkdir(this.stateDir, { recursive: true });
     for (; ; ) {
       try {
-        await fs3.mkdir(lockDir);
+        await fs2.mkdir(lockDir);
         break;
       } catch (error2) {
         if (error2.code !== "EEXIST") throw error2;
         try {
-          const stat = await fs3.stat(lockDir);
+          const stat = await fs2.stat(lockDir);
           if (Date.now() - stat.mtimeMs > 3e4) {
-            await fs3.rm(lockDir, { recursive: true, force: true });
+            await fs2.rm(lockDir, { recursive: true, force: true });
             continue;
           }
         } catch {
@@ -26170,7 +25693,7 @@ var CloudState = class {
     try {
       return await operation();
     } finally {
-      await fs3.rm(lockDir, { recursive: true, force: true });
+      await fs2.rm(lockDir, { recursive: true, force: true });
     }
   }
   serialize(operation) {
@@ -26195,11 +25718,11 @@ var CloudState = class {
     return this.serialize(async () => {
       let cursor = this.cursor + 1n;
       let file = `delta-${cursorToDecimalString(cursor)}.zip`;
-      while (await fs3.stat(path4.join(this.stateDir, file)).then(() => true, () => false)) {
+      while (await fs2.stat(path3.join(this.stateDir, file)).then(() => true, () => false)) {
         cursor = cursor + 1n;
         file = `delta-${cursorToDecimalString(cursor)}.zip`;
       }
-      await this.atomicWrite(path4.join(this.stateDir, file), zipBytes);
+      await this.atomicWrite(path3.join(this.stateDir, file), zipBytes);
       this.cursor = cursor;
       this.entries.push({ cursor: cursorToDecimalString(cursor), origin, file });
       await this.writeState();
@@ -26213,7 +25736,7 @@ var CloudState = class {
         cursor: parseCursor(entry.cursor),
         origin: entry.origin,
         file: entry.file,
-        bytes: await fs3.readFile(path4.join(this.stateDir, entry.file))
+        bytes: await fs2.readFile(path3.join(this.stateDir, entry.file))
       })));
     });
   }
@@ -26287,13 +25810,13 @@ var CloudState = class {
       ...Object.keys(this.lastPull).length ? { lastPull: this.lastPull } : {},
       ...this.lastFinalized ? { lastFinalized: this.lastFinalized } : {}
     };
-    await this.atomicWrite(path4.join(this.stateDir, "state.json"), new TextEncoder().encode(`${JSON.stringify(value, null, 2)}
+    await this.atomicWrite(path3.join(this.stateDir, "state.json"), new TextEncoder().encode(`${JSON.stringify(value, null, 2)}
 `));
   }
   async atomicWrite(target, bytes) {
     const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
-    await fs3.writeFile(temporary, bytes);
-    await fs3.rename(temporary, target);
+    await fs2.writeFile(temporary, bytes);
+    await fs2.rename(temporary, target);
   }
 };
 
@@ -26303,8 +25826,8 @@ import https from "node:https";
 import net from "node:net";
 
 // src/cloud/sync-observer.ts
-import { promises as fs4 } from "node:fs";
-import path5 from "node:path";
+import { promises as fs3 } from "node:fs";
+import path4 from "node:path";
 import zlib from "node:zlib";
 var VENDOR_SYNC_HOST = "sync.mylifeorganized.net";
 var SUMMARY_FILE = "soap-summary.jsonl";
@@ -26433,7 +25956,7 @@ var SyncObserver = class {
   append(record2) {
     const line = `${JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), ...record2 })}
 `;
-    void fs4.mkdir(this.stateDir, { recursive: true }).then(() => fs4.appendFile(path5.join(this.stateDir, SUMMARY_FILE), line)).catch((error2) => log(`sync observer write failed: ${error2 instanceof Error ? error2.message : String(error2)}`));
+    void fs3.mkdir(this.stateDir, { recursive: true }).then(() => fs3.appendFile(path4.join(this.stateDir, SUMMARY_FILE), line)).catch((error2) => log(`sync observer write failed: ${error2 instanceof Error ? error2.message : String(error2)}`));
   }
 };
 
@@ -26803,39 +26326,40 @@ var INSTRUCTIONS = `
 ## MyLifeOrganized (MLO) task management
 
 MLO is an OUTLINER: tasks live in one deep tree, and deep nesting is idiomatic. Prefer placing
-tasks under parents (parentId, subtasks outlines) over flat top-level lists.
+tasks under parents over flat top-level lists.
 
 ### Ids
 Task ids are PATH-BASED ("1.2.3" = position in the tree) and shift whenever the tree changes.
 Treat them as valid only for immediate follow-up calls; after any write (or if MLO was used
-interactively), re-run list_tasks/search_tasks before using ids again. Never store ids.
+interactively), re-run list_tasks/search_tasks before using ids again. Never store path ids.
+add_task takes a parent GUID (\`parentUid\`, from get_task) instead of a path id.
 
-### Writes are expensive \u2014 batch them
-Every write rewrites the data file and, if the MLO app is open, closes and relaunches it.
-Always group related changes into ONE call:
-- add_task: \`tasks\` array (up to 25, each with own parent/fields) and/or a \`subtasks\` outline per task
-- update_task: \`updates\` array (up to 25 field edits/moves in one write)
-- complete_task / uncomplete_task / delete_task: \`ids\` arrays
-Each write keeps a timestamped backup next to the data file; batches are atomic (one bad id \u2192 no change).
+### How writes work
+Writes never touch the data file. Each write queues a sync delta on the local cloud endpoint
+and triggers MLO's QuickSync; MLO's own merge logic applies it, and the app keeps running.
+The result's \`verified\` flag says whether a fresh export confirmed the change \u2014 \`false\`
+means "queued, not applied yet", not failure; MLO applies it on its next sync session.
+Batch tools (\`ids\`/\`updates\` arrays) send the whole batch as ONE delta and are atomic:
+one bad id and nothing is queued.
+
+### Coverage limits (fail fast, nothing queued)
+- update_task / complete_task / uncomplete_task need the task's full record in the delta
+  log \u2014 available once a task was added by this server or changed in MLO since the local
+  endpoint took over. Otherwise make the change in the MLO app.
+- update_task cannot edit booleans (IsProject, Starred, Hide*), Flag, Places, or
+  dependencies yet; date edits on recurring tasks are refused (the series would desync).
+- complete_task refuses recurring tasks \u2014 completing in MLO generates the next occurrence.
+- delete_task removes each task AND its whole subtree; it needs recoverable GUIDs for the
+  full subtree.
 
 ### Field conventions
-- Contexts are MLO "Places" (@Office, @Home). Run list_contexts first and reuse existing ones.
-  update_task's Places is a FULL-replacement list.
-- Importance/Effort are stored 0\u2013200 (100 = normal); add_task takes a 1\u20135 scale instead.
 - Dates are local ISO without timezone ("2026-08-01T15:00:00").
-- RECURRING tasks: their pattern lives in Recurrence fields the tools do not edit. Overwriting
-  DueDateTime on a recurring task can desync the series \u2014 get_task first, and prefer letting MLO
-  handle recurrence.
-- add_task's natural-language dates/urgency/parseText use MLO's best-effort rapid-entry parser;
-  everything else is written exactly. Batch mode is exact-only.
-- add_task without a parentId files the task into the profile's capture inbox \u2014 the top-level
-  "<Inbox>" node (same caption in every MLO language; list_tasks marks it [inbox]). Pass
-  parentId "root" for a deliberate top-level task. No inbox node \u2192 top level, and the result
-  says so.
+- Importance/Effort are 0\u2013200 (100 = normal).
+- Contexts are MLO "Places" (@Office); currently read-only (list_contexts, search filters).
 
 ### Completion
 complete_task marks done (projects get ProjectStatus too); uncomplete_task reopens.
-sync runs the profile's cloud/Wi-Fi QuickSync.
+sync runs the profile's QuickSync; cloud_status shows the local endpoint's cursor and log.
 `.trim();
 async function main() {
   const config2 = loadConfig();
@@ -26859,7 +26383,7 @@ function watchOwnBuild(cloudServer) {
   let startMtime;
   const timer = setInterval(async () => {
     try {
-      const mtime = (await fs5.stat(entry)).mtimeMs;
+      const mtime = (await fs4.stat(entry)).mtimeMs;
       startMtime ??= mtime;
       if (mtime !== startMtime && !isMloBusy()) {
         log("server build changed on disk \u2014 exiting so the client restarts the new version");

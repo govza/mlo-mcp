@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TaskNode } from "../../src/types.js";
-import { collectTombstones, wereTasksDeleted } from "../../src/tools/cloud-delete-task.js";
+import { collectTombstones, wereTasksDeleted } from "../../src/tools/delete-task.js";
 
 function task(id: string, caption: string, guid?: string, children: TaskNode[] = []): TaskNode {
   return {
@@ -19,7 +19,7 @@ const A = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}";
 const B = "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}";
 const C = "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}";
 
-describe("cloud_delete_task tombstone collection", () => {
+describe("delete_task tombstone collection", () => {
   it("tombstones every descendant, not just the selected task", () => {
     const tree = [task("1", "parent", A, [task("1.1", "child", B, [task("1.1.1", "grandchild", C)])])];
     const { uids, missingGuid } = collectTombstones(tree, ["1"]);
@@ -45,7 +45,7 @@ describe("cloud_delete_task tombstone collection", () => {
   });
 });
 
-describe("cloud_delete_task verification", () => {
+describe("delete_task verification", () => {
   it("is not verified while a tombstoned GUID is still exported", () => {
     expect(wereTasksDeleted([task("1", "survivor", A)], [A])).toBe(false);
   });

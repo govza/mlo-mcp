@@ -5,12 +5,10 @@ file to change when rebinding capture to a different task backend.
 
 - **Inbox** = the top-level `<Inbox>` node (MLO's capture inbox — the caption
   is literally `<Inbox>` in every MLO language; `list_tasks` marks it
-  `[inbox]`). `add_task` files unparented tasks there automatically.
-- Buffer captured items and write them in `add_task` batches (≤25 per call,
-  no parentId — the server routes them to the inbox; check each reported
-  placement says "inbox") — batching avoids restarting the MLO app per item,
-  but don't hold everything to the very end of a long session; flush between
-  categories.
+  `[inbox]`). Find it once at the start (`list_tasks maxDepth:1`, then
+  `get_task` for its GUID) and pass that GUID as `add_task.parentUid` for
+  every capture; without a parentUid captures land at the top level.
+- `add_task` takes one task per call — write each capture as it lands rather
+  than buffering (writes queue sync deltas; the MLO app keeps running).
 - Captures are bare captions only — no contexts, dates, or importance at this
-  stage (that's clarify's job, and it keeps the rapid-entry parser out of the
-  way of the user's own words).
+  stage (that's clarify's job).
