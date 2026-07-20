@@ -107,13 +107,36 @@ export function annotateGuids(mlFile: Buffer, tasks: TaskNode[]): number {
   }
 
   // 4. post-order constrained assignment
+  //
+  // The file's last footer belongs to the invisible root: never assignable.
+  const assignable = guidOffs.slice(0, -1);
+  const rootOff = guidOffs.length ? guidOffs[guidOffs.length - 1] : raw.length;
+
+  // Nodes still awaiting a GUID at each point in post-order. Used to detect
+  // the desync below.
+  const pending: number[] = new Array(postList.length).fill(0);
+  for (let i = postList.length - 1, seen = 0; i >= 0; i--) {
+    if (postList[i].capOff !== undefined) seen++;
+    pending[i] = seen;
+  }
+
   let gi = 0;
   let assigned = 0;
-  for (const n of postList) {
+  for (let i = 0; i < postList.length; i++) {
+    const n = postList[i];
     if (n.capOff === undefined) continue;
-    if (gi < guidOffs.length && guidOffs[gi] > n.capOff && guidOffs[gi] < n.endBound!) {
+    // The trailing ancestor chain has no following caption, so step 2 left its
+    // bound at raw.length — wide enough to swallow an ancestor's footer. Bound
+    // it by the root footer and only assign while the remaining footers still
+    // line up 1:1 with the remaining nodes; once a node's own footer is missing
+    // (recurring tasks carry a different layout) the alignment is provably
+    // broken, and a wrong GUID is far worse than none: it silently retargets
+    // writes and deletes at another task's subtree.
+    const bound = Math.min(n.endBound!, rootOff);
+    if (n.endBound === raw.length && pending[i] !== assignable.length - gi) continue;
+    if (gi < assignable.length && assignable[gi] > n.capOff && assignable[gi] < bound) {
       // an IDD from the XML export is authoritative — keep it, but still consume the slot
-      n.task.Guid ??= formatGuid(raw.subarray(guidOffs[gi], guidOffs[gi] + 16));
+      n.task.Guid ??= formatGuid(raw.subarray(assignable[gi], assignable[gi] + 16));
       gi++;
       assigned++;
     }

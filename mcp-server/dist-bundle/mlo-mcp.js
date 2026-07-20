@@ -25663,12 +25663,22 @@ function annotateGuids(mlFile, tasks) {
     guidOffs.push(g + GUID_PREFIX.length);
     g = raw.indexOf(GUID_PREFIX, g + 1);
   }
+  const assignable = guidOffs.slice(0, -1);
+  const rootOff = guidOffs.length ? guidOffs[guidOffs.length - 1] : raw.length;
+  const pending = new Array(postList.length).fill(0);
+  for (let i2 = postList.length - 1, seen = 0; i2 >= 0; i2--) {
+    if (postList[i2].capOff !== void 0) seen++;
+    pending[i2] = seen;
+  }
   let gi = 0;
   let assigned = 0;
-  for (const n of postList) {
+  for (let i2 = 0; i2 < postList.length; i2++) {
+    const n = postList[i2];
     if (n.capOff === void 0) continue;
-    if (gi < guidOffs.length && guidOffs[gi] > n.capOff && guidOffs[gi] < n.endBound) {
-      n.task.Guid ??= formatGuid(raw.subarray(guidOffs[gi], guidOffs[gi] + 16));
+    const bound = Math.min(n.endBound, rootOff);
+    if (n.endBound === raw.length && pending[i2] !== assignable.length - gi) continue;
+    if (gi < assignable.length && assignable[gi] > n.capOff && assignable[gi] < bound) {
+      n.task.Guid ??= formatGuid(raw.subarray(assignable[gi], assignable[gi] + 16));
       gi++;
       assigned++;
     }
