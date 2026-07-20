@@ -26609,11 +26609,14 @@ function collectTombstones(tasks, ids, resolveUid = (task) => task.Guid) {
   }
   return { targets, uids: [...uids], missingGuid: [...missingGuid] };
 }
-function wereTasksDeleted(after, uids) {
-  const present = new Set(
-    flatten(after).map((task) => task.Guid?.toUpperCase()).filter((guid2) => guid2 !== void 0)
-  );
-  return uids.every((uid) => !present.has(uid.toUpperCase()));
+function wereTasksDeleted(before, after, uids, resolveUid = (task) => task.Guid) {
+  const present = /* @__PURE__ */ new Set();
+  for (const task of flatten(after)) {
+    const uid = resolveUid(task);
+    if (uid) present.add(uid.toUpperCase());
+  }
+  if (uids.some((uid) => present.has(uid.toUpperCase()))) return false;
+  return flatten(before).length - flatten(after).length >= uids.length;
 }
 var deleteTaskTool = defineTool({
   name: "delete_task",
@@ -26653,7 +26656,12 @@ var deleteTaskTool = defineTool({
       ctx.store.invalidate();
       try {
         const after = (await ctx.store.getSnapshot(true)).tasks;
-        verified = wereTasksDeleted(after, uids);
+        verified = wereTasksDeleted(
+          before,
+          after,
+          uids,
+          (task) => task.Guid?.toUpperCase() ?? resolveTaskUid(task, cloud.rows)
+        );
         message = verified ? `Deletion of ${described} was queued and no tombstoned task remains in a fresh MLO export.` : `Deletion of ${described} was queued, but at least one tombstoned task is still present in the fresh export after QuickSync.`;
       } catch (error2) {
         message = `Deletion of ${described} was queued, but verification failed: ${error2 instanceof Error ? error2.message : String(error2)}`;

@@ -47,14 +47,38 @@ describe("delete_task tombstone collection", () => {
 
 describe("delete_task verification", () => {
   it("is not verified while a tombstoned GUID is still exported", () => {
-    expect(wereTasksDeleted([task("1", "survivor", A)], [A])).toBe(false);
+    const survivor = task("1", "survivor", A);
+    expect(wereTasksDeleted([survivor], [survivor], [A])).toBe(false);
   });
 
   it("is verified once no tombstoned GUID remains, regardless of other tasks", () => {
-    expect(wereTasksDeleted([task("1", "unrelated", B)], [A])).toBe(true);
+    const before = [task("1", "doomed", A), task("2", "unrelated", B)];
+    expect(wereTasksDeleted(before, [task("1", "unrelated", B)], [A])).toBe(true);
   });
 
   it("compares GUIDs case-insensitively", () => {
-    expect(wereTasksDeleted([task("1", "survivor", A.toLowerCase())], [A])).toBe(false);
+    const survivor = task("1", "survivor", A.toLowerCase());
+    expect(wereTasksDeleted([survivor], [survivor], [A])).toBe(false);
+  });
+
+  // A task added through the cloud log has no binary footer, so the export
+  // carries no Guid for it. Matching on Guid alone found nothing and read that
+  // as "deleted" — reporting success for a delta MLO had not applied yet.
+  it("does not read a GUID-less survivor as deleted", () => {
+    const survivor = task("1", "queued but unapplied");
+    expect(wereTasksDeleted([survivor], [survivor], [A])).toBe(false);
+  });
+
+  it("resolves identity the same way the tombstones were targeted", () => {
+    const survivor = task("1", "cloud-only");
+    const viaCloudLog = (t: TaskNode) => (t.Caption === "cloud-only" ? A : undefined);
+    expect(wereTasksDeleted([survivor], [survivor], [A], viaCloudLog)).toBe(false);
+  });
+
+  it("requires the tree to shrink by the tombstoned subtree size", () => {
+    const before = [task("1", "parent", A, [task("1.1", "child", B)])];
+    expect(wereTasksDeleted(before, [], [A, B])).toBe(true);
+    // same uids claimed gone, but only one node actually left the tree
+    expect(wereTasksDeleted(before, [task("1", "leftover", C)], [A, B])).toBe(false);
   });
 });

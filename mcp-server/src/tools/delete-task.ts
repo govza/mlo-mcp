@@ -43,12 +43,30 @@ export function collectTombstones(
   return { targets, uids: [...uids], missingGuid: [...missingGuid] };
 }
 
-/** A tombstoned task counts as deleted only when its GUID is absent from the fresh export. */
-export function wereTasksDeleted(after: TaskNode[], uids: readonly string[]): boolean {
-  const present = new Set(
-    flatten(after).map((task) => task.Guid?.toUpperCase()).filter((guid): guid is string => guid !== undefined)
-  );
-  return uids.every((uid) => !present.has(uid.toUpperCase()));
+/**
+ * A tombstoned task counts as deleted only on positive evidence of removal.
+ *
+ * Identity must be resolved the same way the tombstones were targeted: a task
+ * reachable only through the cloud log carries no Guid in the export, so
+ * matching on Guid alone cannot see it and its absence from the match set is
+ * not evidence it is gone. That vacuous pass is why a queued-but-unapplied
+ * delete could report success. The tree must also have actually shrunk by the
+ * tombstoned subtree size — under-reporting here is safe (the caller says
+ * "queued, not applied yet"), over-reporting is not.
+ */
+export function wereTasksDeleted(
+  before: TaskNode[],
+  after: TaskNode[],
+  uids: readonly string[],
+  resolveUid: (task: TaskNode) => string | undefined = (task) => task.Guid,
+): boolean {
+  const present = new Set<string>();
+  for (const task of flatten(after)) {
+    const uid = resolveUid(task);
+    if (uid) present.add(uid.toUpperCase());
+  }
+  if (uids.some((uid) => present.has(uid.toUpperCase()))) return false;
+  return flatten(before).length - flatten(after).length >= uids.length;
 }
 
 export const deleteTaskTool = defineTool({
@@ -96,7 +114,9 @@ export const deleteTaskTool = defineTool({
       ctx.store.invalidate();
       try {
         const after = (await ctx.store.getSnapshot(true)).tasks;
-        verified = wereTasksDeleted(after, uids);
+        verified = wereTasksDeleted(before, after, uids, (task) =>
+          task.Guid?.toUpperCase() ?? resolveTaskUid(task, cloud.rows),
+        );
         message = verified
           ? `Deletion of ${described} was queued and no tombstoned task remains in a fresh MLO export.`
           : `Deletion of ${described} was queued, but at least one tombstoned task is still present in the fresh export after QuickSync.`;
