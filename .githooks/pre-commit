@@ -1,0 +1,11 @@
+#!/bin/sh
+# profile/profile.ml is the live MLO data file on this machine, not just the
+# demo fixture it is tracked as: it carries the cloud sync account details and
+# shows as modified permanently. Keep it out of commits made by reflex
+# (`git add -A`, `git commit -a`) while leaving a deliberate commit possible.
+if git diff --cached --name-only | grep -qx 'profile/profile.ml'; then
+  echo 'refusing: profile/profile.ml is staged (contains live cloud account data)'
+  echo 'commit it deliberately with --no-verify if that is really what you want'
+  exit 1
+fi
+exit 0
