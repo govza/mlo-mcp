@@ -25665,23 +25665,25 @@ function annotateGuids(mlFile, tasks) {
   }
   const assignable = guidOffs.slice(0, -1);
   const rootOff = guidOffs.length ? guidOffs[guidOffs.length - 1] : raw.length;
-  const pending = new Array(postList.length).fill(0);
-  for (let i2 = postList.length - 1, seen = 0; i2 >= 0; i2--) {
-    if (postList[i2].capOff !== void 0) seen++;
-    pending[i2] = seen;
-  }
   let gi = 0;
   let assigned = 0;
-  for (let i2 = 0; i2 < postList.length; i2++) {
-    const n = postList[i2];
-    if (n.capOff === void 0) continue;
-    const bound = Math.min(n.endBound, rootOff);
-    if (n.endBound === raw.length && pending[i2] !== assignable.length - gi) continue;
-    if (gi < assignable.length && assignable[gi] > n.capOff && assignable[gi] < bound) {
-      n.task.Guid ??= formatGuid(raw.subarray(assignable[gi], assignable[gi] + 16));
-      gi++;
-      assigned++;
+  for (let i2 = 0; i2 < postList.length; ) {
+    const bound = Math.min(postList[i2].endBound, rootOff);
+    let j = i2;
+    while (j < postList.length && Math.min(postList[j].endBound, rootOff) === bound) j++;
+    const chain2 = postList.slice(i2, j);
+    let f = gi;
+    while (f < assignable.length && assignable[f] < bound) f++;
+    const avail = f - gi;
+    const aligned = avail === chain2.length && chain2.every((n, k) => n.capOff !== void 0 && assignable[gi + k] > n.capOff);
+    if (aligned) {
+      chain2.forEach((n, k) => {
+        n.task.Guid ??= formatGuid(raw.subarray(assignable[gi + k], assignable[gi + k] + 16));
+        assigned++;
+      });
     }
+    gi = f;
+    i2 = j;
   }
   return assigned;
 }

@@ -39,13 +39,24 @@ describe.skipIf(!mloInstalled)("mlo.exe integration", () => {
     expect(code).toBe(2);
   });
 
-  it("recovers GUIDs for >90% of tasks (E4)", async () => {
+  it("recovers GUIDs for most tasks, and never the same one twice (E4)", async () => {
     const xml = await exportXml(env.config);
     const tasks = buildTaskTree(parseMloXml(xml));
     const count = annotateGuids(await readDataFile(env.config), tasks);
     const all = flatten(tasks);
-    expect(count / all.length).toBeGreaterThan(0.9);
+
+    // Coverage is state-dependent and deliberately not maximised: a task
+    // written through the cloud delta has a caption but no GUID footer until
+    // MLO re-serializes it, and annotateGuids drops the whole ancestor chain
+    // it sits in rather than guess which node the remaining footers belong to.
+    expect(count / all.length).toBeGreaterThan(0.8);
+
     const guid = all.find((t) => t.Guid)?.Guid;
     expect(guid).toMatch(/^\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\}$/);
+
+    // The real invariant: a stolen footer shows up as two tasks claiming one
+    // GUID, which silently retargets writes and deletes at another subtree.
+    const guids = all.map((t) => t.Guid).filter(Boolean);
+    expect(new Set(guids).size).toBe(guids.length);
   });
 });
