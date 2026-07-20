@@ -11,9 +11,16 @@ import type { TaskNode } from "./types.js";
  *   after all of its children — post-order — containing the 16-byte GUID
  *   preceded by the bytes 64 00 00 00 01 00 00 00 00 00 00 00.
  * - Alignment: match captions sequentially in pre-order with a moving cursor,
- *   then assign GUIDs in post-order, constrained to lie inside the node's
- *   (captionOffset, subtreeEndBound) window. Recurring tasks use a different
- *   footer layout and end up without a GUID — callers must handle undefined.
+ *   then assign GUIDs in post-order. A last child closes its parent and any
+ *   further ancestors it ends, so all of them share one subtree end bound and
+ *   their footers all fall in that single window; that chain, not the
+ *   individual node, is the unit that must balance 1:1 against the footers
+ *   inside it. Chains that do not balance are left entirely unassigned —
+ *   see step 4 for why no alignment heuristic is sound there.
+ * - Nodes therefore routinely end up without a GUID (recurring tasks use a
+ *   different footer layout; cloud-delta writes have no footer until MLO
+ *   re-serializes them, and they take their whole chain down with them), so
+ *   callers must handle undefined.
  * - The file's last GUID belongs to the invisible root; it is NOT a valid
  *   -task target (MLO pops a modal Warning and the CLI hangs), so it is
  *   deliberately never assigned.
@@ -112,34 +119,59 @@ export function annotateGuids(mlFile: Buffer, tasks: TaskNode[]): number {
   const assignable = guidOffs.slice(0, -1);
   const rootOff = guidOffs.length ? guidOffs[guidOffs.length - 1] : raw.length;
 
-  // Nodes still awaiting a GUID at each point in post-order. Used to detect
-  // the desync below.
-  const pending: number[] = new Array(postList.length).fill(0);
-  for (let i = postList.length - 1, seen = 0; i >= 0; i--) {
-    if (postList[i].capOff !== undefined) seen++;
-    pending[i] = seen;
-  }
-
+  // A node closes its whole ancestor chain whenever it is their last
+  // descendant, and step 2 hands every node in that chain the SAME end bound —
+  // the next caption after the shared subtree. Those nodes are consecutive in
+  // post-order and their footers are the ones lying before that bound, so the
+  // chain is the unit that has to balance: N nodes must find exactly N footers
+  // inside the window. Matching greedily one node at a time instead lets a
+  // footerless node swallow its parent's footer and cascade up the chain,
+  // because the parent's footer does sit inside the child's (chain-wide)
+  // window. This is the general form of the trailing-chain case fixed in
+  // e383ccf — that chain is just the one whose bound is the root footer.
   let gi = 0;
   let assigned = 0;
-  for (let i = 0; i < postList.length; i++) {
-    const n = postList[i];
-    if (n.capOff === undefined) continue;
-    // The trailing ancestor chain has no following caption, so step 2 left its
-    // bound at raw.length — wide enough to swallow an ancestor's footer. Bound
-    // it by the root footer and only assign while the remaining footers still
-    // line up 1:1 with the remaining nodes; once a node's own footer is missing
-    // (recurring tasks carry a different layout) the alignment is provably
-    // broken, and a wrong GUID is far worse than none: it silently retargets
+  for (let i = 0; i < postList.length; ) {
+    const bound = Math.min(postList[i].endBound!, rootOff);
+    let j = i;
+    while (j < postList.length && Math.min(postList[j].endBound!, rootOff) === bound) j++;
+    const chain = postList.slice(i, j);
+
+    let f = gi;
+    while (f < assignable.length && assignable[f] < bound) f++;
+    const avail = f - gi;
+
+    // One footer per node means the alignment is determined. Any other count
+    // means a node in the chain serialized without one — recurring tasks use a
+    // different footer layout, and a task written through the cloud delta gets
+    // a caption but no footer until MLO re-serializes it — and nothing in the
+    // bytes says WHICH node that is: for a delta-added subtree it is the
+    // innermost, for a recurring parent it is the outermost, and every
+    // order-preserving assignment of k footers to n>k nested nodes is equally
+    // consistent with the file. So assign none rather than guess. A blank GUID
+    // just falls back to the cloud delta log; a wrong one silently retargets
     // writes and deletes at another task's subtree.
-    const bound = Math.min(n.endBound!, rootOff);
-    if (n.endBound === raw.length && pending[i] !== assignable.length - gi) continue;
-    if (gi < assignable.length && assignable[gi] > n.capOff && assignable[gi] < bound) {
-      // an IDD from the XML export is authoritative — keep it, but still consume the slot
-      n.task.Guid ??= formatGuid(raw.subarray(assignable[gi], assignable[gi] + 16));
-      gi++;
-      assigned++;
+    //
+    // A caption that did not match anywhere leaves the same ambiguity from the
+    // other side — the node is still in the chain and may still own one of the
+    // footers — so a chain holding one is never trusted either, however neatly
+    // the counts happen to line up.
+    // Every node must also sit before the footer it would take; a footer that
+    // precedes its own caption means the chain is misaligned however well it
+    // counts, and then none of it can be trusted either.
+    const aligned =
+      avail === chain.length &&
+      chain.every((n, k) => n.capOff !== undefined && assignable[gi + k] > n.capOff);
+
+    if (aligned) {
+      chain.forEach((n, k) => {
+        // an IDD from the XML export is authoritative — keep it, but still consume the slot
+        n.task.Guid ??= formatGuid(raw.subarray(assignable[gi + k], assignable[gi + k] + 16));
+        assigned++;
+      });
     }
+    gi = f; // resync past this chain's window either way
+    i = j;
   }
   return assigned;
 }
