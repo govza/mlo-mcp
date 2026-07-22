@@ -3231,8 +3231,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path5) {
-      let input = path5;
+    function removeDotSegments(path11) {
+      let input = path11;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3484,8 +3484,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path5, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path5 && path5 !== "/" ? path5 : void 0;
+        const [path11, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path11 && path11 !== "/" ? path11 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -3544,7 +3544,7 @@ var require_schemes = __commonJS({
       urnComponent.nss = (uuidComponent.uuid || "").toLowerCase();
       return urnComponent;
     }
-    var http2 = (
+    var http3 = (
       /** @type {SchemeHandler} */
       {
         scheme: "http",
@@ -3553,11 +3553,11 @@ var require_schemes = __commonJS({
         serialize: httpSerialize
       }
     );
-    var https2 = (
+    var https3 = (
       /** @type {SchemeHandler} */
       {
         scheme: "https",
-        domainHost: http2.domainHost,
+        domainHost: http3.domainHost,
         parse: httpParse,
         serialize: httpSerialize
       }
@@ -3601,8 +3601,8 @@ var require_schemes = __commonJS({
     var SCHEMES = (
       /** @type {Record<SchemeName, SchemeHandler>} */
       {
-        http: http2,
-        https: https2,
+        http: http3,
+        https: https3,
         ws,
         wss,
         urn,
@@ -4317,7 +4317,7 @@ var require_core = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text, msg) => text + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text2, msg) => text2 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -6878,12 +6878,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs5, exportName) {
+    function addFormats(ajv, list, fs10, exportName) {
       var _a2;
       var _b2;
       (_a2 = (_b2 = ajv.opts.code).formats) !== null && _a2 !== void 0 ? _a2 : _b2.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs5[f]);
+        ajv.addFormat(f, fs10[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -8444,7 +8444,7 @@ var require_node2json = __commonJS({
       return compress(node, options);
     }
     function compress(arr, options, jPath) {
-      let text;
+      let text2;
       const compressedObj = {};
       for (let i2 = 0; i2 < arr.length; i2++) {
         const tagObj = arr[i2];
@@ -8453,8 +8453,8 @@ var require_node2json = __commonJS({
         if (jPath === void 0) newJpath = property;
         else newJpath = jPath + "." + property;
         if (property === options.textNodeName) {
-          if (text === void 0) text = tagObj[property];
-          else text += "" + tagObj[property];
+          if (text2 === void 0) text2 = tagObj[property];
+          else text2 += "" + tagObj[property];
         } else if (property === void 0) {
           continue;
         } else if (tagObj[property]) {
@@ -8482,9 +8482,9 @@ var require_node2json = __commonJS({
           }
         }
       }
-      if (typeof text === "string") {
-        if (text.length > 0) compressedObj[options.textNodeName] = text;
-      } else if (text !== void 0) compressedObj[options.textNodeName] = text;
+      if (typeof text2 === "string") {
+        if (text2.length > 0) compressedObj[options.textNodeName] = text2;
+      } else if (text2 !== void 0) compressedObj[options.textNodeName] = text2;
       return compressedObj;
     }
     function propName(obj) {
@@ -8530,7 +8530,7 @@ var require_XMLParser = __commonJS({
     var OrderedObjParser = require_OrderedObjParser();
     var { prettify } = require_node2json();
     var validator = require_validator();
-    var XMLParser3 = class {
+    var XMLParser4 = class {
       constructor(options) {
         this.externalEntities = {};
         this.options = buildOptions(options);
@@ -8577,7 +8577,7 @@ var require_XMLParser = __commonJS({
         }
       }
     };
-    module.exports = XMLParser3;
+    module.exports = XMLParser4;
   }
 });
 
@@ -8597,9 +8597,9 @@ var require_orderedJs2Xml = __commonJS({
       let isPreviousElementTag = false;
       if (!Array.isArray(arr)) {
         if (arr !== void 0 && arr !== null) {
-          let text = arr.toString();
-          text = replaceEntitiesValue(text, options);
-          return text;
+          let text2 = arr.toString();
+          text2 = replaceEntitiesValue(text2, options);
+          return text2;
         }
         return "";
       }
@@ -8970,10 +8970,10 @@ var require_fxp = __commonJS({
   "node_modules/.pnpm/fast-xml-parser@4.5.7/node_modules/fast-xml-parser/src/fxp.js"(exports, module) {
     "use strict";
     var validator = require_validator();
-    var XMLParser3 = require_XMLParser();
+    var XMLParser4 = require_XMLParser();
     var XMLBuilder2 = require_json2xml();
     module.exports = {
-      XMLParser: XMLParser3,
+      XMLParser: XMLParser4,
       XMLValidator: validator,
       XMLBuilder: XMLBuilder2
     };
@@ -8981,7 +8981,7 @@ var require_fxp = __commonJS({
 });
 
 // src/index.ts
-import { promises as fs4 } from "node:fs";
+import { promises as fs9 } from "node:fs";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/external.js
@@ -9462,8 +9462,8 @@ function getErrorMap() {
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path5, errorMaps, issueData } = params;
-  const fullPath = [...path5, ...issueData.path || []];
+  const { data, path: path11, errorMaps, issueData } = params;
+  const fullPath = [...path11, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -9579,11 +9579,11 @@ var errorUtil;
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path5, key) {
+  constructor(parent, value, path11, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path5;
+    this._path = path11;
     this._key = key;
   }
   get path() {
@@ -13220,10 +13220,10 @@ function assignProp(target, prop, value) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path5) {
-  if (!path5)
+function getElementAtPath(obj, path11) {
+  if (!path11)
     return obj;
-  return path5.reduce((acc, key) => acc?.[key], obj);
+  return path11.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -13543,11 +13543,11 @@ function aborted(x2, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path5, issues) {
+function prefixIssues(path11, issues) {
   return issues.map((iss) => {
     var _a2;
     (_a2 = iss).path ?? (_a2.path = []);
-    iss.path.unshift(path5);
+    iss.path.unshift(path11);
     return iss;
   });
 }
@@ -23197,14 +23197,14 @@ var StdioServerTransport = class {
 };
 
 // src/config.ts
-import path3 from "node:path";
-import os from "node:os";
+import path8 from "node:path";
+import os2 from "node:os";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 // src/cloud/server.ts
-import http from "node:http";
-import https from "node:https";
+import http2 from "node:http";
+import https2 from "node:https";
 import net from "node:net";
 
 // src/cloud/cursor.ts
@@ -23278,9 +23278,9 @@ function parseRecords(input) {
   return records;
 }
 function parseSectionedCsv(input) {
-  const text = typeof input === "string" ? input : new TextDecoder("utf-8", { fatal: true }).decode(input);
-  if (text.charCodeAt(0) === 65279) throw new Error("data.csv must not contain a UTF-8 BOM");
-  const records = parseRecords(text);
+  const text2 = typeof input === "string" ? input : new TextDecoder("utf-8", { fatal: true }).decode(input);
+  if (text2.charCodeAt(0) === 65279) throw new Error("data.csv must not contain a UTF-8 BOM");
+  const records = parseRecords(text2);
   const sections = [];
   let current;
   for (const record2 of records) {
@@ -23294,7 +23294,7 @@ function parseSectionedCsv(input) {
     else current.rows.push(record2);
   }
   for (const section of sections) if (!section.header.length) throw new Error(`section [${section.name}] has no header`);
-  return { sections, source: text };
+  return { sections, source: text2 };
 }
 function writeField(value) {
   return /[",\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
@@ -24560,9 +24560,38 @@ function unpackEnvelope(bytes) {
   return document;
 }
 
+// src/cloud/gateway.ts
+import { execFile } from "node:child_process";
+import { promises as fs6 } from "node:fs";
+import os from "node:os";
+import path6 from "node:path";
+
 // src/cloud/state.ts
 import { promises as fs } from "node:fs";
 import path from "node:path";
+
+// src/cloud/local-stamp.ts
+var INT64_MIN = -9223372036854775808n;
+var INT64_MAX = 9223372036854775807n;
+function parseLocalStamp(value) {
+  if (!/^-?[0-9]+$/.test(value)) throw new Error(`invalid local sync stamp: "${value}"`);
+  const parsed = BigInt(value);
+  if (parsed < INT64_MIN || parsed > INT64_MAX) {
+    throw new Error(`local sync stamp exceeds signed 64-bit range: "${value}"`);
+  }
+  return parsed;
+}
+function localStampToString(value) {
+  return value.toString(10);
+}
+
+// src/cloud/state.ts
+var EndpointMismatchError = class extends Error {
+  constructor() {
+    super("client cursor is newer than an initialized local cloud state");
+    this.name = "EndpointMismatchError";
+  }
+};
 var CloudState = class {
   constructor(stateDir) {
     this.stateDir = stateDir;
@@ -24572,6 +24601,8 @@ var CloudState = class {
   entries = [];
   lastPull = {};
   lastFinalized;
+  lastStamp;
+  mismatches = 0;
   chain = Promise.resolve();
   async load() {
     await fs.mkdir(this.stateDir, { recursive: true });
@@ -24579,12 +24610,16 @@ var CloudState = class {
     this.entries = [];
     this.lastPull = {};
     this.lastFinalized = void 0;
+    this.lastStamp = void 0;
+    this.mismatches = 0;
     try {
       const parsed = JSON.parse(await fs.readFile(path.join(this.stateDir, "state.json"), "utf8"));
       this.cursor = parseCursor(parsed.highWater);
       this.entries = parsed.entries;
       this.lastPull = parsed.lastPull ?? {};
       this.lastFinalized = parsed.lastFinalized;
+      this.lastStamp = parsed.lastLocalStamp;
+      this.mismatches = parsed.endpointMismatches ?? 0;
       for (const entry of this.entries) parseCursor(entry.cursor);
     } catch (error2) {
       if (error2.code !== "ENOENT") throw error2;
@@ -24652,6 +24687,24 @@ var CloudState = class {
       return cursor;
     });
   }
+  /**
+   * Append an entry at an EXTERNALLY assigned cursor (the vendor's remote
+   * version, for mirror logs). Re-observing an already-recorded version is a
+   * no-op; an older unseen version is ignored with `false` (vendor versions
+   * are monotonic — a merged Get response already covered it).
+   */
+  async appendAtCursor(origin, zipBytes, cursor) {
+    return this.serialize(async () => {
+      if (this.entries.some((entry) => parseCursor(entry.cursor) === cursor)) return false;
+      if (cursor <= this.cursor) return false;
+      const file = `delta-${cursorToDecimalString(cursor)}.zip`;
+      await this.atomicWrite(path.join(this.stateDir, file), zipBytes);
+      this.cursor = cursor;
+      this.entries.push({ cursor: cursorToDecimalString(cursor), origin, file });
+      await this.writeState();
+      return true;
+    });
+  }
   async entriesAfter(cursor, excludeOrigin) {
     return this.read(async () => {
       const selected = this.entries.filter((entry) => parseCursor(entry.cursor) > cursor && entry.origin !== excludeOrigin);
@@ -24679,7 +24732,7 @@ var CloudState = class {
     await this.serialize(async () => {
       if (baseline <= this.cursor) return;
       if (this.lastPull[origin] !== void 0 || this.entries.some((entry) => entry.origin === origin)) {
-        throw new Error("client cursor is newer than an initialized local cloud state");
+        throw new EndpointMismatchError();
       }
       for (const entry of this.entries) {
         entry.cursor = cursorToDecimalString(parseCursor(entry.cursor) + baseline);
@@ -24687,6 +24740,32 @@ var CloudState = class {
       this.cursor = this.cursor + baseline;
       await this.writeState();
     });
+  }
+  /**
+   * Record the opaque local baseline the app sent with an upload. The value is
+   * kept for diagnostics only — it is a different counter namespace from the
+   * cloud cursor and must never gate or rebase anything.
+   */
+  async recordLocalStamp(stamp) {
+    await this.serialize(async () => {
+      const value = localStampToString(stamp);
+      if (this.lastStamp === value) return;
+      this.lastStamp = value;
+      await this.writeState();
+    });
+  }
+  async lastLocalStamp() {
+    return this.read(() => this.lastStamp === void 0 ? void 0 : parseLocalStamp(this.lastStamp));
+  }
+  /** Count an endpoint-mismatch rejection (distinct from bootstrap-required). */
+  async recordEndpointMismatch() {
+    await this.serialize(async () => {
+      this.mismatches += 1;
+      await this.writeState();
+    });
+  }
+  async endpointMismatchCount() {
+    return this.read(() => this.mismatches);
   }
   /** Record the cursor an origin accepted from a pull (only ever advances). */
   async recordPull(origin, cursor) {
@@ -24731,7 +24810,9 @@ var CloudState = class {
       highWater: cursorToDecimalString(this.cursor),
       entries: this.entries,
       ...Object.keys(this.lastPull).length ? { lastPull: this.lastPull } : {},
-      ...this.lastFinalized ? { lastFinalized: this.lastFinalized } : {}
+      ...this.lastFinalized ? { lastFinalized: this.lastFinalized } : {},
+      ...this.lastStamp !== void 0 ? { lastLocalStamp: this.lastStamp } : {},
+      ...this.mismatches ? { endpointMismatches: this.mismatches } : {}
     };
     await this.atomicWrite(path.join(this.stateDir, "state.json"), new TextEncoder().encode(`${JSON.stringify(value, null, 2)}
 `));
@@ -24743,10 +24824,508 @@ var CloudState = class {
   }
 };
 
-// src/cloud/sync-observer.ts
+// src/cloud/binding.ts
+import { promises as fs4 } from "node:fs";
+import path4 from "node:path";
+
+// src/cloud/partition.ts
+import { createHash } from "node:crypto";
+import { promises as fs3 } from "node:fs";
+import path3 from "node:path";
+
+// src/cloud/snapshot-store.ts
 import { promises as fs2 } from "node:fs";
 import path2 from "node:path";
-import zlib from "node:zlib";
+var SnapshotStore = class {
+  constructor(dir) {
+    this.dir = dir;
+  }
+  dir;
+  pointerPath() {
+    return path2.join(this.dir, "snapshot.json");
+  }
+  async pointer() {
+    try {
+      return JSON.parse(await fs2.readFile(this.pointerPath(), "utf8"));
+    } catch (error2) {
+      if (error2.code !== "ENOENT") throw error2;
+      return void 0;
+    }
+  }
+  async load() {
+    const pointer = await this.pointer();
+    if (!pointer) return void 0;
+    const text2 = await fs2.readFile(path2.join(this.dir, pointer.file), "utf8");
+    return { document: parseSectionedCsv(text2), version: parseCursor(pointer.version) };
+  }
+  async version() {
+    const pointer = await this.pointer();
+    return pointer ? parseCursor(pointer.version) : void 0;
+  }
+  /** Transactionally store `document` as the baseline covering `version`. */
+  async materialize(document, version2) {
+    await fs2.mkdir(this.dir, { recursive: true });
+    const previous = await this.pointer();
+    const seq = (previous?.seq ?? 0) + 1;
+    const file = `snapshot-${seq}.csv`;
+    const target = path2.join(this.dir, file);
+    const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
+    const handle = await fs2.open(temporary, "w");
+    try {
+      await handle.writeFile(emitSectionedCsv(document));
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    await fs2.rename(temporary, target);
+    const pointer = {
+      file,
+      version: cursorToDecimalString(version2),
+      seq,
+      materializedAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    const pointerTemporary = `${this.pointerPath()}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
+    await fs2.writeFile(pointerTemporary, `${JSON.stringify(pointer, null, 2)}
+`);
+    await fs2.rename(pointerTemporary, this.pointerPath());
+    if (previous && previous.file !== file) {
+      await fs2.rm(path2.join(this.dir, previous.file), { force: true });
+    }
+  }
+};
+
+// src/cloud/partition.ts
+var GUID_BODY = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/;
+function normalizeDataFileUid(raw) {
+  const body = raw.trim().replace(/^\{/, "").replace(/\}$/, "").toUpperCase();
+  if (!GUID_BODY.test(body)) throw new Error(`invalid dataFileUID: "${raw}"`);
+  return `{${body}}`;
+}
+function partitionKey(uid) {
+  return createHash("sha256").update(normalizeDataFileUid(uid), "utf8").digest("hex").slice(0, 16);
+}
+async function atomicWrite(target, text2) {
+  const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
+  await fs3.writeFile(temporary, text2);
+  await fs3.rename(temporary, target);
+}
+var PartitionHandle = class {
+  constructor(uid, key, dir) {
+    this.uid = uid;
+    this.key = key;
+    this.dir = dir;
+  }
+  uid;
+  key;
+  dir;
+  cloudState;
+  snapshotStore;
+  mirrorCloudState;
+  mirrorSnapshotStore;
+  /** Local-mode delta log; lives under `<partition>/local`. */
+  get state() {
+    this.cloudState ??= new CloudState(path3.join(this.dir, "local"));
+    return this.cloudState;
+  }
+  /** Materialized baseline beside the log (found by projections via the log dir). */
+  get snapshots() {
+    this.snapshotStore ??= new SnapshotStore(path3.join(this.dir, "local", "snapshot"));
+    return this.snapshotStore;
+  }
+  /**
+   * Upstream-mode mirror: envelopes captured from the vendor flow, stored at
+   * the VENDOR-assigned versions ("app" = uploads, "mcp" = downloads — the
+   * mirror never serves pulls, so origins only label direction). Its
+   * materialized baseline sits beside it like any log's.
+   */
+  get mirrorState() {
+    this.mirrorCloudState ??= new CloudState(path3.join(this.dir, "mirror"));
+    return this.mirrorCloudState;
+  }
+  get mirrorSnapshots() {
+    this.mirrorSnapshotStore ??= new SnapshotStore(path3.join(this.dir, "mirror", "snapshot"));
+    return this.mirrorSnapshotStore;
+  }
+  metaPath() {
+    return path3.join(this.dir, "meta.json");
+  }
+  async meta() {
+    const parsed = JSON.parse(await fs3.readFile(this.metaPath(), "utf8"));
+    return parsed;
+  }
+  async mode() {
+    return (await this.meta()).mode;
+  }
+  async lifecycle() {
+    return (await this.meta()).lifecycle;
+  }
+  async setLifecycle(next) {
+    const current = await this.meta();
+    await atomicWrite(this.metaPath(), `${JSON.stringify({ ...current, lifecycle: next }, null, 2)}
+`);
+  }
+  /** True when nothing was ever stored: no deltas, no pulls, no mirror entries. */
+  async isEmpty() {
+    const state = this.state;
+    const [highWater, counts, lastPull, mirrorCounts] = await Promise.all([
+      state.highWater(),
+      state.counts(),
+      state.lastPullCursor("app"),
+      this.mirrorState.counts()
+    ]);
+    return highWater === 0n && counts.mcp === 0 && counts.app === 0 && lastPull === 0n && mirrorCounts.mcp === 0 && mirrorCounts.app === 0;
+  }
+};
+var PartitionRegistry = class {
+  constructor(stateRoot) {
+    this.stateRoot = stateRoot;
+  }
+  stateRoot;
+  handles = /* @__PURE__ */ new Map();
+  partitionsDir() {
+    return path3.join(this.stateRoot, "partitions");
+  }
+  /**
+   * Open a partition, creating its directory and meta on first use.
+   * `createMode` labels a NEWLY created partition (from the binding or the
+   * armed window that introduced it); an existing partition keeps its meta.
+   */
+  async open(rawUid, createMode = "upstream") {
+    const uid = normalizeDataFileUid(rawUid);
+    const key = partitionKey(uid);
+    const cached2 = this.handles.get(key);
+    if (cached2) return cached2;
+    const dir = path3.join(this.partitionsDir(), key);
+    await fs3.mkdir(dir, { recursive: true });
+    const handle = new PartitionHandle(uid, key, dir);
+    try {
+      const meta = await handle.meta();
+      if (normalizeDataFileUid(meta.dataFileUID) !== uid) {
+        throw new Error(`partition key collision: ${dir} already belongs to a different dataFileUID`);
+      }
+    } catch (error2) {
+      if (error2.code !== "ENOENT") throw error2;
+      const meta = {
+        dataFileUID: uid,
+        mode: createMode,
+        lifecycle: "uninitialized",
+        createdAt: (/* @__PURE__ */ new Date()).toISOString()
+      };
+      await atomicWrite(path3.join(dir, "meta.json"), `${JSON.stringify(meta, null, 2)}
+`);
+    }
+    this.handles.set(key, handle);
+    return handle;
+  }
+  /** Resolve a partition only if it already exists on disk. */
+  async resolveExisting(rawUid) {
+    const uid = normalizeDataFileUid(rawUid);
+    const key = partitionKey(uid);
+    const cached2 = this.handles.get(key);
+    if (cached2) return cached2;
+    const dir = path3.join(this.partitionsDir(), key);
+    try {
+      await fs3.stat(path3.join(dir, "meta.json"));
+    } catch {
+      return void 0;
+    }
+    return this.open(uid);
+  }
+  async list() {
+    let keys;
+    try {
+      keys = await fs3.readdir(this.partitionsDir());
+    } catch {
+      return [];
+    }
+    const summaries = [];
+    for (const key of keys.sort()) {
+      try {
+        const meta = JSON.parse(
+          await fs3.readFile(path3.join(this.partitionsDir(), key, "meta.json"), "utf8")
+        );
+        summaries.push({ key, ...meta });
+      } catch {
+      }
+    }
+    return summaries;
+  }
+};
+
+// src/cloud/binding.ts
+function canonicalProfilePath(profilePath) {
+  return path4.resolve(profilePath).toLowerCase();
+}
+var BindingStore = class {
+  constructor(stateRoot) {
+    this.stateRoot = stateRoot;
+  }
+  stateRoot;
+  chain = Promise.resolve();
+  file() {
+    return path4.join(this.stateRoot, "bindings.json");
+  }
+  async withLock(operation) {
+    const lockDir = path4.join(this.stateRoot, ".bindings-lock");
+    const deadline = Date.now() + 1e4;
+    await fs4.mkdir(this.stateRoot, { recursive: true });
+    for (; ; ) {
+      try {
+        await fs4.mkdir(lockDir);
+        break;
+      } catch (error2) {
+        if (error2.code !== "EEXIST") throw error2;
+        try {
+          const stat = await fs4.stat(lockDir);
+          if (Date.now() - stat.mtimeMs > 3e4) {
+            await fs4.rm(lockDir, { recursive: true, force: true });
+            continue;
+          }
+        } catch {
+          continue;
+        }
+        if (Date.now() >= deadline) throw new Error(`timed out waiting for bindings lock: ${lockDir}`);
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+    }
+    try {
+      return await operation();
+    } finally {
+      await fs4.rm(lockDir, { recursive: true, force: true });
+    }
+  }
+  serialize(operation) {
+    const run = () => this.withLock(operation);
+    const next = this.chain.then(run, run);
+    this.chain = next.catch(() => void 0);
+    return next;
+  }
+  async load() {
+    try {
+      const parsed = JSON.parse(await fs4.readFile(this.file(), "utf8"));
+      return parsed.bindings ?? [];
+    } catch (error2) {
+      if (error2.code !== "ENOENT") throw error2;
+      return [];
+    }
+  }
+  async save(bindings) {
+    const target = this.file();
+    const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
+    await fs4.writeFile(temporary, `${JSON.stringify({ bindings }, null, 2)}
+`);
+    await fs4.rename(temporary, target);
+  }
+  async forProfile(profilePath) {
+    const canonical = canonicalProfilePath(profilePath);
+    return (await this.load()).find((binding) => canonicalProfilePath(binding.profilePath) === canonical);
+  }
+  async forUid(rawUid) {
+    const uid = normalizeDataFileUid(rawUid);
+    return (await this.load()).find((binding) => binding.dataFileUID === uid);
+  }
+  /** Create (or return) the binding for a profile. Mode conflicts fail closed. */
+  async create(profilePath, mode) {
+    return this.serialize(async () => {
+      const bindings = await this.load();
+      const canonical = canonicalProfilePath(profilePath);
+      const existing = bindings.find((binding2) => canonicalProfilePath(binding2.profilePath) === canonical);
+      if (existing) {
+        if (existing.mode !== mode) {
+          throw new Error(
+            `profile is already bound in "${existing.mode}" mode; switching modes requires an explicit rebind with a fresh partition (cloud_bootstrap { rebind: true })`
+          );
+        }
+        return existing;
+      }
+      const binding = { profilePath, mode, createdAt: (/* @__PURE__ */ new Date()).toISOString() };
+      bindings.push(binding);
+      await this.save(bindings);
+      return binding;
+    });
+  }
+  /** Attach a dataFileUID to a profile's binding. All conflicts fail closed. */
+  async bindUid(profilePath, rawUid) {
+    return this.serialize(async () => {
+      const uid = normalizeDataFileUid(rawUid);
+      const bindings = await this.load();
+      const canonical = canonicalProfilePath(profilePath);
+      const binding = bindings.find((entry) => canonicalProfilePath(entry.profilePath) === canonical);
+      if (!binding) throw new Error(`no binding exists for profile ${profilePath}; create one first`);
+      if (binding.dataFileUID && binding.dataFileUID !== uid) {
+        throw new Error(
+          `profile is already bound to a different dataFileUID; rebinding requires an explicit fresh bootstrap (cloud_bootstrap { rebind: true })`
+        );
+      }
+      const other = bindings.find((entry) => entry !== binding && entry.dataFileUID === uid);
+      if (other) {
+        throw new Error(`dataFileUID is already bound to a different profile (${other.profilePath})`);
+      }
+      binding.dataFileUID = uid;
+      binding.boundAt = (/* @__PURE__ */ new Date()).toISOString();
+      await this.save(bindings);
+      return binding;
+    });
+  }
+  /**
+   * Explicit rebind: reset the profile's binding to `mode` with no UID. The
+   * old partition directory is left intact as evidence; only the pointer
+   * moves. This is the ONLY way a binding's mode changes.
+   */
+  async replace(profilePath, mode) {
+    return this.serialize(async () => {
+      const bindings = await this.load();
+      const canonical = canonicalProfilePath(profilePath);
+      const index = bindings.findIndex((entry) => canonicalProfilePath(entry.profilePath) === canonical);
+      const binding = { profilePath, mode, createdAt: (/* @__PURE__ */ new Date()).toISOString() };
+      if (index >= 0) bindings[index] = binding;
+      else bindings.push(binding);
+      await this.save(bindings);
+      return binding;
+    });
+  }
+  /**
+   * Drop a profile's UID binding as part of an explicit rebind. The old
+   * partition directory is left intact as evidence; only the pointer moves.
+   */
+  async unbindUid(profilePath) {
+    await this.serialize(async () => {
+      const bindings = await this.load();
+      const canonical = canonicalProfilePath(profilePath);
+      const binding = bindings.find((entry) => canonicalProfilePath(entry.profilePath) === canonical);
+      if (!binding) return;
+      delete binding.dataFileUID;
+      delete binding.boundAt;
+      await this.save(bindings);
+    });
+  }
+  async list() {
+    return this.load();
+  }
+};
+
+// src/cloud/bootstrap.ts
+import { promises as fs5 } from "node:fs";
+import path5 from "node:path";
+var DEFAULT_TTL_MS = 30 * 60 * 1e3;
+var BootstrapController = class {
+  constructor(stateRoot) {
+    this.stateRoot = stateRoot;
+  }
+  stateRoot;
+  chain = Promise.resolve();
+  dir() {
+    return path5.join(this.stateRoot, "bootstrap");
+  }
+  markerPath() {
+    return path5.join(this.dir(), "armed.json");
+  }
+  stagedPath() {
+    return path5.join(this.dir(), "staged.zip");
+  }
+  serialize(operation) {
+    const next = this.chain.then(operation, operation);
+    this.chain = next.catch(() => void 0);
+    return next;
+  }
+  async read() {
+    try {
+      return JSON.parse(await fs5.readFile(this.markerPath(), "utf8"));
+    } catch (error2) {
+      if (error2.code !== "ENOENT") throw error2;
+      return void 0;
+    }
+  }
+  async write(window2) {
+    await fs5.mkdir(this.dir(), { recursive: true });
+    const target = this.markerPath();
+    const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
+    await fs5.writeFile(temporary, `${JSON.stringify(window2, null, 2)}
+`);
+    await fs5.rename(temporary, target);
+  }
+  /** The active window, expiring it lazily. */
+  async current() {
+    return this.serialize(async () => {
+      const window2 = await this.read();
+      if (!window2) return void 0;
+      if (Date.parse(window2.expiresAt) <= Date.now()) {
+        await this.remove();
+        return void 0;
+      }
+      return window2;
+    });
+  }
+  /** Arm for one profile. A live window for a different profile fails closed. */
+  async arm(profilePath, mode, ttlMs = DEFAULT_TTL_MS) {
+    return this.serialize(async () => {
+      const existing = await this.read();
+      if (existing && Date.parse(existing.expiresAt) > Date.now() && existing.profilePath !== profilePath) {
+        throw new Error(
+          `a bootstrap window is already armed for a different profile (${existing.profilePath}); wait for it to complete or expire`
+        );
+      }
+      const now = Date.now();
+      const window2 = {
+        profilePath,
+        mode,
+        armedAt: new Date(now).toISOString(),
+        expiresAt: new Date(now + ttlMs).toISOString()
+      };
+      await this.write(window2);
+      await fs5.rm(this.stagedPath(), { force: true });
+      return window2;
+    });
+  }
+  /**
+   * Record the unknown `dataFileUID` introducing itself to the armed window.
+   * Exactly one is accepted; a different one disarms and fails closed.
+   */
+  async noteUidSeen(rawUid) {
+    const uid = normalizeDataFileUid(rawUid);
+    await this.serialize(async () => {
+      const window2 = await this.read();
+      if (!window2) throw new Error("no bootstrap window is armed");
+      if (!window2.dataFileUID) {
+        await this.write({ ...window2, dataFileUID: uid });
+        return;
+      }
+      if (window2.dataFileUID !== uid) {
+        await this.remove();
+        throw new Error(
+          "a second unknown dataFileUID appeared during the bootstrap window \u2014 disarmed; make sure only the target profile syncs during bootstrap, then re-run cloud_bootstrap"
+        );
+      }
+    });
+  }
+  async noteEmptyGetServed() {
+    await this.serialize(async () => {
+      const window2 = await this.read();
+      if (window2 && !window2.sawEmptyGet) await this.write({ ...window2, sawEmptyGet: true });
+    });
+  }
+  /** Persist the candidate snapshot bytes for idempotent (re)validation. */
+  async stageSnapshot(bytes) {
+    await this.serialize(async () => {
+      await fs5.mkdir(this.dir(), { recursive: true });
+      const target = this.stagedPath();
+      const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
+      await fs5.writeFile(temporary, bytes);
+      await fs5.rename(temporary, target);
+    });
+  }
+  /** Close the window after success; the staged upload is no longer needed. */
+  async complete() {
+    await this.serialize(() => this.remove());
+  }
+  async disarm() {
+    await this.serialize(() => this.remove());
+  }
+  async remove() {
+    await fs5.rm(this.markerPath(), { force: true });
+    await fs5.rm(this.stagedPath(), { force: true });
+  }
+};
 
 // src/log.ts
 function log(message) {
@@ -24754,15 +25333,186 @@ function log(message) {
 `);
 }
 
+// src/cloud/gateway.ts
+var SESSION_PIN_TTL_MS = 10 * 60 * 1e3;
+var CloudGateway = class {
+  registry;
+  bindings;
+  bootstrap;
+  stateRoot;
+  unboundState;
+  rootPrepared = false;
+  sessionAuthorities = /* @__PURE__ */ new Map();
+  constructor(options) {
+    this.stateRoot = options.stateRoot;
+    this.registry = new PartitionRegistry(options.stateRoot);
+    this.bindings = new BindingStore(options.stateRoot);
+    this.bootstrap = new BootstrapController(options.stateRoot);
+  }
+  /** Where the sync observer writes its structural summaries. */
+  observerDir() {
+    return this.stateRoot;
+  }
+  /**
+   * Placeholder log for callers that address no specific partition, so
+   * `/v1/status` (the attach probe) and tool contexts keep a stable shape
+   * before a profile is bound. Never routed to by SOAP.
+   */
+  defaultState() {
+    this.unboundState ??= new CloudState(path6.join(this.stateRoot, "unbound"));
+    return this.unboundState;
+  }
+  /**
+   * Decide the authority for one SOAP sync operation from its parsed fields.
+   * Local termination answers local-mode partitions (and malformed requests,
+   * which it fails properly); upstream-bound and unknown windowless
+   * dataFileUIDs belong to the vendor. The decision is pinned per sessionID
+   * so a binding change can never switch authorities mid-session.
+   */
+  async decideAuthority(fields) {
+    const sessionId = typeof fields.sessionID === "string" && fields.sessionID.length ? fields.sessionID : void 0;
+    const now = Date.now();
+    if (sessionId) {
+      const pinned = this.sessionAuthorities.get(sessionId);
+      if (pinned && pinned.expires > now) {
+        pinned.expires = now + SESSION_PIN_TTL_MS;
+        return pinned.authority;
+      }
+      this.sessionAuthorities.delete(sessionId);
+    }
+    const authority = await this.computeAuthority(fields);
+    if (sessionId) {
+      for (const [key, value] of this.sessionAuthorities) if (value.expires <= now) this.sessionAuthorities.delete(key);
+      this.sessionAuthorities.set(sessionId, { authority, expires: now + SESSION_PIN_TTL_MS });
+    }
+    return authority;
+  }
+  async computeAuthority(fields) {
+    const rawUid = typeof fields.dataFileUID === "string" && fields.dataFileUID.length ? fields.dataFileUID : void 0;
+    if (!rawUid) return { kind: "local" };
+    let uid;
+    try {
+      uid = normalizeDataFileUid(rawUid);
+    } catch {
+      return { kind: "local" };
+    }
+    await this.prepareRoot();
+    const binding = await this.bindings.forUid(uid);
+    if (binding) {
+      if (binding.mode === "local") return { kind: "local" };
+      const partition = await this.registry.open(uid, binding.mode);
+      return { kind: "upstream", context: { partition, capture: true, bootstrapping: false } };
+    }
+    const window2 = await this.bootstrap.current();
+    if (window2 && window2.mode === "upstream") {
+      const firstContact = !window2.dataFileUID;
+      try {
+        await this.bootstrap.noteUidSeen(uid);
+      } catch (error2) {
+        return { kind: "reject", message: error2 instanceof Error ? error2.message : String(error2) };
+      }
+      const partition = await this.registry.open(uid, "upstream");
+      if (firstContact && !await partition.isEmpty()) {
+        return { kind: "reject", message: "bootstrap requires an empty partition, but this dataFileUID already has history" };
+      }
+      return { kind: "upstream", context: { partition, capture: true, bootstrapping: true } };
+    }
+    if (window2) return { kind: "local" };
+    log(`sync operation for unknown dataFileUID forwarded to the vendor without capture (no binding, no armed bootstrap)`);
+    return { kind: "upstream", context: { capture: false, bootstrapping: false } };
+  }
+  /** A CONNECT tunnel to the vendor sync host blinds the mirror; record it. */
+  async noteVendorConnect() {
+    await this.prepareRoot();
+    const target = path6.join(this.stateRoot, "mirror-blind.json");
+    await fs6.writeFile(target, `${JSON.stringify({ mirrorBlind: true, at: (/* @__PURE__ */ new Date()).toISOString() }, null, 2)}
+`);
+    log(`HTTPS CONNECT to the vendor sync host: sync is TLS-tunneled and the upstream mirror is blind \u2014 uncheck "Use secure connection" in MLO's cloud login`);
+  }
+  async mirrorBlind() {
+    try {
+      await fs6.stat(path6.join(this.stateRoot, "mirror-blind.json"));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  async noteMirrorUnhealthy() {
+    await this.prepareRoot();
+    const target = path6.join(this.stateRoot, "mirror-health.json");
+    await fs6.writeFile(target, `${JSON.stringify({ healthy: false, at: (/* @__PURE__ */ new Date()).toISOString() }, null, 2)}
+`);
+  }
+  async mirrorHealthy() {
+    try {
+      await fs6.stat(path6.join(this.stateRoot, "mirror-health.json"));
+      return false;
+    } catch {
+      return true;
+    }
+  }
+  /** The partition bound to a profile, or a description of why none is. */
+  async boundPartition(profilePath) {
+    const binding = await this.bindings.forProfile(profilePath);
+    if (!binding?.dataFileUID) return { kind: "unbound", ...binding ? { binding } : {} };
+    await this.prepareRoot();
+    const partition = await this.registry.open(binding.dataFileUID, binding.mode);
+    return { kind: "bound", binding, partition, lifecycle: await partition.lifecycle() };
+  }
+  /** Resolve the state for a `/v1` call with an optional `dataFileUID`. */
+  async stateForV1(rawUid) {
+    if (rawUid === void 0) return this.defaultState();
+    await this.prepareRoot();
+    const partition = await this.registry.open(rawUid);
+    return partition.state;
+  }
+  /**
+   * Create the private state root on first use, restricting it to the current
+   * user. Node has no native Windows ACL API, so this is a best-effort
+   * `icacls` call; failure only logs — the root still works, with inherited
+   * per-user `%LOCALAPPDATA%` permissions in the default location.
+   */
+  async ensureRoot() {
+    return this.prepareRoot();
+  }
+  async prepareRoot() {
+    if (this.rootPrepared) return;
+    this.rootPrepared = true;
+    let created = false;
+    try {
+      await fs6.mkdir(this.stateRoot, { recursive: false });
+      created = true;
+    } catch (error2) {
+      if (error2.code !== "EEXIST") {
+        await fs6.mkdir(this.stateRoot, { recursive: true });
+        created = true;
+      }
+    }
+    if (created && process.platform === "win32") {
+      const user = process.env.USERNAME ?? os.userInfo().username;
+      execFile(
+        "icacls",
+        [this.stateRoot, "/inheritance:r", "/grant:r", `${user}:(OI)(CI)F`],
+        (error2) => {
+          if (error2) log(`could not restrict state root ACL (non-fatal): ${error2.message}`);
+        }
+      );
+    }
+  }
+};
+
 // src/cloud/sync-observer.ts
+import { promises as fs7 } from "node:fs";
+import path7 from "node:path";
+import zlib from "node:zlib";
 var VENDOR_SYNC_HOST = "sync.mylifeorganized.net";
 var SUMMARY_FILE = "soap-summary.jsonl";
 var SENSITIVE = /pass|credential|token|secret|session|cookie|email|user|login/i;
 var BODY = /<(?:[\w.-]+:)?Body(?:\s[^>]*)?>([\s\S]*?)<\/(?:[\w.-]+:)?Body\s*>/i;
 var TAG = /<(?!\/)(?:[\w.-]+:)?([\w.-]+)(?:\s[^>]*)?>/gi;
 var CAPTURE_LIMIT = 4 * 1024 * 1024;
-function escapeRegExp(text) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function escapeRegExp(text2) {
+  return text2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 function operationShape(xml2) {
   const body = BODY.exec(xml2)?.[1] ?? "";
@@ -24882,12 +25632,152 @@ var SyncObserver = class {
   append(record2) {
     const line = `${JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), ...record2 })}
 `;
-    void fs2.mkdir(this.stateDir, { recursive: true }).then(() => fs2.appendFile(path2.join(this.stateDir, SUMMARY_FILE), line)).catch((error2) => log(`sync observer write failed: ${error2 instanceof Error ? error2.message : String(error2)}`));
+    void fs7.mkdir(this.stateDir, { recursive: true }).then(() => fs7.appendFile(path7.join(this.stateDir, SUMMARY_FILE), line)).catch((error2) => log(`sync observer write failed: ${error2 instanceof Error ? error2.message : String(error2)}`));
   }
 };
 
 // src/cloud/soap.ts
 var import_fast_xml_parser = __toESM(require_fxp(), 1);
+
+// src/cloud/snapshot-validate.ts
+var GUID = /^\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\}$/;
+var CANONICAL_TASK_COLUMNS = TODO_ITEMS_HEADER;
+function normalizedGuid(value) {
+  return value.trim().toUpperCase();
+}
+function validateFullSnapshot(document) {
+  const errors = [];
+  const stats = {};
+  const versions = findSection(document, "SysVersions");
+  const fileVersion = versions?.rows[0]?.[versions.header.indexOf("FileVersion")];
+  if (fileVersion !== "3") errors.push(`unsupported SysVersions.FileVersion "${fileVersion ?? "<missing>"}"`);
+  const tasks = findSection(document, "TodoItems");
+  if (!tasks) {
+    return { ok: false, errors: ["snapshot has no TodoItems section"], stats };
+  }
+  const canonical = tasks.header.slice(0, CANONICAL_TASK_COLUMNS.length);
+  if (canonical.join(",") !== CANONICAL_TASK_COLUMNS.join(",")) {
+    const firstDiff = CANONICAL_TASK_COLUMNS.findIndex((column, index) => canonical[index] !== column);
+    errors.push(
+      `TodoItems header deviates from the supported 82-column layout at column ${firstDiff + 1} ("${canonical[firstDiff] ?? "<missing>"}" instead of "${CANONICAL_TASK_COLUMNS[firstDiff]}")`
+    );
+  }
+  const uidIndex = tasks.header.indexOf("UID");
+  const parentIndex = tasks.header.indexOf("ParentUID");
+  const flagIndex = tasks.header.indexOf("FlagUID");
+  const live = /* @__PURE__ */ new Map();
+  for (const [rowNumber, row] of tasks.rows.entries()) {
+    if (row.length !== tasks.header.length) {
+      errors.push(`TodoItems row ${rowNumber + 1} has ${row.length} cells, expected ${tasks.header.length}`);
+      continue;
+    }
+    const uid = normalizedGuid(row[uidIndex] ?? "");
+    if (!GUID.test(uid)) {
+      errors.push(`TodoItems row ${rowNumber + 1} has an invalid UID "${row[uidIndex] ?? ""}"`);
+      continue;
+    }
+    if (live.has(uid)) errors.push(`duplicate task UID ${uid}`);
+    live.set(uid, normalizedGuid(row[parentIndex] ?? ""));
+  }
+  stats.tasks = live.size;
+  if (live.size === 0) errors.push("snapshot contains no tasks \u2014 not a full upload");
+  for (const [uid, parent] of live) {
+    if (parent && !live.has(parent)) errors.push(`task ${uid} has unresolved ParentUID ${parent}`);
+  }
+  const visited = /* @__PURE__ */ new Set();
+  for (const start of live.keys()) {
+    if (visited.has(start)) continue;
+    const chain2 = /* @__PURE__ */ new Set();
+    let current = start;
+    while (current && live.has(current) && !visited.has(current)) {
+      if (chain2.has(current)) {
+        errors.push(`task parent cycle involving ${current}`);
+        break;
+      }
+      chain2.add(current);
+      current = live.get(current) || void 0;
+    }
+    for (const uid of chain2) visited.add(uid);
+  }
+  const namedUids = (name) => {
+    const section = findSection(document, name);
+    const uids = /* @__PURE__ */ new Set();
+    if (!section) {
+      errors.push(`snapshot has no ${name} section`);
+      return uids;
+    }
+    const index = section.header.indexOf("UID");
+    for (const row of section.rows) {
+      const uid = normalizedGuid(row[index] ?? "");
+      if (!GUID.test(uid)) errors.push(`${name} row has an invalid UID "${row[index] ?? ""}"`);
+      else if (uids.has(uid)) errors.push(`duplicate ${name} UID ${uid}`);
+      else uids.add(uid);
+    }
+    return uids;
+  };
+  const places = namedUids("Places");
+  const flags = namedUids("Flags");
+  stats.places = places.size;
+  stats.flags = flags.size;
+  const tombstones = (name, column, liveSet2) => {
+    const section = findSection(document, name);
+    if (!section) return 0;
+    const index = section.header.indexOf(column);
+    const seen = /* @__PURE__ */ new Set();
+    for (const row of section.rows) {
+      const uid = normalizedGuid(row[index] ?? "");
+      if (!GUID.test(uid)) errors.push(`${name} row has an invalid UID "${row[index] ?? ""}"`);
+      else if (seen.has(uid)) errors.push(`duplicate tombstone ${uid} in ${name}`);
+      else {
+        seen.add(uid);
+        if (liveSet2.has(uid)) errors.push(`${name} tombstone ${uid} overlaps a live row`);
+      }
+    }
+    return seen.size;
+  };
+  stats.taskTombstones = tombstones("TodoItems.Deleted", "TodoItemUID", new Set(live.keys()));
+  stats.placeTombstones = tombstones("Places.Deleted", "PlaceUID", places);
+  stats.flagTombstones = tombstones("Flags.Deleted", "FlagUID", flags);
+  const relations = (name, checks) => {
+    const section = findSection(document, name);
+    if (!section) return 0;
+    for (const row of section.rows) {
+      for (const { column, set, what } of checks) {
+        const uid = normalizedGuid(row[section.header.indexOf(column)] ?? "");
+        if (!set.has(uid)) errors.push(`${name} references ${what} ${uid || "<blank>"} that is not in the snapshot`);
+      }
+    }
+    return section.rows.length;
+  };
+  const liveSet = new Set(live.keys());
+  stats.taskPlaces = relations("TodoItemPlaces", [
+    { column: "TodoItemUID", set: liveSet, what: "task" },
+    { column: "PlaceUID", set: places, what: "context" }
+  ]);
+  stats.dependencies = relations("TodoItems.Dependency", [
+    { column: "TaskUID", set: liveSet, what: "task" },
+    { column: "DependencyUID", set: liveSet, what: "task" }
+  ]);
+  stats.starredOrder = relations("TodoView.ManualOrdering.Starred", [
+    { column: "UID", set: liveSet, what: "task" }
+  ]);
+  stats.placeRelations = relations("PlaceRelations", [
+    { column: "PlaceUID", set: places, what: "context" },
+    { column: "ParentPlaceUID", set: places, what: "context" }
+  ]);
+  if (flagIndex >= 0) {
+    for (const row of tasks.rows) {
+      const flag = normalizedGuid(row[flagIndex] ?? "");
+      if (flag && !flags.has(flag)) errors.push(`task ${normalizedGuid(row[uidIndex] ?? "")} references unknown flag ${flag}`);
+    }
+  }
+  const config2 = findSection(document, "Config");
+  if (!config2) errors.push("snapshot has no Config section \u2014 this looks like an ordinary incremental delta, not a full upload");
+  else stats.configRows = config2.rows.length;
+  return { ok: errors.length === 0, errors, stats };
+}
+
+// src/cloud/soap.ts
 var SOAP_NAMESPACE = "http://schemas.xmlsoap.org/soap/envelope/";
 var MLO_NAMESPACE = "http://www.mylifeorganized.net/";
 var SOAP_OPERATIONS = [
@@ -24957,6 +25847,16 @@ function prepareMcpDeltaForMlo(document) {
   }
   return document;
 }
+function peekSoapFields(xml2, operation) {
+  try {
+    return parseFields(xml2, operation);
+  } catch {
+    return {};
+  }
+}
+function soapOperationFailure(operation, message) {
+  return envelope(operation, failureFields(operation, message));
+}
 function soapOperationFromAction(action) {
   const value = Array.isArray(action) ? action[0] : action;
   if (!value) return void 0;
@@ -24964,11 +25864,117 @@ function soapOperationFromAction(action) {
   const name = normalized.slice(normalized.lastIndexOf("/") + 1);
   return OPERATIONS.has(name) ? name : void 0;
 }
-async function handleSoapOperation(state, operation, xml2) {
+async function handleSoapRequest(gateway, operation, xml2) {
   const fields = parseFields(xml2, operation);
+  const rawUid = typeof fields.dataFileUID === "string" && fields.dataFileUID.length ? fields.dataFileUID : void 0;
+  const fail = (message) => envelope(operation, failureFields(operation, message));
+  if (!rawUid) return fail("dataFileUID is required to route this operation to a state partition");
+  let uid;
+  try {
+    uid = normalizeDataFileUid(rawUid);
+  } catch (error2) {
+    return fail(error2 instanceof Error ? error2.message : String(error2));
+  }
+  await gateway.ensureRoot();
+  const binding = await gateway.bindings.forUid(uid);
+  const window2 = await gateway.bootstrap.current();
+  if (binding) {
+    if (binding.mode === "upstream") {
+      return fail("this dataFileUID is bound to the vendor Cloud (upstream mode); the local endpoint does not terminate its sync operations");
+    }
+    const partition = await gateway.registry.open(uid, binding.mode);
+    if (await partition.lifecycle() === "ready") {
+      return handleParsedSoapOperation(partition.state, operation, fields);
+    }
+    if (window2 && window2.profilePath === binding.profilePath) {
+      return handleBootstrapOperation(gateway, partition, operation, fields);
+    }
+    return fail(
+      "this profile's partition is not bootstrapped; run cloud_bootstrap, then Re-synchronize in MLO \u2014 an ordinary sync will not help"
+    );
+  }
+  if (window2) {
+    const firstContact = !window2.dataFileUID;
+    try {
+      await gateway.bootstrap.noteUidSeen(uid);
+    } catch (error2) {
+      return fail(error2 instanceof Error ? error2.message : String(error2));
+    }
+    const partition = await gateway.registry.open(uid, window2.mode);
+    if (firstContact && !await partition.isEmpty()) {
+      return fail("bootstrap requires an empty partition, but this dataFileUID already has history");
+    }
+    return handleBootstrapOperation(gateway, partition, operation, fields);
+  }
+  return fail(
+    "unknown dataFileUID: no profile is bound to it and no bootstrap window is armed; run cloud_bootstrap first"
+  );
+}
+async function handleBootstrapOperation(gateway, partition, operation, fields) {
+  const bootstrap = gateway.bootstrap;
+  const state = partition.state;
+  if (operation === "GetModificationsBytesEx") {
+    const response = await handleParsedSoapOperation(state, operation, fields);
+    await bootstrap.noteEmptyGetServed();
+    return response;
+  }
+  if (operation === "ApplyModificationsBytesEx") {
+    const stamp = parseLocalStamp(requiredText(fields, "lastSyncTimestamp"));
+    await state.recordLocalStamp(stamp);
+    const fail = (message) => envelope(operation, failureFields(
+      operation,
+      message,
+      field("newServerTimeStamp", cursorToDecimalString(ZERO_CURSOR))
+    ));
+    const window2 = await bootstrap.current();
+    if (!window2?.sawEmptyGet) {
+      return fail("bootstrap upload arrived before the empty-partition pull \u2014 restart the Re-synchronize in MLO");
+    }
+    const encoded = fields.data;
+    if (typeof encoded !== "string" || !encoded.length) {
+      return fail("bootstrap expects a full-snapshot upload, but the request carried no data");
+    }
+    let bytes;
+    let document;
+    try {
+      bytes = decodeBase64(encoded);
+      document = unpackEnvelope(bytes);
+    } catch (error2) {
+      return fail(error2 instanceof Error ? error2.message : String(error2));
+    }
+    await bootstrap.stageSnapshot(bytes);
+    const validation = validateFullSnapshot(document);
+    if (!validation.ok) {
+      await partition.setLifecycle("bootstrap-required");
+      const preview = validation.errors.slice(0, 5).join("; ");
+      const suffix = validation.errors.length > 5 ? ` (+${validation.errors.length - 5} more)` : "";
+      return fail(`bootstrap snapshot failed validation: ${preview}${suffix}`);
+    }
+    const cursor = await state.append("app", bytes);
+    await partition.snapshots.materialize(document, cursor);
+    await gateway.bindings.bindUid(window2.profilePath, partition.uid);
+    await partition.setLifecycle("ready");
+    await bootstrap.complete();
+    return envelope(operation, successFields(operation, field("newServerTimeStamp", cursorToDecimalString(cursor))));
+  }
+  await state.finalize();
+  return envelope(operation, successFields(operation));
+}
+async function handleParsedSoapOperation(state, operation, fields) {
   if (operation === "GetModificationsBytesEx") {
     const baseline = parseCursor(requiredText(fields, "newerThan"));
-    await state.adoptInitialBaseline("app", baseline);
+    try {
+      await state.adoptInitialBaseline("app", baseline);
+    } catch (error2) {
+      if (!(error2 instanceof EndpointMismatchError)) throw error2;
+      await state.recordEndpointMismatch();
+      const highWater = await state.highWater();
+      return envelope(operation, failureFields(
+        operation,
+        "endpoint mismatch: the profile's stored cloud cursor belongs to a different server history; a full re-synchronization against an empty partition is required",
+        field("maxVersion", cursorToDecimalString(highWater))
+      ));
+    }
     const entries = await state.entriesAfter(baseline, "app");
     const cursor = entries.length ? entries.at(-1).cursor : await state.highWater();
     await state.recordPull("app", cursor);
@@ -24981,16 +25987,9 @@ async function handleSoapOperation(state, operation, xml2) {
     return envelope(operation, successFields(operation, field("maxVersion", cursorToDecimalString(cursor)) + data));
   }
   if (operation === "ApplyModificationsBytesEx") {
-    const baseline = parseCursor(requiredText(fields, "lastSyncTimestamp"));
-    await state.adoptInitialBaseline("app", baseline);
+    const stamp = parseLocalStamp(requiredText(fields, "lastSyncTimestamp"));
+    await state.recordLocalStamp(stamp);
     const highWater = await state.highWater();
-    if (baseline > highWater) {
-      return envelope(operation, failureFields(
-        operation,
-        "lastSyncTimestamp is newer than the server high-water cursor",
-        field("newServerTimeStamp", cursorToDecimalString(highWater))
-      ));
-    }
     const encoded = fields.data;
     if (encoded !== void 0 && typeof encoded !== "string") {
       return envelope(operation, failureFields(
@@ -25021,6 +26020,106 @@ async function handleSoapOperation(state, operation, xml2) {
 function soapFault(message) {
   const xml2 = `<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="${SOAP_NAMESPACE}"><soap:Body><soap:Fault>` + field("faultcode", "soap:Client") + field("faultstring", message) + `</soap:Fault></soap:Body></soap:Envelope>`;
   return new TextEncoder().encode(xml2);
+}
+
+// src/cloud/upstream.ts
+var import_fast_xml_parser2 = __toESM(require_fxp(), 1);
+import http from "node:http";
+import https from "node:https";
+import zlib2 from "node:zlib";
+async function forwardBuffered(target, method, headers, body) {
+  const transport = target.protocol === "https:" ? https : http;
+  const outgoing = { ...headers, host: target.host, "content-length": body.byteLength };
+  delete outgoing["proxy-connection"];
+  delete outgoing["transfer-encoding"];
+  return new Promise((resolve, reject) => {
+    const request = transport.request(target, { method, headers: outgoing }, (response) => {
+      const chunks = [];
+      response.on("data", (chunk) => chunks.push(chunk));
+      response.on("end", () => resolve({
+        status: response.statusCode ?? 502,
+        headers: response.headers,
+        body: Buffer.concat(chunks)
+      }));
+      response.on("error", reject);
+    });
+    request.on("error", reject);
+    request.end(body);
+  });
+}
+function decodeBody2(result) {
+  const encoding = (result.headers["content-encoding"] ?? "").toString().toLowerCase();
+  if (encoding.includes("gzip")) return zlib2.gunzipSync(result.body).toString("utf8");
+  if (encoding.includes("deflate")) return zlib2.inflateSync(result.body).toString("utf8");
+  return result.body.toString("utf8");
+}
+var parser2 = new import_fast_xml_parser2.XMLParser({
+  removeNSPrefix: true,
+  ignoreAttributes: true,
+  parseTagValue: false,
+  trimValues: true,
+  processEntities: true
+});
+function responseFields(xml2, operation) {
+  try {
+    const document = parser2.parse(xml2);
+    const body = document.Envelope?.Body;
+    const node = body?.[`${operation}Response`];
+    if (!node || typeof node !== "object" || Array.isArray(node)) return void 0;
+    return node;
+  } catch {
+    return void 0;
+  }
+}
+function text(fields, name) {
+  const value = fields?.[name];
+  return typeof value === "string" && value.length ? value : void 0;
+}
+async function forwardVendorSoap(gateway, context, target, operation, requestHeaders, requestBytes, requestFields) {
+  const result = await forwardBuffered(target, "POST", requestHeaders, requestBytes);
+  if (!context.capture || !context.partition || result.status !== 200) return result;
+  try {
+    await captureExchange(gateway, context, operation, requestFields, result);
+  } catch (error2) {
+    log(`upstream mirror capture failed (response passed through unchanged): ${error2 instanceof Error ? error2.message : String(error2)}`);
+    await gateway.noteMirrorUnhealthy();
+  }
+  return result;
+}
+async function captureExchange(gateway, context, operation, requestFields, result) {
+  const partition = context.partition;
+  const fields = responseFields(decodeBody2(result), operation);
+  if (text(fields, `${operation}Result`) !== "true") return;
+  if (operation === "ApplyModificationsBytesEx") {
+    const version2 = text(fields, "newServerTimeStamp");
+    const data = typeof requestFields.data === "string" ? requestFields.data : void 0;
+    if (!version2 || !data) return;
+    const bytes = Buffer.from(data.replace(/\s+/g, ""), "base64");
+    const document = unpackEnvelope(bytes);
+    await partition.mirrorState.appendAtCursor("app", bytes, parseCursor(version2));
+    if (context.bootstrapping) await tryCompleteBootstrap(gateway, partition, document, version2);
+    return;
+  }
+  if (operation === "GetModificationsBytesEx") {
+    const version2 = text(fields, "maxVersion");
+    const data = text(fields, "data");
+    if (!version2 || !data) return;
+    const bytes = Buffer.from(data.replace(/\s+/g, ""), "base64");
+    const document = unpackEnvelope(bytes);
+    await partition.mirrorState.appendAtCursor("mcp", bytes, parseCursor(version2));
+    if (context.bootstrapping) await tryCompleteBootstrap(gateway, partition, document, version2);
+  }
+}
+async function tryCompleteBootstrap(gateway, partition, document, version2) {
+  const window2 = await gateway.bootstrap.current();
+  if (!window2) return;
+  const validation = validateFullSnapshot(document);
+  if (!validation.ok) return;
+  await partition.mirrorSnapshots.materialize(document, parseCursor(version2));
+  await gateway.bindings.bindUid(window2.profilePath, partition.uid);
+  await partition.setLifecycle("ready");
+  await gateway.bootstrap.complete();
+  log(`upstream mirror bootstrapped at vendor version ${version2} (${validation.stats.tasks} tasks)`);
 }
 
 // src/cloud/server.ts
@@ -25074,7 +26173,7 @@ function clientOrigin(client) {
 function isAbsoluteRequestTarget(target) {
   return /^https?:\/\//i.test(target);
 }
-async function interceptVendorSoap(request, response, state, observer) {
+async function interceptVendorSoap(request, response, gateway, observer) {
   if (request.method !== "POST") return false;
   let target;
   try {
@@ -25088,13 +26187,34 @@ async function interceptVendorSoap(request, response, state, observer) {
   const requestBytes = await readBytes(request);
   const exchange = observer.begin(request.method, target, request.headers);
   exchange.addRequestChunk(requestBytes);
+  const requestXml = requestBytes.toString("utf8");
+  const fields = peekSoapFields(requestXml, operation);
+  const authority = await gateway.decideAuthority(fields);
+  if (authority.kind === "upstream") {
+    try {
+      const result = await forwardVendorSoap(gateway, authority.context, target, operation, request.headers, requestBytes, fields);
+      exchange.addResponseChunk(result.body);
+      exchange.finish(result.status, result.headers);
+      response.writeHead(result.status, result.headers);
+      response.end(result.body);
+    } catch (error2) {
+      const message = `vendor forward failed: ${error2 instanceof Error ? error2.message : String(error2)}`;
+      exchange.finish(502, {});
+      xml(response, 502, soapFault(message));
+    }
+    return true;
+  }
   let responseBytes;
   let status = 200;
-  try {
-    responseBytes = await handleSoapOperation(state, operation, requestBytes.toString("utf8"));
-  } catch (error2) {
-    status = 500;
-    responseBytes = soapFault(error2 instanceof Error ? error2.message : String(error2));
+  if (authority.kind === "reject") {
+    responseBytes = soapOperationFailure(operation, authority.message);
+  } else {
+    try {
+      responseBytes = await handleSoapRequest(gateway, operation, requestXml);
+    } catch (error2) {
+      status = 500;
+      responseBytes = soapFault(error2 instanceof Error ? error2.message : String(error2));
+    }
   }
   exchange.addResponseChunk(Buffer.from(responseBytes));
   exchange.finish(status, { "content-type": "text/xml; charset=utf-8" });
@@ -25109,7 +26229,7 @@ function forwardRequest(request, response, observer) {
     json(response, 400, { error: "invalid proxy request target" });
     return;
   }
-  const transport = target.protocol === "https:" ? https : target.protocol === "http:" ? http : void 0;
+  const transport = target.protocol === "https:" ? https2 : target.protocol === "http:" ? http2 : void 0;
   if (!transport) {
     json(response, 400, { error: "unsupported proxy protocol" });
     return;
@@ -25133,7 +26253,7 @@ function forwardRequest(request, response, observer) {
   if (exchange) request.on("data", (chunk) => exchange.addRequestChunk(chunk));
   request.pipe(upstream);
 }
-function tunnelConnect(request, client, head, observer) {
+function tunnelConnect(request, client, head, observer, gateway) {
   const separator = (request.url ?? "").lastIndexOf(":");
   const host = separator > 0 ? request.url.slice(0, separator) : "";
   const port = Number(separator > 0 ? request.url.slice(separator + 1) : "");
@@ -25141,7 +26261,10 @@ function tunnelConnect(request, client, head, observer) {
     client.end("HTTP/1.1 400 Bad Request\r\n\r\n");
     return;
   }
-  if (observer.matches(host)) observer.recordConnect(host, port);
+  if (observer.matches(host)) {
+    observer.recordConnect(host, port);
+    void gateway.noteVendorConnect().catch(() => void 0);
+  }
   const upstream = net.connect(port, host);
   upstream.once("connect", () => {
     client.write("HTTP/1.1 200 Connection Established\r\n\r\n");
@@ -25157,12 +26280,14 @@ async function startCloudServer(options) {
   if (host !== "localhost" && host !== "::1" && !/^127(?:\.\d{1,3}){3}$/.test(host)) {
     throw new Error(`MLO cloud server must bind to a loopback host (received "${host}")`);
   }
-  const state = options.state ?? new CloudState(options.stateDir);
-  const observer = new SyncObserver(options.stateDir, options.observeHost);
-  const server = http.createServer(async (request, response) => {
+  if (!options.gateway && !options.stateRoot) throw new Error("cloud server needs a gateway or a stateRoot");
+  const gateway = options.gateway ?? new CloudGateway({ stateRoot: options.stateRoot });
+  const state = gateway.defaultState();
+  const observer = new SyncObserver(gateway.observerDir(), options.observeHost);
+  const server = http2.createServer(async (request, response) => {
     try {
       if (isAbsoluteRequestTarget(request.url ?? "")) {
-        if (await interceptVendorSoap(request, response, state, observer)) return;
+        if (await interceptVendorSoap(request, response, gateway, observer)) return;
         forwardRequest(request, response, observer);
         return;
       }
@@ -25173,7 +26298,13 @@ async function startCloudServer(options) {
           state.counts(),
           state.pendingFor("app")
         ]);
-        json(response, 200, { cursor: cursorToDecimalString(highWater), entries: counts, pendingForApp });
+        json(response, 200, {
+          cursor: cursorToDecimalString(highWater),
+          entries: counts,
+          pendingForApp,
+          stateRoot: gateway.stateRoot,
+          partitions: await gateway.registry.list()
+        });
         return;
       }
       if (request.method !== "POST" || !["/v1/pull", "/v1/push", "/v1/finalize"].includes(url.pathname)) {
@@ -25182,18 +26313,26 @@ async function startCloudServer(options) {
       }
       const body = await readJson(request);
       const client = requiredString(body, "client");
+      const rawUid = typeof body.dataFileUID === "string" && body.dataFileUID.length ? body.dataFileUID : void 0;
+      let requestState;
+      try {
+        requestState = await gateway.stateForV1(rawUid);
+      } catch (error2) {
+        json(response, 400, { error: error2 instanceof Error ? error2.message : String(error2) });
+        return;
+      }
       if (url.pathname === "/v1/pull") {
         const cursor = parseCursor(requiredString(body, "cursor"));
         const origin = clientOrigin(client);
-        const entries = await state.entriesAfter(cursor, origin);
+        const entries = await requestState.entriesAfter(cursor, origin);
         if (!entries.length) {
-          const highWater = await state.highWater();
-          await state.recordPull(origin, highWater);
+          const highWater = await requestState.highWater();
+          await requestState.recordPull(origin, highWater);
           json(response, 200, { cursor: cursorToDecimalString(highWater) });
         } else {
           const merged = mergeDeltas(entries.map((entry) => unpackEnvelope(entry.bytes)));
           const returned = entries.at(-1).cursor;
-          await state.recordPull(origin, returned);
+          await requestState.recordPull(origin, returned);
           json(response, 200, {
             cursor: cursorToDecimalString(returned),
             envelope: Buffer.from(packEnvelope(merged)).toString("base64")
@@ -25203,7 +26342,7 @@ async function startCloudServer(options) {
       }
       if (url.pathname === "/v1/push") {
         const baseline = parseCursor(requiredString(body, "baseline"));
-        if (baseline > await state.highWater()) {
+        if (baseline > await requestState.highWater()) {
           json(response, 409, { error: "baseline is newer than the server high-water cursor" });
           return;
         }
@@ -25213,18 +26352,18 @@ async function startCloudServer(options) {
         } catch (error2) {
           throw Object.assign(error2, { status: 400 });
         }
-        const cursor = await state.append(clientOrigin(client), bytes);
+        const cursor = await requestState.append(clientOrigin(client), bytes);
         json(response, 200, { cursor: cursorToDecimalString(cursor) });
         return;
       }
-      await state.finalize();
+      await requestState.finalize();
       json(response, 200, { ok: true });
     } catch (error2) {
       const status = typeof error2.status === "number" ? error2.status : 500;
       json(response, status, { error: error2 instanceof Error ? error2.message : String(error2) });
     }
   });
-  server.on("connect", (request, socket, head) => tunnelConnect(request, socket, head, observer));
+  server.on("connect", (request, socket, head) => tunnelConnect(request, socket, head, observer, gateway));
   await new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(options.port ?? DEFAULT_CLOUD_PORT, host, () => {
@@ -25238,6 +26377,7 @@ async function startCloudServer(options) {
   return {
     server,
     state,
+    gateway,
     host,
     port,
     async stop() {
@@ -25269,18 +26409,12 @@ async function startOrAttachCloudServer(options) {
 
 // src/config.ts
 var DEFAULT_EXE = "C:\\Program Files (x86)\\MyLifeOrganized.net\\MLO\\mlo.exe";
-var DEV_PROFILE = path3.resolve(
-  path3.dirname(fileURLToPath(import.meta.url)),
+var DEV_PROFILE = path8.resolve(
+  path8.dirname(fileURLToPath(import.meta.url)),
   "..",
   "..",
   "profile",
   "profile.ml"
-);
-var DEV_CLOUD_STATE_DIR = path3.resolve(
-  path3.dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "..",
-  "messages"
 );
 function resolveDataFile() {
   if (process.env.MLO_DATA_FILE) return process.env.MLO_DATA_FILE;
@@ -25288,6 +26422,11 @@ function resolveDataFile() {
   throw new Error(
     "MLO_DATA_FILE environment variable is required. Set it to the path of your .ml data file."
   );
+}
+function resolveStateRoot() {
+  if (process.env.MLO_CLOUD_STATE_ROOT) return process.env.MLO_CLOUD_STATE_ROOT;
+  if (process.env.LOCALAPPDATA) return path8.join(process.env.LOCALAPPDATA, "mlo-mcp", "cloud");
+  return path8.join(os2.homedir(), ".mlo-mcp", "cloud");
 }
 function loadConfig() {
   const dataFile = resolveDataFile();
@@ -25298,7 +26437,7 @@ function loadConfig() {
   return {
     mloExePath: process.env.MLO_EXE_PATH ?? DEFAULT_EXE,
     dataFile,
-    exportDir: process.env.MLO_EXPORT_DIR ?? path3.join(os.tmpdir(), "mlo-mcp"),
+    exportDir: process.env.MLO_EXPORT_DIR ?? path8.join(os2.tmpdir(), "mlo-mcp"),
     cacheStaleMs: Number(process.env.MLO_CACHE_STALE_MS) || 3e4,
     // Only needed when the capture inbox is NOT MLO's own <Inbox> node (e.g. a
     // hand-made "Входящие" folder). MLO itself hardcodes the caption "<Inbox>"
@@ -25306,14 +26445,14 @@ function loadConfig() {
     inboxCaption: process.env.MLO_INBOX_CAPTION || void 0,
     cloudHost: process.env.MLO_CLOUD_HOST ?? "127.0.0.1",
     cloudPort,
-    cloudStateDir: process.env.MLO_CLOUD_STATE_DIR ?? DEV_CLOUD_STATE_DIR
+    cloudStateRoot: resolveStateRoot()
   };
 }
 
 // src/mlo-cli.ts
 import { spawn } from "node:child_process";
-import { promises as fs3 } from "node:fs";
-import path4 from "node:path";
+import { promises as fs8 } from "node:fs";
+import path9 from "node:path";
 var EXIT_MESSAGES = {
   1: "invalid command-line argument",
   2: "target file already exists (mlo.exe -saveXML/-saveML never overwrite)",
@@ -25344,13 +26483,13 @@ async function withFileLock(config2, fn) {
   const deadline = Date.now() + 9e4;
   for (; ; ) {
     try {
-      await fs3.mkdir(lockDir);
+      await fs8.mkdir(lockDir);
       break;
     } catch {
       try {
-        const st = await fs3.stat(lockDir);
+        const st = await fs8.stat(lockDir);
         if (Date.now() - st.mtimeMs > 18e4) {
-          await fs3.rm(lockDir, { recursive: true, force: true });
+          await fs8.rm(lockDir, { recursive: true, force: true });
           continue;
         }
       } catch {
@@ -25369,7 +26508,7 @@ async function withFileLock(config2, fn) {
     return await fn();
   } finally {
     fileLockHeld = false;
-    await fs3.rm(lockDir, { recursive: true, force: true });
+    await fs8.rm(lockDir, { recursive: true, force: true });
   }
 }
 function withMloFileLock(config2, fn) {
@@ -25417,7 +26556,7 @@ function execMlo(config2, args, timeoutMs) {
 var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function ensureDataFile(config2) {
   try {
-    await fs3.access(config2.dataFile);
+    await fs8.access(config2.dataFile);
   } catch {
     throw new MloError(`MLO_DATA_FILE not found at "${config2.dataFile}"`);
   }
@@ -25426,17 +26565,17 @@ var exportCounter = 0;
 function exportXml(config2, taskGuid) {
   return withMloFileLock(config2, async () => {
     await ensureDataFile(config2);
-    await fs3.mkdir(config2.exportDir, { recursive: true });
-    const target = path4.join(config2.exportDir, `export-${process.pid}-${++exportCounter}.xml`);
-    await fs3.rm(target, { force: true });
+    await fs8.mkdir(config2.exportDir, { recursive: true });
+    const target = path9.join(config2.exportDir, `export-${process.pid}-${++exportCounter}.xml`);
+    await fs8.rm(target, { force: true });
     const args = [config2.dataFile];
     if (taskGuid) args.push(`-task=${taskGuid}`);
     args.push(`-saveXML=${target}`);
     try {
       await execMlo(config2, args, 3e4);
-      return await fs3.readFile(target, "utf8");
+      return await fs8.readFile(target, "utf8");
     } finally {
-      await fs3.rm(target, { force: true });
+      await fs8.rm(target, { force: true });
     }
   });
 }
@@ -25447,24 +26586,24 @@ function quickSync(config2) {
   });
 }
 function readDataFile(config2) {
-  return fs3.readFile(config2.dataFile);
+  return fs8.readFile(config2.dataFile);
 }
 
 // src/xml.ts
-var import_fast_xml_parser2 = __toESM(require_fxp(), 1);
+var import_fast_xml_parser3 = __toESM(require_fxp(), 1);
 var SHARED_OPTIONS = {
   ignoreAttributes: false,
   attributeNamePrefix: "@_",
   processEntities: true
 };
-var parser2 = new import_fast_xml_parser2.XMLParser({
+var parser3 = new import_fast_xml_parser3.XMLParser({
   ...SHARED_OPTIONS,
   trimValues: false,
   parseTagValue: false,
   parseAttributeValue: false,
   isArray: (name) => name === "TaskNode" || name === "Place" || name === "TaskPlace" || name === "UID"
 });
-var builder = new import_fast_xml_parser2.XMLBuilder({
+var builder = new import_fast_xml_parser3.XMLBuilder({
   ...SHARED_OPTIONS,
   format: true,
   indentBy: "  ",
@@ -25483,7 +26622,7 @@ function dropWhitespaceText(value) {
   }
 }
 function parseMloXml(xml2) {
-  const doc = parser2.parse(xml2);
+  const doc = parser3.parse(xml2);
   const rootList = doc["MyLifeOrganized-xml"]?.TaskTree?.TaskNode;
   if (!rootList || rootList.length === 0) {
     throw new Error("not a MyLifeOrganized XML export: missing MyLifeOrganized-xml/TaskTree/TaskNode");
@@ -25503,7 +26642,7 @@ function num(v) {
   return v === void 0 || v === "" ? void 0 : Number(v);
 }
 function toModel(raw, id, parentPath, depth) {
-  const path5 = [...parentPath, raw["@_Caption"]];
+  const path11 = [...parentPath, raw["@_Caption"]];
   const node = {
     id,
     Guid: raw.IDD,
@@ -25529,10 +26668,10 @@ function toModel(raw, id, parentPath, depth) {
     CompleteSubTasksInOrder: delphiBool(raw.CompleteSubTasksInOrder),
     DependsOn: raw.Dependency?.UID ?? [],
     Children: [],
-    Path: path5,
+    Path: path11,
     Depth: depth
   };
-  node.Children = (raw.TaskNode ?? []).map((c, i2) => toModel(c, `${id}.${i2 + 1}`, path5, depth + 1));
+  node.Children = (raw.TaskNode ?? []).map((c, i2) => toModel(c, `${id}.${i2 + 1}`, path11, depth + 1));
   return node;
 }
 function buildTaskTree(doc) {
@@ -25731,6 +26870,37 @@ var MloStore = class {
 };
 
 // src/tools/shared.ts
+async function resolveReadCloudState(ctx) {
+  if (!ctx.cloud) return ctx.cloudState;
+  const bound = await ctx.cloud.boundPartition(ctx.config.dataFile);
+  if (bound.kind !== "bound") return ctx.cloudState;
+  return bound.binding.mode === "upstream" ? bound.partition.mirrorState : bound.partition.state;
+}
+async function requireWritableCloudState(ctx) {
+  if (!ctx.cloud) return ctx.cloudState;
+  const bound = await ctx.cloud.boundPartition(ctx.config.dataFile);
+  if (bound.kind === "unbound") {
+    if (bound.binding?.mode === "upstream") {
+      throw new Error(
+        "this profile is bound to the vendor Cloud (upstream mode); MCP write-through is not enabled \u2014 make this change in the MLO app"
+      );
+    }
+    throw new Error(
+      "this profile has no bootstrapped cloud partition; run cloud_bootstrap, then Re-synchronize in MLO (Sync \u2192 Advanced) \u2014 an ordinary sync will not help"
+    );
+  }
+  if (bound.binding.mode === "upstream") {
+    throw new Error(
+      "this profile is bound to the vendor Cloud (upstream mode); MCP write-through is not enabled \u2014 make this change in the MLO app"
+    );
+  }
+  if (bound.lifecycle !== "ready") {
+    throw new Error(
+      `cloud partition is not bootstrapped (${bound.lifecycle}); run cloud_bootstrap, then Re-synchronize in MLO (Sync \u2192 Advanced) \u2014 an ordinary sync will not help`
+    );
+  }
+  return bound.partition.state;
+}
 function defineTool(tool) {
   return tool;
 }
@@ -25779,8 +26949,8 @@ function toSummary(t) {
     parentPath: t.Path.slice(0, -1).join(" > ")
   };
 }
-function textResult(text, structuredContent) {
-  return { content: [{ type: "text", text }], ...structuredContent ? { structuredContent } : {} };
+function textResult(text2, structuredContent) {
+  return { content: [{ type: "text", text: text2 }], ...structuredContent ? { structuredContent } : {} };
 }
 function errorResult(message) {
   return { isError: true, content: [{ type: "text", text: message }] };
@@ -25829,12 +26999,12 @@ var listTasksTool = defineTool({
     }
     const entries = collectVisible(tasks, { includeCompleted, maxDepth });
     const shown = entries.slice(0, limit ?? DEFAULT_RESULT_LIMIT);
-    let text = renderVisible(shown, format);
+    let text2 = renderVisible(shown, format);
     if (shown.length < entries.length) {
-      text += `
+      text2 += `
 \u2026 showing ${shown.length} of ${entries.length} tasks \u2014 narrow with parentId/maxDepth or raise limit`;
     }
-    return textResult(text, { tasks: shown.map((e) => toSummary(e.task)), total: entries.length });
+    return textResult(text2, { tasks: shown.map((e) => toSummary(e.task)), total: entries.length });
   }
 });
 
@@ -25864,16 +27034,17 @@ var searchTasksTool = defineTool({
     const snap = await ctx.store.getSnapshot();
     const matches = searchTasks(snap.tasks, filters);
     const shown = matches.slice(0, limit ?? DEFAULT_RESULT_LIMIT);
-    let text = shown.length ? shown.map((t) => `${renderLine(t)}  (${t.Path.slice(0, -1).join(" > ") || "top level"})`).join("\n") : "no matching tasks";
+    let text2 = shown.length ? shown.map((t) => `${renderLine(t)}  (${t.Path.slice(0, -1).join(" > ") || "top level"})`).join("\n") : "no matching tasks";
     if (shown.length < matches.length) {
-      text += `
+      text2 += `
 \u2026 showing ${shown.length} of ${matches.length} matches \u2014 narrow the filters or raise limit`;
     }
-    return textResult(text, { tasks: shown.map(toSummary), total: matches.length });
+    return textResult(text2, { tasks: shown.map(toSummary), total: matches.length });
   }
 });
 
 // src/cloud/log-projection.ts
+import path10 from "node:path";
 function rowValue(known, column) {
   const index = known.header.indexOf(column);
   return index < 0 ? "" : known.row[index] ?? "";
@@ -25907,8 +27078,12 @@ function latestFullRows(documents) {
   return rows;
 }
 async function knownCloudProjection(state) {
-  const entries = await state.entriesAfter(ZERO_CURSOR);
-  const merged = mergeDeltas(entries.map((entry) => unpackEnvelope(entry.bytes)));
+  const snapshot = await new SnapshotStore(path10.join(state.stateDir, "snapshot")).load();
+  const entries = await state.entriesAfter(snapshot?.version ?? ZERO_CURSOR);
+  const merged = mergeDeltas([
+    ...snapshot ? [snapshot.document] : [],
+    ...entries.map((entry) => unpackEnvelope(entry.bytes))
+  ]);
   const rows = latestFullRows([merged]);
   const collectRelations = (sectionName, ownerColumn, valueColumn) => {
     const section = findSection(merged, sectionName);
@@ -25944,6 +27119,87 @@ async function knownCloudProjection(state) {
   };
 }
 
+// src/cloud/structure-align.ts
+function buildCloudTree(projection) {
+  const nodes = /* @__PURE__ */ new Map();
+  for (const [uid, known] of projection.rows) {
+    const index = Number(rowValue(known, "ItemIndex"));
+    nodes.set(uid, {
+      uid,
+      caption: rowValue(known, "Caption"),
+      itemIndex: Number.isFinite(index) ? index : Number.MAX_SAFE_INTEGER,
+      children: []
+    });
+  }
+  const roots = [];
+  for (const [uid, known] of projection.rows) {
+    const node = nodes.get(uid);
+    const parent = rowValue(known, "ParentUID").toUpperCase();
+    const parentNode = parent ? nodes.get(parent) : void 0;
+    if (parentNode) parentNode.children.push(node);
+    else roots.push(node);
+  }
+  const sortSiblings = (siblings) => {
+    siblings.sort((a, b) => a.itemIndex - b.itemIndex);
+    for (const node of siblings) sortSiblings(node.children);
+  };
+  sortSiblings(roots);
+  return roots;
+}
+function alignSiblings(exportChildren, cloudChildren, identity) {
+  let pairs = [];
+  let positional = exportChildren.length === cloudChildren.length;
+  if (positional) {
+    for (let index = 0; index < exportChildren.length; index++) {
+      if (exportChildren[index].Caption !== cloudChildren[index].caption) {
+        positional = false;
+        break;
+      }
+    }
+  }
+  if (positional) {
+    pairs = exportChildren.map((task, index) => [task, cloudChildren[index]]);
+  } else {
+    const countBy = (captions) => {
+      const counts = /* @__PURE__ */ new Map();
+      for (const caption of captions) counts.set(caption, (counts.get(caption) ?? 0) + 1);
+      return counts;
+    };
+    const exportCounts = countBy(exportChildren.map((task) => task.Caption));
+    const cloudCounts = countBy(cloudChildren.map((node) => node.caption));
+    const cloudByCaption = new Map(cloudChildren.map((node) => [node.caption, node]));
+    for (const task of exportChildren) {
+      if (exportCounts.get(task.Caption) === 1 && cloudCounts.get(task.Caption) === 1) {
+        pairs.push([task, cloudByCaption.get(task.Caption)]);
+      }
+    }
+  }
+  for (const [task, node] of pairs) {
+    identity.byPathId.set(task.id, node.uid);
+    identity.confidence.set(task.id, positional ? "positional" : "caption-unique");
+    alignSiblings(task.Children, node.children, identity);
+  }
+}
+function alignExportToSnapshot(exportRoots, projection) {
+  const identity = { byPathId: /* @__PURE__ */ new Map(), confidence: /* @__PURE__ */ new Map() };
+  alignSiblings(exportRoots, buildCloudTree(projection), identity);
+  return identity;
+}
+function buildUidResolver(exportRoots, projection) {
+  const identity = alignExportToSnapshot(exportRoots, projection);
+  return (task) => {
+    const structural = identity.byPathId.get(task.id);
+    const binary = task.Guid?.toUpperCase();
+    if (structural) {
+      if (binary && binary !== structural) {
+        log(`GUID cross-check mismatch for [${task.id}] "${task.Caption}": binary ${binary} vs structural ${structural} \u2014 using structural`);
+      }
+      return structural;
+    }
+    return binary ?? resolveTaskUid(task, projection.rows);
+  };
+}
+
 // src/tools/get-task.ts
 var getTaskTool = defineTool({
   name: "get_task",
@@ -25972,8 +27228,8 @@ var getTaskTool = defineTool({
     const t = findById(snap.tasks, id);
     if (!t) return errorResult(`no task with id "${id}" \u2014 ids shift when the tree changes; re-run list_tasks`);
     const all = flatten(snap.tasks);
-    const cloud = await knownCloudProjection(ctx.cloudState);
-    const uidFor = (task2) => task2.Guid?.toUpperCase() ?? resolveTaskUid(task2, cloud.rows);
+    const cloud = await knownCloudProjection(await resolveReadCloudState(ctx));
+    const uidFor = buildUidResolver(snap.tasks, cloud);
     const resolvedUid = uidFor(t);
     const byGuid = /* @__PURE__ */ new Map();
     for (const task2 of all) {
@@ -26105,8 +27361,9 @@ var addTasksTool = defineTool({
       byKey.set(spec.key, spec);
     }
     validateGraph(tasks, byKey);
+    const cloudState = await requireWritableCloudState(ctx);
     const uids = new Map(tasks.map((spec) => [spec.key, generateGuid()]));
-    const cloud = await knownCloudProjection(ctx.cloudState);
+    const cloud = await knownCloudProjection(cloudState);
     let starredIndex = Math.max(0, ...[...cloud.starredOrderByTask.values()].map(Number).filter(Number.isFinite)) + 500;
     const maxItemIndexByParent = /* @__PURE__ */ new Map();
     for (const known of cloud.rows.values()) {
@@ -26154,7 +27411,7 @@ var addTasksTool = defineTool({
         ...starOrder !== void 0 ? { starredOrderIndex: starOrder } : {}
       });
     });
-    const cursor = cursorToDecimalString(await ctx.cloudState.append("mcp", packEnvelope(mergeDeltas(documents))));
+    const cursor = cursorToDecimalString(await cloudState.append("mcp", packEnvelope(mergeDeltas(documents))));
     const resultTasks = tasks.map((spec) => ({ key: spec.key, uid: uids.get(spec.key) }));
     const queued = tasks.length === 1 ? "1 task was queued" : `${tasks.length} tasks were queued atomically`;
     let verified = false;
@@ -26215,12 +27472,14 @@ var addTaskTool = defineTool({
 
 // src/tools/row-update.ts
 async function runCloudRowUpdate(ctx, ids, plan) {
+  const cloudState = await requireWritableCloudState(ctx);
   const before = (await ctx.store.getSnapshot(true)).tasks;
-  const cloud = await knownCloudProjection(ctx.cloudState);
+  const cloud = await knownCloudProjection(cloudState);
+  const resolveUid = buildUidResolver(before, cloud);
   const resolved = [...new Set(ids)].map((id) => {
     const task = findById(before, id);
     if (!task) throw new Error(`no task with id "${id}" \u2014 ids shift when the tree changes; re-run list_tasks`);
-    return { id, task, uid: task.Guid?.toUpperCase() ?? resolveTaskUid(task, cloud.rows) };
+    return { id, task, uid: resolveUid(task) };
   });
   const noGuid = resolved.filter(({ uid }) => !uid);
   if (noGuid.length > 0) {
@@ -26278,7 +27537,7 @@ async function runCloudRowUpdate(ctx, ids, plan) {
       };
     })
   );
-  const cursor = cursorToDecimalString(await ctx.cloudState.append("mcp", packEnvelope(delta)));
+  const cursor = cursorToDecimalString(await cloudState.append("mcp", packEnvelope(delta)));
   const described = targets.map(({ id, task }) => `[${id}] "${task.Caption}"`).join(", ");
   const uids = targets.map((target) => target.uid);
   let verified = false;
@@ -26287,11 +27546,13 @@ async function runCloudRowUpdate(ctx, ids, plan) {
     await quickSync(ctx.config);
     ctx.store.invalidate();
     try {
-      const after = flatten((await ctx.store.getSnapshot(true)).tasks);
-      const verificationCloud = await knownCloudProjection(ctx.cloudState);
+      const afterRoots = (await ctx.store.getSnapshot(true)).tasks;
+      const after = flatten(afterRoots);
+      const verificationCloud = await knownCloudProjection(cloudState);
+      const verifyUid = buildUidResolver(afterRoots, verificationCloud);
       const byGuid = /* @__PURE__ */ new Map();
       for (const task of after) {
-        const uid = task.Guid?.toUpperCase() ?? resolveTaskUid(task, verificationCloud.rows);
+        const uid = verifyUid(task);
         if (uid) byGuid.set(uid, task);
       }
       verified = targets.every((target) => {
@@ -26440,6 +27701,7 @@ var updateTaskTool = defineTool({
     return runCloudRowUpdate(ctx, [...specs.keys()], {
       verb: "Update",
       prepare(before, targets, cloud) {
+        const resolveUid = buildUidResolver(before, cloud);
         let starIndex = nextStarredIndex(cloud);
         for (const { id, task } of targets) {
           const spec = specs.get(id);
@@ -26458,7 +27720,7 @@ var updateTaskTool = defineTool({
               const dependency = findById(before, dependencyId);
               if (!dependency) throw new Error(`no dependency task with id "${dependencyId}" \u2014 re-run list_tasks`);
               if (dependency === task) throw new Error(`[${id}] "${task.Caption}" cannot depend on itself`);
-              const dependencyUid = dependency.Guid?.toUpperCase() ?? resolveTaskUid(dependency, cloud.rows);
+              const dependencyUid = resolveUid(dependency);
               if (!dependencyUid) {
                 throw new Error(`no recoverable GUID for dependency [${dependencyId}] "${dependency.Caption}"`);
               }
@@ -26467,7 +27729,7 @@ var updateTaskTool = defineTool({
             dependencyUids.set(id, dependencies);
           }
           if (spec.Starred === true) {
-            const taskUid = task.Guid?.toUpperCase() ?? resolveTaskUid(task, cloud.rows);
+            const taskUid = resolveUid(task);
             const current = taskUid ? cloud.starredOrderByTask.get(taskUid) : void 0;
             starredOrder.set(id, current || String(starIndex));
             if (!current) starIndex += 500;
@@ -26483,7 +27745,7 @@ var updateTaskTool = defineTool({
           if (flatten([task]).includes(dest)) {
             throw new Error(`cannot move [${id}] "${task.Caption}" into its own subtree`);
           }
-          const destUid = dest.Guid?.toUpperCase() ?? resolveTaskUid(dest, cloud.rows);
+          const destUid = resolveUid(dest);
           if (!destUid) {
             throw new Error(
               `no recoverable GUID for move destination [${moveTo}] "${dest.Caption}" \u2014 move the task in the MLO app`
@@ -26635,13 +27897,10 @@ var deleteTaskTool = defineTool({
   },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   async execute({ ids }, ctx) {
+    const cloudState = await requireWritableCloudState(ctx);
     const before = (await ctx.store.getSnapshot(true)).tasks;
-    const cloud = await knownCloudProjection(ctx.cloudState);
-    const { targets, uids, missingGuid } = collectTombstones(
-      before,
-      ids,
-      (task) => task.Guid?.toUpperCase() ?? resolveTaskUid(task, cloud.rows)
-    );
+    const cloud = await knownCloudProjection(cloudState);
+    const { targets, uids, missingGuid } = collectTombstones(before, ids, buildUidResolver(before, cloud));
     if (missingGuid.length > 0) {
       const list = missingGuid.map((task) => `[${task.id}] "${task.Caption}"`).join(", ");
       throw new Error(
@@ -26649,7 +27908,7 @@ var deleteTaskTool = defineTool({
       );
     }
     const delta = buildTaskDeleteDelta(uids);
-    const cursor = cursorToDecimalString(await ctx.cloudState.append("mcp", packEnvelope(delta)));
+    const cursor = cursorToDecimalString(await cloudState.append("mcp", packEnvelope(delta)));
     const described = targets.map(({ id, task }) => `[${id}] "${task.Caption}"`).join(", ");
     let verified = false;
     let message;
@@ -26658,12 +27917,7 @@ var deleteTaskTool = defineTool({
       ctx.store.invalidate();
       try {
         const after = (await ctx.store.getSnapshot(true)).tasks;
-        verified = wereTasksDeleted(
-          before,
-          after,
-          uids,
-          (task) => task.Guid?.toUpperCase() ?? resolveTaskUid(task, cloud.rows)
-        );
+        verified = wereTasksDeleted(before, after, uids, buildUidResolver(after, cloud));
         message = verified ? `Deletion of ${described} was queued and no tombstoned task remains in a fresh MLO export.` : `Deletion of ${described} was queued, but at least one tombstoned task is still present in the fresh export after QuickSync.`;
       } catch (error2) {
         message = `Deletion of ${described} was queued, but verification failed: ${error2 instanceof Error ? error2.message : String(error2)}`;
@@ -26702,8 +27956,8 @@ var listContextsTool = defineTool({
     }
     const captions = [.../* @__PURE__ */ new Set([...defined, ...usage.keys()])];
     const contexts = captions.map((Caption) => ({ Caption, defined: defined.includes(Caption), tasksUsing: usage.get(Caption) ?? 0 })).sort((a, b) => b.tasksUsing - a.tasksUsing || a.Caption.localeCompare(b.Caption));
-    const text = contexts.length ? contexts.map((c) => `${c.Caption}  (${c.tasksUsing} task${c.tasksUsing === 1 ? "" : "s"}${c.defined ? "" : ", not in places list"})`).join("\n") : "(no contexts defined)";
-    return textResult(text, { contexts });
+    const text2 = contexts.length ? contexts.map((c) => `${c.Caption}  (${c.tasksUsing} task${c.tasksUsing === 1 ? "" : "s"}${c.defined ? "" : ", not in places list"})`).join("\n") : "(no contexts defined)";
+    return textResult(text2, { contexts });
   }
 });
 
@@ -26727,30 +27981,142 @@ var syncTool = defineTool({
 var cloudStatusTool = defineTool({
   name: "cloud_status",
   title: "Local cloud sync status",
-  description: "Report local cloud endpoint configuration, cursor, and delta counts.",
+  description: "Report local cloud endpoint configuration, the profile's partition binding and bootstrap lifecycle, cursor, and delta counts.",
   inputSchema: {},
   outputSchema: {
     host: external_exports.string(),
     port: external_exports.number(),
     cursor: external_exports.string(),
     entries: external_exports.object({ mcp: external_exports.number(), app: external_exports.number() }),
-    pendingForApp: external_exports.number()
+    pendingForApp: external_exports.number(),
+    /** "unbound" before bootstrap, or the bound partition's mode. */
+    mode: external_exports.string(),
+    lifecycle: external_exports.string().optional().describe("uninitialized | bootstrap-required | ready (bound partitions only)"),
+    dataFileUID: external_exports.string().optional(),
+    /** Foreign-cursor rejections: the profile synced against a different server history. */
+    endpointMismatches: external_exports.number(),
+    lastLocalStamp: external_exports.string().optional(),
+    stateRoot: external_exports.string().optional(),
+    partitions: external_exports.array(external_exports.object({ key: external_exports.string(), mode: external_exports.string(), lifecycle: external_exports.string() })).optional(),
+    mirror: external_exports.object({
+      entries: external_exports.object({ uploads: external_exports.number(), downloads: external_exports.number() }),
+      lastVendorVersion: external_exports.string(),
+      mirrorBlind: external_exports.boolean(),
+      healthy: external_exports.boolean()
+    }).optional().describe("Upstream-mode capture coverage (vendor stays the cursor authority)")
   },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   async execute(_args, ctx) {
-    const [cursor, entries, pendingForApp] = await Promise.all([
-      ctx.cloudState.highWater(),
-      ctx.cloudState.counts(),
-      ctx.cloudState.pendingFor("app")
+    const state = await resolveReadCloudState(ctx);
+    const [cursor, entries, pendingForApp, mismatches, lastStamp] = await Promise.all([
+      state.highWater(),
+      state.counts(),
+      state.pendingFor("app"),
+      state.endpointMismatchCount(),
+      state.lastLocalStamp()
     ]);
+    const gateway = ctx.cloud;
+    let mode = "unpartitioned";
+    let lifecycle;
+    let dataFileUID;
+    let partitions;
+    let mirror;
+    if (gateway) {
+      const bound = await gateway.boundPartition(ctx.config.dataFile);
+      if (bound.kind === "bound") {
+        mode = bound.binding.mode;
+        lifecycle = bound.lifecycle;
+        dataFileUID = bound.binding.dataFileUID;
+        if (bound.binding.mode === "upstream") {
+          const [counts, highWater, blind, healthy] = await Promise.all([
+            bound.partition.mirrorState.counts(),
+            bound.partition.mirrorState.highWater(),
+            gateway.mirrorBlind(),
+            gateway.mirrorHealthy()
+          ]);
+          mirror = {
+            entries: { uploads: counts.app, downloads: counts.mcp },
+            lastVendorVersion: cursorToDecimalString(highWater),
+            mirrorBlind: blind,
+            healthy
+          };
+        }
+      } else {
+        mode = "unbound";
+        lifecycle = "uninitialized";
+      }
+      partitions = (await gateway.registry.list()).map((partition) => ({
+        key: partition.key,
+        mode: partition.mode,
+        lifecycle: partition.lifecycle
+      }));
+    }
     const result = {
       host: ctx.config.cloudHost,
       port: ctx.config.cloudPort,
       cursor: cursorToDecimalString(cursor),
       entries,
-      pendingForApp
+      pendingForApp,
+      mode,
+      ...lifecycle ? { lifecycle } : {},
+      ...dataFileUID ? { dataFileUID } : {},
+      endpointMismatches: mismatches,
+      ...lastStamp !== void 0 ? { lastLocalStamp: localStampToString(lastStamp) } : {},
+      ...gateway?.stateRoot ? { stateRoot: gateway.stateRoot } : {},
+      ...partitions ? { partitions } : {},
+      ...mirror ? { mirror } : {}
     };
-    return textResult(`Cloud endpoint ${result.host}:${result.port}; cursor ${result.cursor}; ${result.pendingForApp} pending for app.`, result);
+    const bindingNote = mode === "unbound" ? "no partition bound \u2014 run cloud_bootstrap" : `${mode} partition, ${lifecycle ?? "n/a"}`;
+    const mismatchNote = mismatches ? `; ${mismatches} endpoint mismatch(es) \u2014 the profile synced against a different server history` : "";
+    return textResult(
+      `Cloud endpoint ${result.host}:${result.port}; ${bindingNote}; cursor ${result.cursor}; ${result.pendingForApp} pending for app${mismatchNote}.`,
+      result
+    );
+  }
+});
+
+// src/tools/cloud-bootstrap.ts
+var cloudBootstrapTool = defineTool({
+  name: "cloud_bootstrap",
+  title: "Arm a full-snapshot bootstrap",
+  description: "Arm the one-time bootstrap window for this profile: bind it to a fresh cloud state partition and accept MLO's next Re-synchronize as the authoritative full snapshot. Local mode only; requires an empty partition.",
+  inputSchema: {
+    mode: external_exports.enum(["upstream", "local"]).optional().describe(
+      'Binding authority. "upstream" (default): transparent proxy to the real vendor Cloud with a passive read mirror \u2014 vendor/mobile sync keeps working, MCP writes stay disabled. "local": this endpoint IS the cloud (full MCP writes) \u2014 the profile must never sync against the vendor again.'
+    ),
+    rebind: external_exports.boolean().optional().describe(
+      "Explicitly drop the current partition binding and bootstrap into a fresh one. The old partition directory is preserved as evidence."
+    )
+  },
+  outputSchema: {
+    armed: external_exports.boolean(),
+    mode: external_exports.string(),
+    expiresAt: external_exports.string(),
+    instructions: external_exports.string()
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  async execute({ mode: requestedMode, rebind }, ctx) {
+    const gateway = ctx.cloud;
+    if (!gateway) throw new Error("no cloud gateway is attached to this server context");
+    const mode = requestedMode ?? "upstream";
+    await gateway.ensureRoot();
+    const binding = rebind ? await gateway.bindings.replace(ctx.config.dataFile, mode) : await gateway.bindings.create(ctx.config.dataFile, mode);
+    if (binding.dataFileUID) {
+      const partition = await gateway.registry.open(binding.dataFileUID, binding.mode);
+      if (await partition.lifecycle() === "ready") {
+        throw new Error(
+          "this profile is already bootstrapped and ready; pass { rebind: true } to discard the binding and bootstrap into a fresh partition (the old partition stays on disk as evidence)"
+        );
+      }
+    }
+    const window2 = await gateway.bootstrap.arm(ctx.config.dataFile, mode);
+    const instructions = mode === "upstream" ? `Armed (upstream mirror). In MLO: keep the cloud sync proxy pointed at this endpoint with "Use secure connection" UNCHECKED (a TLS tunnel would blind the mirror), then open the profile's sync settings (Advanced) and run Re-synchronize with Bidirectional direction and no property exclusions. The real vendor Cloud stays the authority; the endpoint passively captures the full database flowing through and materializes it as the read mirror. Check cloud_status afterward \u2014 lifecycle must be "ready". MCP writes stay disabled in upstream mode. The window expires at ${window2.expiresAt}.` : `Armed (local replacement server). In MLO: make sure the cloud sync proxy points at this endpoint, then open the profile's sync settings (Advanced) and run Re-synchronize with Bidirectional direction and no property exclusions. MLO will pull an empty state and upload its complete database; the endpoint validates and materializes it as the authoritative baseline. Check cloud_status afterward \u2014 lifecycle must be "ready". WARNING: a local-mode profile must never sync against the vendor Cloud again. The window expires at ${window2.expiresAt}.`;
+    return textResult(instructions, {
+      armed: true,
+      mode,
+      expiresAt: window2.expiresAt,
+      instructions
+    });
   }
 });
 
@@ -26767,7 +28133,8 @@ var allTools = [
   deleteTaskTool,
   listContextsTool,
   syncTool,
-  cloudStatusTool
+  cloudStatusTool,
+  cloudBootstrapTool
 ];
 
 // src/index.ts
@@ -26818,9 +28185,9 @@ sync runs the profile's QuickSync; cloud_status shows the local endpoint's curso
 async function main() {
   const config2 = loadConfig();
   const store = new MloStore(config2);
-  const cloudState = new CloudState(config2.cloudStateDir);
-  const ctx = { config: config2, store, cloudState };
-  const cloudServer = await startOrAttachCloudServer({ host: config2.cloudHost, port: config2.cloudPort, stateDir: config2.cloudStateDir, state: cloudState });
+  const cloud = new CloudGateway({ stateRoot: config2.cloudStateRoot });
+  const ctx = { config: config2, store, cloudState: cloud.defaultState(), cloud };
+  const cloudServer = await startOrAttachCloudServer({ host: config2.cloudHost, port: config2.cloudPort, gateway: cloud });
   const server = new McpServer({ name: "mlo-mcp", version: "0.2.0" }, { instructions: INSTRUCTIONS });
   for (const tool of allTools) registerTool(server, tool, ctx);
   await server.connect(new StdioServerTransport());
@@ -26837,7 +28204,7 @@ function watchOwnBuild(cloudServer) {
   let startMtime;
   const timer = setInterval(async () => {
     try {
-      const mtime = (await fs4.stat(entry)).mtimeMs;
+      const mtime = (await fs9.stat(entry)).mtimeMs;
       startMtime ??= mtime;
       if (mtime !== startMtime && !isMloBusy()) {
         log("server build changed on disk \u2014 exiting so the client restarts the new version");
