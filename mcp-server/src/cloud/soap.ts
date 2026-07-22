@@ -1,9 +1,12 @@
 import { XMLParser } from "fast-xml-parser";
-import { cursorToDecimalString, parseCursor, type CloudCursor } from "./cursor.js";
+import { cursorToDecimalString, ZERO_CURSOR, type CloudCursor } from "./cursor.js";
+import { parseCursor } from "./cursor.js";
 import { mergeDeltas, NEW_TASK_DEFAULTS } from "./delta.js";
 import { findSection, type SectionedCsv } from "./csv.js";
 import { packEnvelope, unpackEnvelope } from "./envelope.js";
 import { parseLocalStamp } from "./local-stamp.js";
+import { normalizeDataFileUid, type PartitionHandle } from "./partition.js";
+import { validateFullSnapshot } from "./snapshot-validate.js";
 import { CloudState, EndpointMismatchError } from "./state.js";
 import type { CloudGateway } from "./gateway.js";
 
@@ -105,9 +108,9 @@ export function soapOperationFromAction(action: string | string[] | undefined): 
 
 /**
  * Gateway entry point: route the request to the state partition selected by
- * its `dataFileUID` (or the legacy single log), then handle it. Routing
- * failures (missing/invalid UID in partitioned mode) are protocol-level
- * failures, not transport faults.
+ * its `dataFileUID` (or the legacy single log), enforce binding/lifecycle,
+ * and run the bootstrap protocol while a window is armed. Routing and policy
+ * failures are protocol-level failures, not transport faults.
  */
 export async function handleSoapRequest(
   gateway: CloudGateway,
@@ -116,16 +119,133 @@ export async function handleSoapRequest(
 ): Promise<Uint8Array> {
   const fields = parseFields(xml, operation);
   const rawUid = typeof fields.dataFileUID === "string" && fields.dataFileUID.length ? fields.dataFileUID : undefined;
-  let state: CloudState;
+  if (gateway.legacyState) return handleParsedSoapOperation(gateway.legacyState, operation, fields);
+
+  const fail = (message: string) => envelope(operation, failureFields(operation, message));
+  if (!rawUid) return fail("dataFileUID is required to route this operation to a state partition");
+  let uid: string;
   try {
-    ({ state } = await gateway.resolveForSoap(rawUid));
+    uid = normalizeDataFileUid(rawUid);
   } catch (error) {
-    return envelope(operation, failureFields(
-      operation,
-      error instanceof Error ? error.message : String(error),
-    ));
+    return fail(error instanceof Error ? error.message : String(error));
   }
-  return handleParsedSoapOperation(state, operation, fields);
+  await gateway.ensureRoot();
+
+  const binding = await gateway.bindings!.forUid(uid);
+  const window = await gateway.bootstrap!.current();
+
+  if (binding) {
+    if (binding.mode === "upstream") {
+      // Local termination would fork the vendor's cursor namespace. Upstream
+      // forwarding handles these before this point; reaching here means the
+      // proxy path could not forward.
+      return fail("this dataFileUID is bound to the vendor Cloud (upstream mode); the local endpoint does not terminate its sync operations");
+    }
+    const partition = await gateway.registry!.open(uid);
+    if (await partition.lifecycle() === "ready") {
+      return handleParsedSoapOperation(partition.state, operation, fields);
+    }
+    if (window && window.profilePath === binding.profilePath) {
+      return handleBootstrapOperation(gateway, partition, operation, fields);
+    }
+    return fail(
+      "this profile's partition is not bootstrapped; run cloud_bootstrap, then Re-synchronize in MLO — an ordinary sync will not help",
+    );
+  }
+
+  if (window) {
+    const firstContact = !window.dataFileUID;
+    try {
+      await gateway.bootstrap!.noteUidSeen(uid);
+    } catch (error) {
+      return fail(error instanceof Error ? error.message : String(error));
+    }
+    const partition = await gateway.registry!.open(uid);
+    // First contact must find a genuinely empty partition: a bidirectional
+    // re-sync Get would otherwise deliver whatever the partition holds before
+    // MLO uploads its snapshot. Later ops of the same window continue (the
+    // window's own Get/Apply legitimately leave adoption/pull marks).
+    if (firstContact && !(await partition.isEmpty())) {
+      return fail("bootstrap requires an empty partition, but this dataFileUID already has history");
+    }
+    return handleBootstrapOperation(gateway, partition, operation, fields);
+  }
+
+  return fail(
+    "unknown dataFileUID: no profile is bound to it and no bootstrap window is armed; run cloud_bootstrap first",
+  );
+}
+
+/**
+ * The armed-window protocol, mirroring the verified Re-synchronize sequence
+ * (Get → Apply full snapshot → Get → Release):
+ *
+ * - Get on the empty partition serves the empty skeleton (adopting the
+ *   profile's cursor — the one legitimate adoption) and records the
+ *   bidirectional precondition;
+ * - Apply must be a validated full snapshot; success materializes it
+ *   transactionally, binds the UID, and marks the partition ready;
+ * - a failed validation keeps the staged bytes for diagnosis, marks the
+ *   partition bootstrap-required, and fails the operation so MLO does not
+ *   advance its baseline on an upload the endpoint refused to keep.
+ */
+async function handleBootstrapOperation(
+  gateway: CloudGateway,
+  partition: PartitionHandle,
+  operation: SoapOperation,
+  fields: Record<string, unknown>,
+): Promise<Uint8Array> {
+  const bootstrap = gateway.bootstrap!;
+  const state = partition.state;
+
+  if (operation === "GetModificationsBytesEx") {
+    const response = await handleParsedSoapOperation(state, operation, fields);
+    await bootstrap.noteEmptyGetServed();
+    return response;
+  }
+
+  if (operation === "ApplyModificationsBytesEx") {
+    const stamp = parseLocalStamp(requiredText(fields, "lastSyncTimestamp"));
+    await state.recordLocalStamp(stamp);
+    const fail = (message: string) => envelope(operation, failureFields(
+      operation,
+      message,
+      field("newServerTimeStamp", cursorToDecimalString(ZERO_CURSOR)),
+    ));
+    const window = await bootstrap.current();
+    if (!window?.sawEmptyGet) {
+      return fail("bootstrap upload arrived before the empty-partition pull — restart the Re-synchronize in MLO");
+    }
+    const encoded = fields.data;
+    if (typeof encoded !== "string" || !encoded.length) {
+      return fail("bootstrap expects a full-snapshot upload, but the request carried no data");
+    }
+    let bytes: Uint8Array;
+    let document: SectionedCsv;
+    try {
+      bytes = decodeBase64(encoded);
+      document = unpackEnvelope(bytes);
+    } catch (error) {
+      return fail(error instanceof Error ? error.message : String(error));
+    }
+    await bootstrap.stageSnapshot(bytes);
+    const validation = validateFullSnapshot(document);
+    if (!validation.ok) {
+      await partition.setLifecycle("bootstrap-required");
+      const preview = validation.errors.slice(0, 5).join("; ");
+      const suffix = validation.errors.length > 5 ? ` (+${validation.errors.length - 5} more)` : "";
+      return fail(`bootstrap snapshot failed validation: ${preview}${suffix}`);
+    }
+    const cursor = await state.append("app", bytes);
+    await partition.snapshots.materialize(document, cursor);
+    await gateway.bindings!.bindUid(window.profilePath, partition.uid);
+    await partition.setLifecycle("ready");
+    await bootstrap.complete();
+    return envelope(operation, successFields(operation, field("newServerTimeStamp", cursorToDecimalString(cursor))));
+  }
+
+  await state.finalize();
+  return envelope(operation, successFields(operation));
 }
 
 export async function handleSoapOperation(

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { SnapshotStore } from "./snapshot-store.js";
 import { CloudState } from "./state.js";
 
 /**
@@ -54,6 +55,7 @@ async function atomicWrite(target: string, text: string): Promise<void> {
 
 export class PartitionHandle {
   private cloudState?: CloudState;
+  private snapshotStore?: SnapshotStore;
 
   constructor(
     readonly uid: string,
@@ -65,6 +67,12 @@ export class PartitionHandle {
   get state(): CloudState {
     this.cloudState ??= new CloudState(path.join(this.dir, "local"));
     return this.cloudState;
+  }
+
+  /** Materialized baseline beside the log (found by projections via the log dir). */
+  get snapshots(): SnapshotStore {
+    this.snapshotStore ??= new SnapshotStore(path.join(this.dir, "local", "snapshot"));
+    return this.snapshotStore;
   }
 
   private metaPath(): string {

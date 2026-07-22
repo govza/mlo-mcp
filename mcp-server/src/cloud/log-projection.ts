@@ -1,7 +1,9 @@
+import path from "node:path";
 import { findSection, type SectionedCsv } from "./csv.js";
 import { mergeDeltas } from "./delta.js";
 import { unpackEnvelope } from "./envelope.js";
 import { ZERO_CURSOR } from "./cursor.js";
+import { SnapshotStore } from "./snapshot-store.js";
 import type { CloudState } from "./state.js";
 import type { TaskNode } from "../types.js";
 
@@ -78,8 +80,15 @@ export async function knownFullRows(state: CloudState): Promise<Map<string, Know
 
 /** Latest task rows plus relation/lookup state needed to author lossless updates. */
 export async function knownCloudProjection(state: CloudState): Promise<KnownCloudProjection> {
-  const entries = await state.entriesAfter(ZERO_CURSOR);
-  const merged = mergeDeltas(entries.map((entry) => unpackEnvelope(entry.bytes)));
+  // A materialized bootstrap snapshot (stored beside the log) is the baseline;
+  // only entries newer than its version are merged on top. Logs without a
+  // snapshot (legacy demo dirs) keep the original full re-merge.
+  const snapshot = await new SnapshotStore(path.join(state.stateDir, "snapshot")).load();
+  const entries = await state.entriesAfter(snapshot?.version ?? ZERO_CURSOR);
+  const merged = mergeDeltas([
+    ...(snapshot ? [snapshot.document] : []),
+    ...entries.map((entry) => unpackEnvelope(entry.bytes)),
+  ]);
   const rows = latestFullRows([merged]);
   const collectRelations = (sectionName: string, ownerColumn: string, valueColumn: string): Map<string, string[]> => {
     const section = findSection(merged, sectionName)!;

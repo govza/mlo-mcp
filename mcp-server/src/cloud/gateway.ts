@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { CloudState } from "./state.js";
 import { BindingStore, type ProfileBinding } from "./binding.js";
+import { BootstrapController } from "./bootstrap.js";
 import { PartitionRegistry, type PartitionHandle, type PartitionLifecycle, type PartitionMode } from "./partition.js";
 import { log } from "../log.js";
 
@@ -30,6 +31,7 @@ export interface CloudGatewayOptions {
 export class CloudGateway {
   readonly registry?: PartitionRegistry;
   readonly bindings?: BindingStore;
+  readonly bootstrap?: BootstrapController;
   readonly legacyState?: CloudState;
   readonly stateRoot?: string;
   readonly legacyStateDir?: string;
@@ -46,6 +48,7 @@ export class CloudGateway {
       this.stateRoot = options.stateRoot;
       this.registry = new PartitionRegistry(options.stateRoot, options.defaultMode);
       this.bindings = new BindingStore(options.stateRoot);
+      this.bootstrap = new BootstrapController(options.stateRoot);
     } else {
       throw new Error("CloudGateway requires either a stateRoot or a legacyStateDir");
     }
@@ -70,15 +73,6 @@ export class CloudGateway {
     if (this.legacyState) return this.legacyState;
     this.unboundState ??= new CloudState(path.join(this.stateRoot!, "unbound"));
     return this.unboundState;
-  }
-
-  /** Resolve the state for a SOAP sync operation carrying `dataFileUID`. */
-  async resolveForSoap(rawUid: string | undefined): Promise<{ state: CloudState; partition?: PartitionHandle }> {
-    if (this.legacyState) return { state: this.legacyState };
-    if (!rawUid) throw new Error("dataFileUID is required to route this operation to a state partition");
-    await this.prepareRoot();
-    const partition = await this.registry!.open(rawUid);
-    return { state: partition.state, partition };
   }
 
   /**
@@ -114,6 +108,10 @@ export class CloudGateway {
    * `icacls` call; failure only logs — the root still works, with inherited
    * per-user `%LOCALAPPDATA%` permissions in the default location.
    */
+  async ensureRoot(): Promise<void> {
+    return this.prepareRoot();
+  }
+
   private async prepareRoot(): Promise<void> {
     if (this.rootPrepared || !this.stateRoot) return;
     this.rootPrepared = true;

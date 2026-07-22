@@ -11,6 +11,7 @@ import { deleteTaskTool } from "./delete-task.js";
 import { listContextsTool } from "./list-contexts.js";
 import { syncTool } from "./sync.js";
 import { cloudStatusTool } from "./cloud-status.js";
+import { cloudBootstrapTool } from "./cloud-bootstrap.js";
 
 /** Authoritative tool registry — index.ts and scripts/run-tool.ts both iterate this. */
 export const allTools: MloTool[] = [
@@ -26,4 +27,5 @@ export const allTools: MloTool[] = [
   listContextsTool,
   syncTool,
   cloudStatusTool,
+  cloudBootstrapTool,
 ] as MloTool[];

@@ -106,9 +106,14 @@ describe("partition registry", () => {
 });
 
 describe("SOAP partition routing", () => {
-  it("routes sync operations by their dataFileUID and keeps histories apart", async () => {
+  it("routes ready-bound dataFileUIDs to their own partitions and keeps histories apart", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-root-")); dirs.push(root);
     const gateway = new CloudGateway({ stateRoot: root, defaultMode: "local" });
+    for (const [profile, uid] of [["C:\\a.ml", UID_A], ["C:\\b.ml", UID_B]] as const) {
+      await gateway.bindings!.create(profile, "local");
+      await gateway.bindings!.bindUid(profile, uid);
+      await (await gateway.registry!.open(uid)).setLifecycle("ready");
+    }
 
     const apply = async (uid: string, caption: string) => handleSoapRequest(gateway, "ApplyModificationsBytesEx", soapRequest("ApplyModificationsBytesEx", {
       dataFileUID: uid,
@@ -119,10 +124,8 @@ describe("SOAP partition routing", () => {
     expect(responseField(await apply(UID_B, "caption in B"), "newServerTimeStamp")).toBe("1");
 
     // A pull from partition A must never see partition B's rows even though
-    // both hold the identical task UID; entries are excluded by same-origin,
-    // so pull as the "mcp" side via each partition's state directly.
-    const registry = gateway.registry!;
-    const a = await registry.open(UID_A);
+    // both hold the identical task UID.
+    const a = await gateway.registry!.open(UID_A);
     const entries = await a.state.entriesAfter(0n as never);
     expect(entries).toHaveLength(1);
     const tasks = findSection(unpackEnvelope(entries[0]!.bytes), "TodoItems")!;
@@ -137,6 +140,19 @@ describe("SOAP partition routing", () => {
     }));
     expect(responseField(response, "GetModificationsBytesExResult")).toBe("false");
     expect(responseField(response, "errorMessage")).toContain("dataFileUID is required");
+  });
+
+  it("fails an unknown dataFileUID closed when no bootstrap window is armed", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-root-")); dirs.push(root);
+    const gateway = new CloudGateway({ stateRoot: root, defaultMode: "local" });
+    const response = await handleSoapRequest(gateway, "GetModificationsBytesEx", soapRequest("GetModificationsBytesEx", {
+      dataFileUID: UID_A,
+      newerThan: "0",
+    }));
+    expect(responseField(response, "GetModificationsBytesExResult")).toBe("false");
+    expect(responseField(response, "errorMessage")).toContain("no profile is bound");
+    // Fail-closed means no partition state was created for the unknown UID.
+    expect(await gateway.registry!.resolveExisting(UID_A)).toBeUndefined();
   });
 });
 
