@@ -4,6 +4,13 @@ This workflow observes the disposable development profile's MLO cloud traffic
 while keeping credentials out of console output. It is for local protocol
 debugging only. Do not capture a personal profile or commit capture files.
 
+This is an independent interoperability aid, not affiliated with or endorsed by
+the makers of MyLifeOrganized. Use it only against your own account and a
+disposable development profile, and only as a last resort when the local
+endpoint's own structural summaries are not enough — never to intercept anyone
+else's traffic. Restore your proxy settings and remove the local CA certificate
+when you are done.
+
 ## Prefer the local endpoint's delta log
 
 When MLO is already configured to use mcp-cloud at `127.0.0.1:8181`, no MITM
@@ -55,8 +62,8 @@ Runtime files live in the repository's ignored `.mitmproxy/` directory:
   by `mcp-server/scripts/inspect-cloud-capture.py`.
 - `mitmdump.log` contains proxy diagnostics.
 
-The inspector only summarizes XML responses from
-`sync.mylifeorganized.net`. It prints operation and field names, status codes,
+The inspector only summarizes XML responses from the vendor sync host
+(`<vendor-sync-host>`). It prints operation and field names, status codes,
 and SOAP actions; it does not print field values. Raw flows remain sensitive.
 
 ## Start the proxy

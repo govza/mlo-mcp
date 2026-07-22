@@ -83,6 +83,14 @@ claude mcp add mlo -e MLO_DATA_FILE=C:\path\to\your.ml -- node C:\path\to\mlo-mc
 
 Everything in `docs/` was verified empirically against MLO 15.x on Windows — MLO's CLI is largely undocumented, so the quirk catalog there is the map of what actually works.
 
+## Disclaimer
+
+Independent project for interoperability and personal use — not affiliated with,
+authorized by, or endorsed by the makers of MyLifeOrganized. "MyLifeOrganized"
+and "MLO" are trademarks of their respective owner, used here only to name the
+app this project interoperates with. It drives a copy of the app you already
+license and installed, on your own machine and data.
+
 ## License
 
 MIT

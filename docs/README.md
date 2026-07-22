@@ -21,6 +21,6 @@ MLO itself — reverse-engineered formats, protocol, and task model ([mlo/](mlo/
 | [mlo/cloud-sync.md](mlo/cloud-sync.md) | The cloud-sync data plane, observed empirically: ZIP/`data.csv` delta envelopes, CSV sections, logical cursor semantics |
 | [mlo/mitm-proxy.md](mlo/mitm-proxy.md) | Debug-only mitmproxy workflow — the TLS-interception fallback if vendor sync traffic turns out not to be observable as plain HTTP |
 
-Historical context: `sources/` (git-ignored, local-only) holds the underlying research material these documents distill.
+These documents are an independent, unofficial description derived from the author's own installed client and their own account's sync traffic, for interoperability and personal use — not affiliated with or endorsed by the makers of MyLifeOrganized. Any local-only working material stays git-ignored and out of the repository.
 
 The CLI, format, and architecture docs were **verified empirically on MLO 15.x (Windows, Delphi build)** — MLO's CLI is largely undocumented. The exception is [mlo/mlo-task-model.md](mlo/mlo-task-model.md), which distills MLO's *own* bundled help (`mlo.chm`) and is therefore vendor-described behavior rather than re-verified.
