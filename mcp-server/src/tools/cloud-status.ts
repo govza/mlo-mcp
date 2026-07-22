@@ -26,6 +26,15 @@ export const cloudStatusTool = defineTool({
     partitions: z
       .array(z.object({ key: z.string(), mode: z.string(), lifecycle: z.string() }))
       .optional(),
+    mirror: z
+      .object({
+        entries: z.object({ uploads: z.number(), downloads: z.number() }),
+        lastVendorVersion: z.string(),
+        mirrorBlind: z.boolean(),
+        healthy: z.boolean(),
+      })
+      .optional()
+      .describe("Upstream-mode capture coverage (vendor stays the cursor authority)"),
   },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   async execute(_args, ctx) {
@@ -42,12 +51,27 @@ export const cloudStatusTool = defineTool({
     let lifecycle: string | undefined;
     let dataFileUID: string | undefined;
     let partitions: { key: string; mode: string; lifecycle: string }[] | undefined;
+    let mirror: { entries: { uploads: number; downloads: number }; lastVendorVersion: string; mirrorBlind: boolean; healthy: boolean } | undefined;
     if (gateway?.partitioned) {
       const bound = await gateway.boundPartition(ctx.config.dataFile);
       if (bound.kind === "bound") {
         mode = bound.binding.mode;
         lifecycle = bound.lifecycle;
         dataFileUID = bound.binding.dataFileUID;
+        if (bound.binding.mode === "upstream") {
+          const [counts, highWater, blind, healthy] = await Promise.all([
+            bound.partition.mirrorState.counts(),
+            bound.partition.mirrorState.highWater(),
+            gateway.mirrorBlind(),
+            gateway.mirrorHealthy(),
+          ]);
+          mirror = {
+            entries: { uploads: counts.app, downloads: counts.mcp },
+            lastVendorVersion: cursorToDecimalString(highWater),
+            mirrorBlind: blind,
+            healthy,
+          };
+        }
       } else {
         mode = "unbound";
         lifecycle = "uninitialized";
@@ -71,6 +95,7 @@ export const cloudStatusTool = defineTool({
       ...(lastStamp !== undefined ? { lastLocalStamp: localStampToString(lastStamp) } : {}),
       ...(gateway?.stateRoot ? { stateRoot: gateway.stateRoot } : {}),
       ...(partitions ? { partitions } : {}),
+      ...(mirror ? { mirror } : {}),
     };
     const bindingNote = mode === "legacy"
       ? "legacy demo log"

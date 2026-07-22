@@ -41,13 +41,6 @@ export const cloudBootstrapTool = defineTool({
       );
     }
     const mode = gateway.defaultMode;
-    if (mode === "upstream") {
-      throw new Error(
-        "upstream-mode bootstrap (transparent vendor mirror) is not implemented yet; " +
-        "set MLO_CLOUD_MODE=local to bootstrap this profile against the local replacement endpoint " +
-        "— note that a local-mode profile must never sync against the vendor Cloud again",
-      );
-    }
     await gateway.ensureRoot();
     const binding = await gateway.bindings!.create(ctx.config.dataFile, mode);
     if (binding.dataFileUID) {
@@ -62,12 +55,19 @@ export const cloudBootstrapTool = defineTool({
       }
     }
     const window = await gateway.bootstrap!.arm(ctx.config.dataFile, mode);
-    const instructions =
-      "Armed. In MLO: make sure the cloud sync proxy points at this endpoint, then open the profile's " +
-      "sync settings (Advanced) and run Re-synchronize with Bidirectional direction and no property exclusions. " +
-      "MLO will pull an empty state and upload its complete database; the endpoint validates and materializes " +
-      "it as the authoritative baseline. Check cloud_status afterward — lifecycle must be \"ready\". " +
-      `The window expires at ${window.expiresAt}.`;
+    const instructions = mode === "upstream"
+      ? "Armed (upstream mirror). In MLO: keep the cloud sync proxy pointed at this endpoint with " +
+        "\"Use secure connection\" UNCHECKED (a TLS tunnel would blind the mirror), then open the profile's " +
+        "sync settings (Advanced) and run Re-synchronize with Bidirectional direction and no property exclusions. " +
+        "The real vendor Cloud stays the authority; the endpoint passively captures the full database flowing " +
+        "through and materializes it as the read mirror. Check cloud_status afterward — lifecycle must be " +
+        `"ready". MCP writes stay disabled in upstream mode. The window expires at ${window.expiresAt}.`
+      : "Armed (local replacement server). In MLO: make sure the cloud sync proxy points at this endpoint, then " +
+        "open the profile's sync settings (Advanced) and run Re-synchronize with Bidirectional direction and no " +
+        "property exclusions. MLO will pull an empty state and upload its complete database; the endpoint " +
+        "validates and materializes it as the authoritative baseline. Check cloud_status afterward — lifecycle " +
+        `must be "ready". WARNING: a local-mode profile must never sync against the vendor Cloud again. ` +
+        `The window expires at ${window.expiresAt}.`;
     return textResult(instructions, {
       armed: true,
       mode,

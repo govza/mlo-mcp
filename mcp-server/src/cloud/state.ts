@@ -136,6 +136,25 @@ export class CloudState {
     });
   }
 
+  /**
+   * Append an entry at an EXTERNALLY assigned cursor (the vendor's remote
+   * version, for mirror logs). Re-observing an already-recorded version is a
+   * no-op; an older unseen version is ignored with `false` (vendor versions
+   * are monotonic — a merged Get response already covered it).
+   */
+  async appendAtCursor(origin: DeltaOrigin, zipBytes: Uint8Array, cursor: CloudCursor): Promise<boolean> {
+    return this.serialize(async () => {
+      if (this.entries.some((entry) => parseCursor(entry.cursor) === cursor)) return false;
+      if (cursor <= this.cursor) return false;
+      const file = `delta-${cursorToDecimalString(cursor)}.zip`;
+      await this.atomicWrite(path.join(this.stateDir, file), zipBytes);
+      this.cursor = cursor;
+      this.entries.push({ cursor: cursorToDecimalString(cursor), origin, file });
+      await this.writeState();
+      return true;
+    });
+  }
+
   async entriesAfter(cursor: CloudCursor, excludeOrigin?: DeltaOrigin): Promise<DeltaEntry[]> {
     return this.read(async () => {
       const selected = this.entries.filter((entry) => parseCursor(entry.cursor) > cursor && entry.origin !== excludeOrigin);

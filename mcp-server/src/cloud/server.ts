@@ -7,7 +7,8 @@ import { packEnvelope, unpackEnvelope } from "./envelope.js";
 import { CloudState, type DeltaOrigin } from "./state.js";
 import { CloudGateway } from "./gateway.js";
 import { SyncObserver } from "./sync-observer.js";
-import { handleSoapRequest, soapFault, soapOperationFromAction } from "./soap.js";
+import { handleSoapRequest, peekSoapFields, soapFault, soapOperationFailure, soapOperationFromAction } from "./soap.js";
+import { forwardVendorSoap } from "./upstream.js";
 import { log } from "../log.js";
 
 const BODY_LIMIT = 32 * 1024 * 1024;
@@ -109,13 +110,39 @@ async function interceptVendorSoap(
   const requestBytes = await readBytes(request);
   const exchange = observer.begin(request.method, target, request.headers);
   exchange.addRequestChunk(requestBytes);
+  const requestXml = requestBytes.toString("utf8");
+  const fields = peekSoapFields(requestXml, operation);
+
+  // Mode dispatch: one authority per profile session. Upstream-bound (and
+  // unknown, windowless) dataFileUIDs are forwarded to the vendor with the
+  // response returned verbatim; everything else terminates locally.
+  const authority = await gateway.decideAuthority(fields);
+  if (authority.kind === "upstream") {
+    try {
+      const result = await forwardVendorSoap(gateway, authority.context, target, operation, request.headers, requestBytes, fields);
+      exchange.addResponseChunk(result.body);
+      exchange.finish(result.status, result.headers);
+      response.writeHead(result.status, result.headers);
+      response.end(result.body);
+    } catch (error) {
+      const message = `vendor forward failed: ${error instanceof Error ? error.message : String(error)}`;
+      exchange.finish(502, {});
+      xml(response, 502, soapFault(message));
+    }
+    return true;
+  }
+
   let responseBytes: Uint8Array;
   let status = 200;
-  try {
-    responseBytes = await handleSoapRequest(gateway, operation, requestBytes.toString("utf8"));
-  } catch (error) {
-    status = 500;
-    responseBytes = soapFault(error instanceof Error ? error.message : String(error));
+  if (authority.kind === "reject") {
+    responseBytes = soapOperationFailure(operation, authority.message);
+  } else {
+    try {
+      responseBytes = await handleSoapRequest(gateway, operation, requestXml);
+    } catch (error) {
+      status = 500;
+      responseBytes = soapFault(error instanceof Error ? error.message : String(error));
+    }
   }
   exchange.addResponseChunk(Buffer.from(responseBytes));
   exchange.finish(status, { "content-type": "text/xml; charset=utf-8" });
@@ -158,7 +185,7 @@ function forwardRequest(request: IncomingMessage, response: ServerResponse, obse
   request.pipe(upstream);
 }
 
-function tunnelConnect(request: IncomingMessage, client: net.Socket, head: Buffer, observer: SyncObserver): void {
+function tunnelConnect(request: IncomingMessage, client: net.Socket, head: Buffer, observer: SyncObserver, gateway: CloudGateway): void {
   const separator = (request.url ?? "").lastIndexOf(":");
   const host = separator > 0 ? request.url!.slice(0, separator) : "";
   const port = Number(separator > 0 ? request.url!.slice(separator + 1) : "");
@@ -166,7 +193,11 @@ function tunnelConnect(request: IncomingMessage, client: net.Socket, head: Buffe
     client.end("HTTP/1.1 400 Bad Request\r\n\r\n");
     return;
   }
-  if (observer.matches(host)) observer.recordConnect(host, port);
+  if (observer.matches(host)) {
+    observer.recordConnect(host, port);
+    // TLS-tunneled vendor sync would bypass the upstream mirror entirely.
+    if (gateway.partitioned) void gateway.noteVendorConnect().catch(() => undefined);
+  }
   const upstream = net.connect(port, host);
   upstream.once("connect", () => {
     client.write("HTTP/1.1 200 Connection Established\r\n\r\n");
@@ -261,7 +292,7 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
       json(response, status, { error: error instanceof Error ? error.message : String(error) });
     }
   });
-  server.on("connect", (request, socket, head) => tunnelConnect(request, socket as net.Socket, head, observer));
+  server.on("connect", (request, socket, head) => tunnelConnect(request, socket as net.Socket, head, observer, gateway));
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
     server.listen(options.port ?? DEFAULT_CLOUD_PORT, host, () => { server.off("error", reject); resolve(); });

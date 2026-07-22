@@ -98,6 +98,20 @@ function prepareMcpDeltaForMlo(document: SectionedCsv): SectionedCsv {
   return document;
 }
 
+/** Parsed operation fields for routing decisions; {} when the body is malformed. */
+export function peekSoapFields(xml: string, operation: SoapOperation): Record<string, unknown> {
+  try {
+    return parseFields(xml, operation);
+  } catch {
+    return {};
+  }
+}
+
+/** A protocol-level failure envelope, for policy rejections outside the handlers. */
+export function soapOperationFailure(operation: SoapOperation, message: string): Uint8Array {
+  return envelope(operation, failureFields(operation, message));
+}
+
 export function soapOperationFromAction(action: string | string[] | undefined): SoapOperation | undefined {
   const value = Array.isArray(action) ? action[0] : action;
   if (!value) return undefined;

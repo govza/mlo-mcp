@@ -24,7 +24,10 @@ export interface ToolContext {
 export async function resolveReadCloudState(ctx: ToolContext): Promise<CloudState> {
   if (!ctx.cloud || !ctx.cloud.partitioned) return ctx.cloudState;
   const bound = await ctx.cloud.boundPartition(ctx.config.dataFile);
-  return bound.kind === "bound" ? bound.partition.state : ctx.cloudState;
+  if (bound.kind !== "bound") return ctx.cloudState;
+  // Upstream profiles read from the vendor-versioned mirror; local ones from
+  // the replacement server's own log.
+  return bound.binding.mode === "upstream" ? bound.partition.mirrorState : bound.partition.state;
 }
 
 /**

@@ -5,8 +5,21 @@ import path from "node:path";
 import { CloudState } from "./state.js";
 import { BindingStore, type ProfileBinding } from "./binding.js";
 import { BootstrapController } from "./bootstrap.js";
-import { PartitionRegistry, type PartitionHandle, type PartitionLifecycle, type PartitionMode } from "./partition.js";
+import { normalizeDataFileUid, PartitionRegistry, type PartitionHandle, type PartitionLifecycle, type PartitionMode } from "./partition.js";
+import type { UpstreamContext } from "./upstream.js";
 import { log } from "../log.js";
+
+/**
+ * Which authority answers one SOAP sync operation. All three operations of a
+ * profile session must resolve to the SAME authority (the vendor protocol's
+ * session is one logical unit), so decisions are pinned per `sessionID`.
+ */
+export type SoapAuthority =
+  | { kind: "local" }
+  | { kind: "upstream"; context: UpstreamContext }
+  | { kind: "reject"; message: string };
+
+const SESSION_PIN_TTL_MS = 10 * 60 * 1000;
 
 /**
  * Routes every cloud-state access — SOAP, /v1, MCP tools, status — to the
@@ -38,6 +51,7 @@ export class CloudGateway {
   readonly defaultMode: PartitionMode;
   private unboundState?: CloudState;
   private rootPrepared = false;
+  private sessionAuthorities = new Map<string, { authority: SoapAuthority; expires: number }>();
 
   constructor(options: CloudGatewayOptions) {
     this.defaultMode = options.defaultMode;
@@ -73,6 +87,106 @@ export class CloudGateway {
     if (this.legacyState) return this.legacyState;
     this.unboundState ??= new CloudState(path.join(this.stateRoot!, "unbound"));
     return this.unboundState;
+  }
+
+  /**
+   * Decide the authority for one SOAP sync operation from its parsed fields.
+   * Local termination stays the answer for legacy mode and local-mode
+   * partitions; upstream-bound (and unknown, windowless) dataFileUIDs belong
+   * to the vendor. The decision is pinned per sessionID so a binding change
+   * can never switch authorities mid-session.
+   */
+  async decideAuthority(fields: Record<string, unknown>): Promise<SoapAuthority> {
+    if (this.legacyState) return { kind: "local" };
+    const sessionId = typeof fields.sessionID === "string" && fields.sessionID.length ? fields.sessionID : undefined;
+    const now = Date.now();
+    if (sessionId) {
+      const pinned = this.sessionAuthorities.get(sessionId);
+      if (pinned && pinned.expires > now) {
+        pinned.expires = now + SESSION_PIN_TTL_MS;
+        return pinned.authority;
+      }
+      this.sessionAuthorities.delete(sessionId);
+    }
+    const authority = await this.computeAuthority(fields);
+    if (sessionId) {
+      for (const [key, value] of this.sessionAuthorities) if (value.expires <= now) this.sessionAuthorities.delete(key);
+      this.sessionAuthorities.set(sessionId, { authority, expires: now + SESSION_PIN_TTL_MS });
+    }
+    return authority;
+  }
+
+  private async computeAuthority(fields: Record<string, unknown>): Promise<SoapAuthority> {
+    const rawUid = typeof fields.dataFileUID === "string" && fields.dataFileUID.length ? fields.dataFileUID : undefined;
+    if (!rawUid) return { kind: "local" }; // local handling reports the missing UID
+    let uid: string;
+    try {
+      uid = normalizeDataFileUid(rawUid);
+    } catch {
+      return { kind: "local" }; // local handling reports the invalid UID
+    }
+    await this.prepareRoot();
+    const binding = await this.bindings!.forUid(uid);
+    if (binding) {
+      if (binding.mode === "local") return { kind: "local" };
+      const partition = await this.registry!.open(uid);
+      return { kind: "upstream", context: { partition, capture: true, bootstrapping: false } };
+    }
+    const window = await this.bootstrap!.current();
+    if (window && window.mode === "upstream") {
+      const firstContact = !window.dataFileUID;
+      try {
+        await this.bootstrap!.noteUidSeen(uid);
+      } catch (error) {
+        return { kind: "reject", message: error instanceof Error ? error.message : String(error) };
+      }
+      const partition = await this.registry!.open(uid);
+      if (firstContact && !(await partition.isEmpty())) {
+        return { kind: "reject", message: "bootstrap requires an empty partition, but this dataFileUID already has history" };
+      }
+      return { kind: "upstream", context: { partition, capture: true, bootstrapping: true } };
+    }
+    if (window) return { kind: "local" }; // local-mode bootstrap window
+    // Unknown UID, nothing armed: stay out of the way — forward to the vendor
+    // unchanged, touch nothing, and leave a trace for the operator.
+    log(`sync operation for unknown dataFileUID forwarded to the vendor without capture (no binding, no armed bootstrap)`);
+    return { kind: "upstream", context: { capture: false, bootstrapping: false } };
+  }
+
+  /** A CONNECT tunnel to the vendor sync host blinds the mirror; record it. */
+  async noteVendorConnect(): Promise<void> {
+    if (!this.stateRoot) return;
+    await this.prepareRoot();
+    const target = path.join(this.stateRoot, "mirror-blind.json");
+    await fs.writeFile(target, `${JSON.stringify({ mirrorBlind: true, at: new Date().toISOString() }, null, 2)}\n`);
+    log("HTTPS CONNECT to the vendor sync host: sync is TLS-tunneled and the upstream mirror is blind — uncheck \"Use secure connection\" in MLO's cloud login");
+  }
+
+  async mirrorBlind(): Promise<boolean> {
+    if (!this.stateRoot) return false;
+    try {
+      await fs.stat(path.join(this.stateRoot, "mirror-blind.json"));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async noteMirrorUnhealthy(): Promise<void> {
+    if (!this.stateRoot) return;
+    await this.prepareRoot();
+    const target = path.join(this.stateRoot, "mirror-health.json");
+    await fs.writeFile(target, `${JSON.stringify({ healthy: false, at: new Date().toISOString() }, null, 2)}\n`);
+  }
+
+  async mirrorHealthy(): Promise<boolean> {
+    if (!this.stateRoot) return true;
+    try {
+      await fs.stat(path.join(this.stateRoot, "mirror-health.json"));
+      return false;
+    } catch {
+      return true;
+    }
   }
 
   /**
