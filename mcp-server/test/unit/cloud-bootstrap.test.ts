@@ -23,7 +23,7 @@ const TOMBSTONE = "{99999999-9999-9999-9999-999999999999}";
 async function gatewayAt(): Promise<CloudGateway> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-boot-"));
   dirs.push(root);
-  return new CloudGateway({ stateRoot: root, defaultMode: "local" });
+  return new CloudGateway({ stateRoot: root });
 }
 
 /**
@@ -114,8 +114,8 @@ describe("snapshot validation", () => {
 describe("bootstrap window over SOAP", () => {
   async function armAndBootstrap(gateway: CloudGateway): Promise<void> {
     await gateway.ensureRoot();
-    await gateway.bindings!.create(PROFILE, "local");
-    await gateway.bootstrap!.arm(PROFILE, "local");
+    await gateway.bindings.create(PROFILE, "local");
+    await gateway.bootstrap.arm(PROFILE, "local");
   }
 
   it("runs the verified re-synchronize sequence to a ready partition", async () => {
@@ -144,10 +144,10 @@ describe("bootstrap window over SOAP", () => {
     const released = await soap(gateway, "ReleaseSyncSessionBytes", { dataFileUID: UID, sessionID: "s" });
     expect(responseField(released, "ReleaseSyncSessionBytesResult")).toBe("true");
 
-    const partition = await gateway.registry!.open(UID);
+    const partition = await gateway.registry.open(UID);
     expect(await partition.lifecycle()).toBe("ready");
-    expect((await gateway.bindings!.forProfile(PROFILE))?.dataFileUID).toBe(UID);
-    expect(await gateway.bootstrap!.current()).toBeUndefined();
+    expect((await gateway.bindings.forProfile(PROFILE))?.dataFileUID).toBe(UID);
+    expect(await gateway.bootstrap.current()).toBeUndefined();
 
     // The materialized snapshot backs projections: both tasks resolve with
     // their real UIDs, including the duplicate-caption child.
@@ -186,12 +186,12 @@ describe("bootstrap window over SOAP", () => {
     });
     expect(responseField(rejected, "ApplyModificationsBytesExResult")).toBe("false");
     expect(responseField(rejected, "errorMessage")).toContain("failed validation");
-    const partition = await gateway.registry!.open(UID);
+    const partition = await gateway.registry.open(UID);
     expect(await partition.lifecycle()).toBe("bootstrap-required");
     // Nothing was appended — the refused upload never became history.
     expect(await partition.state.highWater()).toBe(0n);
     // The staged bytes were kept for diagnosis.
-    expect(await fs.stat(gateway.bootstrap!.stagedPath()).then(() => true, () => false)).toBe(true);
+    expect(await fs.stat(gateway.bootstrap.stagedPath()).then(() => true, () => false)).toBe(true);
 
     // In-window retry with the real full snapshot succeeds (restart/replay).
     const retried = await soap(gateway, "ApplyModificationsBytesEx", {
@@ -219,10 +219,10 @@ describe("bootstrap window over SOAP", () => {
   it("refuses concurrent arming for a different profile and survives controller restarts", async () => {
     const gateway = await gatewayAt();
     await armAndBootstrap(gateway);
-    await expect(gateway.bootstrap!.arm("C:\\Other.ml", "local"))
+    await expect(gateway.bootstrap.arm("C:\\Other.ml", "local"))
       .rejects.toThrow("already armed for a different profile");
     // A fresh gateway over the same root sees the persisted window (attach mode).
-    const attached = new CloudGateway({ stateRoot: gateway.stateRoot!, defaultMode: "local" });
+    const attached = new CloudGateway({ stateRoot: gateway.stateRoot });
     expect((await attached.bootstrap!.current())?.profilePath).toBe(PROFILE);
   });
 
@@ -237,7 +237,7 @@ describe("bootstrap window over SOAP", () => {
     });
     expect(responseField(applied, "ApplyModificationsBytesExResult")).toBe("true");
 
-    const partition = await gateway.registry!.open(UID);
+    const partition = await gateway.registry.open(UID);
     const stored = await partition.snapshots.load();
     expect(stored).toBeDefined();
     const futureSection = findSection(stored!.document, "Future.Section");

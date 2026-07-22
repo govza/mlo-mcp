@@ -19,7 +19,7 @@ afterEach(async () => {
 describe("CloudClient", () => {
   it("drives a complete app-side cloud sync cycle", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-client-")); dirs.push(dir);
-    const handle = await startCloudServer({ host: "127.0.0.1", port: 0, stateDir: dir }); handles.push(handle);
+    const handle = await startCloudServer({ host: "127.0.0.1", port: 0, stateRoot: dir }); handles.push(handle);
     const client = new CloudClient({ baseUrl: `http://${handle.host}:${handle.port}` });
     expect(await client.pull(ZERO_CURSOR)).toEqual({ cursor: ZERO_CURSOR });
 
@@ -36,7 +36,7 @@ describe("CloudClient", () => {
     const pushedCursor = await client.push(packEnvelope(appDelta), pulled.cursor);
     expect(pushedCursor).toBe(2n);
     expect(await client.pull(pulled.cursor)).toEqual({ cursor: pushedCursor });
-    expect(await client.status()).toEqual({ cursor: "2", entries: { mcp: 1, app: 1 }, pendingForApp: 0 });
+    expect(await client.status()).toMatchObject({ cursor: "2", entries: { mcp: 1, app: 1 }, pendingForApp: 0 });
     await expect(client.finalize()).resolves.toBeUndefined();
   });
 });

@@ -122,9 +122,9 @@ export function soapOperationFromAction(action: string | string[] | undefined): 
 
 /**
  * Gateway entry point: route the request to the state partition selected by
- * its `dataFileUID` (or the legacy single log), enforce binding/lifecycle,
- * and run the bootstrap protocol while a window is armed. Routing and policy
- * failures are protocol-level failures, not transport faults.
+ * its `dataFileUID`, enforce binding/lifecycle, and run the bootstrap
+ * protocol while a window is armed. Routing and policy failures are
+ * protocol-level failures, not transport faults.
  */
 export async function handleSoapRequest(
   gateway: CloudGateway,
@@ -133,7 +133,6 @@ export async function handleSoapRequest(
 ): Promise<Uint8Array> {
   const fields = parseFields(xml, operation);
   const rawUid = typeof fields.dataFileUID === "string" && fields.dataFileUID.length ? fields.dataFileUID : undefined;
-  if (gateway.legacyState) return handleParsedSoapOperation(gateway.legacyState, operation, fields);
 
   const fail = (message: string) => envelope(operation, failureFields(operation, message));
   if (!rawUid) return fail("dataFileUID is required to route this operation to a state partition");
@@ -145,8 +144,8 @@ export async function handleSoapRequest(
   }
   await gateway.ensureRoot();
 
-  const binding = await gateway.bindings!.forUid(uid);
-  const window = await gateway.bootstrap!.current();
+  const binding = await gateway.bindings.forUid(uid);
+  const window = await gateway.bootstrap.current();
 
   if (binding) {
     if (binding.mode === "upstream") {
@@ -155,7 +154,7 @@ export async function handleSoapRequest(
       // proxy path could not forward.
       return fail("this dataFileUID is bound to the vendor Cloud (upstream mode); the local endpoint does not terminate its sync operations");
     }
-    const partition = await gateway.registry!.open(uid);
+    const partition = await gateway.registry.open(uid, binding.mode);
     if (await partition.lifecycle() === "ready") {
       return handleParsedSoapOperation(partition.state, operation, fields);
     }
@@ -170,11 +169,11 @@ export async function handleSoapRequest(
   if (window) {
     const firstContact = !window.dataFileUID;
     try {
-      await gateway.bootstrap!.noteUidSeen(uid);
+      await gateway.bootstrap.noteUidSeen(uid);
     } catch (error) {
       return fail(error instanceof Error ? error.message : String(error));
     }
-    const partition = await gateway.registry!.open(uid);
+    const partition = await gateway.registry.open(uid, window.mode);
     // First contact must find a genuinely empty partition: a bidirectional
     // re-sync Get would otherwise deliver whatever the partition holds before
     // MLO uploads its snapshot. Later ops of the same window continue (the
@@ -209,7 +208,7 @@ async function handleBootstrapOperation(
   operation: SoapOperation,
   fields: Record<string, unknown>,
 ): Promise<Uint8Array> {
-  const bootstrap = gateway.bootstrap!;
+  const bootstrap = gateway.bootstrap;
   const state = partition.state;
 
   if (operation === "GetModificationsBytesEx") {
@@ -252,7 +251,7 @@ async function handleBootstrapOperation(
     }
     const cursor = await state.append("app", bytes);
     await partition.snapshots.materialize(document, cursor);
-    await gateway.bindings!.bindUid(window.profilePath, partition.uid);
+    await gateway.bindings.bindUid(window.profilePath, partition.uid);
     await partition.setLifecycle("ready");
     await bootstrap.complete();
     return envelope(operation, successFields(operation, field("newServerTimeStamp", cursorToDecimalString(cursor))));

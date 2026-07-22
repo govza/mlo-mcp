@@ -132,17 +132,18 @@ export class PartitionHandle {
 export class PartitionRegistry {
   private handles = new Map<string, PartitionHandle>();
 
-  constructor(
-    readonly stateRoot: string,
-    readonly defaultMode: PartitionMode,
-  ) {}
+  constructor(readonly stateRoot: string) {}
 
   private partitionsDir(): string {
     return path.join(this.stateRoot, "partitions");
   }
 
-  /** Open a partition, creating its directory and meta on first use. */
-  async open(rawUid: string): Promise<PartitionHandle> {
+  /**
+   * Open a partition, creating its directory and meta on first use.
+   * `createMode` labels a NEWLY created partition (from the binding or the
+   * armed window that introduced it); an existing partition keeps its meta.
+   */
+  async open(rawUid: string, createMode: PartitionMode = "upstream"): Promise<PartitionHandle> {
     const uid = normalizeDataFileUid(rawUid);
     const key = partitionKey(uid);
     const cached = this.handles.get(key);
@@ -159,7 +160,7 @@ export class PartitionRegistry {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
       const meta: PartitionMeta = {
         dataFileUID: uid,
-        mode: this.defaultMode,
+        mode: createMode,
         lifecycle: "uninitialized",
         createdAt: new Date().toISOString(),
       };

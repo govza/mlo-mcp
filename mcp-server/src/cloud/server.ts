@@ -19,17 +19,17 @@ export const DEFAULT_CLOUD_PORT = 8181;
 export interface CloudServerOptions {
   host?: string;
   port?: number;
-  /** Legacy/demo single state dir; builds a legacy-mode gateway when `gateway` is absent. */
-  stateDir?: string;
-  /** Partition-aware routing; takes precedence over `stateDir`. */
+  /** Partition-aware routing; built from `stateRoot` when absent. */
   gateway?: CloudGateway;
+  /** State root sugar for callers without a prebuilt gateway (tests). */
+  stateRoot?: string;
   /** Hostname whose proxied traffic is structurally summarized (tests override the vendor default). */
   observeHost?: string;
 }
 
 export interface CloudServerHandle {
   server: http.Server;
-  /** The gateway's default (legacy or unbound) state; partition state is reached via `gateway`. */
+  /** The gateway's default (unbound) state; partition state is reached via `gateway`. */
   state: CloudState;
   gateway: CloudGateway;
   host: string;
@@ -196,7 +196,7 @@ function tunnelConnect(request: IncomingMessage, client: net.Socket, head: Buffe
   if (observer.matches(host)) {
     observer.recordConnect(host, port);
     // TLS-tunneled vendor sync would bypass the upstream mirror entirely.
-    if (gateway.partitioned) void gateway.noteVendorConnect().catch(() => undefined);
+    void gateway.noteVendorConnect().catch(() => undefined);
   }
   const upstream = net.connect(port, host);
   upstream.once("connect", () => {
@@ -214,7 +214,8 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
   if (host !== "localhost" && host !== "::1" && !/^127(?:\.\d{1,3}){3}$/.test(host)) {
     throw new Error(`MLO cloud server must bind to a loopback host (received "${host}")`);
   }
-  const gateway = options.gateway ?? new CloudGateway({ legacyStateDir: options.stateDir, defaultMode: "local" });
+  if (!options.gateway && !options.stateRoot) throw new Error("cloud server needs a gateway or a stateRoot");
+  const gateway = options.gateway ?? new CloudGateway({ stateRoot: options.stateRoot! });
   const state = gateway.defaultState();
   const observer = new SyncObserver(gateway.observerDir(), options.observeHost);
   const server = http.createServer(async (request, response) => {
@@ -231,13 +232,12 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
           state.counts(),
           state.pendingFor("app"),
         ]);
-        const partitions = gateway.registry ? await gateway.registry.list() : undefined;
         json(response, 200, {
           cursor: cursorToDecimalString(highWater),
           entries: counts,
           pendingForApp,
-          ...(gateway.stateRoot ? { stateRoot: gateway.stateRoot } : {}),
-          ...(partitions ? { partitions } : {}),
+          stateRoot: gateway.stateRoot,
+          partitions: await gateway.registry.list(),
         });
         return;
       }

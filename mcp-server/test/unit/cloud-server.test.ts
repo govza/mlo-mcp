@@ -5,6 +5,7 @@ import http from "node:http";
 import net from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import { startCloudServer, startOrAttachCloudServer, type CloudServerHandle } from "../../src/cloud/server.js";
+import { CloudGateway } from "../../src/cloud/gateway.js";
 import { buildTaskAddDelta } from "../../src/cloud/delta.js";
 import { packEnvelope, unpackEnvelope } from "../../src/cloud/envelope.js";
 
@@ -25,14 +26,14 @@ async function post(handle: CloudServerHandle, route: string, body: unknown) {
 describe("cloud HTTP server", () => {
   it("refuses non-loopback binding because the local SOAP adapter bypasses vendor authentication", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-bind-")); dirs.push(dir);
-    await expect(startCloudServer({ host: "0.0.0.0", port: 0, stateDir: dir }))
+    await expect(startCloudServer({ host: "0.0.0.0", port: 0, stateRoot: dir }))
       .rejects.toThrow("must bind to a loopback host");
   });
 
   it("attaches instead of failing when the port is held by another mlo-mcp endpoint", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-attach-")); dirs.push(dir);
-    const first = await startCloudServer({ host: "127.0.0.1", port: 0, stateDir: dir }); handles.push(first);
-    const second = await startOrAttachCloudServer({ host: "127.0.0.1", port: first.port, stateDir: dir });
+    const first = await startCloudServer({ host: "127.0.0.1", port: 0, stateRoot: dir }); handles.push(first);
+    const second = await startOrAttachCloudServer({ host: "127.0.0.1", port: first.port, stateRoot: dir });
     expect(second).toBeUndefined();
   });
 
@@ -43,7 +44,7 @@ describe("cloud HTTP server", () => {
     const address = other.address();
     if (!address || typeof address === "string") throw new Error("missing address");
     try {
-      await expect(startOrAttachCloudServer({ host: "127.0.0.1", port: address.port, stateDir: dir }))
+      await expect(startOrAttachCloudServer({ host: "127.0.0.1", port: address.port, stateRoot: dir }))
         .rejects.toThrow(/EADDRINUSE/);
     } finally {
       await new Promise<void>((resolve, reject) => other.close((error) => error ? reject(error) : resolve()));
@@ -52,12 +53,18 @@ describe("cloud HTTP server", () => {
 
   it("intercepts supported vendor SOAP operations instead of forwarding credentials", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-soap-proxy-")); dirs.push(dir);
-    const handle = await startCloudServer({ host: "127.0.0.1", port: 0, stateDir: dir, observeHost: "127.0.0.1" });
+    const gateway = new CloudGateway({ stateRoot: dir });
+    const UID = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}";
+    await gateway.bindings.create("C:\\demo.ml", "local");
+    await gateway.bindings.bindUid("C:\\demo.ml", UID);
+    const partition = await gateway.registry.open(UID, "local");
+    await partition.setLifecycle("ready");
+    const handle = await startCloudServer({ host: "127.0.0.1", port: 0, gateway, observeHost: "127.0.0.1" });
     handles.push(handle);
     const delta = packEnvelope(buildTaskAddDelta({ uid: "{12345678-1234-1234-1234-123456789ABC}", caption: "queued", createdDate: "a", lastModified: "a" }));
-    await handle.state.append("mcp", delta);
+    await partition.state.append("mcp", delta);
     const requestBody = `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body>` +
-      `<GetModificationsBytesEx xmlns="http://www.mylifeorganized.net/"><loginBytes>c2VjcmV0</loginBytes><newerThan>50</newerThan></GetModificationsBytesEx>` +
+      `<GetModificationsBytesEx xmlns="http://www.mylifeorganized.net/"><loginBytes>c2VjcmV0</loginBytes><dataFileUID>${UID}</dataFileUID><newerThan>50</newerThan></GetModificationsBytesEx>` +
       `</soap:Body></soap:Envelope>`;
 
     const result = await new Promise<{ status: number; body: string }>((resolve, reject) => {
@@ -91,7 +98,7 @@ describe("cloud HTTP server", () => {
     await new Promise<void>((resolve) => upstream.listen(0, "127.0.0.1", resolve));
     const upstreamAddress = upstream.address();
     if (!upstreamAddress || typeof upstreamAddress === "string") throw new Error("missing upstream address");
-    const handle = await startCloudServer({ host: "127.0.0.1", port: 0, stateDir: dir }); handles.push(handle);
+    const handle = await startCloudServer({ host: "127.0.0.1", port: 0, stateRoot: dir }); handles.push(handle);
 
     const proxied = await new Promise<{ status: number; header?: string; body: string }>((resolve, reject) => {
       const request = http.request({
@@ -127,7 +134,7 @@ describe("cloud HTTP server", () => {
 
   it("implements pull, push validation, filtering, and cursor rules", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-server-")); dirs.push(dir);
-    const handle = await startCloudServer({ host: "127.0.0.1", port: 0, stateDir: dir }); handles.push(handle);
+    const handle = await startCloudServer({ host: "127.0.0.1", port: 0, stateRoot: dir }); handles.push(handle);
     expect(await post(handle, "/v1/pull", { client: "mlo-app", cursor: "0" })).toEqual({ status: 200, body: { cursor: "0" } });
 
     const delta = packEnvelope(buildTaskAddDelta({ uid: "{12345678-1234-1234-1234-123456789ABC}", caption: "queued", createdDate: "a", lastModified: "a" }));
@@ -148,6 +155,6 @@ describe("cloud HTTP server", () => {
 
     // The app pulled through cursor 2, so nothing is pending for it.
     const status = await fetch(`http://${handle.host}:${handle.port}/v1/status`);
-    expect(await status.json()).toEqual({ cursor: "2", entries: { mcp: 1, app: 1 }, pendingForApp: 0 });
+    expect(await status.json()).toMatchObject({ cursor: "2", entries: { mcp: 1, app: 1 }, pendingForApp: 0, stateRoot: dir, partitions: [] });
   });
 });

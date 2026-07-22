@@ -150,6 +150,24 @@ export class BindingStore {
   }
 
   /**
+   * Explicit rebind: reset the profile's binding to `mode` with no UID. The
+   * old partition directory is left intact as evidence; only the pointer
+   * moves. This is the ONLY way a binding's mode changes.
+   */
+  async replace(profilePath: string, mode: PartitionMode): Promise<ProfileBinding> {
+    return this.serialize(async () => {
+      const bindings = await this.load();
+      const canonical = canonicalProfilePath(profilePath);
+      const index = bindings.findIndex((entry) => canonicalProfilePath(entry.profilePath) === canonical);
+      const binding: ProfileBinding = { profilePath, mode, createdAt: new Date().toISOString() };
+      if (index >= 0) bindings[index] = binding;
+      else bindings.push(binding);
+      await this.save(bindings);
+      return binding;
+    });
+  }
+
+  /**
    * Drop a profile's UID binding as part of an explicit rebind. The old
    * partition directory is left intact as evidence; only the pointer moves.
    */

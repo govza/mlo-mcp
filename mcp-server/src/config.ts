@@ -20,16 +20,6 @@ const DEV_PROFILE = path.resolve(
   "profile.ml"
 );
 
-// Keep generated cloud messages out of profile/ and in one repo-local,
-// git-ignored directory. Packaged installs can override this as usual with
-// MLO_CLOUD_STATE_DIR.
-const DEV_CLOUD_STATE_DIR = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "..",
-  "messages"
-);
-
 function resolveDataFile(): string {
   if (process.env.MLO_DATA_FILE) return process.env.MLO_DATA_FILE;
   if (existsSync(DEV_PROFILE)) return DEV_PROFILE;
@@ -38,6 +28,9 @@ function resolveDataFile(): string {
   );
 }
 
+// One automatic private root outside any checkout; every profile gets its own
+// partition under it, keyed by dataFileUID. MLO_CLOUD_STATE_ROOT exists for
+// tests and unusual installs, not routine configuration.
 function resolveStateRoot(): string {
   if (process.env.MLO_CLOUD_STATE_ROOT) return process.env.MLO_CLOUD_STATE_ROOT;
   if (process.env.LOCALAPPDATA) return path.join(process.env.LOCALAPPDATA, "mlo-mcp", "cloud");
@@ -51,15 +44,6 @@ export function loadConfig(): MloConfig {
   if (!Number.isInteger(cloudPort) || cloudPort < 0 || cloudPort > 65535) {
     throw new Error("MLO_CLOUD_PORT must be an integer from 0 through 65535");
   }
-  // A real profile (MLO_DATA_FILE) gets private partitioned state and the
-  // vendor-proxy default; the repo dev/demo profile keeps the repo-local
-  // single log. MLO_CLOUD_STATE_DIR forces legacy single-log semantics.
-  const cloudLegacyStateDir =
-    process.env.MLO_CLOUD_STATE_DIR ?? (process.env.MLO_DATA_FILE ? undefined : DEV_CLOUD_STATE_DIR);
-  const cloudMode = process.env.MLO_CLOUD_MODE ?? (cloudLegacyStateDir ? "local" : "upstream");
-  if (cloudMode !== "local" && cloudMode !== "upstream") {
-    throw new Error('MLO_CLOUD_MODE must be "local" or "upstream"');
-  }
   return {
     mloExePath: process.env.MLO_EXE_PATH ?? DEFAULT_EXE,
     dataFile,
@@ -72,7 +56,5 @@ export function loadConfig(): MloConfig {
     cloudHost: process.env.MLO_CLOUD_HOST ?? "127.0.0.1",
     cloudPort,
     cloudStateRoot: resolveStateRoot(),
-    ...(cloudLegacyStateDir ? { cloudLegacyStateDir } : {}),
-    cloudMode,
   };
 }

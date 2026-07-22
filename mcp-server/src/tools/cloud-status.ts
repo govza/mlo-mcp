@@ -15,7 +15,7 @@ export const cloudStatusTool = defineTool({
     cursor: z.string(),
     entries: z.object({ mcp: z.number(), app: z.number() }),
     pendingForApp: z.number(),
-    /** "legacy" (demo single log), "unbound", or the bound partition's mode. */
+    /** "unbound" before bootstrap, or the bound partition's mode. */
     mode: z.string(),
     lifecycle: z.string().optional().describe("uninitialized | bootstrap-required | ready (bound partitions only)"),
     dataFileUID: z.string().optional(),
@@ -47,12 +47,12 @@ export const cloudStatusTool = defineTool({
       state.lastLocalStamp(),
     ]);
     const gateway = ctx.cloud;
-    let mode = "legacy";
+    let mode = "unpartitioned"; // only in gateway-less unit-test contexts
     let lifecycle: string | undefined;
     let dataFileUID: string | undefined;
     let partitions: { key: string; mode: string; lifecycle: string }[] | undefined;
     let mirror: { entries: { uploads: number; downloads: number }; lastVendorVersion: string; mirrorBlind: boolean; healthy: boolean } | undefined;
-    if (gateway?.partitioned) {
+    if (gateway) {
       const bound = await gateway.boundPartition(ctx.config.dataFile);
       if (bound.kind === "bound") {
         mode = bound.binding.mode;
@@ -76,7 +76,7 @@ export const cloudStatusTool = defineTool({
         mode = "unbound";
         lifecycle = "uninitialized";
       }
-      partitions = (await gateway.registry!.list()).map((partition) => ({
+      partitions = (await gateway.registry.list()).map((partition) => ({
         key: partition.key,
         mode: partition.mode,
         lifecycle: partition.lifecycle,
@@ -97,11 +97,9 @@ export const cloudStatusTool = defineTool({
       ...(partitions ? { partitions } : {}),
       ...(mirror ? { mirror } : {}),
     };
-    const bindingNote = mode === "legacy"
-      ? "legacy demo log"
-      : mode === "unbound"
-        ? "no partition bound — run cloud_bootstrap"
-        : `${mode} partition, ${lifecycle}`;
+    const bindingNote = mode === "unbound"
+      ? "no partition bound — run cloud_bootstrap"
+      : `${mode} partition, ${lifecycle ?? "n/a"}`;
     const mismatchNote = mismatches
       ? `; ${mismatches} endpoint mismatch(es) — the profile synced against a different server history`
       : "";

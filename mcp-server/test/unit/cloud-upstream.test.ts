@@ -113,7 +113,7 @@ function proxied(handle: CloudServerHandle, vendorPort: number, operation: strin
 async function upstreamGateway(): Promise<CloudGateway> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-up-"));
   dirs.push(root);
-  const gateway = new CloudGateway({ stateRoot: root, defaultMode: "upstream" });
+  const gateway = new CloudGateway({ stateRoot: root });
   await gateway.ensureRoot();
   return gateway;
 }
@@ -130,8 +130,8 @@ function contextFor(gateway: CloudGateway): ToolContext {
 describe("upstream transparent proxy", () => {
   it("forwards all three operations verbatim and returns the vendor response unchanged", async () => {
     const gateway = await upstreamGateway();
-    await gateway.bindings!.create(PROFILE, "upstream");
-    await gateway.bindings!.bindUid(PROFILE, UID);
+    await gateway.bindings.create(PROFILE, "upstream");
+    await gateway.bindings.bindUid(PROFILE, UID);
     const vendor = await startVendor((operation) => ({
       body: operation === "GetModificationsBytesEx"
         ? vendorResponse(operation, { GetModificationsBytesExResult: "true", maxVersion: "15515" })
@@ -162,14 +162,14 @@ describe("upstream transparent proxy", () => {
     expect(vendor.calls[0]!.body).toContain("<newerThan>15514</newerThan>");
     expect(vendor.calls[1]!.body).toContain("<lastSyncTimestamp>24838</lastSyncTimestamp>");
     // Nothing was locally cursor-stamped: the local log for this partition stays empty.
-    const partition = await gateway.registry!.open(UID);
+    const partition = await gateway.registry.open(UID);
     expect(await partition.state.highWater()).toBe(0n);
   });
 
   it("captures an armed re-sync flow into the mirror and reaches ready without touching the vendor exchange", async () => {
     const gateway = await upstreamGateway();
-    await gateway.bindings!.create(PROFILE, "upstream");
-    await gateway.bootstrap!.arm(PROFILE, "upstream");
+    await gateway.bindings.create(PROFILE, "upstream");
+    await gateway.bootstrap.arm(PROFILE, "upstream");
     const snapshotB64 = Buffer.from(packEnvelope(fullSnapshot())).toString("base64");
     const vendor = await startVendor((operation) => ({
       body: operation === "GetModificationsBytesEx"
@@ -188,10 +188,10 @@ describe("upstream transparent proxy", () => {
     await proxied(proxy, vendor.port, "ReleaseSyncSessionBytes",
       soapEnvelope("ReleaseSyncSessionBytes", { sessionID: "s1", dataFileUID: UID }));
 
-    const partition = await gateway.registry!.open(UID);
+    const partition = await gateway.registry.open(UID);
     expect(await partition.lifecycle()).toBe("ready");
-    expect((await gateway.bindings!.forProfile(PROFILE))?.dataFileUID).toBe(UID);
-    expect(await gateway.bootstrap!.current()).toBeUndefined();
+    expect((await gateway.bindings.forProfile(PROFILE))?.dataFileUID).toBe(UID);
+    expect(await gateway.bootstrap.current()).toBeUndefined();
     // The mirror holds the upload at the VENDOR-assigned version.
     expect(await partition.mirrorState.highWater()).toBe(101n);
     // Reads resolve through the mirror; writes stay refused in upstream mode.
@@ -204,8 +204,8 @@ describe("upstream transparent proxy", () => {
 
   it("returns the vendor response unchanged even when mirror capture fails", async () => {
     const gateway = await upstreamGateway();
-    await gateway.bindings!.create(PROFILE, "upstream");
-    await gateway.bindings!.bindUid(PROFILE, UID);
+    await gateway.bindings.create(PROFILE, "upstream");
+    await gateway.bindings.bindUid(PROFILE, UID);
     const vendor = await startVendor((operation) => ({
       body: vendorResponse(operation, {
         [`${operation}Result`]: "true",
@@ -222,14 +222,14 @@ describe("upstream transparent proxy", () => {
     expect(apply.status).toBe(200);
     expect(apply.body).toContain("<newServerTimeStamp>200</newServerTimeStamp>");
     expect(await gateway.mirrorHealthy()).toBe(false);
-    const partition = await gateway.registry!.open(UID);
+    const partition = await gateway.registry.open(UID);
     expect(await partition.mirrorState.highWater()).toBe(0n);
   });
 
   it("pins the authority per session so a mid-session binding change cannot switch it", async () => {
     const gateway = await upstreamGateway();
-    await gateway.bindings!.create(PROFILE, "upstream");
-    await gateway.bindings!.bindUid(PROFILE, UID);
+    await gateway.bindings.create(PROFILE, "upstream");
+    await gateway.bindings.bindUid(PROFILE, UID);
     const vendor = await startVendor((operation) => ({
       body: vendorResponse(operation, { [`${operation}Result`]: "true", maxVersion: "1" }),
     }));
@@ -239,7 +239,7 @@ describe("upstream transparent proxy", () => {
     expect(vendor.calls).toHaveLength(1);
 
     // Simulate an operator rebinding the profile to local mid-session.
-    await gateway.bindings!.unbindUid(PROFILE);
+    await gateway.bindings.unbindUid(PROFILE);
     // (a fresh local-mode binding for the same UID would normally be a new
     // profile epoch; here we just verify the pin keeps routing upstream)
     const followUp = await proxied(proxy, vendor.port, "ReleaseSyncSessionBytes",
@@ -269,15 +269,15 @@ describe("upstream transparent proxy", () => {
   it("keeps an upstream mirror and a local partition with identical content fully separate", async () => {
     const gateway = await upstreamGateway();
     // Profile A: upstream-bound mirror.
-    await gateway.bindings!.create(PROFILE, "upstream");
-    await gateway.bindings!.bindUid(PROFILE, UID);
-    const upstream = await gateway.registry!.open(UID);
+    await gateway.bindings.create(PROFILE, "upstream");
+    await gateway.bindings.bindUid(PROFILE, UID);
+    const upstream = await gateway.registry.open(UID);
     await upstream.mirrorState.appendAtCursor("app", packEnvelope(fullSnapshot("mirror copy")), 50n as never);
     // Profile B: local-mode partition holding the IDENTICAL task UID/caption.
     const LOCAL_UID = "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}";
-    await gateway.bindings!.create("C:\\local.ml", "local");
-    await gateway.bindings!.bindUid("C:\\local.ml", LOCAL_UID);
-    const local = await gateway.registry!.open(LOCAL_UID);
+    await gateway.bindings.create("C:\\local.ml", "local");
+    await gateway.bindings.bindUid("C:\\local.ml", LOCAL_UID);
+    const local = await gateway.registry.open(LOCAL_UID);
     await local.state.append("mcp", packEnvelope(fullSnapshot("local copy")));
 
     const mirrorProjection = await knownCloudProjection(upstream.mirrorState);

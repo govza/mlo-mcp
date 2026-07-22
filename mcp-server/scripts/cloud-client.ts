@@ -27,20 +27,15 @@ for (let index = 0; index < args.length;) {
 }
 
 // Per-client cursor files live inside the state they belong to: the addressed
-// partition's clients/ dir, or the legacy demo dir when no --uid is given.
-const legacyStateDir = process.env.MLO_CLOUD_STATE_DIR ?? path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "..",
-  "messages",
-);
+// partition's clients/ dir, or the root-level clients/ dir for the unbound
+// default state when no --uid is given.
 const stateRoot = process.env.MLO_CLOUD_STATE_ROOT ??
   (process.env.LOCALAPPDATA
     ? path.join(process.env.LOCALAPPDATA, "mlo-mcp", "cloud")
     : path.join(os.homedir(), ".mlo-mcp", "cloud"));
 const cursorDir = dataFileUID
   ? path.join(stateRoot, "partitions", partitionKey(dataFileUID), "clients")
-  : legacyStateDir;
+  : path.join(stateRoot, "clients");
 const cursorFile = path.join(cursorDir, `client-${clientName.replace(/[^a-zA-Z0-9._-]/g, "_")}-cursor.json`);
 const cloud = new CloudClient({ baseUrl: process.env.MLO_CLOUD_BASE_URL, client: clientName, dataFileUID });
 

@@ -133,7 +133,7 @@ cross-checks only.
 
 Unchanged from the original `/v1` contract, with one addition: `pull`,
 `push`, and `finalize` bodies accept an optional `dataFileUID` addressing a
-specific partition (omitted = the legacy/demo log or the unbound default).
+specific partition (omitted = the unbound default state).
 `GET /v1/status` keeps its `{ cursor, entries, pendingForApp }` shape (the
 attach probe depends on it) and adds `stateRoot` and `partitions` in
 partitioned mode. Malformed envelopes are rejected with `400` and never
@@ -141,20 +141,24 @@ appended.
 
 ## Configuration
 
+`MLO_DATA_FILE` is the only routine configuration. A profile's mode is not
+server configuration at all — it is chosen once, per profile, as the `mode`
+argument of `cloud_bootstrap` and persisted in the binding.
+
 | Env var | Default | Meaning |
 |---|---|---|
+| `MLO_DATA_FILE` | repo `profile/profile.ml` (dev fallback) | the managed `.ml` profile |
 | `MLO_CLOUD_HOST` | `127.0.0.1` | bind address (loopback only by design) |
 | `MLO_CLOUD_PORT` | `8181` | listen port |
-| `MLO_CLOUD_STATE_ROOT` | `%LOCALAPPDATA%\mlo-mcp\cloud` | private partitioned state root |
-| `MLO_CLOUD_MODE` | `upstream` for real profiles, `local` for the repo demo | default mode for new bindings |
-| `MLO_CLOUD_STATE_DIR` | `<repo>\messages` for the demo profile | legacy single-log override (demo semantics) |
+| `MLO_CLOUD_STATE_ROOT` | `%LOCALAPPDATA%\mlo-mcp\cloud` | override for tests/unusual installs only |
 | `MLO_CLOUD_WRITE_THROUGH` | unset | stage-2 seam flag; no effect until the vendor experiments land |
 
-The repository's `messages\` directory is **quarantined demo evidence**: it
+The repository's `messages\` directory is **archived evidence only**: it
 provably mixes two profiles' history (a foreign full snapshot sits at cursor 4
-beside another profile's deltas) and must never seed a real profile's
-baseline. The demo profile keeps using it through the legacy override; real
-profiles (`MLO_DATA_FILE`) get partitioned private state automatically.
+beside another profile's deltas), is no longer read or written by the server,
+and must never seed any profile's baseline. Every profile — the repo demo
+included — gets a partition under the private root and goes through
+`cloud_bootstrap` + Re-synchronize.
 
 When the port is already held by another mlo-mcp session's endpoint (probed
 via `GET /v1/status`), the new session *attaches*: it runs without its own
@@ -163,10 +167,10 @@ through the state root's cross-process locking.
 
 ## MCP tool surface
 
-- `cloud_bootstrap` — create/verify the profile binding, require an empty
-  target partition (`rebind: true` for an explicit fresh epoch), arm the
-  one-time window, and return the operator instructions for the
-  Re-synchronize run. Works for both modes.
+- `cloud_bootstrap { mode?, rebind? }` — create/verify the profile binding
+  (`mode`: `"upstream"` default or `"local"`; a mode switch requires
+  `rebind: true`), require an empty target partition, arm the one-time
+  window, and return the operator instructions for the Re-synchronize run.
 - `cloud_status` — endpoint config, binding (mode, `dataFileUID`), lifecycle,
   cursor and delta counts, last local stamp, endpoint-mismatch count
   (distinct from bootstrap-required), partition inventory, and upstream

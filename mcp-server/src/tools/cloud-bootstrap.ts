@@ -18,6 +18,14 @@ export const cloudBootstrapTool = defineTool({
     "Arm the one-time bootstrap window for this profile: bind it to a fresh cloud state partition and accept " +
     "MLO's next Re-synchronize as the authoritative full snapshot. Local mode only; requires an empty partition.",
   inputSchema: {
+    mode: z
+      .enum(["upstream", "local"])
+      .optional()
+      .describe(
+        'Binding authority. "upstream" (default): transparent proxy to the real vendor Cloud with a passive ' +
+        'read mirror — vendor/mobile sync keeps working, MCP writes stay disabled. "local": this endpoint IS ' +
+        "the cloud (full MCP writes) — the profile must never sync against the vendor again.",
+      ),
     rebind: z
       .boolean()
       .optional()
@@ -33,28 +41,24 @@ export const cloudBootstrapTool = defineTool({
     instructions: z.string(),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  async execute({ rebind }, ctx) {
+  async execute({ mode: requestedMode, rebind }, ctx) {
     const gateway = ctx.cloud;
-    if (!gateway?.partitioned) {
-      throw new Error(
-        "the legacy demo state dir needs no bootstrap — partitioned state (a real profile via MLO_DATA_FILE) is required",
-      );
-    }
-    const mode = gateway.defaultMode;
+    if (!gateway) throw new Error("no cloud gateway is attached to this server context");
+    const mode = requestedMode ?? "upstream";
     await gateway.ensureRoot();
-    const binding = await gateway.bindings!.create(ctx.config.dataFile, mode);
+    const binding = rebind
+      ? await gateway.bindings.replace(ctx.config.dataFile, mode)
+      : await gateway.bindings.create(ctx.config.dataFile, mode);
     if (binding.dataFileUID) {
-      const partition = await gateway.registry!.open(binding.dataFileUID);
-      if (rebind) {
-        await gateway.bindings!.unbindUid(ctx.config.dataFile);
-      } else if (await partition.lifecycle() === "ready") {
+      const partition = await gateway.registry.open(binding.dataFileUID, binding.mode);
+      if (await partition.lifecycle() === "ready") {
         throw new Error(
           "this profile is already bootstrapped and ready; pass { rebind: true } to discard the binding and " +
           "bootstrap into a fresh partition (the old partition stays on disk as evidence)",
         );
       }
     }
-    const window = await gateway.bootstrap!.arm(ctx.config.dataFile, mode);
+    const window = await gateway.bootstrap.arm(ctx.config.dataFile, mode);
     const instructions = mode === "upstream"
       ? "Armed (upstream mirror). In MLO: keep the cloud sync proxy pointed at this endpoint with " +
         "\"Use secure connection\" UNCHECKED (a TLS tunnel would blind the mirror), then open the profile's " +

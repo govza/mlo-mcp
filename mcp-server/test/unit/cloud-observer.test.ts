@@ -84,7 +84,7 @@ describe("proxy sync observation", () => {
     });
     await new Promise<void>((resolve) => upstream.listen(0, "127.0.0.1", resolve));
     const upstreamPort = (upstream.address() as net.AddressInfo).port;
-    const handle = await startCloudServer({ host: "127.0.0.1", port: 0, stateDir: dir, observeHost: "127.0.0.1" });
+    const handle = await startCloudServer({ host: "127.0.0.1", port: 0, stateRoot: dir, observeHost: "127.0.0.1" });
     handles.push(handle);
 
     const send = (targetPath: string, body?: string) =>
@@ -142,7 +142,7 @@ describe("proxy sync observation", () => {
     await new Promise<void>((resolve) => upstream.listen(0, "127.0.0.1", resolve));
     const upstreamPort = (upstream.address() as net.AddressInfo).port;
     // observeHost keeps its vendor default, so 127.0.0.1 traffic is not recorded
-    const handle = await startCloudServer({ host: "127.0.0.1", port: 0, stateDir: dir });
+    const handle = await startCloudServer({ host: "127.0.0.1", port: 0, stateRoot: dir });
     handles.push(handle);
 
     await new Promise<void>((resolve, reject) => {

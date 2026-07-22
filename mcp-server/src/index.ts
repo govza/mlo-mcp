@@ -60,11 +60,7 @@ sync runs the profile's QuickSync; cloud_status shows the local endpoint's curso
 async function main(): Promise<void> {
   const config = loadConfig();
   const store = new MloStore(config);
-  const cloud = new CloudGateway({
-    stateRoot: config.cloudStateRoot,
-    legacyStateDir: config.cloudLegacyStateDir,
-    defaultMode: config.cloudMode,
-  });
+  const cloud = new CloudGateway({ stateRoot: config.cloudStateRoot });
   const ctx = { config, store, cloudState: cloud.defaultState(), cloud };
   // undefined = another session already serves the endpoint; this one shares
   // the delta log via CloudState's cross-process locking and needs no listener.

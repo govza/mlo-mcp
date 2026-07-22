@@ -66,9 +66,9 @@ describe("dataFileUID normalization and partition keys", () => {
 describe("partition registry", () => {
   it("creates partitions with meta and resolves existing ones only", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-root-")); dirs.push(root);
-    const registry = new PartitionRegistry(root, "local");
+    const registry = new PartitionRegistry(root);
     expect(await registry.resolveExisting(UID_A)).toBeUndefined();
-    const partition = await registry.open(UID_A);
+    const partition = await registry.open(UID_A, "local");
     expect(partition.uid).toBe(UID_A);
     expect(await partition.lifecycle()).toBe("uninitialized");
     expect(await partition.mode()).toBe("local");
@@ -81,9 +81,9 @@ describe("partition registry", () => {
 
   it("keeps two partitions holding identical task UIDs and captions fully isolated", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-root-")); dirs.push(root);
-    const registry = new PartitionRegistry(root, "local");
-    const a = await registry.open(UID_A);
-    const b = await registry.open(UID_B);
+    const registry = new PartitionRegistry(root);
+    const a = await registry.open(UID_A, "local");
+    const b = await registry.open(UID_B, "local");
     expect(a.dir).not.toBe(b.dir);
 
     await a.state.append("app", taskDelta("caption in A"));
@@ -108,11 +108,11 @@ describe("partition registry", () => {
 describe("SOAP partition routing", () => {
   it("routes ready-bound dataFileUIDs to their own partitions and keeps histories apart", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-root-")); dirs.push(root);
-    const gateway = new CloudGateway({ stateRoot: root, defaultMode: "local" });
+    const gateway = new CloudGateway({ stateRoot: root });
     for (const [profile, uid] of [["C:\\a.ml", UID_A], ["C:\\b.ml", UID_B]] as const) {
-      await gateway.bindings!.create(profile, "local");
-      await gateway.bindings!.bindUid(profile, uid);
-      await (await gateway.registry!.open(uid)).setLifecycle("ready");
+      await gateway.bindings.create(profile, "local");
+      await gateway.bindings.bindUid(profile, uid);
+      await (await gateway.registry.open(uid)).setLifecycle("ready");
     }
 
     const apply = async (uid: string, caption: string) => handleSoapRequest(gateway, "ApplyModificationsBytesEx", soapRequest("ApplyModificationsBytesEx", {
@@ -125,7 +125,7 @@ describe("SOAP partition routing", () => {
 
     // A pull from partition A must never see partition B's rows even though
     // both hold the identical task UID.
-    const a = await gateway.registry!.open(UID_A);
+    const a = await gateway.registry.open(UID_A);
     const entries = await a.state.entriesAfter(0n as never);
     expect(entries).toHaveLength(1);
     const tasks = findSection(unpackEnvelope(entries[0]!.bytes), "TodoItems")!;
@@ -134,7 +134,7 @@ describe("SOAP partition routing", () => {
 
   it("fails a sync operation without a dataFileUID in partitioned mode", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-root-")); dirs.push(root);
-    const gateway = new CloudGateway({ stateRoot: root, defaultMode: "local" });
+    const gateway = new CloudGateway({ stateRoot: root });
     const response = await handleSoapRequest(gateway, "GetModificationsBytesEx", soapRequest("GetModificationsBytesEx", {
       newerThan: "0",
     }));
@@ -144,7 +144,7 @@ describe("SOAP partition routing", () => {
 
   it("fails an unknown dataFileUID closed when no bootstrap window is armed", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-root-")); dirs.push(root);
-    const gateway = new CloudGateway({ stateRoot: root, defaultMode: "local" });
+    const gateway = new CloudGateway({ stateRoot: root });
     const response = await handleSoapRequest(gateway, "GetModificationsBytesEx", soapRequest("GetModificationsBytesEx", {
       dataFileUID: UID_A,
       newerThan: "0",
@@ -152,14 +152,14 @@ describe("SOAP partition routing", () => {
     expect(responseField(response, "GetModificationsBytesExResult")).toBe("false");
     expect(responseField(response, "errorMessage")).toContain("no profile is bound");
     // Fail-closed means no partition state was created for the unknown UID.
-    expect(await gateway.registry!.resolveExisting(UID_A)).toBeUndefined();
+    expect(await gateway.registry.resolveExisting(UID_A)).toBeUndefined();
   });
 });
 
 describe("/v1 partition addressing", () => {
   it("routes by dataFileUID in partitioned mode and stays isolated", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-root-")); dirs.push(root);
-    const gateway = new CloudGateway({ stateRoot: root, defaultMode: "local" });
+    const gateway = new CloudGateway({ stateRoot: root });
     const handle = await startCloudServer({ host: "127.0.0.1", port: 0, gateway }); handles.push(handle);
     const base = `http://${handle.host}:${handle.port}`;
 
@@ -203,7 +203,7 @@ describe("/v1 partition addressing", () => {
 
   it("rejects an invalid dataFileUID without touching any state", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-root-")); dirs.push(root);
-    const gateway = new CloudGateway({ stateRoot: root, defaultMode: "local" });
+    const gateway = new CloudGateway({ stateRoot: root });
     const handle = await startCloudServer({ host: "127.0.0.1", port: 0, gateway }); handles.push(handle);
     const response = await fetch(`http://${handle.host}:${handle.port}/v1/pull`, {
       method: "POST",
@@ -214,25 +214,4 @@ describe("/v1 partition addressing", () => {
     expect(((await response.json()) as { error: string }).error).toContain("invalid dataFileUID");
   });
 
-  it("keeps the legacy single-log behavior when only a stateDir is configured", async () => {
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-legacy-")); dirs.push(dir);
-    const handle = await startCloudServer({ host: "127.0.0.1", port: 0, stateDir: dir }); handles.push(handle);
-    const base = `http://${handle.host}:${handle.port}`;
-    const response = await fetch(`${base}/v1/push`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        client: "test-client",
-        baseline: "0",
-        envelope: Buffer.from(taskDelta("legacy")).toString("base64"),
-      }),
-    });
-    expect(response.status).toBe(200);
-    const status = await (await fetch(`${base}/v1/status`)).json() as Record<string, unknown>;
-    expect(status.cursor).toBe("1");
-    expect(status.stateRoot).toBeUndefined();
-    expect(status.partitions).toBeUndefined();
-    // The delta landed in the legacy dir itself, not a partitions/ tree.
-    expect(await fs.stat(path.join(dir, "delta-1.zip")).then(() => true, () => false)).toBe(true);
-  });
 });

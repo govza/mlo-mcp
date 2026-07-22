@@ -26,11 +26,7 @@ if (!tool) {
 }
 
 const config = loadConfig();
-const cloud = new CloudGateway({
-  stateRoot: config.cloudStateRoot,
-  legacyStateDir: config.cloudLegacyStateDir,
-  defaultMode: config.cloudMode,
-});
+const cloud = new CloudGateway({ stateRoot: config.cloudStateRoot });
 const ctx = { config, store: new MloStore(config), cloudState: cloud.defaultState(), cloud };
 const args = z.object(tool.inputSchema).parse(JSON.parse(json ?? "{}"));
 

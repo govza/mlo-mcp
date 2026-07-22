@@ -17,16 +17,15 @@ export interface ToolContext {
 }
 
 /**
- * Cloud state for read paths (projections, GUID recovery). Legacy demo mode
- * uses the single log; partitioned mode uses the bound partition when one
- * exists, else the empty default — reads never fail on binding state.
+ * Cloud state for read paths (projections, GUID recovery): the bound
+ * partition when one exists (upstream profiles read the vendor-versioned
+ * mirror), else the empty default — reads never fail on binding state.
+ * Contexts without a gateway (unit-test fixtures) use their state directly.
  */
 export async function resolveReadCloudState(ctx: ToolContext): Promise<CloudState> {
-  if (!ctx.cloud || !ctx.cloud.partitioned) return ctx.cloudState;
+  if (!ctx.cloud) return ctx.cloudState;
   const bound = await ctx.cloud.boundPartition(ctx.config.dataFile);
   if (bound.kind !== "bound") return ctx.cloudState;
-  // Upstream profiles read from the vendor-versioned mirror; local ones from
-  // the replacement server's own log.
   return bound.binding.mode === "upstream" ? bound.partition.mirrorState : bound.partition.state;
 }
 
@@ -34,18 +33,15 @@ export async function resolveReadCloudState(ctx: ToolContext): Promise<CloudStat
  * Cloud state for mutation paths. Fails fast — before anything is queued —
  * unless the profile's partition is writable:
  *
- * - legacy/demo mode is exempt (disposable evidence, current behavior);
  * - an unbound or un-bootstrapped local partition needs a full
  *   re-synchronization, not another ordinary sync;
  * - upstream mode has no write path until verified write-through exists.
  */
 export async function requireWritableCloudState(ctx: ToolContext): Promise<CloudState> {
-  if (!ctx.cloud || !ctx.cloud.partitioned) return ctx.cloudState;
+  if (!ctx.cloud) return ctx.cloudState;
   const bound = await ctx.cloud.boundPartition(ctx.config.dataFile);
-  if (bound.kind === "legacy") return bound.state;
   if (bound.kind === "unbound") {
-    const mode = bound.binding?.mode ?? ctx.cloud.defaultMode;
-    if (mode === "upstream") {
+    if (bound.binding?.mode === "upstream") {
       throw new Error(
         "this profile is bound to the vendor Cloud (upstream mode); MCP write-through is not enabled — make this change in the MLO app",
       );

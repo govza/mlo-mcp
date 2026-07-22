@@ -39,17 +39,6 @@ export interface MloConfig {
   inboxCaption?: string;
   cloudHost: string;
   cloudPort: number;
-  /**
-   * Private per-`dataFileUID` partitioned state root (outside the checkout).
-   * Used whenever no legacy dir applies.
-   */
+  /** Private per-`dataFileUID` partitioned state root (outside the checkout, automatic). */
   cloudStateRoot: string;
-  /**
-   * Legacy single-log state dir (repo demo profile or explicit
-   * MLO_CLOUD_STATE_DIR). Disposable demo evidence; may mix histories and
-   * must never seed a real profile's baseline.
-   */
-  cloudLegacyStateDir?: string;
-  /** Default authority for new partitions: vendor proxy ("upstream") or replacement server ("local"). */
-  cloudMode: "local" | "upstream";
 }
