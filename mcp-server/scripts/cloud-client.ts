@@ -1,7 +1,9 @@
 import { promises as fs } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CloudClient, type CloudPullResult } from "../src/cloud/client.js";
+import { normalizeDataFileUid, partitionKey } from "../src/cloud/partition.js";
 import { cursorToDecimalString, parseCursor, ZERO_CURSOR, type CloudCursor } from "../src/cloud/cursor.js";
 import { findSection, type SectionedCsv } from "../src/cloud/csv.js";
 import { buildTaskAddDelta, buildTaskDeleteDelta, generateGuid } from "../src/cloud/delta.js";
@@ -11,25 +13,36 @@ import { nowIso } from "../src/tools/shared.js";
 const args = process.argv.slice(2);
 let clientName = "mlo-app";
 let cursorOverride: string | undefined;
+let dataFileUID: string | undefined;
 for (let index = 0; index < args.length;) {
-  if (args[index] === "--client" || args[index] === "--cursor") {
+  if (args[index] === "--client" || args[index] === "--cursor" || args[index] === "--uid") {
     const option = args[index]!;
     const value = args[index + 1];
     if (!value) throw new Error(`${option} requires a value`);
     if (option === "--client") clientName = value;
+    else if (option === "--uid") dataFileUID = normalizeDataFileUid(value);
     else cursorOverride = value;
     args.splice(index, 2);
   } else index++;
 }
 
-const stateDir = process.env.MLO_CLOUD_STATE_DIR ?? path.resolve(
+// Per-client cursor files live inside the state they belong to: the addressed
+// partition's clients/ dir, or the legacy demo dir when no --uid is given.
+const legacyStateDir = process.env.MLO_CLOUD_STATE_DIR ?? path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
   "..",
   "messages",
 );
-const cursorFile = path.join(stateDir, `client-${clientName.replace(/[^a-zA-Z0-9._-]/g, "_")}-cursor.json`);
-const cloud = new CloudClient({ baseUrl: process.env.MLO_CLOUD_BASE_URL, client: clientName });
+const stateRoot = process.env.MLO_CLOUD_STATE_ROOT ??
+  (process.env.LOCALAPPDATA
+    ? path.join(process.env.LOCALAPPDATA, "mlo-mcp", "cloud")
+    : path.join(os.homedir(), ".mlo-mcp", "cloud"));
+const cursorDir = dataFileUID
+  ? path.join(stateRoot, "partitions", partitionKey(dataFileUID), "clients")
+  : legacyStateDir;
+const cursorFile = path.join(cursorDir, `client-${clientName.replace(/[^a-zA-Z0-9._-]/g, "_")}-cursor.json`);
+const cloud = new CloudClient({ baseUrl: process.env.MLO_CLOUD_BASE_URL, client: clientName, dataFileUID });
 
 async function readCursor(): Promise<CloudCursor> {
   if (cursorOverride !== undefined) return parseCursor(cursorOverride);

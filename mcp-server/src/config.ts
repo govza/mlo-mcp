@@ -38,12 +38,27 @@ function resolveDataFile(): string {
   );
 }
 
+function resolveStateRoot(): string {
+  if (process.env.MLO_CLOUD_STATE_ROOT) return process.env.MLO_CLOUD_STATE_ROOT;
+  if (process.env.LOCALAPPDATA) return path.join(process.env.LOCALAPPDATA, "mlo-mcp", "cloud");
+  return path.join(os.homedir(), ".mlo-mcp", "cloud");
+}
+
 export function loadConfig(): MloConfig {
   const dataFile = resolveDataFile();
 
   const cloudPort = Number(process.env.MLO_CLOUD_PORT ?? String(DEFAULT_CLOUD_PORT));
   if (!Number.isInteger(cloudPort) || cloudPort < 0 || cloudPort > 65535) {
     throw new Error("MLO_CLOUD_PORT must be an integer from 0 through 65535");
+  }
+  // A real profile (MLO_DATA_FILE) gets private partitioned state and the
+  // vendor-proxy default; the repo dev/demo profile keeps the repo-local
+  // single log. MLO_CLOUD_STATE_DIR forces legacy single-log semantics.
+  const cloudLegacyStateDir =
+    process.env.MLO_CLOUD_STATE_DIR ?? (process.env.MLO_DATA_FILE ? undefined : DEV_CLOUD_STATE_DIR);
+  const cloudMode = process.env.MLO_CLOUD_MODE ?? (cloudLegacyStateDir ? "local" : "upstream");
+  if (cloudMode !== "local" && cloudMode !== "upstream") {
+    throw new Error('MLO_CLOUD_MODE must be "local" or "upstream"');
   }
   return {
     mloExePath: process.env.MLO_EXE_PATH ?? DEFAULT_EXE,
@@ -56,6 +71,8 @@ export function loadConfig(): MloConfig {
     inboxCaption: process.env.MLO_INBOX_CAPTION || undefined,
     cloudHost: process.env.MLO_CLOUD_HOST ?? "127.0.0.1",
     cloudPort,
-    cloudStateDir: process.env.MLO_CLOUD_STATE_DIR ?? DEV_CLOUD_STATE_DIR,
+    cloudStateRoot: resolveStateRoot(),
+    ...(cloudLegacyStateDir ? { cloudLegacyStateDir } : {}),
+    cloudMode,
   };
 }

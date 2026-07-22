@@ -5,6 +5,7 @@ import { findSection, type SectionedCsv } from "./csv.js";
 import { packEnvelope, unpackEnvelope } from "./envelope.js";
 import { parseLocalStamp } from "./local-stamp.js";
 import { CloudState, EndpointMismatchError } from "./state.js";
+import type { CloudGateway } from "./gateway.js";
 
 const SOAP_NAMESPACE = "http://schemas.xmlsoap.org/soap/envelope/";
 const MLO_NAMESPACE = "http://www.mylifeorganized.net/";
@@ -102,12 +103,44 @@ export function soapOperationFromAction(action: string | string[] | undefined): 
   return OPERATIONS.has(name) ? name as SoapOperation : undefined;
 }
 
+/**
+ * Gateway entry point: route the request to the state partition selected by
+ * its `dataFileUID` (or the legacy single log), then handle it. Routing
+ * failures (missing/invalid UID in partitioned mode) are protocol-level
+ * failures, not transport faults.
+ */
+export async function handleSoapRequest(
+  gateway: CloudGateway,
+  operation: SoapOperation,
+  xml: string,
+): Promise<Uint8Array> {
+  const fields = parseFields(xml, operation);
+  const rawUid = typeof fields.dataFileUID === "string" && fields.dataFileUID.length ? fields.dataFileUID : undefined;
+  let state: CloudState;
+  try {
+    ({ state } = await gateway.resolveForSoap(rawUid));
+  } catch (error) {
+    return envelope(operation, failureFields(
+      operation,
+      error instanceof Error ? error.message : String(error),
+    ));
+  }
+  return handleParsedSoapOperation(state, operation, fields);
+}
+
 export async function handleSoapOperation(
   state: CloudState,
   operation: SoapOperation,
   xml: string,
 ): Promise<Uint8Array> {
-  const fields = parseFields(xml, operation);
+  return handleParsedSoapOperation(state, operation, parseFields(xml, operation));
+}
+
+async function handleParsedSoapOperation(
+  state: CloudState,
+  operation: SoapOperation,
+  fields: Record<string, unknown>,
+): Promise<Uint8Array> {
 
   if (operation === "GetModificationsBytesEx") {
     const baseline = parseCursor(requiredText(fields, "newerThan"));

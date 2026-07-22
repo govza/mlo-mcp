@@ -1,0 +1,118 @@
+import { execFile } from "node:child_process";
+import { promises as fs } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { CloudState } from "./state.js";
+import { PartitionRegistry, type PartitionHandle, type PartitionMode } from "./partition.js";
+import { log } from "../log.js";
+
+/**
+ * Routes every cloud-state access — SOAP, /v1, MCP tools, status — to the
+ * right storage:
+ *
+ * - **Legacy mode** (`legacyStateDir` set): the original single delta log.
+ *   Used for the repo demo profile and explicit `MLO_CLOUD_STATE_DIR`
+ *   overrides. The directory is treated as disposable demo evidence — it can
+ *   mix histories (the repo `messages/` provably does) and must never become
+ *   a bootstrap baseline for a real profile.
+ * - **Partitioned mode** (`stateRoot` set): per-`dataFileUID` partitions under
+ *   a private root outside the checkout. SOAP requests must carry a valid
+ *   `dataFileUID` to be routed; `/v1` calls may address a partition explicitly
+ *   or fall back to the session default.
+ */
+export interface CloudGatewayOptions {
+  stateRoot?: string;
+  legacyStateDir?: string;
+  defaultMode: PartitionMode;
+}
+
+export class CloudGateway {
+  readonly registry?: PartitionRegistry;
+  readonly legacyState?: CloudState;
+  readonly stateRoot?: string;
+  readonly legacyStateDir?: string;
+  private unboundState?: CloudState;
+  private rootPrepared = false;
+
+  constructor(options: CloudGatewayOptions) {
+    if (options.legacyStateDir) {
+      this.legacyStateDir = options.legacyStateDir;
+      this.legacyState = new CloudState(options.legacyStateDir);
+    } else if (options.stateRoot) {
+      this.stateRoot = options.stateRoot;
+      this.registry = new PartitionRegistry(options.stateRoot, options.defaultMode);
+    } else {
+      throw new Error("CloudGateway requires either a stateRoot or a legacyStateDir");
+    }
+  }
+
+  get partitioned(): boolean {
+    return this.registry !== undefined;
+  }
+
+  /** Where the sync observer writes its structural summaries. */
+  observerDir(): string {
+    return this.legacyStateDir ?? this.stateRoot!;
+  }
+
+  /**
+   * Default state for callers that address no specific partition: the legacy
+   * log, or a placeholder "unbound" log under the private root. The unbound
+   * log exists so `/v1/status` (the attach probe) and tools keep a stable
+   * shape before a profile is bound; it is never routed to by SOAP.
+   */
+  defaultState(): CloudState {
+    if (this.legacyState) return this.legacyState;
+    this.unboundState ??= new CloudState(path.join(this.stateRoot!, "unbound"));
+    return this.unboundState;
+  }
+
+  /** Resolve the state for a SOAP sync operation carrying `dataFileUID`. */
+  async resolveForSoap(rawUid: string | undefined): Promise<{ state: CloudState; partition?: PartitionHandle }> {
+    if (this.legacyState) return { state: this.legacyState };
+    if (!rawUid) throw new Error("dataFileUID is required to route this operation to a state partition");
+    await this.prepareRoot();
+    const partition = await this.registry!.open(rawUid);
+    return { state: partition.state, partition };
+  }
+
+  /** Resolve the state for a `/v1` call with an optional `dataFileUID`. */
+  async stateForV1(rawUid: string | undefined): Promise<CloudState> {
+    if (rawUid === undefined) return this.defaultState();
+    if (this.legacyState) return this.legacyState;
+    await this.prepareRoot();
+    const partition = await this.registry!.open(rawUid);
+    return partition.state;
+  }
+
+  /**
+   * Create the private state root on first use, restricting it to the current
+   * user. Node has no native Windows ACL API, so this is a best-effort
+   * `icacls` call; failure only logs — the root still works, with inherited
+   * per-user `%LOCALAPPDATA%` permissions in the default location.
+   */
+  private async prepareRoot(): Promise<void> {
+    if (this.rootPrepared || !this.stateRoot) return;
+    this.rootPrepared = true;
+    let created = false;
+    try {
+      await fs.mkdir(this.stateRoot, { recursive: false });
+      created = true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+        await fs.mkdir(this.stateRoot, { recursive: true });
+        created = true;
+      }
+    }
+    if (created && process.platform === "win32") {
+      const user = process.env.USERNAME ?? os.userInfo().username;
+      execFile(
+        "icacls",
+        [this.stateRoot, "/inheritance:r", "/grant:r", `${user}:(OI)(CI)F`],
+        (error) => {
+          if (error) log(`could not restrict state root ACL (non-fatal): ${error.message}`);
+        },
+      );
+    }
+  }
+}

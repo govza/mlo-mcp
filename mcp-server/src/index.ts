@@ -8,7 +8,7 @@ import { MloStore } from "./store.js";
 import { log } from "./log.js";
 import { allTools } from "./tools/registry.js";
 import { registerTool } from "./tools/shared.js";
-import { CloudState } from "./cloud/state.js";
+import { CloudGateway } from "./cloud/gateway.js";
 import { startOrAttachCloudServer, type CloudServerHandle } from "./cloud/server.js";
 
 /** Connection-time usage guide shown to the LLM (MCP `instructions`). */
@@ -60,11 +60,15 @@ sync runs the profile's QuickSync; cloud_status shows the local endpoint's curso
 async function main(): Promise<void> {
   const config = loadConfig();
   const store = new MloStore(config);
-  const cloudState = new CloudState(config.cloudStateDir);
-  const ctx = { config, store, cloudState };
+  const cloud = new CloudGateway({
+    stateRoot: config.cloudStateRoot,
+    legacyStateDir: config.cloudLegacyStateDir,
+    defaultMode: config.cloudMode,
+  });
+  const ctx = { config, store, cloudState: cloud.defaultState(), cloud };
   // undefined = another session already serves the endpoint; this one shares
   // the delta log via CloudState's cross-process locking and needs no listener.
-  const cloudServer = await startOrAttachCloudServer({ host: config.cloudHost, port: config.cloudPort, stateDir: config.cloudStateDir, state: cloudState });
+  const cloudServer = await startOrAttachCloudServer({ host: config.cloudHost, port: config.cloudPort, gateway: cloud });
 
   const server = new McpServer({ name: "mlo-mcp", version: "0.2.0" }, { instructions: INSTRUCTIONS });
   for (const tool of allTools) registerTool(server, tool, ctx);

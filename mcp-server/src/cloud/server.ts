@@ -5,8 +5,9 @@ import { cursorToDecimalString, parseCursor } from "./cursor.js";
 import { mergeDeltas } from "./delta.js";
 import { packEnvelope, unpackEnvelope } from "./envelope.js";
 import { CloudState, type DeltaOrigin } from "./state.js";
+import { CloudGateway } from "./gateway.js";
 import { SyncObserver } from "./sync-observer.js";
-import { handleSoapOperation, soapFault, soapOperationFromAction } from "./soap.js";
+import { handleSoapRequest, soapFault, soapOperationFromAction } from "./soap.js";
 import { log } from "../log.js";
 
 const BODY_LIMIT = 32 * 1024 * 1024;
@@ -17,15 +18,19 @@ export const DEFAULT_CLOUD_PORT = 8181;
 export interface CloudServerOptions {
   host?: string;
   port?: number;
-  stateDir: string;
-  state?: CloudState;
+  /** Legacy/demo single state dir; builds a legacy-mode gateway when `gateway` is absent. */
+  stateDir?: string;
+  /** Partition-aware routing; takes precedence over `stateDir`. */
+  gateway?: CloudGateway;
   /** Hostname whose proxied traffic is structurally summarized (tests override the vendor default). */
   observeHost?: string;
 }
 
 export interface CloudServerHandle {
   server: http.Server;
+  /** The gateway's default (legacy or unbound) state; partition state is reached via `gateway`. */
   state: CloudState;
+  gateway: CloudGateway;
   host: string;
   port: number;
   stop(): Promise<void>;
@@ -90,7 +95,7 @@ function isAbsoluteRequestTarget(target: string): boolean {
 async function interceptVendorSoap(
   request: IncomingMessage,
   response: ServerResponse,
-  state: CloudState,
+  gateway: CloudGateway,
   observer: SyncObserver,
 ): Promise<boolean> {
   if (request.method !== "POST") return false;
@@ -107,7 +112,7 @@ async function interceptVendorSoap(
   let responseBytes: Uint8Array;
   let status = 200;
   try {
-    responseBytes = await handleSoapOperation(state, operation, requestBytes.toString("utf8"));
+    responseBytes = await handleSoapRequest(gateway, operation, requestBytes.toString("utf8"));
   } catch (error) {
     status = 500;
     responseBytes = soapFault(error instanceof Error ? error.message : String(error));
@@ -178,12 +183,13 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
   if (host !== "localhost" && host !== "::1" && !/^127(?:\.\d{1,3}){3}$/.test(host)) {
     throw new Error(`MLO cloud server must bind to a loopback host (received "${host}")`);
   }
-  const state = options.state ?? new CloudState(options.stateDir);
-  const observer = new SyncObserver(options.stateDir, options.observeHost);
+  const gateway = options.gateway ?? new CloudGateway({ legacyStateDir: options.stateDir, defaultMode: "local" });
+  const state = gateway.defaultState();
+  const observer = new SyncObserver(gateway.observerDir(), options.observeHost);
   const server = http.createServer(async (request, response) => {
     try {
       if (isAbsoluteRequestTarget(request.url ?? "")) {
-        if (await interceptVendorSoap(request, response, state, observer)) return;
+        if (await interceptVendorSoap(request, response, gateway, observer)) return;
         forwardRequest(request, response, observer);
         return;
       }
@@ -194,7 +200,14 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
           state.counts(),
           state.pendingFor("app"),
         ]);
-        json(response, 200, { cursor: cursorToDecimalString(highWater), entries: counts, pendingForApp });
+        const partitions = gateway.registry ? await gateway.registry.list() : undefined;
+        json(response, 200, {
+          cursor: cursorToDecimalString(highWater),
+          entries: counts,
+          pendingForApp,
+          ...(gateway.stateRoot ? { stateRoot: gateway.stateRoot } : {}),
+          ...(partitions ? { partitions } : {}),
+        });
         return;
       }
       if (request.method !== "POST" || !["/v1/pull", "/v1/push", "/v1/finalize"].includes(url.pathname)) {
@@ -202,18 +215,26 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
       }
       const body = await readJson(request);
       const client = requiredString(body, "client");
+      const rawUid = typeof body.dataFileUID === "string" && body.dataFileUID.length ? body.dataFileUID : undefined;
+      let requestState: CloudState;
+      try {
+        requestState = await gateway.stateForV1(rawUid);
+      } catch (error) {
+        json(response, 400, { error: error instanceof Error ? error.message : String(error) });
+        return;
+      }
       if (url.pathname === "/v1/pull") {
         const cursor = parseCursor(requiredString(body, "cursor"));
         const origin = clientOrigin(client);
-        const entries = await state.entriesAfter(cursor, origin);
+        const entries = await requestState.entriesAfter(cursor, origin);
         if (!entries.length) {
-          const highWater = await state.highWater();
-          await state.recordPull(origin, highWater);
+          const highWater = await requestState.highWater();
+          await requestState.recordPull(origin, highWater);
           json(response, 200, { cursor: cursorToDecimalString(highWater) });
         } else {
           const merged = mergeDeltas(entries.map((entry) => unpackEnvelope(entry.bytes)));
           const returned = entries.at(-1)!.cursor;
-          await state.recordPull(origin, returned);
+          await requestState.recordPull(origin, returned);
           json(response, 200, {
             cursor: cursorToDecimalString(returned),
             envelope: Buffer.from(packEnvelope(merged)).toString("base64"),
@@ -223,17 +244,17 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
       }
       if (url.pathname === "/v1/push") {
         const baseline = parseCursor(requiredString(body, "baseline"));
-        if (baseline > await state.highWater()) {
+        if (baseline > await requestState.highWater()) {
           json(response, 409, { error: "baseline is newer than the server high-water cursor" }); return;
         }
         const bytes = decodeEnvelope(requiredString(body, "envelope"));
         try { unpackEnvelope(bytes); }
         catch (error) { throw Object.assign(error as Error, { status: 400 }); }
-        const cursor = await state.append(clientOrigin(client), bytes);
+        const cursor = await requestState.append(clientOrigin(client), bytes);
         json(response, 200, { cursor: cursorToDecimalString(cursor) });
         return;
       }
-      await state.finalize();
+      await requestState.finalize();
       json(response, 200, { ok: true });
     } catch (error) {
       const status = typeof (error as { status?: unknown }).status === "number" ? (error as { status: number }).status : 500;
@@ -249,7 +270,7 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
   const port = typeof address === "object" && address ? address.port : options.port ?? DEFAULT_CLOUD_PORT;
   log(`cloud server listening on http://${host}:${port}`);
   return {
-    server, state, host, port,
+    server, state, gateway, host, port,
     async stop() {
       await state.flush();
       await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

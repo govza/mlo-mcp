@@ -5,11 +5,15 @@ import type { MloConfig, TaskNode } from "../types.js";
 import type { MloStore } from "../store.js";
 import { log } from "../log.js";
 import type { CloudState } from "../cloud/state.js";
+import type { CloudGateway } from "../cloud/gateway.js";
 
 export interface ToolContext {
   config: MloConfig;
   store: MloStore;
+  /** The gateway's default state (legacy demo log, or the unbound placeholder). */
   cloudState: CloudState;
+  /** Partition-aware routing; absent only in old test fixtures. */
+  cloud?: CloudGateway;
 }
 
 /** All four hints are mandatory so every tool states its contract explicitly. */

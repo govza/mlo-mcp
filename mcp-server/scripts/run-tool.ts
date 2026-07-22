@@ -9,7 +9,7 @@ import { z } from "zod";
 import { loadConfig } from "../src/config.js";
 import { MloStore } from "../src/store.js";
 import { allTools } from "../src/tools/registry.js";
-import { CloudState } from "../src/cloud/state.js";
+import { CloudGateway } from "../src/cloud/gateway.js";
 import { renderList } from "./tool-catalog.js";
 
 const [name, json] = process.argv.slice(2);
@@ -26,7 +26,12 @@ if (!tool) {
 }
 
 const config = loadConfig();
-const ctx = { config, store: new MloStore(config), cloudState: new CloudState(config.cloudStateDir) };
+const cloud = new CloudGateway({
+  stateRoot: config.cloudStateRoot,
+  legacyStateDir: config.cloudLegacyStateDir,
+  defaultMode: config.cloudMode,
+});
+const ctx = { config, store: new MloStore(config), cloudState: cloud.defaultState(), cloud };
 const args = z.object(tool.inputSchema).parse(JSON.parse(json ?? "{}"));
 
 const result = await tool.execute(args, ctx);
