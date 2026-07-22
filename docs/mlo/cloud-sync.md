@@ -442,10 +442,30 @@ re-synchronized on the next sync. The client's sync log and UI use
 `ResetSyncTimeStamps`, `FullResyncPerformed`, and “Full re-synchronization
 initiated”.
 
-No clean controlled capture of that button has yet been made, so the exact
-stamp reset sequence and which side is selected as authoritative are not
-specified here. Treat re-synchronization as an explicit client state transition,
-not a magic server cursor response.
+**Captured (controlled live run):** the button shows a confirmation dialog
+only — there is **no authoritative-side selector** — and the next session
+runs:
+
+```text
+Get → Apply (full snapshot) → Get → Release
+```
+
+With **Bidirectional** selected, all property exclusions unchecked, and an
+empty local endpoint partition, MLO exported and uploaded its complete local
+database. The captured snapshot contained 77 complete task rows, 18 contexts,
+12 context relations, 7 flags, 47 task-context relations, 1 dependency,
+3 starred-order rows, 10 `Config` rows, and **6 historical task tombstones**.
+
+Two corrections this capture makes to earlier assumptions:
+
+- A full snapshot MAY carry tombstone sections alongside the live rows.
+  Bootstrap validation must allow tombstones, require them to be unique, and
+  reject any overlap with live UIDs — but must not treat their presence as
+  evidence of a partial upload.
+- The numeric `lastSyncTimestamp` of the re-sync upload was not retained by
+  the structural capture, so **no counter heuristic (such as `0`) may be used
+  to recognize a re-synchronization**. A server must detect bootstrap from an
+  explicitly armed session plus validated full-snapshot coverage.
 
 ### Replacing the server mid-history
 
@@ -467,6 +487,33 @@ A replacement endpoint must use one of these sound bootstrap strategies:
 Inventing GUIDs or building partial task rows from XML is not equivalent. A
 partial `TodoItems` replacement can erase recurrence, reminders, formatting,
 ordering, review state, or other fields absent from XML exports.
+
+### Switching endpoints is not a reconnect
+
+A controlled experiment synced one profile against the vendor Cloud, then
+pointed it back at a replacement endpoint. The results were destructive on
+both legs:
+
+- against the vendor, the profile imported remote history and duplicated
+  whole subtrees (77 tasks grew to 131, with repeated `Personal`, `<Inbox>`,
+  and project branches);
+- back at the replacement endpoint, MLO presented the vendor's remote cursor
+  as `newerThan` — foreign to and numerically ahead of the endpoint's own
+  namespace.
+
+Each endpoint owns a separate remote-version namespace: a profile's stored
+remote cursor is meaningful only to the endpoint that assigned it.
+Consequences for a compatible server:
+
+- reject a foreign/newer cursor as an explicit **endpoint mismatch** failure;
+  never silently rebase local history onto it;
+- adopt a client's stored cursor only into a genuinely uninitialized state;
+- moving a profile between endpoints, in either direction, requires an
+  explicit full re-synchronization against an empty/new remote database — it
+  cannot be accomplished by re-pointing a proxy;
+- one profile must not alternate between endpoints. Keep separate `.ml`
+  copies per endpoint unless endpoint-specific sync metadata can be saved and
+  restored, which has not been demonstrated.
 
 ## ZIP payload envelope
 
@@ -823,6 +870,7 @@ these edges as inclusion relationships.
 | Event | Payload |
 |---|---|
 | First sync to empty Cloud file | All tasks, contexts, flags, relationships, ordering, and Config |
+| Re-synchronize against an empty endpoint | The same complete upload, plus historical tombstones |
 | Subsequent no-op QuickSync | No complete snapshot; only empty/no-change response |
 
 ### Task lifecycle
@@ -911,8 +959,9 @@ The following questions should remain explicit until captured:
 - vendor failure bodies versus SOAP Fault/HTTP status behavior;
 - whether uploads are echoed byte-for-byte to the same client on its next Get;
 - replay/idempotency behavior for a repeated Apply in one `sessionID`;
+- whether the vendor accepts an extra complete row merged into a client's
+  outbound Apply, and whether the follow-up Get makes MLO apply it locally;
 - concurrent two-client conflict cases and server transaction boundaries;
-- exact Re-synchronize button sequence and authoritative-side choice;
 - Config update/merge behavior after initial sync;
 - parent deletion cascade behavior;
 - create/update/delete behavior for contexts and flags;
@@ -922,6 +971,11 @@ The following questions should remain explicit until captured:
 - how each “do not sync ...” option changes complete-record semantics;
 - maximum payload size, chunking, and any multi-entry envelope variants;
 - why some server operations consume more than one remote version.
+
+The echo, replay, and merged-row experiments are the gate for the MCP
+endpoint's upstream write-through stage ([mcp-cloud](../mcp-cloud.md)): until
+they are captured on a disposable vendor profile, MCP mutations stay disabled
+for upstream-bound profiles.
 
 Until those are resolved, preserve opaque data and prefer a rejected operation
 over a lossy partial-record rewrite.

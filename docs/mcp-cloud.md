@@ -1,238 +1,190 @@
-# mcp-cloud: local cloud-sync endpoint for the MLO app
+# mcp-cloud: the local cloud-sync endpoint for the MLO app
 
-`mcp-cloud` is the server's write path (it replaced the retired
-file-replacement pipeline that closed the GUI and swapped the `.ml` file): the
-MCP server *is* the cloud. It runs a local sync
-endpoint on `127.0.0.1:8181`; the app's cloud-sync client connects to it, pulls
-our deltas, and applies them through MLO's own merge logic. We trigger a session
-with the already-verified `mlo.exe -QuickSync`.
+`mcp-cloud` is the server's cloud-side half: a loopback HTTP listener on
+`127.0.0.1:8181` that MLO's cloud-sync client reaches through the app's HTTP
+**proxy setting** (MLO hardcodes the vendor sync URL; the proxy is the
+permanent wiring, not a debugging aid). Sync sessions are triggered with the
+already-verified `mlo.exe -QuickSync`.
 
-MLO hardcodes the vendor sync URL (`sync.mylifeorganized.net`) — there is no
-custom-server setting — so the way the app's sync traffic reaches mcp-cloud at
-all is MLO's HTTP **proxy setting**, pointed at this same listener. That is the
-permanent wiring, not a debugging aid. Only origin-form requests to the local
-`/v1/*` API are handled by mcp-cloud; unrelated absolute-form HTTP requests are
-forwarded unchanged, the three supported sync operations are terminated
-locally, and HTTPS `CONNECT` requests are tunneled end-to-end. This lets initial
-vendor login and WSDL discovery proceed while sync payloads stay in the local
-delta log. Request bodies and credentials are never logged.
+It operates in one of two **modes per profile**, chosen by the profile's
+persisted binding. The two modes never share state, because each sync endpoint
+owns its own remote-version namespace and switching a profile between
+authorities is unrecoverable (verified live: duplicate-subtree imports, then
+foreign-cursor rejections — see
+[Switching endpoints is not a reconnect](mlo/cloud-sync.md#switching-endpoints-is-not-a-reconnect)).
 
-Getting from here to "QuickSync applies our deltas" is a two-step plan:
+## Upstream mode — real profiles (default)
 
-1. **Observe (one-time).** While proxying, traffic to the vendor sync host is
-   structurally summarized to `<stateDir>/soap-summary.jsonl` — the same
-   credential-safe shape as the mitmproxy addon
-   (`scripts/inspect-cloud-capture.py`): operation and field names, SOAP
-   actions, status codes; never field values. Credential-shaped response field
-   names are masked. One QuickSync through the proxy captures the request
-   shapes the vendor's field-name-free docs deliberately omit. A `CONNECT` to
-   the sync host is recorded too — that would mean the app tunnels sync over
-   TLS, plain-HTTP observation sees nothing, and one
-   [mitmproxy](mlo/mitm-proxy.md) session with its CA certificate is needed for
-   this step instead.
-2. **Terminate locally.** With the shapes known, mcp-cloud answers those sync
-   operations itself — serving pulls from and appending pushes to the delta
-   log below instead of forwarding — and the vendor service drops out of the
-   loop entirely. This adapter is implemented for the three operations listed
-   below; mitmproxy is never part of this runtime path.
+The endpoint is a **transparent proxy** for the three vendor sync operations.
+The vendor Cloud remains the only cursor authority: requests and responses
+pass through byte-for-byte, all three operations of one `sessionID` go to the
+same authority, and nothing local generates, rebases, or adopts a cursor.
 
-The **data plane** (envelope bytes, CSV sections, cursor semantics) is fixed by
-[cloud-sync.md](mlo/cloud-sync.md) and is not renegotiable here. The **wire contract**
-below is ours to define — the vendor's field and operation names were
-intentionally never part of the implementation contract — and the app-side
-client implements this document.
+Passively, the endpoint captures the validated envelopes flowing through into
+a per-`dataFileUID` **mirror**, ordered by the vendor-assigned versions
+(uploads at `newServerTimeStamp`, downloads at `maxVersion`). A capture
+failure never alters the proxied exchange; it only marks the mirror unhealthy
+in `cloud_status`.
 
-## Roles and state
+- **Bootstrap:** arm with `cloud_bootstrap`, then run **Re-synchronize** in
+  MLO against the real Cloud through the proxy. The full database flowing
+  through (in either direction) is validated and materialized as the mirror
+  baseline; the profile's `dataFileUID` is bound and the partition becomes
+  `ready`. Reads and identity resolution then work for every task while MLO,
+  the vendor Cloud, and mobile clients stay in sync.
+- **Writes:** refused ("upstream write-through not enabled"). Stage 2 —
+  merging pending MCP deltas into MLO's own outbound Apply so the vendor
+  assigns the real version — has its seam in `src/cloud/upstream.ts`
+  (`UpstreamWriteThrough`, gated by `MLO_CLOUD_WRITE_THROUGH`), but stays
+  disabled until the echo/replay/merged-row experiments in cloud-sync.md's
+  open list are captured on a disposable vendor profile.
+- **Operational precondition:** MLO's cloud login must have "Use secure
+  connection" **unchecked**. A TLS `CONNECT` to the vendor sync host tunnels
+  end-to-end, blinding the mirror; the endpoint records this and
+  `cloud_status` reports `mirror.mirrorBlind: true`.
 
-- The mcp-cloud server is the **cursor authority**. Cursors are signed 64-bit
-  logical versions, `bigint` end to end in TypeScript, serialized as decimal
-  strings on the wire. They are never derived from wall-clock time.
-- The server keeps an **append-only delta log**. Each entry is
-  `{ cursor, origin, envelope }` where `origin` is `"mcp"` (authored by an MCP
-  tool) or `"app"` (pushed by the app). The high-water cursor is the last
-  entry's cursor.
-- Cursor values are chosen by the server and are strictly increasing but **not
-  guaranteed contiguous** (the observed vendor service also skips values —
-  cloud-sync.md's delete experiment). Clients must never assume `+1`.
-- A party never receives its own changes back: pull returns only entries whose
-  `origin` differs from the caller.
-- On the first MLO pull, a fresh local state adopts the cursor already stored in
-  the profile. Pending local entries are rebased above it. This is a one-time
-  bridge from the old vendor cursor namespace; subsequent cursors are chosen
-  exclusively by mcp-cloud.
+## Local mode — disposable/offline profiles
 
-## MLO SOAP compatibility adapter
+The original replacement-server behavior, hardened: the endpoint terminates
+the three sync operations itself and owns the cursor namespace. A local-mode
+profile must **never** sync against the vendor endpoint again; returning to
+the vendor is a fresh full re-synchronization against an empty vendor file,
+with a separate profile copy.
 
-When MLO uses `127.0.0.1:8181` as its HTTP proxy, requests for the vendor sync
-host arrive in absolute form. mcp-cloud intercepts only `POST` requests to the
-vendor `MLOInetSync.asmx` path with one of these SOAP actions:
+- The server keeps an **append-only delta log** per partition. Each entry is
+  `{ cursor, origin, envelope }` (`origin` is `"mcp"` or `"app"`); pull
+  returns only entries whose origin differs from the caller; cursors are
+  signed 64-bit, strictly increasing, not necessarily contiguous.
+- `ApplyModificationsBytesEx.lastSyncTimestamp` is an opaque signed 64-bit
+  **LocalStamp** (`src/cloud/local-stamp.ts`): recorded for diagnostics, never
+  compared against the cursor namespace, never a rejection reason. (The
+  captured vendor counterexample: local 24838 against remote 15515,
+  accepted.)
+- Cursor adoption (bridging to the cursor a profile already stores) happens
+  only into a genuinely uninitialized partition. A `ready` partition that
+  receives a foreign/newer `newerThan` answers with an explicit SOAP-level
+  **endpoint mismatch** failure — never an HTTP 500, never a silent rebase —
+  and `cloud_status` counts it distinctly from `bootstrap-required`.
 
-| MLO operation | Local operation |
-|---|---|
-| `GetModificationsBytesEx` | Pull changes newer than `newerThan`; return `maxVersion` and optional base64 ZIP `data` |
-| `ApplyModificationsBytesEx` | Validate and append base64 ZIP `data` against `lastSyncTimestamp`; return `newServerTimeStamp` |
-| `ReleaseSyncSessionBytes` | Flush/finalize the local session |
+## Partitions, binding, lifecycle
 
-The login, password, session, encoding, and data-file identity fields are not
-used by the single-profile local endpoint. They are neither persisted nor
-forwarded for these intercepted calls. Unsupported SOAP actions, WSDL fetches,
-and unrelated proxy traffic retain the normal pass-through behavior. Because
-the adapter deliberately does not authenticate these three calls, the server
-refuses to bind to a non-loopback address.
+All real-profile state lives under a private root **outside the checkout**
+(default `%LOCALAPPDATA%\mlo-mcp\cloud`, restricted to the current user via a
+best-effort `icacls` on creation):
+
+```text
+<stateRoot>/
+  bindings.json                 profile path -> { mode, dataFileUID?, boundAt }
+  soap-summary.jsonl            credential-safe structural traffic summaries
+  bootstrap/armed.json          the persisted one-time bootstrap window (+ staged.zip)
+  partitions/<key>/             key = sha256(normalized dataFileUID), first 16 hex
+    meta.json                   { dataFileUID, mode, lifecycle, createdAt }
+    local/                      local-mode delta log (state.json, delta-<cursor>.zip)
+      snapshot/                 materialized baseline (snapshot-<n>.csv + pointer)
+    mirror/                     upstream captures at vendor versions (+ its snapshot/)
+    clients/                    scripts/cloud-client per-partition cursor files
+```
+
+Rules, all fail-closed:
+
+- Every access path — SOAP, `/v1`, MCP tools, `cloud_status` — resolves the
+  same partition through the gateway. Unknown `dataFileUID`s are refused
+  locally (or, in proxy position, forwarded to the vendor **without capture**).
+- A profile is never bound to "the last UID seen". The UID attaches only
+  during an armed bootstrap window, which accepts exactly one previously
+  unknown UID; a second unknown UID disarms the window. One UID serves one
+  profile; a binding's mode never changes silently (`cloud_bootstrap
+  { rebind: true }` starts a fresh partition and re-bootstraps; the old
+  partition stays on disk as evidence).
+- Partition lifecycle: `uninitialized` → `bootstrap-required` → `ready`.
+  Mutation tools fail fast before queueing anything unless the partition is
+  `ready` (local mode); their error directs to `cloud_bootstrap` +
+  Re-synchronize, because an ordinary QuickSync cannot hydrate pre-existing
+  tasks.
+
+## Bootstrap (verified flow)
+
+MLO's **Re-synchronize** shows a confirmation only and runs
+`Get → Apply(full snapshot) → Get → Release`
+([details](mlo/cloud-sync.md#re-synchronize)). With Bidirectional, no
+exclusions, and an empty partition, MLO uploads its complete database — every
+task as a complete 82-column row with its stable UID, possibly with historical
+tombstones.
+
+The endpoint detects bootstrap as **armed session + validated coverage**,
+never a counter value. Validation requires the exact supported `TodoItems`
+header and row width, valid unique UIDs, resolved acyclic parents, tombstones
+disjoint from live rows, resolving context/flag/dependency/ordering
+references, `FileVersion` 3, a `Config` section (the captured full-upload
+marker), and verbatim preservation of unknown sections/columns/cells. A
+passing snapshot is materialized transactionally (temp + fsync + pointer
+rename) as the partition baseline; a failing upload is refused (MLO keeps its
+baseline), the staged bytes are kept for diagnosis, and the partition stays
+`bootstrap-required`.
+
+Projections read **snapshot + newer log entries**, so identity and full-row
+coverage come from the baseline instead of best-effort recovery. Path-id
+resolution aligns the fresh XML outline structurally against the
+UID/`ParentUID`/`ItemIndex` tree (duplicate sibling captions resolve by
+position); the binary `.ml` GUID recovery and caption-path walk are
+cross-checks only.
 
 ## Wire contract (HTTP/1.1, JSON)
 
-Bound to `127.0.0.1` only (configurable host/port, default port `8181`). All
-bodies are `application/json; charset=utf-8`. Envelopes travel as base64-encoded
-ZIP bytes. Cursors are decimal strings.
-
-### `POST /v1/pull`
-
-```json
-{ "client": "mlo-app", "cursor": "100" }
-```
-
-Selects log entries **strictly newer** than `cursor` (and not authored by
-`client`), merges them into one envelope:
-
-```json
-{ "cursor": "104", "envelope": "<base64 zip>" }
-```
-
-When nothing is newer, `envelope` is omitted and `cursor` echoes the current
-high-water mark. The returned `cursor` is the high-water cursor represented by
-the returned delta; the client persists it as its last accepted server version.
-
-### `POST /v1/push`
-
-```json
-{ "client": "mlo-app", "baseline": "104", "envelope": "<base64 zip>" }
-```
-
-`baseline` is the server cursor the delta was created against (i.e. the value
-the client last accepted). The server validates `baseline <= high-water`
-(otherwise `409`), appends the entry at a fresh cursor, and returns it:
-
-```json
-{ "cursor": "105" }
-```
-
-### `POST /v1/finalize`
-
-```json
-{ "client": "mlo-app" }
-```
-
-Finalizes the session after pull/push processing (state is flushed to disk).
-Returns `{ "ok": true }`.
-
-### `GET /v1/status`
-
-Debug/introspection: high-water cursor, per-origin entry counts, pending
-entries for the app. Never returns envelope contents.
-
-Errors are `{ "error": "<message>" }` with 4xx/5xx status; malformed envelopes
-(not a ZIP, missing `data.csv`, unsupported `FileVersion`) are rejected with
-`400` and are **not** appended to the log.
-
-## Envelope rules (normative, from cloud-sync.md)
-
-- Standard ZIP, one entry `data.csv`, method 8 (Deflate).
-- `data.csv`: UTF-8 without BOM, CRLF line endings, begins and ends with a CRLF.
-- The full section skeleton is always emitted, even when empty, with the exact
-  observed section names, column order, and spellings — including
-  `ccChildrenIheritColorCoding` and `ccUnderlineEntireRowthickness`.
-- `SysVersions` row defaults to `3,6.1.3,MLO-Windows`; a consumer requires a
-  supported `FileVersion` (`3`) before interpreting fields.
-- Real CSV reader/writer (quoted commas, doubled quotes, multiline values) —
-  never split on commas.
-- Changed objects are projected as **full logical records** (all 82 `TodoItems`
-  columns), deletions as a single braced uppercase GUID under
-  `[TodoItems.Deleted]`.
-- Unknown sections and columns are preserved verbatim through parse → merge →
-  emit.
-
-### Merging entries into one pull envelope
-
-Applied newest-last over the selected entries:
-
-- `TodoItems` keyed by `UID`: a later full row replaces an earlier one.
-- `TodoItems.Deleted`: union; a tombstone also removes any pending `TodoItems`
-  row for that UID.
-- Other keyed sections (`Places`, `Flags`, relation tables) follow the same
-  full-record-wins rule on their key column(s).
-- Unknown sections concatenate in log order.
-
-## Persistence
-
-State lives in the repository's git-ignored `messages\` directory by default:
-
-- `state.json` — high-water cursor (decimal string), log index
-  (`cursor`, `origin`, filename), the last cursor each origin accepted from a
-  pull (`lastPull`, which is what makes "pending for app" counts real), and
-  last finalized session info.
-- `delta-<cursor>.zip` — one file per log entry, byte-exact as received/emitted.
-- `soap-summary.jsonl` — credential-safe structural summaries of proxied
-  vendor sync traffic (names only, never values; see the proxy section above).
+Unchanged from the original `/v1` contract, with one addition: `pull`,
+`push`, and `finalize` bodies accept an optional `dataFileUID` addressing a
+specific partition (omitted = the legacy/demo log or the unbound default).
+`GET /v1/status` keeps its `{ cursor, entries, pendingForApp }` shape (the
+attach probe depends on it) and adds `stateRoot` and `partitions` in
+partitioned mode. Malformed envelopes are rejected with `400` and never
+appended.
 
 ## Configuration
-
-The local sync endpoint always starts alongside the MCP server. When the port
-is already held by another mlo-mcp session's endpoint (probed via
-`GET /v1/status`), the new session *attaches* instead: it runs without its own
-listener and shares the delta log through the state directory's cross-process
-locking. Any other process on the port is still a startup error.
 
 | Env var | Default | Meaning |
 |---|---|---|
 | `MLO_CLOUD_HOST` | `127.0.0.1` | bind address (loopback only by design) |
 | `MLO_CLOUD_PORT` | `8181` | listen port |
-| `MLO_CLOUD_STATE_DIR` | `<repo>\messages` | message log + state location |
+| `MLO_CLOUD_STATE_ROOT` | `%LOCALAPPDATA%\mlo-mcp\cloud` | private partitioned state root |
+| `MLO_CLOUD_MODE` | `upstream` for real profiles, `local` for the repo demo | default mode for new bindings |
+| `MLO_CLOUD_STATE_DIR` | `<repo>\messages` for the demo profile | legacy single-log override (demo semantics) |
+| `MLO_CLOUD_WRITE_THROUGH` | unset | stage-2 seam flag; no effect until the vendor experiments land |
+
+The repository's `messages\` directory is **quarantined demo evidence**: it
+provably mixes two profiles' history (a foreign full snapshot sits at cursor 4
+beside another profile's deltas) and must never seed a real profile's
+baseline. The demo profile keeps using it through the legacy override; real
+profiles (`MLO_DATA_FILE`) get partitioned private state automatically.
+
+When the port is already held by another mlo-mcp session's endpoint (probed
+via `GET /v1/status`), the new session *attaches*: it runs without its own
+listener and shares bindings, partitions, and the persisted bootstrap window
+through the state root's cross-process locking.
 
 ## MCP tool surface
 
-This endpoint is the server's **only** write path — every MCP write tool
-appends `origin:"mcp"` deltas here and triggers `mlo.exe -QuickSync`
-([tools.md](tools.md) defines the surface):
+- `cloud_bootstrap` — create/verify the profile binding, require an empty
+  target partition (`rebind: true` for an explicit fresh epoch), arm the
+  one-time window, and return the operator instructions for the
+  Re-synchronize run. Works for both modes.
+- `cloud_status` — endpoint config, binding (mode, `dataFileUID`), lifecycle,
+  cursor and delta counts, last local stamp, endpoint-mismatch count
+  (distinct from bootstrap-required), partition inventory, and upstream
+  mirror coverage/health/blindness.
+- `add_task` / `add_tasks` / `update_task` / `complete_task` /
+  `uncomplete_task` / `delete_task` — unchanged surface
+  ([tools.md](tools.md)), now gated: they queue `origin:"mcp"` deltas only on
+  a `ready` local-mode partition (legacy demo log stays exempt) and refuse
+  upstream-bound profiles until write-through is verified.
+- `sync` — triggers `mlo.exe -QuickSync` as before.
 
-- `add_task` — builds a full `TodoItems` row (fresh braced uppercase GUID,
-  `CreatedDate`/`LastModified` in MLO's zone-free ISO form), optional existing
-  Places/Flag/dependency relations and task booleans, appends it, then verifies
-  the task appeared via a fresh export. `add_tasks` applies the same projection
-  to up to 50 locally-keyed tasks as one atomic outline delta.
-- `update_task` — batched full-row field edits (caption, note, dates,
-  importance/effort/estimates, project status, goal, task booleans including
-  Folder/Project/Starred, existing Flag assignment, complete Places replacement)
-  and re-parenting moves via `ParentUID`. Rows, existing relations, Places,
-  Flags, and starred ordering are projected from the delta log. Context removal
-  uses the observed full-replacement rule: a task row with no relation rows
-  clears its contexts. Dependencies use the same complete-replacement rule and
-  resolve path ids to stable GUIDs before queueing. Date edits on recurring
-  tasks are refused.
-- `complete_task` / `uncomplete_task` — full-row updates that set or clear
-  `CompletionDateTime` (and flip `ProjectStatus` for projects). A changed
-  object must travel as a complete 82-column record, and the XML export
-  cannot supply one (it lacks `CreatedDate`/`LastModified`/`ItemIndex`,
-  recurrence internals, reminders, color coding), so the row is sourced from
-  the delta log itself: the latest full row per UID across both origins.
-  Tasks with no such row fail atomically (make the change in the MLO app);
-  coverage grows as tasks flow through the log. `complete_task` refuses
-  recurring tasks — a full-row rewrite would bypass MLO's next-occurrence
-  generation.
-- `delete_task` — resolves path-based ids to GUIDs and appends ONE delta with
-  `TodoItems.Deleted` tombstones for every selected task *and all of its
-  descendants* (whether MLO cascades a bare parent tombstone to children is
-  unverified — cloud-sync.md's delete experiment used a childless task — and
-  extra tombstones union-merge harmlessly), then verifies the GUIDs are gone
-  from a fresh export. Fails atomically when any task in a selected subtree
-  has no GUID recoverable from the binary/XML or an unambiguous logged cloud
-  path.
-- `cloud_status` — read-only mirror of `GET /v1/status`.
+## Vendor handoff
 
-## Open questions (do not hard-code answers)
+Moving a profile between the vendor Cloud and a local-mode partition — in
+either direction — is a deliberate workflow, never a proxy toggle:
 
-- `ItemIndex` semantics for server-authored rows (observed `125` for a fresh
-  root task and `100` in a canonical first-sync row); v1 emits `100`, matching
-  MLO's own plain root-task default.
-- Whether the app consumes cursor values it did not author monotonically per
-  session or per connection — the vendor service skipped a value once.
+1. back up the `.ml` profile;
+2. use a fresh profile copy for the destination endpoint;
+3. run a full Re-synchronize against an empty remote database on that
+   endpoint (`cloud_bootstrap` locally; a new Cloud file at the vendor);
+4. retire the source-endpoint copy — do not alternate.
