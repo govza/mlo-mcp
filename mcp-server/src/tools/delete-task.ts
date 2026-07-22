@@ -4,7 +4,7 @@ import { packEnvelope } from "../cloud/envelope.js";
 import { cursorToDecimalString } from "../cloud/cursor.js";
 import { quickSync } from "../mlo-cli.js";
 import { findById, flatten } from "../task-tree.js";
-import { defineTool, textResult } from "./shared.js";
+import { defineTool, requireWritableCloudState, textResult } from "./shared.js";
 import type { TaskNode } from "../types.js";
 import { knownCloudProjection, resolveTaskUid } from "../cloud/log-projection.js";
 
@@ -90,8 +90,9 @@ export const deleteTaskTool = defineTool({
   async execute({ ids }, ctx) {
     // Unlike add_task, the pre-sync export is mandatory: it is the only
     // source for the path-id → GUID resolution the tombstones are made of.
+    const cloudState = await requireWritableCloudState(ctx);
     const before = (await ctx.store.getSnapshot(true)).tasks;
-    const cloud = await knownCloudProjection(ctx.cloudState);
+    const cloud = await knownCloudProjection(cloudState);
     const { targets, uids, missingGuid } = collectTombstones(
       before,
       ids,
@@ -105,7 +106,7 @@ export const deleteTaskTool = defineTool({
       );
     }
     const delta = buildTaskDeleteDelta(uids);
-    const cursor = cursorToDecimalString(await ctx.cloudState.append("mcp", packEnvelope(delta)));
+    const cursor = cursorToDecimalString(await cloudState.append("mcp", packEnvelope(delta)));
     const described = targets.map(({ id, task }) => `[${id}] "${task.Caption}"`).join(", ");
     let verified = false;
     let message: string;

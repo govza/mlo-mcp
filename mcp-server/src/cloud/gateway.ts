@@ -3,7 +3,8 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { CloudState } from "./state.js";
-import { PartitionRegistry, type PartitionHandle, type PartitionMode } from "./partition.js";
+import { BindingStore, type ProfileBinding } from "./binding.js";
+import { PartitionRegistry, type PartitionHandle, type PartitionLifecycle, type PartitionMode } from "./partition.js";
 import { log } from "../log.js";
 
 /**
@@ -28,19 +29,23 @@ export interface CloudGatewayOptions {
 
 export class CloudGateway {
   readonly registry?: PartitionRegistry;
+  readonly bindings?: BindingStore;
   readonly legacyState?: CloudState;
   readonly stateRoot?: string;
   readonly legacyStateDir?: string;
+  readonly defaultMode: PartitionMode;
   private unboundState?: CloudState;
   private rootPrepared = false;
 
   constructor(options: CloudGatewayOptions) {
+    this.defaultMode = options.defaultMode;
     if (options.legacyStateDir) {
       this.legacyStateDir = options.legacyStateDir;
       this.legacyState = new CloudState(options.legacyStateDir);
     } else if (options.stateRoot) {
       this.stateRoot = options.stateRoot;
       this.registry = new PartitionRegistry(options.stateRoot, options.defaultMode);
+      this.bindings = new BindingStore(options.stateRoot);
     } else {
       throw new Error("CloudGateway requires either a stateRoot or a legacyStateDir");
     }
@@ -74,6 +79,24 @@ export class CloudGateway {
     await this.prepareRoot();
     const partition = await this.registry!.open(rawUid);
     return { state: partition.state, partition };
+  }
+
+  /**
+   * The partition bound to a profile, or a description of why none is. Legacy
+   * mode reports itself as such — the legacy log is demo evidence, exempt
+   * from binding and lifecycle gating.
+   */
+  async boundPartition(profilePath: string): Promise<
+    | { kind: "legacy"; state: CloudState }
+    | { kind: "unbound"; binding?: ProfileBinding }
+    | { kind: "bound"; binding: ProfileBinding; partition: PartitionHandle; lifecycle: PartitionLifecycle }
+  > {
+    if (this.legacyState) return { kind: "legacy", state: this.legacyState };
+    const binding = await this.bindings!.forProfile(profilePath);
+    if (!binding?.dataFileUID) return { kind: "unbound", binding };
+    await this.prepareRoot();
+    const partition = await this.registry!.open(binding.dataFileUID);
+    return { kind: "bound", binding, partition, lifecycle: await partition.lifecycle() };
   }
 
   /** Resolve the state for a `/v1` call with an optional `dataFileUID`. */

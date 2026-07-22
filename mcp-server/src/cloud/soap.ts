@@ -152,6 +152,7 @@ async function handleParsedSoapOperation(
       await state.adoptInitialBaseline("app", baseline);
     } catch (error) {
       if (!(error instanceof EndpointMismatchError)) throw error;
+      await state.recordEndpointMismatch();
       const highWater = await state.highWater();
       return envelope(operation, failureFields(
         operation,

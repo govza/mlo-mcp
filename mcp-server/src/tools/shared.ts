@@ -16,6 +16,54 @@ export interface ToolContext {
   cloud?: CloudGateway;
 }
 
+/**
+ * Cloud state for read paths (projections, GUID recovery). Legacy demo mode
+ * uses the single log; partitioned mode uses the bound partition when one
+ * exists, else the empty default — reads never fail on binding state.
+ */
+export async function resolveReadCloudState(ctx: ToolContext): Promise<CloudState> {
+  if (!ctx.cloud || !ctx.cloud.partitioned) return ctx.cloudState;
+  const bound = await ctx.cloud.boundPartition(ctx.config.dataFile);
+  return bound.kind === "bound" ? bound.partition.state : ctx.cloudState;
+}
+
+/**
+ * Cloud state for mutation paths. Fails fast — before anything is queued —
+ * unless the profile's partition is writable:
+ *
+ * - legacy/demo mode is exempt (disposable evidence, current behavior);
+ * - an unbound or un-bootstrapped local partition needs a full
+ *   re-synchronization, not another ordinary sync;
+ * - upstream mode has no write path until verified write-through exists.
+ */
+export async function requireWritableCloudState(ctx: ToolContext): Promise<CloudState> {
+  if (!ctx.cloud || !ctx.cloud.partitioned) return ctx.cloudState;
+  const bound = await ctx.cloud.boundPartition(ctx.config.dataFile);
+  if (bound.kind === "legacy") return bound.state;
+  if (bound.kind === "unbound") {
+    const mode = bound.binding?.mode ?? ctx.cloud.defaultMode;
+    if (mode === "upstream") {
+      throw new Error(
+        "this profile is bound to the vendor Cloud (upstream mode); MCP write-through is not enabled — make this change in the MLO app",
+      );
+    }
+    throw new Error(
+      "this profile has no bootstrapped cloud partition; run cloud_bootstrap, then Re-synchronize in MLO (Sync → Advanced) — an ordinary sync will not help",
+    );
+  }
+  if (bound.binding.mode === "upstream") {
+    throw new Error(
+      "this profile is bound to the vendor Cloud (upstream mode); MCP write-through is not enabled — make this change in the MLO app",
+    );
+  }
+  if (bound.lifecycle !== "ready") {
+    throw new Error(
+      `cloud partition is not bootstrapped (${bound.lifecycle}); run cloud_bootstrap, then Re-synchronize in MLO (Sync → Advanced) — an ordinary sync will not help`,
+    );
+  }
+  return bound.partition.state;
+}
+
 /** All four hints are mandatory so every tool states its contract explicitly. */
 export interface MloToolAnnotations {
   readOnlyHint: boolean;

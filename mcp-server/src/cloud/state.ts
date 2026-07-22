@@ -36,6 +36,8 @@ interface StateFile {
   lastFinalized?: string;
   /** Last `lastSyncTimestamp` the app sent with an upload. Diagnostics only. */
   lastLocalStamp?: string;
+  /** Times a client presented a cursor from a different server history. */
+  endpointMismatches?: number;
 }
 
 export class CloudState {
@@ -44,6 +46,7 @@ export class CloudState {
   private lastPull: Partial<Record<DeltaOrigin, string>> = {};
   private lastFinalized?: string;
   private lastStamp?: string;
+  private mismatches = 0;
   private chain: Promise<unknown> = Promise.resolve();
 
   constructor(readonly stateDir: string) {}
@@ -55,6 +58,7 @@ export class CloudState {
     this.lastPull = {};
     this.lastFinalized = undefined;
     this.lastStamp = undefined;
+    this.mismatches = 0;
     try {
       const parsed = JSON.parse(await fs.readFile(path.join(this.stateDir, "state.json"), "utf8")) as StateFile;
       this.cursor = parseCursor(parsed.highWater);
@@ -62,6 +66,7 @@ export class CloudState {
       this.lastPull = parsed.lastPull ?? {};
       this.lastFinalized = parsed.lastFinalized;
       this.lastStamp = parsed.lastLocalStamp;
+      this.mismatches = parsed.endpointMismatches ?? 0;
       for (const entry of this.entries) parseCursor(entry.cursor);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
@@ -188,6 +193,18 @@ export class CloudState {
     return this.read(() => (this.lastStamp === undefined ? undefined : parseLocalStamp(this.lastStamp)));
   }
 
+  /** Count an endpoint-mismatch rejection (distinct from bootstrap-required). */
+  async recordEndpointMismatch(): Promise<void> {
+    await this.serialize(async () => {
+      this.mismatches += 1;
+      await this.writeState();
+    });
+  }
+
+  async endpointMismatchCount(): Promise<number> {
+    return this.read(() => this.mismatches);
+  }
+
   /** Record the cursor an origin accepted from a pull (only ever advances). */
   async recordPull(origin: DeltaOrigin, cursor: CloudCursor): Promise<void> {
     await this.serialize(async () => {
@@ -239,6 +256,7 @@ export class CloudState {
       ...(Object.keys(this.lastPull).length ? { lastPull: this.lastPull } : {}),
       ...(this.lastFinalized ? { lastFinalized: this.lastFinalized } : {}),
       ...(this.lastStamp !== undefined ? { lastLocalStamp: this.lastStamp } : {}),
+      ...(this.mismatches ? { endpointMismatches: this.mismatches } : {}),
     };
     await this.atomicWrite(path.join(this.stateDir, "state.json"), new TextEncoder().encode(`${JSON.stringify(value, null, 2)}\n`));
   }

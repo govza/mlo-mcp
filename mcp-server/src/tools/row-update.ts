@@ -5,7 +5,7 @@ import { cursorToDecimalString } from "../cloud/cursor.js";
 import { knownCloudProjection, resolveTaskUid, type KnownCloudProjection, type KnownRow } from "../cloud/log-projection.js";
 import { quickSync } from "../mlo-cli.js";
 import { findById, flatten } from "../task-tree.js";
-import { nowIso, textResult, type ToolContext } from "./shared.js";
+import { nowIso, requireWritableCloudState, textResult, type ToolContext } from "./shared.js";
 import type { TaskNode } from "../types.js";
 
 export interface CloudRowTarget {
@@ -46,10 +46,11 @@ export async function runCloudRowUpdate(
   ids: readonly string[],
   plan: CloudRowUpdatePlan
 ): Promise<CallToolResult> {
+  const cloudState = await requireWritableCloudState(ctx);
   // The pre-sync export supplies path ids; GUIDs come from binary/XML first,
   // then conservatively from the logged Caption/ParentUID path.
   const before = (await ctx.store.getSnapshot(true)).tasks;
-  const cloud = await knownCloudProjection(ctx.cloudState);
+  const cloud = await knownCloudProjection(cloudState);
   const resolved = [...new Set(ids)].map((id) => {
     const task = findById(before, id);
     if (!task) throw new Error(`no task with id "${id}" — ids shift when the tree changes; re-run list_tasks`);
@@ -113,7 +114,7 @@ export async function runCloudRowUpdate(
       };
     })
   );
-  const cursor = cursorToDecimalString(await ctx.cloudState.append("mcp", packEnvelope(delta)));
+  const cursor = cursorToDecimalString(await cloudState.append("mcp", packEnvelope(delta)));
   const described = targets.map(({ id, task }) => `[${id}] "${task.Caption}"`).join(", ");
   const uids = targets.map((target) => target.uid);
   let verified = false;
@@ -123,7 +124,7 @@ export async function runCloudRowUpdate(
     ctx.store.invalidate();
     try {
       const after = flatten((await ctx.store.getSnapshot(true)).tasks);
-      const verificationCloud = await knownCloudProjection(ctx.cloudState);
+      const verificationCloud = await knownCloudProjection(cloudState);
       const byGuid = new Map<string, TaskNode>();
       for (const task of after) {
         const uid = task.Guid?.toUpperCase() ?? resolveTaskUid(task, verificationCloud.rows);

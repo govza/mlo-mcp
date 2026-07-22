@@ -6,7 +6,7 @@ import { knownCloudProjection, resolveNamed, rowValue } from "../cloud/log-proje
 import { quickSync } from "../mlo-cli.js";
 import { flatten } from "../task-tree.js";
 import type { TaskNode } from "../types.js";
-import { defineTool, nowIso, textResult } from "./shared.js";
+import { defineTool, nowIso, requireWritableCloudState, textResult } from "./shared.js";
 
 const BatchTask = z.object({
   key: z.string().min(1).describe("Unique local key used by parentKey/dependsOnKeys within this call"),
@@ -115,8 +115,9 @@ export const addTasksTool = defineTool({
       byKey.set(spec.key, spec);
     }
     validateGraph(tasks, byKey);
+    const cloudState = await requireWritableCloudState(ctx);
     const uids = new Map(tasks.map((spec) => [spec.key, generateGuid()]));
-    const cloud = await knownCloudProjection(ctx.cloudState);
+    const cloud = await knownCloudProjection(cloudState);
     let starredIndex = Math.max(0, ...[...cloud.starredOrderByTask.values()].map(Number).filter(Number.isFinite)) + 500;
     const maxItemIndexByParent = new Map<string, number>();
     for (const known of cloud.rows.values()) {
@@ -164,7 +165,7 @@ export const addTasksTool = defineTool({
         ...(starOrder !== undefined ? { starredOrderIndex: starOrder } : {}),
       });
     });
-    const cursor = cursorToDecimalString(await ctx.cloudState.append("mcp", packEnvelope(mergeDeltas(documents))));
+    const cursor = cursorToDecimalString(await cloudState.append("mcp", packEnvelope(mergeDeltas(documents))));
     const resultTasks = tasks.map((spec) => ({ key: spec.key, uid: uids.get(spec.key)! }));
     const queued = tasks.length === 1 ? "1 task was queued" : `${tasks.length} tasks were queued atomically`;
     let verified = false;
