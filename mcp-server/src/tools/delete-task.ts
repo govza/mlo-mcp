@@ -6,7 +6,8 @@ import { quickSync } from "../mlo-cli.js";
 import { findById, flatten } from "../task-tree.js";
 import { defineTool, requireWritableCloudState, textResult } from "./shared.js";
 import type { TaskNode } from "../types.js";
-import { knownCloudProjection, resolveTaskUid } from "../cloud/log-projection.js";
+import { knownCloudProjection } from "../cloud/log-projection.js";
+import { buildUidResolver } from "../cloud/structure-align.js";
 
 export interface TombstoneSelection {
   targets: Array<{ id: string; task: TaskNode }>;
@@ -93,11 +94,7 @@ export const deleteTaskTool = defineTool({
     const cloudState = await requireWritableCloudState(ctx);
     const before = (await ctx.store.getSnapshot(true)).tasks;
     const cloud = await knownCloudProjection(cloudState);
-    const { targets, uids, missingGuid } = collectTombstones(
-      before,
-      ids,
-      (task) => task.Guid?.toUpperCase() ?? resolveTaskUid(task, cloud.rows),
-    );
+    const { targets, uids, missingGuid } = collectTombstones(before, ids, buildUidResolver(before, cloud));
     if (missingGuid.length > 0) {
       const list = missingGuid.map((task) => `[${task.id}] "${task.Caption}"`).join(", ");
       throw new Error(
@@ -115,9 +112,7 @@ export const deleteTaskTool = defineTool({
       ctx.store.invalidate();
       try {
         const after = (await ctx.store.getSnapshot(true)).tasks;
-        verified = wereTasksDeleted(before, after, uids, (task) =>
-          task.Guid?.toUpperCase() ?? resolveTaskUid(task, cloud.rows),
-        );
+        verified = wereTasksDeleted(before, after, uids, buildUidResolver(after, cloud));
         message = verified
           ? `Deletion of ${described} was queued and no tombstoned task remains in a fresh MLO export.`
           : `Deletion of ${described} was queued, but at least one tombstoned task is still present in the fresh export after QuickSync.`;

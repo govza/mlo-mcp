@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { resolveNamed, resolveTaskUid, rowValue, type KnownCloudProjection, type KnownRow } from "../cloud/log-projection.js";
+import { resolveNamed, rowValue, type KnownCloudProjection, type KnownRow } from "../cloud/log-projection.js";
+import { buildUidResolver } from "../cloud/structure-align.js";
 import { flatten, findById } from "../task-tree.js";
 import { csvTruthy, runCloudRowUpdate, type CloudRowTarget } from "./row-update.js";
 import { defineTool } from "./shared.js";
@@ -168,6 +169,7 @@ export const updateTaskTool = defineTool({
     return runCloudRowUpdate(ctx, [...specs.keys()], {
       verb: "Update",
       prepare(before: TaskNode[], targets: CloudRowTarget[], cloud: KnownCloudProjection) {
+        const resolveUid = buildUidResolver(before, cloud);
         let starIndex = nextStarredIndex(cloud);
         for (const { id, task } of targets) {
           const spec = specs.get(id)!;
@@ -186,7 +188,7 @@ export const updateTaskTool = defineTool({
               const dependency = findById(before, dependencyId);
               if (!dependency) throw new Error(`no dependency task with id "${dependencyId}" — re-run list_tasks`);
               if (dependency === task) throw new Error(`[${id}] "${task.Caption}" cannot depend on itself`);
-              const dependencyUid = dependency.Guid?.toUpperCase() ?? resolveTaskUid(dependency, cloud.rows);
+              const dependencyUid = resolveUid(dependency);
               if (!dependencyUid) {
                 throw new Error(`no recoverable GUID for dependency [${dependencyId}] "${dependency.Caption}"`);
               }
@@ -195,7 +197,7 @@ export const updateTaskTool = defineTool({
             dependencyUids.set(id, dependencies);
           }
           if (spec.Starred === true) {
-            const taskUid = task.Guid?.toUpperCase() ?? resolveTaskUid(task, cloud.rows);
+            const taskUid = resolveUid(task);
             const current = taskUid ? cloud.starredOrderByTask.get(taskUid) : undefined;
             starredOrder.set(id, current || String(starIndex));
             if (!current) starIndex += 500;
@@ -211,7 +213,7 @@ export const updateTaskTool = defineTool({
           if (flatten([task]).includes(dest)) {
             throw new Error(`cannot move [${id}] "${task.Caption}" into its own subtree`);
           }
-          const destUid = dest.Guid?.toUpperCase() ?? resolveTaskUid(dest, cloud.rows);
+          const destUid = resolveUid(dest);
           if (!destUid) {
             throw new Error(
               `no recoverable GUID for move destination [${moveTo}] "${dest.Caption}" — move the task in the MLO app`

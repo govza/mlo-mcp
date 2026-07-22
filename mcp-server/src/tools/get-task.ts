@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { findById, flatten } from "../task-tree.js";
 import { defineTool, textResult, errorResult, toSummary, TaskSummarySchema, resolveReadCloudState } from "./shared.js";
-import { knownCloudProjection, resolveTaskUid } from "../cloud/log-projection.js";
+import { knownCloudProjection } from "../cloud/log-projection.js";
+import { buildUidResolver } from "../cloud/structure-align.js";
 import type { TaskNode } from "../types.js";
 
 export const getTaskTool = defineTool({
@@ -34,7 +35,7 @@ export const getTaskTool = defineTool({
     if (!t) return errorResult(`no task with id "${id}" — ids shift when the tree changes; re-run list_tasks`);
     const all = flatten(snap.tasks);
     const cloud = await knownCloudProjection(await resolveReadCloudState(ctx));
-    const uidFor = (task: TaskNode) => task.Guid?.toUpperCase() ?? resolveTaskUid(task, cloud.rows);
+    const uidFor = buildUidResolver(snap.tasks, cloud);
     const resolvedUid = uidFor(t);
     const byGuid = new Map<string, TaskNode>();
     for (const task of all) {

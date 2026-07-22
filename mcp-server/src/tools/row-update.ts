@@ -2,7 +2,8 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { buildTaskUpdatesDelta } from "../cloud/delta.js";
 import { packEnvelope } from "../cloud/envelope.js";
 import { cursorToDecimalString } from "../cloud/cursor.js";
-import { knownCloudProjection, resolveTaskUid, type KnownCloudProjection, type KnownRow } from "../cloud/log-projection.js";
+import { knownCloudProjection, type KnownCloudProjection, type KnownRow } from "../cloud/log-projection.js";
+import { buildUidResolver } from "../cloud/structure-align.js";
 import { quickSync } from "../mlo-cli.js";
 import { findById, flatten } from "../task-tree.js";
 import { nowIso, requireWritableCloudState, textResult, type ToolContext } from "./shared.js";
@@ -51,10 +52,11 @@ export async function runCloudRowUpdate(
   // then conservatively from the logged Caption/ParentUID path.
   const before = (await ctx.store.getSnapshot(true)).tasks;
   const cloud = await knownCloudProjection(cloudState);
+  const resolveUid = buildUidResolver(before, cloud);
   const resolved = [...new Set(ids)].map((id) => {
     const task = findById(before, id);
     if (!task) throw new Error(`no task with id "${id}" — ids shift when the tree changes; re-run list_tasks`);
-    return { id, task, uid: task.Guid?.toUpperCase() ?? resolveTaskUid(task, cloud.rows) };
+    return { id, task, uid: resolveUid(task) };
   });
   const noGuid = resolved.filter(({ uid }) => !uid);
   if (noGuid.length > 0) {
@@ -123,11 +125,13 @@ export async function runCloudRowUpdate(
     await quickSync(ctx.config);
     ctx.store.invalidate();
     try {
-      const after = flatten((await ctx.store.getSnapshot(true)).tasks);
+      const afterRoots = (await ctx.store.getSnapshot(true)).tasks;
+      const after = flatten(afterRoots);
       const verificationCloud = await knownCloudProjection(cloudState);
+      const verifyUid = buildUidResolver(afterRoots, verificationCloud);
       const byGuid = new Map<string, TaskNode>();
       for (const task of after) {
-        const uid = task.Guid?.toUpperCase() ?? resolveTaskUid(task, verificationCloud.rows);
+        const uid = verifyUid(task);
         if (uid) byGuid.set(uid, task);
       }
       verified = targets.every((target) => {
