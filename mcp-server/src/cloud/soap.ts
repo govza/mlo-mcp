@@ -3,7 +3,8 @@ import { cursorToDecimalString, parseCursor, type CloudCursor } from "./cursor.j
 import { mergeDeltas, NEW_TASK_DEFAULTS } from "./delta.js";
 import { findSection, type SectionedCsv } from "./csv.js";
 import { packEnvelope, unpackEnvelope } from "./envelope.js";
-import { CloudState } from "./state.js";
+import { parseLocalStamp } from "./local-stamp.js";
+import { CloudState, EndpointMismatchError } from "./state.js";
 
 const SOAP_NAMESPACE = "http://schemas.xmlsoap.org/soap/envelope/";
 const MLO_NAMESPACE = "http://www.mylifeorganized.net/";
@@ -110,7 +111,22 @@ export async function handleSoapOperation(
 
   if (operation === "GetModificationsBytesEx") {
     const baseline = parseCursor(requiredText(fields, "newerThan"));
-    await state.adoptInitialBaseline("app", baseline);
+    try {
+      // The one legitimate adoption: a genuinely uninitialized state bridging
+      // to the cursor the profile already stores. An initialized state seeing
+      // a newer cursor means the profile synced against a different server
+      // history; splicing the histories is unrecoverable, so fail explicitly.
+      await state.adoptInitialBaseline("app", baseline);
+    } catch (error) {
+      if (!(error instanceof EndpointMismatchError)) throw error;
+      const highWater = await state.highWater();
+      return envelope(operation, failureFields(
+        operation,
+        "endpoint mismatch: the profile's stored cloud cursor belongs to a different server history; " +
+        "a full re-synchronization against an empty partition is required",
+        field("maxVersion", cursorToDecimalString(highWater)),
+      ));
+    }
     const entries = await state.entriesAfter(baseline, "app");
     const cursor = entries.length ? entries.at(-1)!.cursor : await state.highWater();
     await state.recordPull("app", cursor);
@@ -124,16 +140,14 @@ export async function handleSoapOperation(
   }
 
   if (operation === "ApplyModificationsBytesEx") {
-    const baseline = parseCursor(requiredText(fields, "lastSyncTimestamp"));
-    await state.adoptInitialBaseline("app", baseline);
+    // lastSyncTimestamp is MLO's LOCAL modification baseline — a separate
+    // counter namespace from the remote cloud cursor. It may be negative or
+    // numerically greater than the high-water cursor (captured vendor session:
+    // local 24838 against remote 15515, accepted). It is recorded for
+    // diagnostics and never compared, rejected, or adopted.
+    const stamp = parseLocalStamp(requiredText(fields, "lastSyncTimestamp"));
+    await state.recordLocalStamp(stamp);
     const highWater = await state.highWater();
-    if (baseline > highWater) {
-      return envelope(operation, failureFields(
-        operation,
-        "lastSyncTimestamp is newer than the server high-water cursor",
-        field("newServerTimeStamp", cursorToDecimalString(highWater)),
-      ));
-    }
     const encoded = fields.data;
     if (encoded !== undefined && typeof encoded !== "string") {
       return envelope(operation, failureFields(

@@ -1,8 +1,24 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { cursorToDecimalString, parseCursor, ZERO_CURSOR, type CloudCursor } from "./cursor.js";
+import { localStampToString, parseLocalStamp, type LocalStamp } from "./local-stamp.js";
 
 export type DeltaOrigin = "mcp" | "app";
+
+/**
+ * A client presented a cursor from a different server history: its stored
+ * remote baseline is ahead of this state's high water, but this state is
+ * already initialized for that origin, so adopting the cursor would splice two
+ * incompatible histories (observed live as duplicate-subtree imports after an
+ * endpoint switch). Callers must surface this as an explicit protocol-level
+ * failure, never rebase.
+ */
+export class EndpointMismatchError extends Error {
+  constructor() {
+    super("client cursor is newer than an initialized local cloud state");
+    this.name = "EndpointMismatchError";
+  }
+}
 
 export interface DeltaEntry {
   cursor: CloudCursor;
@@ -18,6 +34,8 @@ interface StateFile {
   /** Last cursor each origin accepted from a pull; makes "pending" counts real. */
   lastPull?: Partial<Record<DeltaOrigin, string>>;
   lastFinalized?: string;
+  /** Last `lastSyncTimestamp` the app sent with an upload. Diagnostics only. */
+  lastLocalStamp?: string;
 }
 
 export class CloudState {
@@ -25,6 +43,7 @@ export class CloudState {
   private entries: StateIndexEntry[] = [];
   private lastPull: Partial<Record<DeltaOrigin, string>> = {};
   private lastFinalized?: string;
+  private lastStamp?: string;
   private chain: Promise<unknown> = Promise.resolve();
 
   constructor(readonly stateDir: string) {}
@@ -35,12 +54,14 @@ export class CloudState {
     this.entries = [];
     this.lastPull = {};
     this.lastFinalized = undefined;
+    this.lastStamp = undefined;
     try {
       const parsed = JSON.parse(await fs.readFile(path.join(this.stateDir, "state.json"), "utf8")) as StateFile;
       this.cursor = parseCursor(parsed.highWater);
       this.entries = parsed.entries;
       this.lastPull = parsed.lastPull ?? {};
       this.lastFinalized = parsed.lastFinalized;
+      this.lastStamp = parsed.lastLocalStamp;
       for (const entry of this.entries) parseCursor(entry.cursor);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
@@ -139,7 +160,7 @@ export class CloudState {
     await this.serialize(async () => {
       if (baseline <= this.cursor) return;
       if (this.lastPull[origin] !== undefined || this.entries.some((entry) => entry.origin === origin)) {
-        throw new Error("client cursor is newer than an initialized local cloud state");
+        throw new EndpointMismatchError();
       }
       for (const entry of this.entries) {
         entry.cursor = cursorToDecimalString((parseCursor(entry.cursor) + baseline) as CloudCursor);
@@ -147,6 +168,24 @@ export class CloudState {
       this.cursor = (this.cursor + baseline) as CloudCursor;
       await this.writeState();
     });
+  }
+
+  /**
+   * Record the opaque local baseline the app sent with an upload. The value is
+   * kept for diagnostics only — it is a different counter namespace from the
+   * cloud cursor and must never gate or rebase anything.
+   */
+  async recordLocalStamp(stamp: LocalStamp): Promise<void> {
+    await this.serialize(async () => {
+      const value = localStampToString(stamp);
+      if (this.lastStamp === value) return;
+      this.lastStamp = value;
+      await this.writeState();
+    });
+  }
+
+  async lastLocalStamp(): Promise<LocalStamp | undefined> {
+    return this.read(() => (this.lastStamp === undefined ? undefined : parseLocalStamp(this.lastStamp)));
   }
 
   /** Record the cursor an origin accepted from a pull (only ever advances). */
@@ -199,6 +238,7 @@ export class CloudState {
       entries: this.entries,
       ...(Object.keys(this.lastPull).length ? { lastPull: this.lastPull } : {}),
       ...(this.lastFinalized ? { lastFinalized: this.lastFinalized } : {}),
+      ...(this.lastStamp !== undefined ? { lastLocalStamp: this.lastStamp } : {}),
     };
     await this.atomicWrite(path.join(this.stateDir, "state.json"), new TextEncoder().encode(`${JSON.stringify(value, null, 2)}\n`));
   }

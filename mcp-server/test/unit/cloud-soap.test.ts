@@ -107,6 +107,55 @@ describe("MLO SOAP compatibility", () => {
     expect(persisted.lastFinalized).toEqual(expect.any(String));
   });
 
+  it("accepts an upload whose local stamp is numerically greater than the remote version", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-soap-")); dirs.push(dir);
+    const state = new CloudState(dir);
+    // Captured vendor counterexample: local stamp 24838 against remote 15515.
+    await state.adoptInitialBaseline("app", parseCursor("15515"));
+    const delta = taskDelta("{ABCDEFAB-1234-1234-1234-ABCDEFABCDEF}", "from MLO");
+
+    const applied = await handleSoapOperation(state, "ApplyModificationsBytesEx", soapRequest("ApplyModificationsBytesEx", {
+      lastSyncTimestamp: "24838",
+      data: Buffer.from(delta).toString("base64"),
+    }));
+    expect(responseField(applied, "ApplyModificationsBytesExResult")).toBe("true");
+    expect(responseField(applied, "newServerTimeStamp")).toBe("15516");
+    expect(await state.counts()).toEqual({ mcp: 0, app: 1 });
+    expect(await state.lastLocalStamp()).toBe(24838n);
+    // The local stamp is a separate namespace: the remote cursor never jumps to it.
+    expect(await state.highWater()).toBe(15516n);
+  });
+
+  it("accepts a negative local stamp as an opaque value", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-soap-")); dirs.push(dir);
+    const state = new CloudState(dir);
+    const delta = taskDelta("{ABCDEFAB-1234-1234-1234-ABCDEFABCDEF}", "from MLO");
+    const applied = await handleSoapOperation(state, "ApplyModificationsBytesEx", soapRequest("ApplyModificationsBytesEx", {
+      lastSyncTimestamp: "-7",
+      data: Buffer.from(delta).toString("base64"),
+    }));
+    expect(responseField(applied, "ApplyModificationsBytesExResult")).toBe("true");
+    expect(responseField(applied, "newServerTimeStamp")).toBe("1");
+    expect(await state.lastLocalStamp()).toBe(-7n);
+  });
+
+  it("answers a foreign newer cursor on an initialized state with an explicit endpoint mismatch", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-soap-")); dirs.push(dir);
+    const state = new CloudState(dir);
+    // Initialize the state for the app: one accepted app delta at cursor 1.
+    await state.append("app", taskDelta("{ABCDEFAB-1234-1234-1234-ABCDEFABCDEF}", "from MLO"));
+    // The profile now presents a cursor from another server's history (e.g. the
+    // vendor Cloud after an endpoint switch). This must be a SOAP-level
+    // failure, not an HTTP 500, and must not rebase the local history.
+    const response = await handleSoapOperation(state, "GetModificationsBytesEx", soapRequest("GetModificationsBytesEx", {
+      newerThan: "15515",
+    }));
+    expect(responseField(response, "GetModificationsBytesExResult")).toBe("false");
+    expect(responseField(response, "errorMessage")).toContain("endpoint mismatch");
+    expect(responseField(response, "maxVersion")).toBe("1");
+    expect(await state.highWater()).toBe(1n);
+  });
+
   it("returns a protocol failure without appending malformed upload data", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-soap-")); dirs.push(dir);
     const state = new CloudState(dir);
