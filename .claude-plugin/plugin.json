@@ -1,7 +1,7 @@
 {
   "name": "mlo",
-  "version": "0.2.0",
-  "description": "MyLifeOrganized for Claude Code — manage the MLO Windows desktop app's task tree from AI sessions, plus a customizable GTD-conventions skill.",
+  "version": "0.3.0",
+  "description": "MyLifeOrganized for Claude Code — manage the MLO Windows desktop app's task tree from AI sessions.",
   "author": {
     "name": "govza"
   },

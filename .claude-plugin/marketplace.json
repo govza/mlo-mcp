@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "mlo",
-      "description": "MyLifeOrganized for Claude Code — manage the MLO Windows desktop app's task tree from AI sessions, plus a customizable GTD-conventions skill.",
+      "description": "MyLifeOrganized for Claude Code — manage the MLO Windows desktop app's task tree from AI sessions.",
       "source": {
         "source": "url",
         "url": "https://github.com/govza/mlo-mcp.git"
