@@ -6,6 +6,8 @@ import type { MloStore } from "../store.js";
 import { log } from "../log.js";
 import type { CloudState } from "../cloud/state.js";
 import type { CloudGateway } from "../cloud/gateway.js";
+import { cursorToDecimalString } from "../cloud/cursor.js";
+import { UpstreamWriteSession } from "../cloud/upstream.js";
 
 export interface ToolContext {
   config: MloConfig;
@@ -30,37 +32,66 @@ export async function resolveReadCloudState(ctx: ToolContext): Promise<CloudStat
 }
 
 /**
- * Cloud state for mutation paths. Fails fast — before anything is queued —
- * unless the profile's partition is writable:
- *
- * - an unbound or un-bootstrapped local partition needs a full
- *   re-synchronization, not another ordinary sync;
- * - upstream mode has no write path until verified write-through exists.
+ * A write path for MCP-authored deltas. `state` is the projection source for
+ * lossless full-row authoring; `commit` places one envelope with the proper
+ * authority — the local partition log (local mode, MLO pulls it on the next
+ * QuickSync) or the endpoint's own vendor client session (upstream mode, the
+ * vendor assigns the real version and MLO receives it like any remote edit).
  */
-export async function requireWritableCloudState(ctx: ToolContext): Promise<CloudState> {
-  if (!ctx.cloud) return ctx.cloudState;
+export interface CloudWriteChannel {
+  state: CloudState;
+  commit(bytes: Uint8Array): Promise<string>;
+}
+
+function localChannel(state: CloudState): CloudWriteChannel {
+  return {
+    state,
+    commit: async (bytes) => cursorToDecimalString(await state.append("mcp", bytes)),
+  };
+}
+
+/**
+ * Resolve the write channel, failing fast — before anything is queued —
+ * unless the profile's partition is bootstrapped and, for upstream mode, the
+ * endpoint has observed the profile's vendor sync traffic since server start
+ * (contacts are held in memory only).
+ */
+export async function requireWriteChannel(ctx: ToolContext): Promise<CloudWriteChannel> {
+  if (!ctx.cloud) return localChannel(ctx.cloudState);
   const bound = await ctx.cloud.boundPartition(ctx.config.dataFile);
   if (bound.kind === "unbound") {
-    if (bound.binding?.mode === "upstream") {
-      throw new Error(
-        "this profile is bound to the vendor Cloud (upstream mode); MCP write-through is not enabled — make this change in the MLO app",
-      );
-    }
     throw new Error(
-      "this profile has no bootstrapped cloud partition; run cloud_bootstrap, then Re-synchronize in MLO (Sync → Advanced) — an ordinary sync will not help",
-    );
-  }
-  if (bound.binding.mode === "upstream") {
-    throw new Error(
-      "this profile is bound to the vendor Cloud (upstream mode); MCP write-through is not enabled — make this change in the MLO app",
+      "this profile has no bootstrapped cloud partition; run cloud_bootstrap " +
+        "(for the default upstream mode, run one sync in MLO through this proxy first so the endpoint can act " +
+        "as a cloud client) — an ordinary sync alone will not help",
     );
   }
   if (bound.lifecycle !== "ready") {
     throw new Error(
-      `cloud partition is not bootstrapped (${bound.lifecycle}); run cloud_bootstrap, then Re-synchronize in MLO (Sync → Advanced) — an ordinary sync will not help`,
+      `cloud partition is not bootstrapped (${bound.lifecycle}); run cloud_bootstrap — an ordinary sync will not help`,
     );
   }
-  return bound.partition.state;
+  if (bound.binding.mode === "local") return localChannel(bound.partition.state);
+  const contact = ctx.cloud.vendorContact(bound.binding.dataFileUID!);
+  if (!contact) {
+    throw new Error(
+      "upstream writes need the profile's vendor sync credentials, which are held in memory only: " +
+        "run one sync in MLO through this proxy since server start, then retry",
+    );
+  }
+  const session = new UpstreamWriteSession(bound.partition, contact);
+  // Refresh the mirror before authoring so full-row rewrites never start
+  // from rows a mobile/vendor edit has already superseded.
+  await session.refresh();
+  return {
+    state: bound.partition.mirrorState,
+    commit: (bytes) => session.commit(bytes),
+  };
+}
+
+/** Back-compat shim for callers that only need the projection state. */
+export async function requireWritableCloudState(ctx: ToolContext): Promise<CloudState> {
+  return (await requireWriteChannel(ctx)).state;
 }
 
 /** All four hints are mandatory so every tool states its contract explicitly. */

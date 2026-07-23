@@ -27,24 +27,28 @@ add_tasks creates up to 50 tasks atomically; local \`key\` values connect its
 \`parentKey\` and \`dependsOnKeys\` outline/dependency references.
 
 ### How writes work
-Writes never touch the data file. Each write queues a sync delta on the local cloud endpoint
-and triggers MLO's QuickSync; MLO's own merge logic applies it, and the app keeps running.
-The result's \`verified\` flag says whether a fresh export confirmed the change — \`false\`
-means "queued, not applied yet", not failure; MLO applies it on its next sync session.
+Writes never touch the data file. Each write travels as a cloud sync delta with full task
+records: in the default upstream mode it is pushed to the real vendor Cloud in the endpoint's
+own sync session (vendor and mobile stay in sync) and reaches the app on its next QuickSync;
+in local mode it is queued on the local replacement endpoint. Either way MLO's own merge
+logic applies it and the app keeps running. The result's \`verified\` flag says whether a
+fresh export confirmed the change — \`false\` means "accepted, not applied yet", not failure.
 Batch tools (\`ids\`/\`updates\` arrays) send the whole batch as ONE delta and are atomic:
 one bad id and nothing is queued.
 
-### Coverage limits (fail fast, nothing queued)
-- update_task / complete_task / uncomplete_task need the task's full record in the delta
-  log — available once a task was added by this server or changed in MLO since the local
-  endpoint took over. Otherwise make the change in the MLO app.
+### Bootstrap (one-time per profile)
+Writes need a bootstrapped cloud partition. If a tool fails with "run cloud_bootstrap":
+for upstream mode run one ordinary MLO sync through the proxy, then call cloud_bootstrap —
+it pulls the vendor's complete history automatically and enables reads and writes for every
+existing task. cloud_status shows binding, lifecycle, and mirror coverage.
+
+### Field support and refusals (fail fast, nothing queued)
 - add_task/update_task support Folder, Project, Starred, visibility/sequential
   booleans, existing Flag assignment, and existing contexts (Places).
 - update_task replaces dependencies through \`dependsOnIds\` (path ids resolved
   atomically to GUIDs); date edits on recurring tasks are refused (the series would desync).
 - complete_task refuses recurring tasks — completing in MLO generates the next occurrence.
-- delete_task removes each task AND its whole subtree; it needs binary/XML or
-  unambiguous logged-path GUID recovery for the full subtree.
+- delete_task removes each task AND its whole subtree.
 
 ### Field conventions
 - Dates are local ISO without timezone ("2026-08-01T15:00:00").

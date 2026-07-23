@@ -6,7 +6,7 @@ import { CloudState } from "./state.js";
 import { BindingStore, type ProfileBinding } from "./binding.js";
 import { BootstrapController } from "./bootstrap.js";
 import { normalizeDataFileUid, PartitionRegistry, type PartitionHandle, type PartitionLifecycle } from "./partition.js";
-import type { UpstreamContext } from "./upstream.js";
+import type { UpstreamContext, VendorContact } from "./upstream.js";
 import { log } from "../log.js";
 
 /**
@@ -40,6 +40,13 @@ export class CloudGateway {
   private unboundState?: CloudState;
   private rootPrepared = false;
   private sessionAuthorities = new Map<string, { authority: SoapAuthority; expires: number }>();
+  /**
+   * Vendor-client contacts per normalized dataFileUID, captured from the
+   * profile's own proxied sync traffic. STRICTLY in-memory: never persisted,
+   * never logged — they let the endpoint act as one more sync client of the
+   * user's own vendor account (pull-bootstrap and MCP write sessions).
+   */
+  private vendorContacts = new Map<string, VendorContact>();
 
   constructor(options: CloudGatewayOptions) {
     this.stateRoot = options.stateRoot;
@@ -103,27 +110,36 @@ export class CloudGateway {
     if (binding) {
       if (binding.mode === "local") return { kind: "local" };
       const partition = await this.registry.open(uid, binding.mode);
-      return { kind: "upstream", context: { partition, capture: true, bootstrapping: false } };
+      return { kind: "upstream", context: { partition, capture: true } };
     }
     const window = await this.bootstrap.current();
-    if (window && window.mode === "upstream") {
-      const firstContact = !window.dataFileUID;
-      try {
-        await this.bootstrap.noteUidSeen(uid);
-      } catch (error) {
-        return { kind: "reject", message: error instanceof Error ? error.message : String(error) };
-      }
-      const partition = await this.registry.open(uid, "upstream");
-      if (firstContact && !(await partition.isEmpty())) {
-        return { kind: "reject", message: "bootstrap requires an empty partition, but this dataFileUID already has history" };
-      }
-      return { kind: "upstream", context: { partition, capture: true, bootstrapping: true } };
-    }
     if (window) return { kind: "local" }; // local-mode bootstrap window
     // Unknown UID, nothing armed: stay out of the way — forward to the vendor
-    // unchanged, touch nothing, and leave a trace for the operator.
+    // unchanged, touch nothing beyond the in-memory contact, and leave a
+    // trace for the operator (upstream bootstrap pulls vendor history itself).
     log(`sync operation for unknown dataFileUID forwarded to the vendor without capture (no binding, no armed bootstrap)`);
-    return { kind: "upstream", context: { capture: false, bootstrapping: false } };
+    return { kind: "upstream", context: { capture: false } };
+  }
+
+  noteVendorContact(rawUid: string, contact: VendorContact): void {
+    try {
+      this.vendorContacts.set(normalizeDataFileUid(rawUid), contact);
+    } catch {
+      /* invalid UID — nothing to key the contact on */
+    }
+  }
+
+  vendorContact(rawUid: string): VendorContact | undefined {
+    try {
+      return this.vendorContacts.get(normalizeDataFileUid(rawUid));
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** All dataFileUIDs whose sync traffic has been seen since server start. */
+  vendorContactUids(): string[] {
+    return [...this.vendorContacts.keys()];
   }
 
   /** A CONNECT tunnel to the vendor sync host blinds the mirror; record it. */

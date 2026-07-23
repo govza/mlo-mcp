@@ -73,15 +73,21 @@ describe("write gating by binding and lifecycle", () => {
   it("blocks writes for an unbound partitioned profile with a bootstrap-directed error", async () => {
     const gateway = new CloudGateway({ stateRoot: await root() });
     await expect(requireWritableCloudState(contextFor(gateway, "C:\\a.ml")))
-      .rejects.toThrow(/no bootstrapped cloud partition.*cloud_bootstrap.*ordinary sync will not help/s);
+      .rejects.toThrow(/no bootstrapped cloud partition.*cloud_bootstrap/s);
   });
 
-  it("blocks writes on an upstream-bound profile with the write-through refusal", async () => {
+  it("blocks upstream writes until bootstrapped and until vendor credentials are in memory", async () => {
     const gateway = new CloudGateway({ stateRoot: await root() });
     await gateway.bindings.create("C:\\a.ml", "upstream");
     await gateway.bindings.bindUid("C:\\a.ml", UID_A);
+    // Bound but not bootstrapped: directed to cloud_bootstrap.
     await expect(requireWritableCloudState(contextFor(gateway, "C:\\a.ml")))
-      .rejects.toThrow(/upstream mode.*write-through is not enabled.*MLO app/s);
+      .rejects.toThrow("not bootstrapped (uninitialized)");
+    // Bootstrapped but no vendor sync traffic observed since server start:
+    // the endpoint cannot act as a cloud client yet.
+    await (await gateway.registry.open(UID_A, "upstream")).setLifecycle("ready");
+    await expect(requireWritableCloudState(contextFor(gateway, "C:\\a.ml")))
+      .rejects.toThrow(/vendor sync credentials.*run one sync/s);
     // A profile with no binding at all gets the bootstrap direction instead.
     await expect(requireWritableCloudState(contextFor(gateway, "C:\\other.ml")))
       .rejects.toThrow("no bootstrapped cloud partition");

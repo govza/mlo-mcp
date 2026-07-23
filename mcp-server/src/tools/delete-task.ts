@@ -1,10 +1,9 @@
 import { z } from "zod";
 import { buildTaskDeleteDelta } from "../cloud/delta.js";
 import { packEnvelope } from "../cloud/envelope.js";
-import { cursorToDecimalString } from "../cloud/cursor.js";
 import { quickSync } from "../mlo-cli.js";
 import { findById, flatten } from "../task-tree.js";
-import { defineTool, requireWritableCloudState, textResult } from "./shared.js";
+import { defineTool, requireWriteChannel, textResult } from "./shared.js";
 import type { TaskNode } from "../types.js";
 import { knownCloudProjection } from "../cloud/log-projection.js";
 import { buildUidResolver } from "../cloud/structure-align.js";
@@ -91,9 +90,9 @@ export const deleteTaskTool = defineTool({
   async execute({ ids }, ctx) {
     // Unlike add_task, the pre-sync export is mandatory: it is the only
     // source for the path-id → GUID resolution the tombstones are made of.
-    const cloudState = await requireWritableCloudState(ctx);
+    const channel = await requireWriteChannel(ctx);
     const before = (await ctx.store.getSnapshot(true)).tasks;
-    const cloud = await knownCloudProjection(cloudState);
+    const cloud = await knownCloudProjection(channel.state);
     const { targets, uids, missingGuid } = collectTombstones(before, ids, buildUidResolver(before, cloud));
     if (missingGuid.length > 0) {
       const list = missingGuid.map((task) => `[${task.id}] "${task.Caption}"`).join(", ");
@@ -103,7 +102,7 @@ export const deleteTaskTool = defineTool({
       );
     }
     const delta = buildTaskDeleteDelta(uids);
-    const cursor = cursorToDecimalString(await cloudState.append("mcp", packEnvelope(delta)));
+    const cursor = await channel.commit(packEnvelope(delta));
     const described = targets.map(({ id, task }) => `[${id}] "${task.Caption}"`).join(", ");
     let verified = false;
     let message: string;

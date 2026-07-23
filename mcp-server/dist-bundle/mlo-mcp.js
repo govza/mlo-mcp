@@ -25343,6 +25343,13 @@ var CloudGateway = class {
   unboundState;
   rootPrepared = false;
   sessionAuthorities = /* @__PURE__ */ new Map();
+  /**
+   * Vendor-client contacts per normalized dataFileUID, captured from the
+   * profile's own proxied sync traffic. STRICTLY in-memory: never persisted,
+   * never logged — they let the endpoint act as one more sync client of the
+   * user's own vendor account (pull-bootstrap and MCP write sessions).
+   */
+  vendorContacts = /* @__PURE__ */ new Map();
   constructor(options) {
     this.stateRoot = options.stateRoot;
     this.registry = new PartitionRegistry(options.stateRoot);
@@ -25401,25 +25408,29 @@ var CloudGateway = class {
     if (binding) {
       if (binding.mode === "local") return { kind: "local" };
       const partition = await this.registry.open(uid, binding.mode);
-      return { kind: "upstream", context: { partition, capture: true, bootstrapping: false } };
+      return { kind: "upstream", context: { partition, capture: true } };
     }
     const window2 = await this.bootstrap.current();
-    if (window2 && window2.mode === "upstream") {
-      const firstContact = !window2.dataFileUID;
-      try {
-        await this.bootstrap.noteUidSeen(uid);
-      } catch (error2) {
-        return { kind: "reject", message: error2 instanceof Error ? error2.message : String(error2) };
-      }
-      const partition = await this.registry.open(uid, "upstream");
-      if (firstContact && !await partition.isEmpty()) {
-        return { kind: "reject", message: "bootstrap requires an empty partition, but this dataFileUID already has history" };
-      }
-      return { kind: "upstream", context: { partition, capture: true, bootstrapping: true } };
-    }
     if (window2) return { kind: "local" };
     log(`sync operation for unknown dataFileUID forwarded to the vendor without capture (no binding, no armed bootstrap)`);
-    return { kind: "upstream", context: { capture: false, bootstrapping: false } };
+    return { kind: "upstream", context: { capture: false } };
+  }
+  noteVendorContact(rawUid, contact) {
+    try {
+      this.vendorContacts.set(normalizeDataFileUid(rawUid), contact);
+    } catch {
+    }
+  }
+  vendorContact(rawUid) {
+    try {
+      return this.vendorContacts.get(normalizeDataFileUid(rawUid));
+    } catch {
+      return void 0;
+    }
+  }
+  /** All dataFileUIDs whose sync traffic has been seen since server start. */
+  vendorContactUids() {
+    return [...this.vendorContacts.keys()];
   }
   /** A CONNECT tunnel to the vendor sync host blinds the mirror; record it. */
   async noteVendorConnect() {
@@ -25645,7 +25656,7 @@ var CANONICAL_TASK_COLUMNS = TODO_ITEMS_HEADER;
 function normalizedGuid(value) {
   return value.trim().toUpperCase();
 }
-function validateFullSnapshot(document) {
+function validateFullSnapshot(document, options = {}) {
   const errors = [];
   const stats = {};
   const versions = findSection(document, "SysVersions");
@@ -25772,8 +25783,10 @@ function validateFullSnapshot(document) {
     }
   }
   const config2 = findSection(document, "Config");
-  if (!config2) errors.push("snapshot has no Config section \u2014 this looks like an ordinary incremental delta, not a full upload");
-  else stats.configRows = config2.rows.length;
+  if (!config2 && options.requireConfig !== false) {
+    errors.push("snapshot has no Config section \u2014 this looks like an ordinary incremental delta, not a full upload");
+  }
+  if (config2) stats.configRows = config2.rows.length;
   return { ok: errors.length === 0, errors, stats };
 }
 
@@ -26027,6 +26040,23 @@ var import_fast_xml_parser2 = __toESM(require_fxp(), 1);
 import http from "node:http";
 import https from "node:https";
 import zlib2 from "node:zlib";
+var CONTACT_FIELDS = ["loginBytes", "passwordBytes", "additionalParams", "encoding"];
+function contactFromRequest(target, fields) {
+  const values = {};
+  for (const name of CONTACT_FIELDS) {
+    const value = fields[name];
+    if (typeof value === "string" && value.length) values[name] = value;
+  }
+  if (!values.loginBytes || !values.passwordBytes) return void 0;
+  return {
+    target,
+    loginBytes: values.loginBytes,
+    passwordBytes: values.passwordBytes,
+    ...values.additionalParams ? { additionalParams: values.additionalParams } : {},
+    ...values.encoding ? { encoding: values.encoding } : {},
+    seenAt: Date.now()
+  };
+}
 async function forwardBuffered(target, method, headers, body) {
   const transport = target.protocol === "https:" ? https : http;
   const outgoing = { ...headers, host: target.host, "content-length": body.byteLength };
@@ -26076,17 +26106,20 @@ function text(fields, name) {
   return typeof value === "string" && value.length ? value : void 0;
 }
 async function forwardVendorSoap(gateway, context, target, operation, requestHeaders, requestBytes, requestFields) {
+  const rawUid = typeof requestFields.dataFileUID === "string" ? requestFields.dataFileUID : void 0;
+  const contact = contactFromRequest(target, requestFields);
+  if (rawUid && contact) gateway.noteVendorContact(rawUid, contact);
   const result = await forwardBuffered(target, "POST", requestHeaders, requestBytes);
   if (!context.capture || !context.partition || result.status !== 200) return result;
   try {
-    await captureExchange(gateway, context, operation, requestFields, result);
+    await captureExchange(context, operation, requestFields, result);
   } catch (error2) {
     log(`upstream mirror capture failed (response passed through unchanged): ${error2 instanceof Error ? error2.message : String(error2)}`);
     await gateway.noteMirrorUnhealthy();
   }
   return result;
 }
-async function captureExchange(gateway, context, operation, requestFields, result) {
+async function captureExchange(context, operation, requestFields, result) {
   const partition = context.partition;
   const fields = responseFields(decodeBody2(result), operation);
   if (text(fields, `${operation}Result`) !== "true") return;
@@ -26095,9 +26128,8 @@ async function captureExchange(gateway, context, operation, requestFields, resul
     const data = typeof requestFields.data === "string" ? requestFields.data : void 0;
     if (!version2 || !data) return;
     const bytes = Buffer.from(data.replace(/\s+/g, ""), "base64");
-    const document = unpackEnvelope(bytes);
+    unpackEnvelope(bytes);
     await partition.mirrorState.appendAtCursor("app", bytes, parseCursor(version2));
-    if (context.bootstrapping) await tryCompleteBootstrap(gateway, partition, document, version2);
     return;
   }
   if (operation === "GetModificationsBytesEx") {
@@ -26105,22 +26137,129 @@ async function captureExchange(gateway, context, operation, requestFields, resul
     const data = text(fields, "data");
     if (!version2 || !data) return;
     const bytes = Buffer.from(data.replace(/\s+/g, ""), "base64");
-    const document = unpackEnvelope(bytes);
+    unpackEnvelope(bytes);
     await partition.mirrorState.appendAtCursor("mcp", bytes, parseCursor(version2));
-    if (context.bootstrapping) await tryCompleteBootstrap(gateway, partition, document, version2);
   }
 }
-async function tryCompleteBootstrap(gateway, partition, document, version2) {
-  const window2 = await gateway.bootstrap.current();
-  if (!window2) return;
-  const validation = validateFullSnapshot(document);
-  if (!validation.ok) return;
-  await partition.mirrorSnapshots.materialize(document, parseCursor(version2));
-  await gateway.bindings.bindUid(window2.profilePath, partition.uid);
-  await partition.setLifecycle("ready");
-  await gateway.bootstrap.complete();
-  log(`upstream mirror bootstrapped at vendor version ${version2} (${validation.stats.tasks} tasks)`);
+function xmlEscape(value) {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;");
 }
+var MLO_NAMESPACE2 = "http://www.mylifeorganized.net/";
+var VendorClient = class {
+  constructor(contact, dataFileUID) {
+    this.contact = contact;
+    this.dataFileUID = dataFileUID;
+  }
+  contact;
+  dataFileUID;
+  request(operation, extra) {
+    const ordered = operation === "ReleaseSyncSessionBytes" ? [
+      ["loginBytes", this.contact.loginBytes],
+      ["passwordBytes", this.contact.passwordBytes],
+      ...this.contact.encoding ? [["encoding", this.contact.encoding]] : [],
+      ["dataFileUID", this.dataFileUID],
+      ...extra
+    ] : [
+      ["loginBytes", this.contact.loginBytes],
+      ["passwordBytes", this.contact.passwordBytes],
+      ...this.contact.additionalParams ? [["additionalParams", this.contact.additionalParams]] : [],
+      ...extra.filter(([name]) => name === "sessionID"),
+      ...this.contact.encoding ? [["encoding", this.contact.encoding]] : [],
+      ["dataFileUID", this.dataFileUID],
+      ...extra.filter(([name]) => name !== "sessionID")
+    ];
+    const body = ordered.map(([name, value]) => `<${name}>${xmlEscape(value)}</${name}>`).join("");
+    const xml2 = `<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><${operation} xmlns="${MLO_NAMESPACE2}">${body}</${operation}></soap:Body></soap:Envelope>`;
+    return forwardBuffered(this.contact.target, "POST", {
+      "content-type": "text/xml; charset=utf-8",
+      soapaction: `"${MLO_NAMESPACE2}${operation}"`
+    }, Buffer.from(xml2, "utf8"));
+  }
+  parse(operation, result) {
+    if (result.status !== 200) throw new Error(`vendor ${operation} failed with HTTP ${result.status}`);
+    const fields = responseFields(decodeBody2(result), operation);
+    if (text(fields, `${operation}Result`) !== "true") {
+      const message = text(fields, "errorMessage") ?? "vendor reported failure";
+      throw new Error(`vendor ${operation} rejected: ${message}`);
+    }
+    return fields;
+  }
+  /** Pull all changes newer than `newerThan`; returns the vendor version and payload. */
+  async pull(sessionId, newerThan) {
+    const fields = this.parse("GetModificationsBytesEx", await this.request("GetModificationsBytesEx", [
+      ["sessionID", sessionId],
+      ["newerThan", cursorToDecimalString(newerThan)]
+    ]));
+    const maxVersion = parseCursor(text(fields, "maxVersion") ?? "0");
+    const data = text(fields, "data");
+    return { maxVersion, ...data ? { data: Buffer.from(data.replace(/\s+/g, ""), "base64") } : {} };
+  }
+  /** Upload one envelope; the vendor assigns and returns the new remote version. */
+  async apply(sessionId, envelope2) {
+    const fields = this.parse("ApplyModificationsBytesEx", await this.request("ApplyModificationsBytesEx", [
+      ["sessionID", sessionId],
+      // Opaque local baseline of THIS client; zero mirrors a first-sync
+      // client, which the vendor demonstrably accepts.
+      ["lastSyncTimestamp", "0"],
+      ["data", Buffer.from(envelope2).toString("base64")]
+    ]));
+    return parseCursor(text(fields, "newServerTimeStamp") ?? "0");
+  }
+  async release(sessionId) {
+    this.parse("ReleaseSyncSessionBytes", await this.request("ReleaseSyncSessionBytes", [["sessionID", sessionId]]));
+  }
+};
+async function bootstrapFromVendor(gateway, profilePath, rawUid) {
+  const contact = gateway.vendorContact(rawUid);
+  if (!contact) {
+    throw new Error(
+      "no vendor sync credentials observed for this dataFileUID yet \u2014 run one sync in MLO through this proxy, then retry"
+    );
+  }
+  const partition = await gateway.registry.open(rawUid, "upstream");
+  const client = new VendorClient(contact, partition.uid);
+  const sessionId = generateGuid();
+  const pulled = await client.pull(sessionId, ZERO_CURSOR);
+  await client.release(sessionId).catch(() => void 0);
+  if (!pulled.data) throw new Error("vendor returned no payload for a full-history pull");
+  const document = unpackEnvelope(pulled.data);
+  const validation = validateFullSnapshot(document, { requireConfig: false });
+  if (!validation.ok) {
+    const preview = validation.errors.slice(0, 5).join("; ");
+    throw new Error(`vendor full-history pull failed snapshot validation: ${preview}`);
+  }
+  await partition.mirrorState.appendAtCursor("mcp", pulled.data, pulled.maxVersion);
+  await partition.mirrorSnapshots.materialize(document, pulled.maxVersion);
+  await gateway.bindings.bindUid(profilePath, partition.uid);
+  await partition.setLifecycle("ready");
+  log(`upstream mirror bootstrapped from vendor history at version ${cursorToDecimalString(pulled.maxVersion)} (${validation.stats.tasks} tasks)`);
+  return { version: cursorToDecimalString(pulled.maxVersion), stats: validation.stats };
+}
+var UpstreamWriteSession = class {
+  constructor(partition, contact) {
+    this.partition = partition;
+    this.client = new VendorClient(contact, partition.uid);
+  }
+  partition;
+  client;
+  sessionId = generateGuid();
+  /** Pull vendor changes newer than the mirror and capture them. */
+  async refresh() {
+    const newerThan = await this.partition.mirrorState.highWater();
+    const pulled = await this.client.pull(this.sessionId, newerThan);
+    if (pulled.data && pulled.maxVersion > newerThan) {
+      unpackEnvelope(pulled.data);
+      await this.partition.mirrorState.appendAtCursor("mcp", pulled.data, pulled.maxVersion);
+    }
+  }
+  /** Upload one MCP-authored envelope; returns the vendor-assigned version. */
+  async commit(envelope2) {
+    const version2 = await this.client.apply(this.sessionId, envelope2);
+    await this.partition.mirrorState.appendAtCursor("mcp", envelope2, version2);
+    await this.client.release(this.sessionId).catch(() => void 0);
+    return cursorToDecimalString(version2);
+  }
+};
 
 // src/cloud/server.ts
 var BODY_LIMIT = 32 * 1024 * 1024;
@@ -26876,30 +27015,38 @@ async function resolveReadCloudState(ctx) {
   if (bound.kind !== "bound") return ctx.cloudState;
   return bound.binding.mode === "upstream" ? bound.partition.mirrorState : bound.partition.state;
 }
-async function requireWritableCloudState(ctx) {
-  if (!ctx.cloud) return ctx.cloudState;
+function localChannel(state) {
+  return {
+    state,
+    commit: async (bytes) => cursorToDecimalString(await state.append("mcp", bytes))
+  };
+}
+async function requireWriteChannel(ctx) {
+  if (!ctx.cloud) return localChannel(ctx.cloudState);
   const bound = await ctx.cloud.boundPartition(ctx.config.dataFile);
   if (bound.kind === "unbound") {
-    if (bound.binding?.mode === "upstream") {
-      throw new Error(
-        "this profile is bound to the vendor Cloud (upstream mode); MCP write-through is not enabled \u2014 make this change in the MLO app"
-      );
-    }
     throw new Error(
-      "this profile has no bootstrapped cloud partition; run cloud_bootstrap, then Re-synchronize in MLO (Sync \u2192 Advanced) \u2014 an ordinary sync will not help"
-    );
-  }
-  if (bound.binding.mode === "upstream") {
-    throw new Error(
-      "this profile is bound to the vendor Cloud (upstream mode); MCP write-through is not enabled \u2014 make this change in the MLO app"
+      "this profile has no bootstrapped cloud partition; run cloud_bootstrap (for the default upstream mode, run one sync in MLO through this proxy first so the endpoint can act as a cloud client) \u2014 an ordinary sync alone will not help"
     );
   }
   if (bound.lifecycle !== "ready") {
     throw new Error(
-      `cloud partition is not bootstrapped (${bound.lifecycle}); run cloud_bootstrap, then Re-synchronize in MLO (Sync \u2192 Advanced) \u2014 an ordinary sync will not help`
+      `cloud partition is not bootstrapped (${bound.lifecycle}); run cloud_bootstrap \u2014 an ordinary sync will not help`
     );
   }
-  return bound.partition.state;
+  if (bound.binding.mode === "local") return localChannel(bound.partition.state);
+  const contact = ctx.cloud.vendorContact(bound.binding.dataFileUID);
+  if (!contact) {
+    throw new Error(
+      "upstream writes need the profile's vendor sync credentials, which are held in memory only: run one sync in MLO through this proxy since server start, then retry"
+    );
+  }
+  const session = new UpstreamWriteSession(bound.partition, contact);
+  await session.refresh();
+  return {
+    state: bound.partition.mirrorState,
+    commit: (bytes) => session.commit(bytes)
+  };
 }
 function defineTool(tool) {
   return tool;
@@ -27361,9 +27508,9 @@ var addTasksTool = defineTool({
       byKey.set(spec.key, spec);
     }
     validateGraph(tasks, byKey);
-    const cloudState = await requireWritableCloudState(ctx);
+    const channel = await requireWriteChannel(ctx);
     const uids = new Map(tasks.map((spec) => [spec.key, generateGuid()]));
-    const cloud = await knownCloudProjection(cloudState);
+    const cloud = await knownCloudProjection(channel.state);
     let starredIndex = Math.max(0, ...[...cloud.starredOrderByTask.values()].map(Number).filter(Number.isFinite)) + 500;
     const maxItemIndexByParent = /* @__PURE__ */ new Map();
     for (const known of cloud.rows.values()) {
@@ -27411,7 +27558,7 @@ var addTasksTool = defineTool({
         ...starOrder !== void 0 ? { starredOrderIndex: starOrder } : {}
       });
     });
-    const cursor = cursorToDecimalString(await cloudState.append("mcp", packEnvelope(mergeDeltas(documents))));
+    const cursor = await channel.commit(packEnvelope(mergeDeltas(documents)));
     const resultTasks = tasks.map((spec) => ({ key: spec.key, uid: uids.get(spec.key) }));
     const queued = tasks.length === 1 ? "1 task was queued" : `${tasks.length} tasks were queued atomically`;
     let verified = false;
@@ -27472,9 +27619,9 @@ var addTaskTool = defineTool({
 
 // src/tools/row-update.ts
 async function runCloudRowUpdate(ctx, ids, plan) {
-  const cloudState = await requireWritableCloudState(ctx);
+  const channel = await requireWriteChannel(ctx);
   const before = (await ctx.store.getSnapshot(true)).tasks;
-  const cloud = await knownCloudProjection(cloudState);
+  const cloud = await knownCloudProjection(channel.state);
   const resolveUid = buildUidResolver(before, cloud);
   const resolved = [...new Set(ids)].map((id) => {
     const task = findById(before, id);
@@ -27537,7 +27684,7 @@ async function runCloudRowUpdate(ctx, ids, plan) {
       };
     })
   );
-  const cursor = cursorToDecimalString(await cloudState.append("mcp", packEnvelope(delta)));
+  const cursor = await channel.commit(packEnvelope(delta));
   const described = targets.map(({ id, task }) => `[${id}] "${task.Caption}"`).join(", ");
   const uids = targets.map((target) => target.uid);
   let verified = false;
@@ -27548,7 +27695,7 @@ async function runCloudRowUpdate(ctx, ids, plan) {
     try {
       const afterRoots = (await ctx.store.getSnapshot(true)).tasks;
       const after = flatten(afterRoots);
-      const verificationCloud = await knownCloudProjection(cloudState);
+      const verificationCloud = await knownCloudProjection(channel.state);
       const verifyUid = buildUidResolver(afterRoots, verificationCloud);
       const byGuid = /* @__PURE__ */ new Map();
       for (const task of after) {
@@ -27897,9 +28044,9 @@ var deleteTaskTool = defineTool({
   },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   async execute({ ids }, ctx) {
-    const cloudState = await requireWritableCloudState(ctx);
+    const channel = await requireWriteChannel(ctx);
     const before = (await ctx.store.getSnapshot(true)).tasks;
-    const cloud = await knownCloudProjection(cloudState);
+    const cloud = await knownCloudProjection(channel.state);
     const { targets, uids, missingGuid } = collectTombstones(before, ids, buildUidResolver(before, cloud));
     if (missingGuid.length > 0) {
       const list = missingGuid.map((task) => `[${task.id}] "${task.Caption}"`).join(", ");
@@ -27908,7 +28055,7 @@ var deleteTaskTool = defineTool({
       );
     }
     const delta = buildTaskDeleteDelta(uids);
-    const cursor = cursorToDecimalString(await cloudState.append("mcp", packEnvelope(delta)));
+    const cursor = await channel.commit(packEnvelope(delta));
     const described = targets.map(({ id, task }) => `[${id}] "${task.Caption}"`).join(", ");
     let verified = false;
     let message;
@@ -28078,29 +28225,37 @@ var cloudStatusTool = defineTool({
 // src/tools/cloud-bootstrap.ts
 var cloudBootstrapTool = defineTool({
   name: "cloud_bootstrap",
-  title: "Arm a full-snapshot bootstrap",
-  description: "Arm the one-time bootstrap window for this profile: bind it to a fresh cloud state partition and accept MLO's next Re-synchronize as the authoritative full snapshot. Local mode only; requires an empty partition.",
+  title: "Bootstrap the profile's cloud partition",
+  description: "Bootstrap this profile for cloud reads and writes. Upstream mode (default) pulls the vendor cloud's full history automatically after one ordinary MLO sync through the proxy; local mode arms a window for MLO's Re-synchronize and makes this endpoint the cloud authority.",
   inputSchema: {
     mode: external_exports.enum(["upstream", "local"]).optional().describe(
-      'Binding authority. "upstream" (default): transparent proxy to the real vendor Cloud with a passive read mirror \u2014 vendor/mobile sync keeps working, MCP writes stay disabled. "local": this endpoint IS the cloud (full MCP writes) \u2014 the profile must never sync against the vendor again.'
+      'Binding authority. "upstream" (default): the real vendor Cloud stays the authority; the endpoint is a transparent proxy plus one more sync client, so MCP reads and writes coexist with vendor/mobile sync. "local": this endpoint IS the cloud \u2014 the profile must never sync against the vendor again.'
     ),
     rebind: external_exports.boolean().optional().describe(
       "Explicitly drop the current partition binding and bootstrap into a fresh one. The old partition directory is preserved as evidence."
     )
   },
   outputSchema: {
-    armed: external_exports.boolean(),
     mode: external_exports.string(),
-    expiresAt: external_exports.string(),
+    bootstrapped: external_exports.boolean().describe("true = the partition is ready now; false = a window was armed and MLO must Re-synchronize"),
+    version: external_exports.string().optional().describe("Vendor remote version the mirror was materialized at (upstream)"),
+    tasks: external_exports.number().optional(),
+    armed: external_exports.boolean().optional(),
+    expiresAt: external_exports.string().optional(),
     instructions: external_exports.string()
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   async execute({ mode: requestedMode, rebind }, ctx) {
     const gateway = ctx.cloud;
     if (!gateway) throw new Error("no cloud gateway is attached to this server context");
     const mode = requestedMode ?? "upstream";
     await gateway.ensureRoot();
     const binding = rebind ? await gateway.bindings.replace(ctx.config.dataFile, mode) : await gateway.bindings.create(ctx.config.dataFile, mode);
+    if (binding.mode !== mode) {
+      throw new Error(
+        `this profile is already bound in "${binding.mode}" mode; switching modes requires { rebind: true } (the old partition stays on disk as evidence)`
+      );
+    }
     if (binding.dataFileUID) {
       const partition = await gateway.registry.open(binding.dataFileUID, binding.mode);
       if (await partition.lifecycle() === "ready") {
@@ -28109,11 +28264,41 @@ var cloudBootstrapTool = defineTool({
         );
       }
     }
+    if (mode === "upstream") {
+      let uid = binding.dataFileUID;
+      if (!uid) {
+        const candidates = [];
+        for (const candidate of gateway.vendorContactUids()) {
+          if (!await gateway.bindings.forUid(candidate)) candidates.push(candidate);
+        }
+        if (candidates.length === 0) {
+          throw new Error(
+            'no vendor sync traffic observed since server start \u2014 run one ordinary sync in MLO through this proxy ("Use secure connection" unchecked), then retry cloud_bootstrap'
+          );
+        }
+        if (candidates.length > 1) {
+          throw new Error(
+            "multiple unbound dataFileUIDs have synced through this proxy \u2014 sync only the target profile, restart the server, and retry so exactly one candidate exists"
+          );
+        }
+        uid = candidates[0];
+      }
+      const result = await bootstrapFromVendor(gateway, ctx.config.dataFile, uid);
+      const instructions2 = `Bootstrapped from the vendor cloud at remote version ${result.version} (${result.stats.tasks} tasks, ${result.stats.places} contexts, ${result.stats.flags} flags). Reads and writes are live: MCP writes go up as this endpoint's own vendor sync sessions and reach MLO on its next QuickSync; vendor and mobile sync are unaffected.`;
+      return textResult(instructions2, {
+        mode,
+        bootstrapped: true,
+        version: result.version,
+        tasks: result.stats.tasks ?? 0,
+        instructions: instructions2
+      });
+    }
     const window2 = await gateway.bootstrap.arm(ctx.config.dataFile, mode);
-    const instructions = mode === "upstream" ? `Armed (upstream mirror). In MLO: keep the cloud sync proxy pointed at this endpoint with "Use secure connection" UNCHECKED (a TLS tunnel would blind the mirror), then open the profile's sync settings (Advanced) and run Re-synchronize with Bidirectional direction and no property exclusions. The real vendor Cloud stays the authority; the endpoint passively captures the full database flowing through and materializes it as the read mirror. Check cloud_status afterward \u2014 lifecycle must be "ready". MCP writes stay disabled in upstream mode. The window expires at ${window2.expiresAt}.` : `Armed (local replacement server). In MLO: make sure the cloud sync proxy points at this endpoint, then open the profile's sync settings (Advanced) and run Re-synchronize with Bidirectional direction and no property exclusions. MLO will pull an empty state and upload its complete database; the endpoint validates and materializes it as the authoritative baseline. Check cloud_status afterward \u2014 lifecycle must be "ready". WARNING: a local-mode profile must never sync against the vendor Cloud again. The window expires at ${window2.expiresAt}.`;
+    const instructions = `Armed (local replacement server). In MLO: make sure the cloud sync proxy points at this endpoint, then open the profile's sync settings (Advanced) and run Re-synchronize with Bidirectional direction and no property exclusions. MLO will pull an empty state and upload its complete database; the endpoint validates and materializes it as the authoritative baseline. Check cloud_status afterward \u2014 lifecycle must be "ready". WARNING: a local-mode profile must never sync against the vendor Cloud again. The window expires at ${window2.expiresAt}.`;
     return textResult(instructions, {
-      armed: true,
       mode,
+      bootstrapped: false,
+      armed: true,
       expiresAt: window2.expiresAt,
       instructions
     });
@@ -28153,24 +28338,28 @@ add_tasks creates up to 50 tasks atomically; local \`key\` values connect its
 \`parentKey\` and \`dependsOnKeys\` outline/dependency references.
 
 ### How writes work
-Writes never touch the data file. Each write queues a sync delta on the local cloud endpoint
-and triggers MLO's QuickSync; MLO's own merge logic applies it, and the app keeps running.
-The result's \`verified\` flag says whether a fresh export confirmed the change \u2014 \`false\`
-means "queued, not applied yet", not failure; MLO applies it on its next sync session.
+Writes never touch the data file. Each write travels as a cloud sync delta with full task
+records: in the default upstream mode it is pushed to the real vendor Cloud in the endpoint's
+own sync session (vendor and mobile stay in sync) and reaches the app on its next QuickSync;
+in local mode it is queued on the local replacement endpoint. Either way MLO's own merge
+logic applies it and the app keeps running. The result's \`verified\` flag says whether a
+fresh export confirmed the change \u2014 \`false\` means "accepted, not applied yet", not failure.
 Batch tools (\`ids\`/\`updates\` arrays) send the whole batch as ONE delta and are atomic:
 one bad id and nothing is queued.
 
-### Coverage limits (fail fast, nothing queued)
-- update_task / complete_task / uncomplete_task need the task's full record in the delta
-  log \u2014 available once a task was added by this server or changed in MLO since the local
-  endpoint took over. Otherwise make the change in the MLO app.
+### Bootstrap (one-time per profile)
+Writes need a bootstrapped cloud partition. If a tool fails with "run cloud_bootstrap":
+for upstream mode run one ordinary MLO sync through the proxy, then call cloud_bootstrap \u2014
+it pulls the vendor's complete history automatically and enables reads and writes for every
+existing task. cloud_status shows binding, lifecycle, and mirror coverage.
+
+### Field support and refusals (fail fast, nothing queued)
 - add_task/update_task support Folder, Project, Starred, visibility/sequential
   booleans, existing Flag assignment, and existing contexts (Places).
 - update_task replaces dependencies through \`dependsOnIds\` (path ids resolved
   atomically to GUIDs); date edits on recurring tasks are refused (the series would desync).
 - complete_task refuses recurring tasks \u2014 completing in MLO generates the next occurrence.
-- delete_task removes each task AND its whole subtree; it needs binary/XML or
-  unambiguous logged-path GUID recovery for the full subtree.
+- delete_task removes each task AND its whole subtree.
 
 ### Field conventions
 - Dates are local ISO without timezone ("2026-08-01T15:00:00").

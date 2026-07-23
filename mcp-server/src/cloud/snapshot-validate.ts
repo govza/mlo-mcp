@@ -24,7 +24,19 @@ function normalizedGuid(value: string): string {
   return value.trim().toUpperCase();
 }
 
-export function validateFullSnapshot(document: SectionedCsv): SnapshotValidation {
+export interface SnapshotValidationOptions {
+  /**
+   * The `Config` section separates a genuine full UPLOAD from an incremental
+   * delta that happened to arrive while armed. A client-initiated pull from
+   * remote version 0 is full by construction, so that path may waive it.
+   */
+  requireConfig?: boolean;
+}
+
+export function validateFullSnapshot(
+  document: SectionedCsv,
+  options: SnapshotValidationOptions = {},
+): SnapshotValidation {
   const errors: string[] = [];
   const stats: Record<string, number> = {};
 
@@ -171,8 +183,10 @@ export function validateFullSnapshot(document: SectionedCsv): SnapshotValidation
   // incremental deltas never did. Its presence separates a genuine full
   // upload from a small delta that happened to arrive while armed.
   const config = findSection(document, "Config");
-  if (!config) errors.push("snapshot has no Config section — this looks like an ordinary incremental delta, not a full upload");
-  else stats.configRows = config.rows.length;
+  if (!config && options.requireConfig !== false) {
+    errors.push("snapshot has no Config section — this looks like an ordinary incremental delta, not a full upload");
+  }
+  if (config) stats.configRows = config.rows.length;
 
   return { ok: errors.length === 0, errors, stats };
 }

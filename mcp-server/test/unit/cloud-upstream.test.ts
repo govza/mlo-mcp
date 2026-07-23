@@ -10,7 +10,8 @@ import { buildTaskAddDelta, mergeDeltas } from "../../src/cloud/delta.js";
 import { packEnvelope } from "../../src/cloud/envelope.js";
 import { findSection, type SectionedCsv } from "../../src/cloud/csv.js";
 import { knownCloudProjection, rowValue } from "../../src/cloud/log-projection.js";
-import { requireWritableCloudState, resolveReadCloudState, type ToolContext } from "../../src/tools/shared.js";
+import { bootstrapFromVendor } from "../../src/cloud/upstream.js";
+import { requireWritableCloudState, requireWriteChannel, resolveReadCloudState, type ToolContext } from "../../src/tools/shared.js";
 import type { MloConfig } from "../../src/types.js";
 
 const dirs: string[] = [];
@@ -166,41 +167,6 @@ describe("upstream transparent proxy", () => {
     expect(await partition.state.highWater()).toBe(0n);
   });
 
-  it("captures an armed re-sync flow into the mirror and reaches ready without touching the vendor exchange", async () => {
-    const gateway = await upstreamGateway();
-    await gateway.bindings.create(PROFILE, "upstream");
-    await gateway.bootstrap.arm(PROFILE, "upstream");
-    const snapshotB64 = Buffer.from(packEnvelope(fullSnapshot())).toString("base64");
-    const vendor = await startVendor((operation) => ({
-      body: operation === "GetModificationsBytesEx"
-        ? vendorResponse(operation, { GetModificationsBytesExResult: "true", maxVersion: "100", data: "" })
-        : operation === "ApplyModificationsBytesEx"
-          ? vendorResponse(operation, { ApplyModificationsBytesExResult: "true", newServerTimeStamp: "101" })
-          : vendorResponse(operation, { ReleaseSyncSessionBytesResult: "true" }),
-    }));
-    const proxy = await startProxy(gateway);
-
-    await proxied(proxy, vendor.port, "GetModificationsBytesEx",
-      soapEnvelope("GetModificationsBytesEx", { sessionID: "s1", dataFileUID: UID, newerThan: "100" }));
-    const apply = await proxied(proxy, vendor.port, "ApplyModificationsBytesEx",
-      soapEnvelope("ApplyModificationsBytesEx", { sessionID: "s1", dataFileUID: UID, lastSyncTimestamp: "0", data: snapshotB64 }));
-    expect(apply.body).toContain("<newServerTimeStamp>101</newServerTimeStamp>");
-    await proxied(proxy, vendor.port, "ReleaseSyncSessionBytes",
-      soapEnvelope("ReleaseSyncSessionBytes", { sessionID: "s1", dataFileUID: UID }));
-
-    const partition = await gateway.registry.open(UID);
-    expect(await partition.lifecycle()).toBe("ready");
-    expect((await gateway.bindings.forProfile(PROFILE))?.dataFileUID).toBe(UID);
-    expect(await gateway.bootstrap.current()).toBeUndefined();
-    // The mirror holds the upload at the VENDOR-assigned version.
-    expect(await partition.mirrorState.highWater()).toBe(101n);
-    // Reads resolve through the mirror; writes stay refused in upstream mode.
-    const ctx = contextFor(gateway);
-    const readState = await resolveReadCloudState(ctx);
-    const projection = await knownCloudProjection(readState);
-    expect(rowValue(projection.rows.get(TASK_UID)!, "Caption")).toBe("Existing task");
-    await expect(requireWritableCloudState(ctx)).rejects.toThrow("write-through is not enabled");
-  });
 
   it("returns the vendor response unchanged even when mirror capture fails", async () => {
     const gateway = await upstreamGateway();
@@ -264,6 +230,68 @@ describe("upstream transparent proxy", () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
     expect(await gateway.mirrorBlind()).toBe(true);
+  });
+
+  it("bootstraps from vendor history and commits MCP writes as one more vendor client", async () => {
+    const gateway = await upstreamGateway();
+    await gateway.bindings.create(PROFILE, "upstream");
+    const NEW_TASK = "{22222222-2222-2222-2222-222222222222}";
+    const vendor = await startVendor((operation, body) => {
+      if (operation === "GetModificationsBytesEx") {
+        // Full history from 0; nothing newer than 500 afterwards.
+        const fromZero = body.includes("<newerThan>0</newerThan>");
+        return {
+          body: vendorResponse(operation, {
+            GetModificationsBytesExResult: "true",
+            maxVersion: "500",
+            ...(fromZero ? { data: Buffer.from(packEnvelope(fullSnapshot())).toString("base64") } : {}),
+          }),
+        };
+      }
+      if (operation === "ApplyModificationsBytesEx") {
+        return { body: vendorResponse(operation, { ApplyModificationsBytesExResult: "true", newServerTimeStamp: "501" }) };
+      }
+      return { body: vendorResponse(operation, { ReleaseSyncSessionBytesResult: "true" }) };
+    });
+    const proxy = await startProxy(gateway);
+
+    // One ordinary proxied sync exposes the vendor contact (in memory only).
+    await proxied(proxy, vendor.port, "GetModificationsBytesEx", soapEnvelope("GetModificationsBytesEx", {
+      loginBytes: "bG9naW4=", passwordBytes: "cGFzcw==", sessionID: "app-session",
+      dataFileUID: UID, newerThan: "500",
+    }));
+    expect(gateway.vendorContactUids()).toEqual([UID]);
+
+    // Zero-touch bootstrap: pull the vendor's complete history as a client.
+    const result = await bootstrapFromVendor(gateway, PROFILE, UID);
+    expect(result.version).toBe("500");
+    const partition = await gateway.registry.open(UID);
+    expect(await partition.lifecycle()).toBe("ready");
+    expect((await gateway.bindings.forProfile(PROFILE))?.dataFileUID).toBe(UID);
+    expect(await partition.mirrorState.highWater()).toBe(500n);
+
+    // MCP write: refresh, author, commit in the endpoint's own vendor session.
+    const channel = await requireWriteChannel(contextFor(gateway));
+    expect(channel.state).toBe(partition.mirrorState);
+    const version = await channel.commit(packEnvelope(mergeDeltas([
+      buildTaskAddDelta({ uid: NEW_TASK, caption: "written by MCP", createdDate: "2026-07-23T10:00:00", lastModified: "2026-07-23T10:00:00" }),
+    ])));
+    expect(version).toBe("501");
+    expect(await partition.mirrorState.highWater()).toBe(501n);
+
+    // The vendor saw a real client session: credentials, session id, opaque
+    // zero stamp, and the envelope; then a release.
+    const apply = vendor.calls.find((call) => call.operation === "ApplyModificationsBytesEx")!;
+    expect(apply.body).toContain("<loginBytes>bG9naW4=</loginBytes>");
+    expect(apply.body).toContain("<lastSyncTimestamp>0</lastSyncTimestamp>");
+    expect(apply.body).toContain(`<dataFileUID>${UID}</dataFileUID>`);
+    expect(vendor.calls.at(-1)!.operation).toBe("ReleaseSyncSessionBytes");
+
+    // The write is visible to projections immediately (and to MLO on its
+    // next QuickSync through the proxy).
+    const projection = await knownCloudProjection(channel.state);
+    expect(rowValue(projection.rows.get(NEW_TASK)!, "Caption")).toBe("written by MCP");
+    expect(rowValue(projection.rows.get(TASK_UID)!, "Caption")).toBe("Existing task");
   });
 
   it("keeps an upstream mirror and a local partition with identical content fully separate", async () => {
