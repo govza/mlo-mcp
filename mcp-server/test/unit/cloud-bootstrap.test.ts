@@ -48,6 +48,8 @@ function fullSnapshot(extras?: { unknownColumn?: boolean; unknownSection?: boole
     }),
   ]);
   findSection(document, "TodoItems.Deleted")!.rows.push([TOMBSTONE]);
+  // Captured live: full snapshots keep starred-order rows for deleted tasks.
+  findSection(document, "TodoView.ManualOrdering.Starred")!.rows.push([TOMBSTONE, "25"]);
   if (extras?.unknownColumn) {
     const tasks = findSection(document, "TodoItems")!;
     tasks.header.push("FutureColumn");
@@ -84,6 +86,7 @@ describe("snapshot validation", () => {
     expect(validation.ok).toBe(true);
     expect(validation.stats.tasks).toBe(2);
     expect(validation.stats.taskTombstones).toBe(1);
+    expect(validation.stats.danglingStarredOrder).toBe(1);
   });
 
   it("rejects an ordinary incremental delta as not a full upload", () => {

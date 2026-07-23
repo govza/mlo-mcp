@@ -165,9 +165,22 @@ export function validateFullSnapshot(
     { column: "TaskUID", set: liveSet, what: "task" },
     { column: "DependencyUID", set: liveSet, what: "task" },
   ]);
-  stats.starredOrder = relations("TodoView.ManualOrdering.Starred", [
-    { column: "UID", set: liveSet, what: "task" },
-  ]);
+  // Captured live: a genuine Re-synchronize snapshot carried starred-order
+  // rows for TOMBSTONED tasks (3 of 6 rows referenced deleted UIDs). Ordering
+  // rows are pure hints — the merge purges them once the tombstone is
+  // consumed — so dangling references are counted, never fatal.
+  const starred = findSection(document, "TodoView.ManualOrdering.Starred");
+  if (starred) {
+    const uidIndex = starred.header.indexOf("UID");
+    let dangling = 0;
+    for (const row of starred.rows) {
+      const uid = normalizedGuid(row[uidIndex] ?? "");
+      if (!GUID.test(uid)) errors.push(`TodoView.ManualOrdering.Starred row has an invalid UID "${row[uidIndex] ?? ""}"`);
+      else if (!liveSet.has(uid)) dangling += 1;
+    }
+    stats.starredOrder = starred.rows.length;
+    stats.danglingStarredOrder = dangling;
+  }
   stats.placeRelations = relations("PlaceRelations", [
     { column: "PlaceUID", set: places, what: "context" },
     { column: "ParentPlaceUID", set: places, what: "context" },

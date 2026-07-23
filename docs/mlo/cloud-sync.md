@@ -456,6 +456,15 @@ database. The captured snapshot contained 77 complete task rows, 18 contexts,
 12 context relations, 7 flags, 47 task-context relations, 1 dependency,
 3 starred-order rows, 10 `Config` rows, and **6 historical task tombstones**.
 
+A second live run (bootstrapping against the MCP endpoint) added:
+
+- the reset zeroes BOTH stored stamps — the sync log reported
+  "Modif. stamps in profile before sync: Local=0 Remote=0" and then exported
+  everything newer than local stamp 0;
+- when the server answers Apply with `Result=false` + `errorMessage`, MLO
+  aborts the upload, keeps its local baseline, surfaces the message verbatim
+  in its sync log, and retries the whole session once after 3 seconds.
+
 Two corrections this capture makes to earlier assumptions:
 
 - A full snapshot MAY carry tombstone sections alongside the live rows.
@@ -687,6 +696,12 @@ assume a fixed increment or renumber all siblings unnecessarily.
 Turning Starred off emitted `Starred=0` and no ordering row. A materialized
 merger should remove an old starred-order record when the task is unstarred or
 deleted.
+
+**Captured (live full snapshot):** a Re-synchronize upload carried ordering
+rows for TOMBSTONED tasks (3 of its 6 rows referenced UIDs present only in
+`TodoItems.Deleted`). Consumers must tolerate dangling starred-order rows —
+they are ordering hints, purged when the tombstone is merged — and a snapshot
+validator must not reject them.
 
 ## `TodoItems` record dictionary
 

@@ -25769,9 +25769,18 @@ function validateFullSnapshot(document, options = {}) {
     { column: "TaskUID", set: liveSet, what: "task" },
     { column: "DependencyUID", set: liveSet, what: "task" }
   ]);
-  stats.starredOrder = relations("TodoView.ManualOrdering.Starred", [
-    { column: "UID", set: liveSet, what: "task" }
-  ]);
+  const starred = findSection(document, "TodoView.ManualOrdering.Starred");
+  if (starred) {
+    const uidIndex2 = starred.header.indexOf("UID");
+    let dangling = 0;
+    for (const row of starred.rows) {
+      const uid = normalizedGuid(row[uidIndex2] ?? "");
+      if (!GUID.test(uid)) errors.push(`TodoView.ManualOrdering.Starred row has an invalid UID "${row[uidIndex2] ?? ""}"`);
+      else if (!liveSet.has(uid)) dangling += 1;
+    }
+    stats.starredOrder = starred.rows.length;
+    stats.danglingStarredOrder = dangling;
+  }
   stats.placeRelations = relations("PlaceRelations", [
     { column: "PlaceUID", set: places, what: "context" },
     { column: "ParentPlaceUID", set: places, what: "context" }
