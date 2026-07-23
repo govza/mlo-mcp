@@ -1,6 +1,7 @@
 /**
- * Invoke any tool directly, no MCP client needed. Requires MLO_DATA_FILE in
- * the environment (`pnpm tools` browses the catalog without one).
+ * Invoke any tool directly, no MCP client needed. Resolves the profile like
+ * the server does — MLO's current profile, auto-detected
+ * (`pnpm tools` browses the catalog without any profile).
  *
  *   pnpm tool list_tasks '{"format":"flat"}'
  *   pnpm tool add_task '{"caption":"Test task"}'

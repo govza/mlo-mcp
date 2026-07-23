@@ -8982,7 +8982,7 @@ var require_fxp = __commonJS({
 
 // src/index.ts
 import { promises as fs9 } from "node:fs";
-import { fileURLToPath as fileURLToPath2 } from "node:url";
+import { fileURLToPath } from "node:url";
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/external.js
 var external_exports = {};
@@ -23200,7 +23200,7 @@ var StdioServerTransport = class {
 import path8 from "node:path";
 import os2 from "node:os";
 import { existsSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { execFile as execFile2, spawnSync } from "node:child_process";
 
 // src/cloud/server.ts
 import http2 from "node:http";
@@ -26557,18 +26557,47 @@ async function startOrAttachCloudServer(options) {
 
 // src/config.ts
 var DEFAULT_EXE = "C:\\Program Files (x86)\\MyLifeOrganized.net\\MLO\\mlo.exe";
-var DEV_PROFILE = path8.resolve(
-  path8.dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "..",
-  "profile",
-  "profile.ml"
-);
+var LAST_DB_FILE_PS_ARGS = [
+  "-NoProfile",
+  "-NonInteractive",
+  "-Command",
+  "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; (Get-ItemProperty 'HKCU:\\Software\\MyLifeOrganized.net\\MyLife\\Settings' -ErrorAction SilentlyContinue).LastDBFile"
+];
+function parseLastDbFile(stdout) {
+  const file = stdout.replace(/^\uFEFF/, "").trim();
+  return file && existsSync(file) ? file : void 0;
+}
+function detectRunningProfile() {
+  if (process.platform !== "win32") return void 0;
+  const result = spawnSync("powershell.exe", LAST_DB_FILE_PS_ARGS, {
+    encoding: "utf8",
+    windowsHide: true,
+    timeout: 1e4
+  });
+  if (result.status !== 0 || !result.stdout) return void 0;
+  return parseLastDbFile(result.stdout);
+}
+function detectRunningProfileAsync() {
+  if (process.platform !== "win32") return Promise.resolve(void 0);
+  return new Promise((resolve) => {
+    execFile2(
+      "powershell.exe",
+      LAST_DB_FILE_PS_ARGS,
+      { encoding: "utf8", windowsHide: true, timeout: 1e4 },
+      (err2, stdout) => resolve(err2 ? void 0 : parseLastDbFile(stdout))
+    );
+  });
+}
 function resolveDataFile() {
-  if (process.env.MLO_DATA_FILE) return process.env.MLO_DATA_FILE;
-  if (existsSync(DEV_PROFILE)) return DEV_PROFILE;
+  const pin = process.argv.find((a) => a.startsWith("--data-file="));
+  if (pin) return { dataFile: pin.slice("--data-file=".length), autoDetected: false };
+  const detected = detectRunningProfile();
+  if (detected) {
+    log(`auto-detected MLO profile: ${detected}`);
+    return { dataFile: detected, autoDetected: true };
+  }
   throw new Error(
-    "MLO_DATA_FILE environment variable is required. Set it to the path of your .ml data file."
+    "No MLO profile found: MLO's settings record no last-opened profile. Open your profile in MLO once so the server can detect it."
   );
 }
 function resolveStateRoot() {
@@ -26577,7 +26606,7 @@ function resolveStateRoot() {
   return path8.join(os2.homedir(), ".mlo-mcp", "cloud");
 }
 function loadConfig() {
-  const dataFile = resolveDataFile();
+  const { dataFile, autoDetected } = resolveDataFile();
   const cloudPort = Number(process.env.MLO_CLOUD_PORT ?? String(DEFAULT_CLOUD_PORT));
   if (!Number.isInteger(cloudPort) || cloudPort < 0 || cloudPort > 65535) {
     throw new Error("MLO_CLOUD_PORT must be an integer from 0 through 65535");
@@ -26585,6 +26614,7 @@ function loadConfig() {
   return {
     mloExePath: process.env.MLO_EXE_PATH ?? DEFAULT_EXE,
     dataFile,
+    dataFileAutoDetected: autoDetected,
     exportDir: process.env.MLO_EXPORT_DIR ?? path8.join(os2.tmpdir(), "mlo-mcp"),
     cacheStaleMs: Number(process.env.MLO_CACHE_STALE_MS) || 3e4,
     // Only needed when the capture inbox is NOT MLO's own <Inbox> node (e.g. a
@@ -26706,7 +26736,7 @@ async function ensureDataFile(config2) {
   try {
     await fs8.access(config2.dataFile);
   } catch {
-    throw new MloError(`MLO_DATA_FILE not found at "${config2.dataFile}"`);
+    throw new MloError(`MLO data file not found at "${config2.dataFile}"`);
   }
 }
 var exportCounter = 0;
@@ -28367,6 +28397,7 @@ async function main() {
   await server.connect(new StdioServerTransport());
   log(`ready \u2014 data file: ${config2.dataFile}`);
   watchOwnBuild(cloudServer);
+  watchProfileSwitch(config2, cloudServer);
   const shutdown = async () => {
     await cloudServer?.stop();
   };
@@ -28374,7 +28405,7 @@ async function main() {
   process.once("SIGTERM", () => void shutdown().finally(() => process.exit(0)));
 }
 function watchOwnBuild(cloudServer) {
-  const entry = fileURLToPath2(import.meta.url);
+  const entry = fileURLToPath(import.meta.url);
   let startMtime;
   const timer = setInterval(async () => {
     try {
@@ -28388,6 +28419,18 @@ function watchOwnBuild(cloudServer) {
     } catch {
     }
   }, 15e3);
+  timer.unref();
+}
+function watchProfileSwitch(config2, cloudServer) {
+  if (!config2.dataFileAutoDetected) return;
+  const timer = setInterval(async () => {
+    const current = await detectRunningProfileAsync();
+    if (current && current !== config2.dataFile && !isMloBusy()) {
+      log(`MLO switched profiles (${config2.dataFile} \u2192 ${current}) \u2014 exiting so the client restarts against it`);
+      await cloudServer?.stop();
+      process.exit(0);
+    }
+  }, 6e4);
   timer.unref();
 }
 main().catch((e) => {

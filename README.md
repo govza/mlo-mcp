@@ -13,7 +13,7 @@ MCP server for the **MyLifeOrganized** (MLO) Windows desktop app. AI agents (Cla
 
 ## Install
 
-The only required setting is `MLO_DATA_FILE` — the path to your `.ml` profile. **Try it against a copy of your profile first** if you're cautious; writes are applied by MLO's own sync merge, and every change is kept as a delta in the local message log.
+No configuration: the server operates on whatever profile MLO currently has open (auto-detected from MLO's own settings in the registry, followed across profile switches). **Try it with a copy of your profile first** if you're cautious — just open the copy in MLO; writes are applied by MLO's own sync merge, and every change is kept as a delta in the local message log.
 
 ### Any MCP client (via npx, straight from GitHub — no npm registry)
 
@@ -22,8 +22,7 @@ The only required setting is `MLO_DATA_FILE` — the path to your `.ml` profile.
   "mcpServers": {
     "mlo": {
       "command": "npx",
-      "args": ["-y", "github:govza/mlo-mcp"],
-      "env": { "MLO_DATA_FILE": "C:\\path\\to\\your.ml" }
+      "args": ["-y", "github:govza/mlo-mcp"]
     }
   }
 }
@@ -36,7 +35,7 @@ npx caches the GitHub install; pin a tag (`github:govza/mlo-mcp#v0.2.0`) for rep
 Either register directly:
 
 ```powershell
-claude mcp add mlo -e MLO_DATA_FILE=C:\path\to\your.ml -- npx -y github:govza/mlo-mcp
+claude mcp add mlo -- npx -y github:govza/mlo-mcp
 ```
 
 or install as a plugin (also ships the GTD skills; updates via `/plugin update`):
@@ -46,11 +45,7 @@ or install as a plugin (also ships the GTD skills; updates via `/plugin update`)
 /plugin install mlo@govza
 ```
 
-The plugin reads `MLO_DATA_FILE` from your environment — set it once, user-level:
-
-```powershell
-[Environment]::SetEnvironmentVariable("MLO_DATA_FILE", "C:\path\to\your.ml", "User")
-```
+The plugin needs no configuration either.
 
 ### Skills (any agent)
 
@@ -66,12 +61,12 @@ Claude Code users who install the plugin above get the skills bundled with it in
 
 ```powershell
 git clone https://github.com/govza/mlo-mcp
-claude mcp add mlo -e MLO_DATA_FILE=C:\path\to\your.ml -- node C:\path\to\mlo-mcp\mcp-server\dist-bundle\mlo-mcp.js
+claude mcp add mlo -- node C:\path\to\mlo-mcp\mcp-server\dist-bundle\mlo-mcp.js
 ```
 
 ### Configuration
 
-`MLO_DATA_FILE` is required; optional vars (`MLO_EXE_PATH`, `MLO_CLOUD_PORT`, …) are documented in [`mcp-server/README.md`](mcp-server/README.md), along with the one-time `cloud_bootstrap` setup (back up your `.ml` profile first).
+None required. The env vars that exist (`MLO_EXE_PATH`, `MLO_CLOUD_PORT`, … — all optional) are documented in [`mcp-server/README.md`](mcp-server/README.md), along with the one-time `cloud_bootstrap` setup (back up your `.ml` profile first).
 
 ## Documentation
 

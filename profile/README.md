@@ -2,14 +2,13 @@
 
 `profile.ml` is MyLifeOrganized's own demo profile — the sample data MLO ships
 for new users ("Business and Career", "Project X1", …). No personal data; safe
-to publish. It has two jobs:
+to publish. Its job: **source fixture for the real-exe tests** — the `mlo`
+test project (`pnpm test:mlo`) copies it to a temp directory per run and never
+touches the original (`mcp-server/test/mlo/helpers.ts`).
 
-- **Source fixture for the real-exe tests:** the `mlo` test project
-  (`pnpm test:mlo`) copies it to a temp directory per run and never touches the
-  original (`mcp-server/test/mlo/helpers.ts`).
-- **Development data file:** when `MLO_DATA_FILE` is unset, the server defaults
-  to this file in repo checkouts (`mcp-server/src/config.ts`), so `pnpm dev` and
-  agent sessions exercise the demo tree instead of a real profile.
+The server itself always operates on the profile MLO has open (auto-detected;
+see `mcp-server/src/config.ts`) — to point a dev session at the demo tree,
+open `profile.ml` in MLO.
 
 `export.xml` is the reference `-saveXML` export of `profile.ml` — the
 ground-truth example of the XML schema documented in `docs/mlo/xml-format.md`.

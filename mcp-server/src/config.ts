@@ -1,30 +1,71 @@
 import path from "node:path";
 import os from "node:os";
 import { existsSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { execFile, spawnSync } from "node:child_process";
 import { DEFAULT_CLOUD_PORT } from "./cloud/server.js";
+import { log } from "./log.js";
 import type { MloConfig } from "./types.js";
 
 const DEFAULT_EXE = "C:\\Program Files (x86)\\MyLifeOrganized.net\\MLO\\mlo.exe";
 
-// Repo checkouts fall back to the demo profile (see profile/README.md) so
-// `pnpm dev` / `pnpm tool` work without MLO_DATA_FILE. Resolved relative to
-// this file, two levels below the repo root in src/, dist/, and dist-bundle/
-// alike; the published npm package ships no profile/, so installs from npm
-// still get the hard error below.
-const DEV_PROFILE = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "..",
-  "profile",
-  "profile.ml"
-);
+// MLO records the profile it currently has open (and reopens on the next
+// launch) in HKCU\...\Settings\LastDBFile, so the server can follow whatever
+// profile mlo.exe is actually running without any configuration. Read via
+// PowerShell rather than reg.exe: reg.exe emits the OEM codepage and would
+// garble non-ASCII profile paths.
+const LAST_DB_FILE_PS_ARGS = [
+  "-NoProfile",
+  "-NonInteractive",
+  "-Command",
+  "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; " +
+    "(Get-ItemProperty 'HKCU:\\Software\\MyLifeOrganized.net\\MyLife\\Settings' -ErrorAction SilentlyContinue).LastDBFile",
+];
 
-function resolveDataFile(): string {
-  if (process.env.MLO_DATA_FILE) return process.env.MLO_DATA_FILE;
-  if (existsSync(DEV_PROFILE)) return DEV_PROFILE;
+function parseLastDbFile(stdout: string): string | undefined {
+  const file = stdout.replace(/^\uFEFF/, "").trim();
+  return file && existsSync(file) ? file : undefined;
+}
+
+function detectRunningProfile(): string | undefined {
+  if (process.platform !== "win32") return undefined;
+  const result = spawnSync("powershell.exe", LAST_DB_FILE_PS_ARGS, {
+    encoding: "utf8",
+    windowsHide: true,
+    timeout: 10_000,
+  });
+  if (result.status !== 0 || !result.stdout) return undefined;
+  return parseLastDbFile(result.stdout);
+}
+
+/** Non-blocking variant for the periodic profile-switch watcher in index.ts. */
+export function detectRunningProfileAsync(): Promise<string | undefined> {
+  if (process.platform !== "win32") return Promise.resolve(undefined);
+  return new Promise((resolve) => {
+    execFile(
+      "powershell.exe",
+      LAST_DB_FILE_PS_ARGS,
+      { encoding: "utf8", windowsHide: true, timeout: 10_000 },
+      (err, stdout) => resolve(err ? undefined : parseLastDbFile(stdout))
+    );
+  });
+}
+
+// The app's open profile is the only one the server can fully operate on
+// (reads drive mlo.exe, writes ride that profile's sync), so there is no
+// profile setting: detect it or refuse to start. `--data-file=` exists for
+// the test harness alone — it runs mlo.exe on temp copies with the GUI
+// closed, where following the registry would hit the developer's real profile.
+function resolveDataFile(): { dataFile: string; autoDetected: boolean } {
+  const pin = process.argv.find((a) => a.startsWith("--data-file="));
+  if (pin) return { dataFile: pin.slice("--data-file=".length), autoDetected: false };
+  const detected = detectRunningProfile();
+  if (detected) {
+    log(`auto-detected MLO profile: ${detected}`);
+    return { dataFile: detected, autoDetected: true };
+  }
   throw new Error(
-    "MLO_DATA_FILE environment variable is required. Set it to the path of your .ml data file."
+    "No MLO profile found: MLO's settings record no last-opened profile. " +
+      "Open your profile in MLO once so the server can detect it."
   );
 }
 
@@ -38,7 +79,7 @@ function resolveStateRoot(): string {
 }
 
 export function loadConfig(): MloConfig {
-  const dataFile = resolveDataFile();
+  const { dataFile, autoDetected } = resolveDataFile();
 
   const cloudPort = Number(process.env.MLO_CLOUD_PORT ?? String(DEFAULT_CLOUD_PORT));
   if (!Number.isInteger(cloudPort) || cloudPort < 0 || cloudPort > 65535) {
@@ -47,6 +88,7 @@ export function loadConfig(): MloConfig {
   return {
     mloExePath: process.env.MLO_EXE_PATH ?? DEFAULT_EXE,
     dataFile,
+    dataFileAutoDetected: autoDetected,
     exportDir: process.env.MLO_EXPORT_DIR ?? path.join(os.tmpdir(), "mlo-mcp"),
     cacheStaleMs: Number(process.env.MLO_CACHE_STALE_MS) || 30_000,
     // Only needed when the capture inbox is NOT MLO's own <Inbox> node (e.g. a

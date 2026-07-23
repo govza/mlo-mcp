@@ -2,10 +2,7 @@
   "mcpServers": {
     "mlo": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT:-.}/mcp-server/dist-bundle/mlo-mcp.js"],
-      "env": {
-        "MLO_DATA_FILE": "${MLO_DATA_FILE:-}"
-      }
+      "args": ["${CLAUDE_PLUGIN_ROOT:-.}/mcp-server/dist-bundle/mlo-mcp.js"]
     }
   }
 }

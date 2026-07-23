@@ -23,14 +23,13 @@ pnpm bundle    # esbuild → dist-bundle/mlo-mcp.js (the committed single-file d
 Register your working copy with Claude Code:
 
 ```powershell
-claude mcp add mlo -e MLO_DATA_FILE=D:\path\to\your.ml -- node D:\dev\projects\oml\mcp-server\dist\index.js
+claude mcp add mlo -- node D:\dev\projects\oml\mcp-server\dist\index.js
 ```
 
 ### Configuration (env vars)
 
 | Variable | Required | Default | Meaning |
 |---|---|---|---|
-| `MLO_DATA_FILE` | yes¹ | — | The `.ml` profile the server operates on |
 | `MLO_EXE_PATH` | no | Program Files path above | mlo.exe location |
 | `MLO_EXPORT_DIR` | no | `%TEMP%\mlo-mcp` | Scratch dir for XML exports |
 | `MLO_CACHE_STALE_MS` | no | `30000` | Task-tree cache lifetime |
@@ -38,9 +37,19 @@ claude mcp add mlo -e MLO_DATA_FILE=D:\path\to\your.ml -- node D:\dev\projects\o
 | `MLO_CLOUD_PORT` | no | `8181` | Local sync endpoint port (`0` = random); MLO profiles configured against the old 8080 default need their sync URL/proxy updated |
 | `MLO_CLOUD_STATE_ROOT` | no | `%LOCALAPPDATA%\mlo-mcp\cloud` | Partitioned sync-state root (override for tests/unusual installs only) |
 
-¹ In a repo checkout, `MLO_DATA_FILE` may be omitted — it defaults to the demo
-profile at `profile/profile.ml`, so `pnpm dev` / `pnpm tool` work out of the box.
-Installs from npm (no `profile/` shipped) still require it.
+There is no profile setting. The server operates on the profile MLO itself
+has open — it reads the `LastDBFile` value under
+`HKCU\Software\MyLifeOrganized.net\MyLife\Settings` (which MLO updates
+whenever it opens a profile), logs the detected path to stderr on startup,
+and refuses to start when no profile was ever opened. It also follows profile
+switches: a background check (every 60s) notices when MLO opens a different
+profile and exits while idle, so the MCP client respawns the server against
+the new profile on the next tool call. This isn't just convenience — reads
+drive `mlo.exe` and writes ride the open profile's sync, so the app's current
+profile is the only one the server can fully operate on. (The test suite,
+which runs `mlo.exe` on temp copies with the GUI closed, pins its profile
+with an internal `--data-file=` argument; that also disables the
+switch-following.)
 
 ## Tools
 
@@ -76,14 +85,14 @@ pnpm test        # both
 
 `pnpm tools` prints the catalog — every tool an MCP client would see, grouped by
 kind, with parameters read straight off the zod schemas (so it cannot drift from
-the code). It needs neither MLO nor `MLO_DATA_FILE`:
+the code). It needs neither MLO nor a profile:
 
 ```powershell
 pnpm tools                 # all tools: one-line summary + params ("?" = optional)
 pnpm tools add_task        # one tool: full input/output schema, hints, a runnable example
 pnpm tools --json          # the same catalog as JSON
 
-pnpm tool list_tasks '{"format":"flat"}'   # actually call one (needs MLO_DATA_FILE)
+pnpm tool list_tasks '{"format":"flat"}'   # actually call one (profile auto-detected, like the server)
 pnpm tool add_task '{"caption":"Test task"}'
 ```
 

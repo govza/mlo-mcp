@@ -33,6 +33,8 @@ export interface TaskNode {
 export interface MloConfig {
   mloExePath: string;
   dataFile: string;
+  /** dataFile came from MLO's registry LastDBFile, not a --data-file test pin — the server follows profile switches. */
+  dataFileAutoDetected?: boolean;
   exportDir: string;
   cacheStaleMs: number;
   /** Caption of the top-level task acting as the capture inbox, overriding <Inbox>/Inbox detection. */

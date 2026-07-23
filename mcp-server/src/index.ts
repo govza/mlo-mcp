@@ -2,7 +2,8 @@ import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { loadConfig } from "./config.js";
+import { loadConfig, detectRunningProfileAsync } from "./config.js";
+import type { MloConfig } from "./types.js";
 import { isMloBusy } from "./mlo-cli.js";
 import { MloStore } from "./store.js";
 import { log } from "./log.js";
@@ -76,6 +77,7 @@ async function main(): Promise<void> {
   await server.connect(new StdioServerTransport());
   log(`ready — data file: ${config.dataFile}`);
   watchOwnBuild(cloudServer);
+  watchProfileSwitch(config, cloudServer);
   const shutdown = async () => {
     await cloudServer?.stop();
   };
@@ -105,6 +107,26 @@ function watchOwnBuild(cloudServer: CloudServerHandle | undefined): void {
       /* transient stat failure (mid-rebuild) — retry next tick */
     }
   }, 15_000);
+  timer.unref();
+}
+
+/**
+ * An auto-detected profile is a snapshot: if the user opens a different
+ * profile in MLO mid-session, this long-lived process would keep serving the
+ * old one. Same remedy as watchOwnBuild — poll the registry value and exit
+ * cleanly while idle so the client respawns against the new profile on the
+ * next tool call. Never fires when a --data-file test pin is in effect.
+ */
+function watchProfileSwitch(config: MloConfig, cloudServer: CloudServerHandle | undefined): void {
+  if (!config.dataFileAutoDetected) return;
+  const timer = setInterval(async () => {
+    const current = await detectRunningProfileAsync();
+    if (current && current !== config.dataFile && !isMloBusy()) {
+      log(`MLO switched profiles (${config.dataFile} → ${current}) — exiting so the client restarts against it`);
+      await cloudServer?.stop();
+      process.exit(0);
+    }
+  }, 60_000);
   timer.unref();
 }
 

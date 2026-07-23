@@ -144,7 +144,7 @@ async function ensureDataFile(config: MloConfig): Promise<void> {
   try {
     await fs.access(config.dataFile);
   } catch {
-    throw new MloError(`MLO_DATA_FILE not found at "${config.dataFile}"`);
+    throw new MloError(`MLO data file not found at "${config.dataFile}"`);
   }
 }
 

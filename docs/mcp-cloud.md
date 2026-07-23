@@ -189,13 +189,18 @@ appended.
 
 ## Configuration
 
-`MLO_DATA_FILE` is the only routine configuration. A profile's authority mode
+No configuration is needed: the data file is auto-detected from the profile
+MLO has open (registry `LastDBFile`), follows profile switches, and the
+server refuses to start when no profile was ever opened — the app's open
+profile is the only one the server can fully operate on (reads drive
+`mlo.exe`, writes ride that profile's sync), so there is no profile setting;
+the test suite pins temp copies with an internal `--data-file=` argument.
+A profile's authority mode
 is not configuration at all: `cloud_bootstrap` always sets up the vendor-
 in-the-loop architecture; only the dev script can bind a profile local.
 
 | Env var | Default | Meaning |
 |---|---|---|
-| `MLO_DATA_FILE` | repo `profile/profile.ml` (dev fallback) | the managed `.ml` profile |
 | `MLO_CLOUD_HOST` | `127.0.0.1` | bind address (loopback only by design) |
 | `MLO_CLOUD_PORT` | `8181` | listen port |
 | `MLO_CLOUD_STATE_ROOT` | `%LOCALAPPDATA%\mlo-mcp\cloud` | override for tests/unusual installs only |

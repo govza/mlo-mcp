@@ -1,5 +1,5 @@
 /**
- * Show what this server exposes — no MCP client, no MLO_DATA_FILE needed.
+ * Show what this server exposes — no MCP client, no MLO profile needed.
  *
  *   pnpm tools               # every tool, grouped by kind
  *   pnpm tools list          # same

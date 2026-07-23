@@ -20,11 +20,10 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
     await client.connect(
       new StdioClientTransport({
         command: process.execPath,
-        args: ["--import", "tsx", "src/index.ts"],
+        args: ["--import", "tsx", "src/index.ts", `--data-file=${env.config.dataFile}`],
         cwd: SERVER_ROOT,
         env: {
           ...process.env,
-          MLO_DATA_FILE: env.config.dataFile,
           MLO_EXE_PATH: env.config.mloExePath,
           MLO_EXPORT_DIR: env.config.exportDir,
           MLO_CLOUD_PORT: "0",

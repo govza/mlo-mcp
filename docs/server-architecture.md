@@ -12,10 +12,14 @@ the server internals around that loop.
 ```
 src/
   index.ts          McpServer wiring (registers tools/registry.ts, server
-                    instructions string), stdio transport, starts the cloud endpoint
-  config.ts         env config (MLO_DATA_FILE, defaulting to profile/profile.ml in repo
-                    checkouts; MLO_EXE_PATH, MLO_EXPORT_DIR, MLO_CACHE_STALE_MS,
-                    MLO_CLOUD_HOST/PORT; the partitioned state root is automatic)
+                    instructions string), stdio transport, starts the cloud endpoint;
+                    idle-exit watchers (rebuilt bundle, auto-detected profile switch)
+                    make the client respawn a current server on the next tool call
+  config.ts         config (data file: auto-detected from MLO's registry LastDBFile —
+                    the profile the app has open — or refuse to start; --data-file=
+                    pins it for the test harness only; env: MLO_EXE_PATH,
+                    MLO_EXPORT_DIR, MLO_CACHE_STALE_MS, MLO_CLOUD_HOST/PORT; the
+                    partitioned state root is automatic)
   mlo-cli.ts        mlo.exe invocation: Delphi quoting, timeouts, exit-code mapping,
                     both locks, -saveXML export, -QuickSync
   xml.ts            parse/build (fast-xml-parser), RawTaskNode
