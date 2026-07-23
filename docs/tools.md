@@ -19,26 +19,29 @@ shapes. If they ever disagree on a shape, the catalog is right.
 - **Ids are path-based** (`"1.2.3"` = position in the tree) and shift whenever
   the tree changes. They are valid only for immediate follow-up calls; after
   any write, re-run `list_tasks`/`search_tasks`. GUIDs (`{…}`) are the stable
-  identity. They are recovered first from the `.ml` binary/XML and then, for
-  logged tasks, from an unambiguous caption/`ParentUID` cloud path; duplicate
-  sibling captions can still leave a task unresolved. `add_task` takes a parent **GUID**
-  (`parentUid`, from `get_task`), not a path id.
-- **Writes never touch the data file.** Every write queues a sync delta on the
-  local cloud endpoint ([mcp-cloud.md](mcp-cloud.md)) and triggers QuickSync;
-  MLO's **own** merge logic applies it, and the app keeps running. The
-  append-only delta log is the durable record of every change.
+  identity, resolved by STRUCTURAL alignment of the fresh export outline
+  against the bootstrapped cloud tree (`UID`/`ParentUID`/`ItemIndex`) — so
+  duplicate sibling captions resolve by position; the binary `.ml` recovery
+  and the caption-path walk are cross-checks only. `add_task` takes a parent
+  **GUID** (`parentUid`, from `get_task`), not a path id.
+- **Writes never touch the data file.** Every write travels as a complete
+  sync delta ([mcp-cloud.md](mcp-cloud.md)): normally committed to the real
+  vendor Cloud in the endpoint's own sync session and delivered to MLO by the
+  triggered QuickSync; MLO's **own** merge logic applies it, and the app
+  keeps running.
 - **Verification is advisory.** Write results carry `verified: true` only when
   a fresh post-QuickSync export confirms the change. `verified: false` does
   not mean failure — the delta is durably queued and MLO applies it on the
   next sync session.
 - **Batches are atomic.** Batch tools (`ids`/`updates` arrays) send the whole
   batch as ONE delta; one bad entry and nothing is queued.
-- **Edit coverage grows with the delta log.** MLO merges a changed task as a
+- **A one-time bootstrap enables writes.** MLO merges a changed task as a
   full 82-column record, and the XML export cannot supply one, so the edit
-  tools source the row from the delta log: a task is editable once it was
-  added by this server or touched in MLO since the local endpoint took over.
-  Anything else fails atomically with a message to make the change in the MLO
-  app.
+  tools source rows from the bootstrapped baseline (`cloud_bootstrap` pulls
+  the vendor cloud's complete history) plus later deltas. Every pre-existing
+  task is editable after bootstrap; before it, mutation tools fail atomically
+  with a pointer to the bootstrap procedure. Back up the `.ml` profile before
+  the first bootstrap.
 
 ## Read tools
 
@@ -52,13 +55,19 @@ shapes. If they ever disagree on a shape, the catalog is right.
   children, GUID when recoverable.
 - **`list_contexts`** — the profile's contexts (MLO Places, `@Office`-style)
   with usage counts.
-- **`cloud_status`** — the local endpoint's cursor, per-origin delta counts,
-  and pending entries (mirror of `GET /v1/status`).
+- **`cloud_status`** — binding (`dataFileUID`, mode), bootstrap lifecycle,
+  cursor and per-origin delta counts, last local stamp, endpoint-mismatch
+  count, partition inventory, and mirror coverage/health.
 
 ## Write tools
 
-All follow queue → QuickSync → verify. See [mcp-cloud.md](mcp-cloud.md) for
+All follow commit → QuickSync → verify. See [mcp-cloud.md](mcp-cloud.md) for
 the delta/envelope details behind each.
+
+- **`cloud_bootstrap`** — the one-time setup: after one ordinary MLO sync
+  through the proxy, pulls the vendor cloud's full history, validates and
+  materializes it, and binds the profile; reads and writes are live
+  afterwards. `rebind: true` starts a fresh partition explicitly.
 
 - **`add_task`** — one task per call, emitted as a full fresh row; parent by
   GUID (`parentUid`) or top level when omitted. Supports Folder, Project,
@@ -80,7 +89,7 @@ the delta/envelope details behind each.
   occurrence, a full-row rewrite would not.
 - **`delete_task`** — tombstones each selected task *and its whole subtree*
   (cascade behavior of a bare parent tombstone is unverified; extra
-  tombstones union-merge harmlessly). Needs binary/XML or unambiguous logged
-  GUID recovery for the whole subtree, else nothing is queued.
+  tombstones union-merge harmlessly). Every task in the subtree must resolve
+  to its stable UID, else nothing is queued.
 - **`sync`** — run MLO QuickSync on demand (every write triggers it
   internally; this reruns it, e.g. to pick up a previously queued delta).

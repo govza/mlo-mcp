@@ -6,14 +6,42 @@
 permanent wiring, not a debugging aid). Sync sessions are triggered with the
 already-verified `mlo.exe -QuickSync`.
 
-It operates in one of two **modes per profile**, chosen by the profile's
-persisted binding. The two modes never share state, because each sync endpoint
-owns its own remote-version namespace and switching a profile between
-authorities is unrecoverable (verified live: duplicate-subtree imports, then
-foreign-cursor rejections — see
+There is **no mode for the user to choose**: every profile runs the
+`MLO ↔ mcp-cloud ↔ vendor Cloud` architecture automatically ("upstream" in
+the code). A second, internal mode — the endpoint acting as a replacement
+cloud with no vendor involved ("local") — exists for disposable/offline test
+profiles only and is armed exclusively by the dev script
+`scripts/bootstrap-local.ts`. The two never share state, because each sync
+endpoint owns its own remote-version namespace and switching a profile
+between authorities is unrecoverable (verified live: duplicate-subtree
+imports, then foreign-cursor rejections — see
 [Switching endpoints is not a reconnect](mlo/cloud-sync.md#switching-endpoints-is-not-a-reconnect)).
 
-## Upstream mode — real profiles (default)
+## Before you start (required)
+
+1. **Back up the `.ml` profile** (file copy while MLO is closed) before the
+   first bootstrap and before ANY sync experimentation. Bootstrap and writes
+   are designed to fail closed, but the profile is the single source of your
+   data and re-synchronization flows rewrite sync state inside it.
+2. **Wire MLO through the endpoint**: cloud sync proxy → `127.0.0.1:8181`,
+   and "Use secure connection" **unchecked** for the sync profile. MLO syncs
+   fine either way — but with it checked the proxy only carries an opaque TLS
+   tunnel: MLO↔vendor sync keeps working while the endpoint sees nothing, so
+   bootstrap, the mirror, and MCP writes silently stay dead (`cloud_status`
+   reports `mirror.mirrorBlind: true` when this happens). For a LOCAL-bound
+   dev profile it is worse than dead: the tunneled sync silently reaches the
+   real vendor Cloud, bypassing the local authority — the unrecoverable
+   endpoint-switch hazard. The setting is per sync profile; MLO's sync log
+   prints "secure connection is OFF for this sync profile" when it is
+   correct.
+3. **Sync once, then bootstrap**: run one ordinary MLO sync (or `sync`), then
+   call `cloud_bootstrap`. Until that bootstrap has completed, read tools work
+   but every mutation tool refuses with a pointer to this procedure — an
+   ordinary sync alone can never enable writes. After every MCP **server
+   restart**, one ordinary proxied sync is needed again before writes resume
+   (the account contact is held in memory only, never on disk).
+
+## Normal operation (upstream)
 
 The architecture is `MLO ↔ mcp-cloud ↔ vendor Cloud`, with no side demoted:
 
@@ -31,11 +59,11 @@ The architecture is `MLO ↔ mcp-cloud ↔ vendor Cloud`, with no side demoted:
   in memory (never persisted, never logged) and reused for the endpoint's own
   vendor sessions.
 
-**Bootstrap (zero-touch):** run one ordinary MLO sync through the proxy, then
-call `cloud_bootstrap`. The endpoint pulls the vendor's complete history from
-remote version 0 as a client, validates it as a full snapshot, materializes it
-as the mirror baseline, and binds the profile. Every existing task resolves to
-its stable UID and complete record afterwards.
+**Bootstrap (zero-touch):** after the one ordinary proxied sync,
+`cloud_bootstrap` pulls the vendor's complete history from remote version 0
+as a client, validates it as a full snapshot, materializes it as the mirror
+baseline, and binds the profile. Every existing task resolves to its stable
+UID and complete record afterwards. No MLO interaction is required.
 
 **Writes:** a mutation tool refreshes the mirror from the vendor (so full-row
 authoring never starts from rows a mobile edit superseded), authors complete
@@ -52,13 +80,14 @@ need; the endpoint records this and `cloud_status` reports
 `mirror.mirrorBlind: true`. Vendor contacts are per-server-run: after a
 restart, one proxied sync must happen before writes resume.
 
-## Local mode — disposable/offline profiles
+## Local mode — dev/testing only (`scripts/bootstrap-local.ts`)
 
-The original replacement-server behavior, hardened: the endpoint terminates
-the three sync operations itself and owns the cursor namespace. A local-mode
-profile must **never** sync against the vendor endpoint again; returning to
-the vendor is a fresh full re-synchronization against an empty vendor file,
-with a separate profile copy.
+The replacement-server behavior, hardened: the endpoint terminates the three
+sync operations itself and owns the cursor namespace. Not exposed through the
+MCP tool surface — it exists for disposable/offline rehearsal profiles. A
+local-mode profile must **never** sync against the vendor endpoint again;
+returning to the vendor is a fresh full re-synchronization against an empty
+vendor file, with a separate profile copy.
 
 - The server keeps an **append-only delta log** per partition. Each entry is
   `{ cursor, origin, envelope }` (`origin` is `"mcp"` or `"app"`); pull
@@ -101,13 +130,12 @@ Rules, all fail-closed:
   same partition through the gateway. Unknown `dataFileUID`s are refused
   locally (or, in proxy position, forwarded to the vendor **without capture**).
 - A profile is never bound to "the last UID seen". The UID attaches only
-  through an explicit `cloud_bootstrap`: the upstream pull-bootstrap requires
-  exactly one unbound candidate among the UIDs whose sync traffic the proxy
-  has seen; the local-mode armed window accepts exactly one previously
-  unknown UID and disarms if a second appears. One UID serves one profile;
-  a binding's mode never changes silently (`cloud_bootstrap { rebind: true }`
-  starts a fresh partition and re-bootstraps; the old partition stays on disk
-  as evidence).
+  through an explicit bootstrap: the pull-bootstrap requires exactly one
+  unbound candidate among the UIDs whose sync traffic the proxy has seen;
+  the local-mode armed window accepts exactly one previously unknown UID and
+  disarms if a second appears. One UID serves one profile; a binding's mode
+  never changes silently (`rebind: true` starts a fresh partition and
+  re-bootstraps; the old partition stays on disk as evidence).
 - Partition lifecycle: `uninitialized` → `bootstrap-required` → `ready`.
   Mutation tools fail fast before queueing anything unless the partition is
   `ready`; their error directs to `cloud_bootstrap`, because an ordinary
@@ -161,9 +189,9 @@ appended.
 
 ## Configuration
 
-`MLO_DATA_FILE` is the only routine configuration. A profile's mode is not
-server configuration at all — it is chosen once, per profile, as the `mode`
-argument of `cloud_bootstrap` and persisted in the binding.
+`MLO_DATA_FILE` is the only routine configuration. A profile's authority mode
+is not configuration at all: `cloud_bootstrap` always sets up the vendor-
+in-the-loop architecture; only the dev script can bind a profile local.
 
 | Env var | Default | Meaning |
 |---|---|---|
@@ -186,12 +214,12 @@ through the state root's cross-process locking.
 
 ## MCP tool surface
 
-- `cloud_bootstrap { mode?, rebind? }` — create/verify the profile binding
-  (`mode`: `"upstream"` default or `"local"`; a mode switch requires
-  `rebind: true`). Upstream: pulls the vendor's full history immediately and
-  returns `bootstrapped: true` with the materialized version and counts.
-  Local: arms the one-time window and returns the operator instructions for
-  the Re-synchronize run.
+- `cloud_bootstrap { rebind? }` — automatic one-time setup: verifies the
+  profile binding, pulls the vendor's full history immediately, and returns
+  `bootstrapped: true` with the materialized version and counts.
+  `rebind: true` discards the current binding for a fresh partition (the old
+  one stays on disk as evidence). Local-mode arming is not part of this tool
+  (`scripts/bootstrap-local.ts`).
 - `cloud_status` — endpoint config, binding (mode, `dataFileUID`), lifecycle,
   cursor and delta counts, last local stamp, endpoint-mismatch count
   (distinct from bootstrap-required), partition inventory, and upstream

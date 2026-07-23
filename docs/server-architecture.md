@@ -15,14 +15,18 @@ src/
                     instructions string), stdio transport, starts the cloud endpoint
   config.ts         env config (MLO_DATA_FILE, defaulting to profile/profile.ml in repo
                     checkouts; MLO_EXE_PATH, MLO_EXPORT_DIR, MLO_CACHE_STALE_MS,
-                    MLO_CLOUD_HOST/PORT/STATE_DIR)
+                    MLO_CLOUD_HOST/PORT; the partitioned state root is automatic)
   mlo-cli.ts        mlo.exe invocation: Delphi quoting, timeouts, exit-code mapping,
                     both locks, -saveXML export, -QuickSync
   xml.ts            parse/build (fast-xml-parser), RawTaskNode
   task-tree.ts      RawTaskNode → TaskNode model, path ids, find/flatten/search/render
-  guids.ts          Caption→GUID recovery from the .ml binary (see mlo/ml-binary-format.md)
+  guids.ts          Caption→GUID recovery from the .ml binary (cross-check only;
+                    see mlo/ml-binary-format.md)
   store.ts          cached snapshot: export → parse → tree → GUID annotation
-  cloud/            the local cloud-sync endpoint (server, SOAP adapter, delta
+  cloud/            the cloud endpoint (gateway + per-dataFileUID partitions and
+                    bindings, vendor proxy + mirror + vendor client sessions
+                    (upstream.ts), bootstrap window, snapshot store/validation,
+                    structural identity (structure-align.ts), SOAP adapter, delta
                     log/state, CSV/envelope codecs, log-projection) — see mcp-cloud.md
   tools/*.ts        one declarative MloTool per file (shared.ts: contract +
                     registerTool; registry.ts: the authoritative tool list;
@@ -33,6 +37,8 @@ scripts/
   tool-catalog.ts   registry → readable catalog, typed from the zod schemas
   tools.ts          browse it: `pnpm tools [<name>|--json]` (no MLO, no data file)
   cloud-client.ts   app-side cloud client CLI: `pnpm cloud pull/push/finalize/sync`
+  serve-cloud.ts    run the cloud endpoint standalone (no MCP client attached)
+  bootstrap-local.ts DEV ONLY: arm a local-mode (replacement-server) bootstrap window
 ```
 
 Tools are declarative objects (`defineTool` in `tools/shared.ts`: name, schemas, all four
@@ -55,18 +61,21 @@ Why: MLO invocations racing each other trigger a modal "file is locked by anothe
 
 ## Writes: queue → QuickSync → verify
 
-Write tools build a sync delta (a full task row, or tombstones), append it to the
-delta log as `origin:"mcp"`, run `mlo.exe -QuickSync`, and then re-export to check
-whether MLO applied it. The `verified` flag in every write result reports that check;
-`false` means *queued, not yet applied* — the delta survives and MLO merges it on a
-later sync session. The MLO app keeps running throughout; nothing touches the `.ml`
-file directly, so there are no backups to manage — the append-only delta log
-(`delta-<cursor>.zip` files) is the durable record of every change.
+Write tools resolve a write channel (`requireWriteChannel`): normally the
+delta (a full task row, or tombstones) is committed to the real vendor Cloud
+in the endpoint's own sync session and MLO receives it on the triggered
+`mlo.exe -QuickSync`; local-mode test partitions append to the replacement
+log instead. A fresh export then checks whether MLO applied it. The
+`verified` flag in every write result reports that check; `false` means
+*accepted, not yet applied* — MLO merges it on a later sync session. The MLO
+app keeps running throughout and nothing touches the `.ml` file directly.
+Still: **back up the profile before the first bootstrap** — sync flows
+rewrite sync state inside the `.ml`.
 
 Full-row edits (`update_task`, `complete_task`, `uncomplete_task`) source the
-82-column record from the delta log via `cloud/log-projection.ts` and share the
-runner in `tools/row-update.ts`; see mcp-cloud.md for why the XML export cannot
-be that source.
+82-column record from the bootstrapped baseline + later deltas via
+`cloud/log-projection.ts` and share the runner in `tools/row-update.ts`; see
+mcp-cloud.md for why the XML export cannot be that source.
 
 ## Error handling & safety conventions
 

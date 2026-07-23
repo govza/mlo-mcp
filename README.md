@@ -71,7 +71,7 @@ claude mcp add mlo -e MLO_DATA_FILE=C:\path\to\your.ml -- node C:\path\to\mlo-mc
 
 ### Configuration
 
-`MLO_DATA_FILE` is required; optional vars (`MLO_EXE_PATH`, `MLO_CLOUD_PORT`, `MLO_CLOUD_STATE_DIR`, …) are documented in [`mcp-server/README.md`](mcp-server/README.md).
+`MLO_DATA_FILE` is required; optional vars (`MLO_EXE_PATH`, `MLO_CLOUD_PORT`, …) are documented in [`mcp-server/README.md`](mcp-server/README.md), along with the one-time `cloud_bootstrap` setup (back up your `.ml` profile first).
 
 ## Documentation
 

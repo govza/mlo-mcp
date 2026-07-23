@@ -36,7 +36,7 @@ claude mcp add mlo -e MLO_DATA_FILE=D:\path\to\your.ml -- node D:\dev\projects\o
 | `MLO_CACHE_STALE_MS` | no | `30000` | Task-tree cache lifetime |
 | `MLO_CLOUD_HOST` | no | `127.0.0.1` | Local sync endpoint bind address (loopback only by design) |
 | `MLO_CLOUD_PORT` | no | `8181` | Local sync endpoint port (`0` = random); MLO profiles configured against the old 8080 default need their sync URL/proxy updated |
-| `MLO_CLOUD_STATE_DIR` | no | `<repo>\messages` | Delta log + sync state location |
+| `MLO_CLOUD_STATE_ROOT` | no | `%LOCALAPPDATA%\mlo-mcp\cloud` | Partitioned sync-state root (override for tests/unusual installs only) |
 
 ¹ In a repo checkout, `MLO_DATA_FILE` may be omitted — it defaults to the demo
 profile at `profile/profile.ml`, so `pnpm dev` / `pnpm tool` work out of the box.
@@ -50,7 +50,8 @@ Installs from npm (no `profile/` shipped) still require it.
 | `search_tasks` | read | text, context, due range, star, completion, project, flag |
 | `get_task` | read | full fields, GUID, children, dependencies |
 | `list_contexts` | read | contexts (Places) with usage counts |
-| `cloud_status` | read | local sync endpoint cursor + delta counts |
+| `cloud_status` | read | binding, bootstrap lifecycle, cursor + delta counts, mirror coverage |
+| `cloud_bootstrap` | write | one-time setup: pulls the vendor cloud's full history and binds the profile |
 | `add_task` | write | one full-row task per call; parent by GUID; booleans, existing Flag/Places |
 | `add_tasks` | write | atomic 1–50 task outline; local parent/dependency keys + existing GUID links |
 | `sync` | write | `-QuickSync` |
@@ -59,9 +60,11 @@ Installs from npm (no `profile/` shipped) still require it.
 | `update_task` | destructive | `updates` batch: fields, booleans, Flag/Places/dependencies + re-parenting |
 | `delete_task` | destructive | tombstones each task + whole subtree, `ids` batch |
 
-Writes never touch the data file. Each write queues a sync delta on the server's local cloud endpoint and triggers QuickSync; **MLO's own merge logic** applies it while the app keeps running. Batches travel as ONE delta and are atomic (one bad id and nothing is queued). Results carry a `verified` flag — `false` means queued but not yet confirmed in a fresh export, not failure. Edits need the task's full record in the delta log (added by this server or changed in MLO since the endpoint took over); see [`../docs/tools.md`](../docs/tools.md) and [`../docs/mcp-cloud.md`](../docs/mcp-cloud.md), including the one-time proxy wiring that routes the app's sync here. The server also sends a connection-time `instructions` guide teaching agents these conventions.
+Writes never touch the data file. Each write travels as a complete sync delta — normally committed to the real **vendor MLO Cloud** in the server's own sync session (the server proxies the app's cloud sync and additionally acts as one more sync client of the account) and delivered to MLO by the triggered QuickSync; **MLO's own merge logic** applies it while the app keeps running. Batches travel as ONE delta and are atomic (one bad id and nothing is queued). Results carry a `verified` flag — `false` means accepted but not yet confirmed in a fresh export, not failure.
 
-Task ids are path-based (`1.2.3`) and shift when the tree changes — the server re-exports before every mutation, and `get_task` also reports each task's stable internal GUID. Recovery uses the `.ml` binary/XML first and an unambiguous logged cloud path second; duplicate sibling captions can remain unresolved.
+**One-time setup per profile:** back up the `.ml`, wire MLO's cloud sync proxy to the endpoint ("Use secure connection" unchecked), run one ordinary sync, then call `cloud_bootstrap` — it pulls the account's complete cloud history so every pre-existing task gets its stable UID and full record. Until then, mutation tools refuse (an ordinary sync alone never enables writes); after every server restart, one proxied sync is needed before writes resume. See [`../docs/tools.md`](../docs/tools.md) and [`../docs/mcp-cloud.md`](../docs/mcp-cloud.md). The server also sends a connection-time `instructions` guide teaching agents these conventions.
+
+Task ids are path-based (`1.2.3`) and shift when the tree changes — the server re-exports before every mutation, and `get_task` also reports each task's stable internal GUID, resolved by structural alignment of the export outline against the bootstrapped cloud tree (duplicate sibling captions resolve by position).
 
 ## Tests & direct tool runs
 

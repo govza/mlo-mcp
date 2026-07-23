@@ -28235,36 +28235,24 @@ var cloudStatusTool = defineTool({
 var cloudBootstrapTool = defineTool({
   name: "cloud_bootstrap",
   title: "Bootstrap the profile's cloud partition",
-  description: "Bootstrap this profile for cloud reads and writes. Upstream mode (default) pulls the vendor cloud's full history automatically after one ordinary MLO sync through the proxy; local mode arms a window for MLO's Re-synchronize and makes this endpoint the cloud authority.",
+  description: "One-time setup for cloud reads and writes: after one ordinary MLO sync through the proxy, pulls the vendor cloud's full history automatically and binds this profile. Back up the .ml profile before the first bootstrap.",
   inputSchema: {
-    mode: external_exports.enum(["upstream", "local"]).optional().describe(
-      'Binding authority. "upstream" (default): the real vendor Cloud stays the authority; the endpoint is a transparent proxy plus one more sync client, so MCP reads and writes coexist with vendor/mobile sync. "local": this endpoint IS the cloud \u2014 the profile must never sync against the vendor again.'
-    ),
     rebind: external_exports.boolean().optional().describe(
       "Explicitly drop the current partition binding and bootstrap into a fresh one. The old partition directory is preserved as evidence."
     )
   },
   outputSchema: {
-    mode: external_exports.string(),
-    bootstrapped: external_exports.boolean().describe("true = the partition is ready now; false = a window was armed and MLO must Re-synchronize"),
-    version: external_exports.string().optional().describe("Vendor remote version the mirror was materialized at (upstream)"),
+    bootstrapped: external_exports.boolean(),
+    version: external_exports.string().optional().describe("Vendor remote version the mirror was materialized at"),
     tasks: external_exports.number().optional(),
-    armed: external_exports.boolean().optional(),
-    expiresAt: external_exports.string().optional(),
     instructions: external_exports.string()
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
-  async execute({ mode: requestedMode, rebind }, ctx) {
+  async execute({ rebind }, ctx) {
     const gateway = ctx.cloud;
     if (!gateway) throw new Error("no cloud gateway is attached to this server context");
-    const mode = requestedMode ?? "upstream";
     await gateway.ensureRoot();
-    const binding = rebind ? await gateway.bindings.replace(ctx.config.dataFile, mode) : await gateway.bindings.create(ctx.config.dataFile, mode);
-    if (binding.mode !== mode) {
-      throw new Error(
-        `this profile is already bound in "${binding.mode}" mode; switching modes requires { rebind: true } (the old partition stays on disk as evidence)`
-      );
-    }
+    const binding = rebind ? await gateway.bindings.replace(ctx.config.dataFile, "upstream") : await gateway.bindings.create(ctx.config.dataFile, "upstream");
     if (binding.dataFileUID) {
       const partition = await gateway.registry.open(binding.dataFileUID, binding.mode);
       if (await partition.lifecycle() === "ready") {
@@ -28273,42 +28261,30 @@ var cloudBootstrapTool = defineTool({
         );
       }
     }
-    if (mode === "upstream") {
-      let uid = binding.dataFileUID;
-      if (!uid) {
-        const candidates = [];
-        for (const candidate of gateway.vendorContactUids()) {
-          if (!await gateway.bindings.forUid(candidate)) candidates.push(candidate);
-        }
-        if (candidates.length === 0) {
-          throw new Error(
-            'no vendor sync traffic observed since server start \u2014 run one ordinary sync in MLO through this proxy ("Use secure connection" unchecked), then retry cloud_bootstrap'
-          );
-        }
-        if (candidates.length > 1) {
-          throw new Error(
-            "multiple unbound dataFileUIDs have synced through this proxy \u2014 sync only the target profile, restart the server, and retry so exactly one candidate exists"
-          );
-        }
-        uid = candidates[0];
+    let uid = binding.dataFileUID;
+    if (!uid) {
+      const candidates = [];
+      for (const candidate of gateway.vendorContactUids()) {
+        if (!await gateway.bindings.forUid(candidate)) candidates.push(candidate);
       }
-      const result = await bootstrapFromVendor(gateway, ctx.config.dataFile, uid);
-      const instructions2 = `Bootstrapped from the vendor cloud at remote version ${result.version} (${result.stats.tasks} tasks, ${result.stats.places} contexts, ${result.stats.flags} flags). Reads and writes are live: MCP writes go up as this endpoint's own vendor sync sessions and reach MLO on its next QuickSync; vendor and mobile sync are unaffected.`;
-      return textResult(instructions2, {
-        mode,
-        bootstrapped: true,
-        version: result.version,
-        tasks: result.stats.tasks ?? 0,
-        instructions: instructions2
-      });
+      if (candidates.length === 0) {
+        throw new Error(
+          'no vendor sync traffic observed since server start \u2014 run one ordinary sync in MLO through this proxy ("Use secure connection" unchecked), then retry cloud_bootstrap'
+        );
+      }
+      if (candidates.length > 1) {
+        throw new Error(
+          "multiple unbound dataFileUIDs have synced through this proxy \u2014 sync only the target profile, restart the server, and retry so exactly one candidate exists"
+        );
+      }
+      uid = candidates[0];
     }
-    const window2 = await gateway.bootstrap.arm(ctx.config.dataFile, mode);
-    const instructions = `Armed (local replacement server). In MLO: make sure the cloud sync proxy points at this endpoint, then open the profile's sync settings (Advanced) and run Re-synchronize with Bidirectional direction and no property exclusions. MLO will pull an empty state and upload its complete database; the endpoint validates and materializes it as the authoritative baseline. Check cloud_status afterward \u2014 lifecycle must be "ready". WARNING: a local-mode profile must never sync against the vendor Cloud again. The window expires at ${window2.expiresAt}.`;
+    const result = await bootstrapFromVendor(gateway, ctx.config.dataFile, uid);
+    const instructions = `Bootstrapped from the vendor cloud at remote version ${result.version} (${result.stats.tasks} tasks, ${result.stats.places} contexts, ${result.stats.flags} flags). Reads and writes are live: MCP writes go up as this endpoint's own vendor sync sessions and reach MLO on its next QuickSync; vendor and mobile sync are unaffected.`;
     return textResult(instructions, {
-      mode,
-      bootstrapped: false,
-      armed: true,
-      expiresAt: window2.expiresAt,
+      bootstrapped: true,
+      version: result.version,
+      tasks: result.stats.tasks ?? 0,
       instructions
     });
   }
