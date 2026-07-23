@@ -9,6 +9,7 @@ MCP server (this project):
 | [tools.md](tools.md) | The MCP tool surface: what each tool is for, its guarantees and coverage limits (schemas: `pnpm tools`) |
 | [server-architecture.md](server-architecture.md) | How the MCP server is built: locking, reads, the queue→QuickSync→verify write loop, tool design |
 | [mcp-cloud.md](mcp-cloud.md) | The local cloud-sync endpoint: wire contract, delta log, merge rules, how the app gets wired to it via MLO's proxy setting |
+| [agents/](agents/) | Conventions for AI agent skills: issue tracker, triage labels, domain-doc consumer rules (glossary/entry point: [/CONTEXT.md](../CONTEXT.md)) |
 
 MLO itself — reverse-engineered formats, protocol, and task model ([mlo/](mlo/)):
 

@@ -26,6 +26,9 @@ export_*.xml
 # Local machine config (permissions, etc.)
 .claude/settings.local.json
 
+# Work-in-progress issues/specs (see docs/agents/issue-tracker.md)
+.scratch/
+
 # Editor / OS
 .DS_Store
 Thumbs.db
