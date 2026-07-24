@@ -153,6 +153,13 @@ export function registerTool(server: McpServer, tool: MloTool, ctx: ToolContext)
  */
 export const DEFAULT_RESULT_LIMIT = 200;
 
+/**
+ * Every input field that takes a Path id repeats this caveat: a client reading
+ * one tool's schema never sees another's, and `instructions` is not guaranteed
+ * to be surfaced at all. One constant so the copies cannot drift apart.
+ */
+export const PATH_ID_CAVEAT = "ids shift when the tree changes";
+
 /** Machine-readable task summary used in structuredContent across tools. */
 export const TaskSummaryShape = {
   id: z.string().describe('Path-based id ("1.2.3"); stable only until the tree changes'),

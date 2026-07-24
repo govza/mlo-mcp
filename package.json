@@ -12,7 +12,8 @@
     "mlo-mcp": "mcp-server/dist-bundle/mlo-mcp.js"
   },
   "files": [
-    "mcp-server/dist-bundle"
+    "mcp-server/dist-bundle",
+    "mcp-server/package.json"
   ],
   "scripts": {
     "build": "pnpm --dir mcp-server build && pnpm --dir mcp-server bundle"

@@ -3,7 +3,7 @@ import { buildTaskDeleteDelta } from "../cloud/delta.js";
 import { packEnvelope } from "../cloud/envelope.js";
 import { quickSync } from "../mlo-cli.js";
 import { findById, flatten } from "../task-tree.js";
-import { defineTool, requireWriteChannel, textResult } from "./shared.js";
+import { defineTool, requireWriteChannel, textResult, PATH_ID_CAVEAT } from "./shared.js";
 import type { TaskNode } from "../types.js";
 import { knownCloudProjection } from "../cloud/log-projection.js";
 import { buildUidResolver } from "../cloud/structure-align.js";
@@ -78,7 +78,8 @@ export const deleteTaskTool = defineTool({
     "subtrees to have a GUID recoverable from binary/XML or an unambiguous logged cloud path; otherwise nothing " +
     "is queued — delete such tasks in the MLO app.",
   inputSchema: {
-    ids: z.array(z.string()).min(1).max(50).describe("Path-based task ids from list_tasks/search_tasks"),
+    ids: z.array(z.string()).min(1).max(50)
+      .describe(`Path-based task ids from list_tasks/search_tasks; ${PATH_ID_CAVEAT}`),
   },
   outputSchema: {
     uids: z.array(z.string()),

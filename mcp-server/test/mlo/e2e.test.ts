@@ -3,6 +3,7 @@ import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { mloInstalled, assertGuiClosed, makeTestEnv, type TestEnv } from "./helpers.js";
+import { SERVER_INFO } from "../../src/version.js";
 
 const SERVER_ROOT = path.resolve(__dirname, "..", "..");
 
@@ -60,6 +61,12 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
 
   it("exposes server instructions", async () => {
     expect(client.getInstructions()).toContain("PATH-BASED");
+  });
+
+  it("reports the shipping version over a real connection", async () => {
+    // The unit test proves the derivation; this proves the derived value is
+    // what actually crosses the wire, which is the only copy a user can see.
+    expect(client.getServerVersion()).toEqual(SERVER_INFO);
   });
 
   it("lists, searches, and gets tasks", async () => {

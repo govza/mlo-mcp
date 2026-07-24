@@ -15,7 +15,8 @@ const BatchTask = z.object({
   dueDateTime: z.string().optional(),
   startDateTime: z.string().optional(),
   parentKey: z.string().optional().describe("Local key of another task in this batch"),
-  parentUid: z.string().optional().describe("GUID of an existing parent; omit both parent fields for top level"),
+  parentUid: z.string().optional()
+    .describe("Stable GUID of an existing parent (from get_task, never a Path id); omit both parent fields for top level"),
   IsProject: z.boolean().optional(),
   Starred: z.boolean().optional(),
   Folder: z.boolean().optional(),
@@ -24,7 +25,8 @@ const BatchTask = z.object({
   Flag: z.string().optional().describe("Existing flag caption"),
   Places: z.array(z.string().min(1)).max(25).optional().describe("Existing context captions"),
   dependsOnKeys: z.array(z.string()).max(25).optional().describe("Local keys in this batch that this task waits for"),
-  dependsOnUids: z.array(z.string()).max(25).optional().describe("GUIDs of existing tasks that this task waits for"),
+  dependsOnUids: z.array(z.string()).max(25).optional()
+    .describe("Stable GUIDs of existing tasks (from get_task) that this task waits for"),
 });
 type BatchTaskSpec = z.infer<typeof BatchTask>;
 

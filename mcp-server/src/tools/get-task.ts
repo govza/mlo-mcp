@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { findById, flatten } from "../task-tree.js";
-import { defineTool, textResult, errorResult, toSummary, TaskSummarySchema, resolveReadCloudState } from "./shared.js";
+import {
+  defineTool,
+  textResult,
+  errorResult,
+  toSummary,
+  TaskSummarySchema,
+  resolveReadCloudState,
+  PATH_ID_CAVEAT,
+} from "./shared.js";
 import { knownCloudProjection } from "../cloud/log-projection.js";
 import { buildUidResolver } from "../cloud/structure-align.js";
 import type { TaskNode } from "../types.js";
@@ -9,7 +17,9 @@ export const getTaskTool = defineTool({
   name: "get_task",
   title: "Get task details",
   description: "Full details of one task by id, including note, estimates, schedule fields and child tasks.",
-  inputSchema: { id: z.string().describe('Path-based id from list_tasks/search_tasks, e.g. "1.2.3"') },
+  inputSchema: {
+    id: z.string().describe(`Path-based id from list_tasks/search_tasks, e.g. "1.2.3"; ${PATH_ID_CAVEAT}`),
+  },
   outputSchema: {
     task: TaskSummarySchema.extend({
       Note: z.string().optional(),

@@ -7,6 +7,7 @@ import {
   toSummary,
   TaskSummarySchema,
   DEFAULT_RESULT_LIMIT,
+  PATH_ID_CAVEAT,
 } from "./shared.js";
 
 export const listTasksTool = defineTool({
@@ -19,7 +20,8 @@ export const listTasksTool = defineTool({
   inputSchema: {
     format: z.enum(["tree", "flat"]).optional().describe("tree (indented outline, default) or flat"),
     includeCompleted: z.boolean().optional().describe("Include completed tasks (default false)"),
-    parentId: z.string().optional().describe("Only list the subtree under this task id"),
+    parentId: z.string().optional()
+      .describe(`Only list the subtree under this Path-based task id; ${PATH_ID_CAVEAT}`),
     maxDepth: z.number().int().min(1).optional().describe("Limit outline depth"),
     limit: z
       .number()

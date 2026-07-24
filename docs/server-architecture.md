@@ -11,10 +11,15 @@ the server internals around that loop.
 
 ```
 src/
-  index.ts          McpServer wiring (registers tools/registry.ts, server
-                    instructions string), stdio transport, starts the cloud endpoint;
+  index.ts          process lifecycle: stdio transport, starts the cloud endpoint;
                     idle-exit watchers (rebuilt bundle, auto-detected profile switch)
                     make the client respawn a current server on the next tool call
+  server.ts         the protocol surface — server identity (version.ts), the
+                    connection-time instructions string, and tool registration from
+                    tools/registry.ts; separate from index.ts so a test can connect a
+                    real client to it in memory
+  version.ts        the reported version, derived from mcp-server/package.json so the
+                    copy a client sees cannot drift from the one that ships
   config.ts         config (data file: auto-detected from MLO's registry LastDBFile —
                     the profile the app has open — or refuse to start; --data-file=
                     pins it for the test harness only; env: MLO_EXE_PATH,

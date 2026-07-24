@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { rowValue, type KnownRow } from "../cloud/log-projection.js";
 import { csvTruthy, runCloudRowUpdate, type CloudRowTarget } from "./row-update.js";
-import { defineTool } from "./shared.js";
+import { defineTool, PATH_ID_CAVEAT } from "./shared.js";
 
 export function completionPatch(known: KnownRow, now: string): Record<string, string> {
   return {
@@ -34,7 +34,8 @@ export const completeTaskTool = defineTool({
     "whose complete record is in the delta log (added via a cloud tool or changed in MLO since the local endpoint " +
     "took over) and refuses recurring tasks (complete those in MLO so the next occurrence is generated).",
   inputSchema: {
-    ids: z.array(z.string()).min(1).max(50).describe("Path-based task ids from list_tasks/search_tasks"),
+    ids: z.array(z.string()).min(1).max(50)
+      .describe(`Path-based task ids from list_tasks/search_tasks; ${PATH_ID_CAVEAT}`),
   },
   outputSchema: {
     uids: z.array(z.string()),

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { rowValue, type KnownRow } from "../cloud/log-projection.js";
 import { runCloudRowUpdate } from "./row-update.js";
-import { defineTool } from "./shared.js";
+import { defineTool, PATH_ID_CAVEAT } from "./shared.js";
 
 export function reopenPatch(known: KnownRow, now: string): Record<string, string> {
   return {
@@ -22,7 +22,10 @@ export const uncompleteTaskTool = defineTool({
     "the local endpoint took over); otherwise nothing is queued — reopen such tasks in the MLO app.",
   inputSchema: {
     ids: z.array(z.string()).min(1).max(50)
-      .describe("Path-based task ids from list_tasks/search_tasks (include completed tasks in the listing to see them)"),
+      .describe(
+        "Path-based task ids from list_tasks/search_tasks (include completed tasks in the listing to see them); " +
+        PATH_ID_CAVEAT
+      ),
   },
   outputSchema: {
     uids: z.array(z.string()),

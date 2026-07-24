@@ -3,11 +3,11 @@ import { resolveNamed, rowValue, type KnownCloudProjection, type KnownRow } from
 import { buildUidResolver } from "../cloud/structure-align.js";
 import { flatten, findById } from "../task-tree.js";
 import { csvTruthy, runCloudRowUpdate, type CloudRowTarget } from "./row-update.js";
-import { defineTool } from "./shared.js";
+import { defineTool, PATH_ID_CAVEAT } from "./shared.js";
 import type { TaskNode } from "../types.js";
 
 const CloudUpdateEntry = z.object({
-  id: z.string().describe("Path-based task id"),
+  id: z.string().describe(`Path-based task id from list_tasks/search_tasks; ${PATH_ID_CAVEAT}`),
   Caption: z.string().min(1).optional(),
   Note: z.string().optional().describe('"" clears'),
   Importance: z.number().min(0).max(200).optional().describe("0–200; 100 = normal"),
@@ -28,9 +28,12 @@ const CloudUpdateEntry = z.object({
   Places: z.array(z.string().min(1)).max(25).optional()
     .describe("Complete replacement set of existing context captions; [] clears all contexts"),
   dependsOnIds: z.array(z.string()).max(25).optional()
-    .describe("Complete replacement set of path ids this task waits for; [] clears all dependencies"),
+    .describe(`Complete replacement set of Path ids this task waits for (${PATH_ID_CAVEAT}); [] clears all dependencies`),
   moveToParentId: z.string().optional()
-    .describe('Re-parent: move this task (with its whole subtree) under the given task id; "" moves it to the top level'),
+    .describe(
+      `Re-parent: move this task (with its whole subtree) under the given Path id (${PATH_ID_CAVEAT}); ` +
+      '"" moves it to the top level'
+    ),
 });
 type CloudUpdateSpec = z.infer<typeof CloudUpdateEntry>;
 

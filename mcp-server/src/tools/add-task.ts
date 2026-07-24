@@ -15,7 +15,8 @@ export const addTaskTool = defineTool({
     note: z.string().optional(),
     dueDateTime: z.string().optional(),
     startDateTime: z.string().optional(),
-    parentUid: z.string().optional(),
+    parentUid: z.string().optional()
+      .describe("Stable GUID of an existing parent (from get_task, never a Path id); omit for top level"),
     IsProject: z.boolean().optional(),
     Starred: z.boolean().optional(),
     Folder: z.boolean().optional().describe("Hide only this task from To-Do views; children remain eligible"),

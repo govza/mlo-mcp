@@ -1,7 +1,9 @@
-// Produce the self-contained single-file server committed at dist-bundle/mlo-mcp.js.
-// End users run it with bare Node (any MCP client, npx from GitHub, the Claude Code
-// plugin) — pnpm/typescript/deps are contributor-only tooling. Re-run `pnpm bundle`
-// and commit the result whenever src/ changes.
+// Produce the single-file server committed at dist-bundle/mlo-mcp.js. End users run
+// it with bare Node (any MCP client, npx from GitHub, the Claude Code plugin) —
+// pnpm/typescript/deps are contributor-only tooling. Dependency-free, but not
+// standalone: src/version.ts reads the sibling ../package.json at startup so the
+// reported version cannot drift, so the file needs that manifest next to its parent
+// directory. Re-run `pnpm bundle` and commit the result whenever src/ changes.
 import { build } from "esbuild";
 
 await build({
