@@ -33,7 +33,7 @@ export interface TaskNode {
 export interface MloConfig {
   mloExePath: string;
   dataFile: string;
-  /** dataFile came from MLO's registry LastDBFile, not a --data-file test pin — the server follows profile switches. */
+  /** dataFile was detected from the running MLO, not pinned by --data-file — the server follows profile switches. */
   dataFileAutoDetected?: boolean;
   exportDir: string;
   cacheStaleMs: number;

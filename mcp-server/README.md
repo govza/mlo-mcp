@@ -38,18 +38,31 @@ claude mcp add mlo -- node D:\dev\projects\oml\mlo-mcp\mcp-server\dist\index.js
 | `MLO_CLOUD_STATE_ROOT` | no | `%LOCALAPPDATA%\mlo-mcp\cloud` | Partitioned sync-state root (override for tests/unusual installs only) |
 
 There is no profile setting. The server operates on the profile MLO itself
-has open — it reads the `LastDBFile` value under
-`HKCU\Software\MyLifeOrganized.net\MyLife\Settings` (which MLO updates
-whenever it opens a profile), logs the detected path to stderr on startup,
-and refuses to start when no profile was ever opened. It also follows profile
-switches: a background check (every 60s) notices when MLO opens a different
-profile and exits while idle, so the MCP client respawns the server against
-the new profile on the next tool call. This isn't just convenience — reads
-drive `mlo.exe` and writes ride the open profile's sync, so the app's current
-profile is the only one the server can fully operate on. (The test suite,
-which runs `mlo.exe` on temp copies with the GUI closed, pins its profile
-with an internal `--data-file=` argument; that also disables the
-switch-following.)
+has open, logs the detected path to stderr on startup, and refuses to start
+when it cannot establish one. This isn't just convenience — reads drive
+`mlo.exe` and writes ride the open profile's sync, so the app's current
+profile is the only one the server can fully operate on.
+
+Detection does not simply trust the registry. The `LastDBFile` value under
+`HKCU\Software\MyLifeOrganized.net\MyLife\Settings` supplies a *candidate*,
+which is then checked against the running MLO — because MLO writes that value
+when it **exits**, not when it opens a profile, so it goes stale the moment
+you switch profiles in the app. The running app is asked two questions the
+registry cannot answer: what its window title says it has open, and whether
+it is actually holding the candidate file open. If either answer contradicts
+the candidate, the server **refuses to start** and names both the stale path
+and what MLO really has open, rather than silently reading the wrong task
+tree and queueing writes against the wrong profile's sync
+([ADR-0004](../docs/adr/0004-ground-truth-the-open-profile.md)). Fix a
+refusal by switching back to that profile in MLO, or by closing and reopening
+MLO so it records the profile you are actually using.
+
+It also follows profile switches: a background check (every 60s) notices when
+MLO opens a different profile — or stops having this one open — and exits
+while idle, so the MCP client respawns the server against the current profile
+on the next tool call. (The test suite, which runs `mlo.exe` on temp copies
+with the GUI closed, pins its profile with an internal `--data-file=`
+argument; that bypasses these checks and disables the switch-following.)
 
 ## Tools
 

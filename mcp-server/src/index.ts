@@ -1,7 +1,8 @@
 import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { loadCloudConfig, loadConfig, detectRunningProfileAsync } from "./config.js";
+import { loadCloudConfig, loadConfig } from "./config.js";
+import { detectProfile } from "./profile-detect.js";
 import type { MloConfig } from "./types.js";
 import { isMloBusy } from "./mlo-cli.js";
 import { MloStore } from "./store.js";
@@ -86,16 +87,33 @@ function watchOwnBuild(): void {
 /**
  * An auto-detected profile is a snapshot: if the user opens a different
  * profile in MLO mid-session, this long-lived process would keep serving the
- * old one. Same remedy as watchOwnBuild — poll the registry value and exit
- * cleanly while idle so the client respawns against the new profile on the
- * next tool call. Never fires when a --data-file test pin is in effect.
+ * old one. Same remedy as watchOwnBuild — re-detect periodically and exit
+ * cleanly while idle so the client respawns on the next tool call. Never fires
+ * when a --data-file test pin is in effect.
+ *
+ * A refusal is a reason to exit too: it means MLO no longer has our profile
+ * open, and a session that stayed up would keep answering from the wrong one.
+ * The respawn re-runs detection, which refuses in loadConfig() and exits with
+ * the reason on stderr — the loud failure we want, though a startup failure
+ * rather than a protocol error, since there is no connected session to fail.
+ * Only "profile-switched" qualifies — a failed probe ("no-profile") is transient
+ * and must not cycle a working session.
  */
 function watchProfileSwitch(config: MloConfig): void {
   if (!config.dataFileAutoDetected) return;
   const timer = setInterval(async () => {
-    const current = await detectRunningProfileAsync();
-    if (current && current !== config.dataFile && !isMloBusy()) {
-      log(`MLO switched profiles (${config.dataFile} → ${current}) — exiting so the client restarts against it`);
+    // Before probing, not after: the probe opens the data file denying all
+    // sharing, and doing that mid-operation is the very contention the data
+    // file's lock exists to prevent. Re-checked on the next tick.
+    if (isMloBusy()) return;
+    const verdict = await detectProfile(config.mloExePath);
+    if (isMloBusy()) return; // an operation started while the probe ran
+    if (verdict.ok && verdict.dataFile !== config.dataFile) {
+      log(`MLO switched profiles (${config.dataFile} → ${verdict.dataFile}) — exiting so the client restarts against it`);
+      process.exit(0);
+    }
+    if (!verdict.ok && verdict.reason === "profile-switched") {
+      log(`MLO no longer has ${config.dataFile} open — exiting rather than serving it`);
       process.exit(0);
     }
   }, 60_000);

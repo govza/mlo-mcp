@@ -1,72 +1,28 @@
 import path from "node:path";
 import os from "node:os";
-import { existsSync } from "node:fs";
-import { execFile, spawnSync } from "node:child_process";
 import { DEFAULT_CLOUD_PORT } from "./cloud/server.js";
+import { detectProfileSync } from "./profile-detect.js";
 import { log } from "./log.js";
 import type { MloConfig } from "./types.js";
 
-const DEFAULT_EXE = "C:\\Program Files (x86)\\MyLifeOrganized.net\\MLO\\mlo.exe";
-
-// MLO records the profile it currently has open (and reopens on the next
-// launch) in HKCU\...\Settings\LastDBFile, so the server can follow whatever
-// profile mlo.exe is actually running without any configuration. Read via
-// PowerShell rather than reg.exe: reg.exe emits the OEM codepage and would
-// garble non-ASCII profile paths.
-const LAST_DB_FILE_PS_ARGS = [
-  "-NoProfile",
-  "-NonInteractive",
-  "-Command",
-  "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; " +
-    "(Get-ItemProperty 'HKCU:\\Software\\MyLifeOrganized.net\\MyLife\\Settings' -ErrorAction SilentlyContinue).LastDBFile",
-];
-
-function parseLastDbFile(stdout: string): string | undefined {
-  const file = stdout.replace(/^\uFEFF/, "").trim();
-  return file && existsSync(file) ? file : undefined;
-}
-
-function detectRunningProfile(): string | undefined {
-  if (process.platform !== "win32") return undefined;
-  const result = spawnSync("powershell.exe", LAST_DB_FILE_PS_ARGS, {
-    encoding: "utf8",
-    windowsHide: true,
-    timeout: 10_000,
-  });
-  if (result.status !== 0 || !result.stdout) return undefined;
-  return parseLastDbFile(result.stdout);
-}
-
-/** Non-blocking variant for the periodic profile-switch watcher in index.ts. */
-export function detectRunningProfileAsync(): Promise<string | undefined> {
-  if (process.platform !== "win32") return Promise.resolve(undefined);
-  return new Promise((resolve) => {
-    execFile(
-      "powershell.exe",
-      LAST_DB_FILE_PS_ARGS,
-      { encoding: "utf8", windowsHide: true, timeout: 10_000 },
-      (err, stdout) => resolve(err ? undefined : parseLastDbFile(stdout))
-    );
-  });
-}
+/** Exported so tests can name the real default instead of restating the literal. */
+export const DEFAULT_EXE = "C:\\Program Files (x86)\\MyLifeOrganized.net\\MLO\\mlo.exe";
 
 // The app's open profile is the only one the server can fully operate on
 // (reads drive mlo.exe, writes ride that profile's sync), so there is no
-// profile setting: detect it or refuse to start. `--data-file=` exists for
-// the test harness alone — it runs mlo.exe on temp copies with the GUI
-// closed, where following the registry would hit the developer's real profile.
-function resolveDataFile(): { dataFile: string; autoDetected: boolean } {
+// profile setting: detect it or refuse to start. Detection grounds the
+// registry's candidate against the running app rather than trusting it — see
+// profile-detect.ts for why the registry value alone is not enough.
+// `--data-file=` exists for the test harness alone — it runs mlo.exe on temp
+// copies with the GUI closed, where following the registry would hit the
+// developer's real profile.
+function resolveDataFile(mloExePath: string): { dataFile: string; autoDetected: boolean } {
   const pin = process.argv.find((a) => a.startsWith("--data-file="));
   if (pin) return { dataFile: pin.slice("--data-file=".length), autoDetected: false };
-  const detected = detectRunningProfile();
-  if (detected) {
-    log(`auto-detected MLO profile: ${detected}`);
-    return { dataFile: detected, autoDetected: true };
-  }
-  throw new Error(
-    "No MLO profile found: MLO's settings record no last-opened profile. " +
-      "Open your profile in MLO once so the server can detect it."
-  );
+  const verdict = detectProfileSync(mloExePath);
+  if (!verdict.ok) throw new Error(verdict.message);
+  log(`auto-detected MLO profile: ${verdict.dataFile}`);
+  return { dataFile: verdict.dataFile, autoDetected: true };
 }
 
 // One automatic private root outside any checkout; every profile gets its own
@@ -103,9 +59,14 @@ export function loadCloudConfig(): CloudConfig {
 }
 
 export function loadConfig(): MloConfig {
-  const { dataFile, autoDetected } = resolveDataFile();
+  // Before the data file: detection looks for this exe's process by name, so an
+  // MLO_EXE_PATH override has to reach it. `||`, not `??`: a blank override
+  // would yield an empty process name, match nothing, and make detection report
+  // MLO as closed — which accepts the registry candidate unchecked.
+  const mloExePath = process.env.MLO_EXE_PATH || DEFAULT_EXE;
+  const { dataFile, autoDetected } = resolveDataFile(mloExePath);
   return {
-    mloExePath: process.env.MLO_EXE_PATH ?? DEFAULT_EXE,
+    mloExePath,
     dataFile,
     dataFileAutoDetected: autoDetected,
     exportDir: process.env.MLO_EXPORT_DIR ?? path.join(os.tmpdir(), "mlo-mcp"),

@@ -12,19 +12,24 @@ the server internals around that loop.
 ```
 src/
   index.ts          process lifecycle: stdio transport, starts the cloud endpoint;
-                    idle-exit watchers (rebuilt bundle, auto-detected profile switch)
-                    make the client respawn a current server on the next tool call
+                    idle-exit watchers (rebuilt bundle, auto-detected profile switch or
+                    a profile MLO no longer has open) make the client respawn a current
+                    server on the next tool call
   server.ts         the protocol surface — server identity (version.ts), the
                     connection-time instructions string, and tool registration from
                     tools/registry.ts; separate from index.ts so a test can connect a
                     real client to it in memory
   version.ts        the reported version, derived from mcp-server/package.json so the
                     copy a client sees cannot drift from the one that ships
-  config.ts         config (data file: auto-detected from MLO's registry LastDBFile —
-                    the profile the app has open — or refuse to start; --data-file=
-                    pins it for the test harness only; env: MLO_EXE_PATH,
-                    MLO_EXPORT_DIR, MLO_CACHE_STALE_MS, MLO_CLOUD_HOST/PORT; the
-                    partitioned state root is automatic)
+  config.ts         config (data file: auto-detected via profile-detect.ts or refuse to
+                    start; --data-file= pins it for the test harness only; env:
+                    MLO_EXE_PATH, MLO_EXPORT_DIR, MLO_CACHE_STALE_MS,
+                    MLO_CLOUD_HOST/PORT; the partitioned state root is automatic)
+  profile-detect.ts which profile MLO actually has open: the registry's LastDBFile
+                    proposes a candidate, the running app's window title and its hold
+                    on the file can refute it, and a refuted candidate is a refusal to
+                    start (ADR-0004). One PowerShell round trip gathers the
+                    observation; judgeProfile() is the pure policy over it
   mlo-cli.ts        mlo.exe invocation: Delphi quoting, timeouts, exit-code mapping,
                     both locks, -saveXML export, -QuickSync
   xml.ts            parse/build (fast-xml-parser), RawTaskNode
@@ -114,7 +119,7 @@ mcp-cloud.md for why the XML export cannot be that source.
 
 ## Tests (vitest, 3 projects-in-2)
 
-- **unit** — parser/builder round-trip, tree ids, filters (fixture is a real export); the whole cloud protocol layer (CSV/envelope codecs, delta building/merging, log state and projection, HTTP server, SOAP adapter, tool helpers).
+- **unit** — parser/builder round-trip, tree ids, filters (fixture is a real export); the whole cloud protocol layer (CSV/envelope codecs, delta building/merging, log state and projection, HTTP server, SOAP adapter, tool helpers); profile detection, whose policy is a pure function over one observation. One suite there is the exception to "no live machine": `profile-detect`'s probe-contract block runs the real PowerShell probe, because the seam it pins (the script's JSON shape) has no other test. It is Windows-gated and read-only — registry, process list, and a read handle on the recorded profile — and needs no mlo.exe, so unlike the **mlo** project it runs with the GUI open.
 - **mlo** (serial, slow) — real mlo.exe against a temp copy of the test profile: export, exit codes, GUID recovery.
 - **e2e** (inside mlo project) — real MCP client over stdio: tool listing/annotations, instructions, read tools, cloud_status. Write tools need the app's sync proxy wired to the local endpoint and are exercised outside this headless suite.
 

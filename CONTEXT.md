@@ -5,7 +5,10 @@ Ubiquitous language for this repo. Terms are defined here in one or two lines; t
 ## The app and its data
 
 - **MLO** — MyLifeOrganized, the Windows desktop outliner this server drives via `mlo.exe`'s command line ([docs/mlo/mlo-cli.md](docs/mlo/mlo-cli.md)).
-- **Profile / `.ml` data file** — MLO's single binary data file. Auto-detected from the registry's `LastDBFile` (the profile the app has open); the server never rewrites it.
+- **Profile / `.ml` data file** — MLO's single binary data file. Auto-detected, never configured; the server never rewrites it.
+- **Profile candidate** — the path the registry's `LastDBFile` proposes. A proposal only: MLO writes that value when it *exits*, so it goes stale on an in-app profile switch ([ADR-0004](docs/adr/0004-ground-truth-the-open-profile.md)).
+- **Refute (a candidate)** — what the running app's own evidence does to a stale candidate: a window title naming a different profile, or the candidate file being one MLO does not hold open. An *unavailable* signal never refutes.
+- **Profile verdict** — detection's answer: the accepted data file, or a refusal (`profile-switched` / `no-profile`). A refuted candidate refuses; it is never silently replaced with a guess.
 - **Task tree** — one deep outline; deep nesting is idiomatic. The task model (computed-score priority, contexts, dependencies, visibility) is in [docs/mlo/mlo-task-model.md](docs/mlo/mlo-task-model.md).
 - **Context (MLO "Place")** — `@Office`-style GTD context attached to tasks.
 - **Path id** — positional id like `"1.2.3"`; shifts whenever the tree changes, valid only for immediate follow-up calls. Never stored.

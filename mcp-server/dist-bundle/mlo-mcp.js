@@ -5320,8 +5320,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path14) {
-      let input = path14;
+    function removeDotSegments(path15) {
+      let input = path15;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -5573,8 +5573,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path14, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path14 && path14 !== "/" ? path14 : void 0;
+        const [path15, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path15 && path15 !== "/" ? path15 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -9182,10 +9182,10 @@ function assignProp(target, prop, value) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path14) {
-  if (!path14)
+function getElementAtPath(obj, path15) {
+  if (!path15)
     return obj;
-  return path14.reduce((acc, key) => acc?.[key], obj);
+  return path15.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -9505,11 +9505,11 @@ function aborted(x2, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path14, issues) {
+function prefixIssues(path15, issues) {
   return issues.map((iss) => {
     var _a2;
     (_a2 = iss).path ?? (_a2.path = []);
-    iss.path.unshift(path14);
+    iss.path.unshift(path15);
     return iss;
   });
 }
@@ -15106,10 +15106,8 @@ var StdioServerTransport = class {
 };
 
 // src/config.ts
-import path11 from "node:path";
+import path12 from "node:path";
 import os2 from "node:os";
-import { existsSync } from "node:fs";
-import { execFile as execFile2, spawnSync } from "node:child_process";
 
 // src/cloud/server.ts
 import http2 from "node:http";
@@ -18738,55 +18736,143 @@ async function startCloudServer(options) {
   return { server, state, gateway, host, port, stop: stopSelf };
 }
 
-// src/config.ts
-var DEFAULT_EXE = "C:\\Program Files (x86)\\MyLifeOrganized.net\\MLO\\mlo.exe";
-var LAST_DB_FILE_PS_ARGS = [
-  "-NoProfile",
-  "-NonInteractive",
-  "-Command",
-  "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; (Get-ItemProperty 'HKCU:\\Software\\MyLifeOrganized.net\\MyLife\\Settings' -ErrorAction SilentlyContinue).LastDBFile"
-];
-function parseLastDbFile(stdout) {
-  const file = stdout.replace(/^\uFEFF/, "").trim();
-  return file && existsSync(file) ? file : void 0;
+// src/profile-detect.ts
+import path11 from "node:path";
+import { execFile as execFile2, spawnSync } from "node:child_process";
+var TITLED_PROFILE = /^\s*\*?\s*(.*\.ml)\s+-\s+\S/i;
+function openProfileNames(windowTitles) {
+  return windowTitles.flatMap((title) => {
+    const named = TITLED_PROFILE.exec(title);
+    if (!named) return [];
+    return [path11.win32.basename(named[1])];
+  });
 }
-function detectRunningProfile() {
+var NO_PROFILE_AT_ALL = "No MLO profile found: MLO's settings record no last-opened profile. Open your profile in MLO once so the server can detect it.";
+var PROBE_FAILED = "Could not detect which profile MLO has open: the detection probe did not return a usable result. It needs Windows and powershell.exe. Check the server's stderr log for the probe's own output.";
+function switchedMessage(candidate, openNames) {
+  const actual = openNames.length ? openNames.map((n) => `"${n}"`).join(", ") : "another profile (it does not hold this file open)";
+  return `MLO has a different profile open than its own settings record.
+  settings (LastDBFile): ${candidate}
+  MLO actually has open: ${actual}
+MLO writes LastDBFile only when it exits, so the value goes stale after an in-app profile switch. Refusing to start rather than operating on a profile you are not using: reads would return the wrong task tree and writes would ride the wrong profile's sync.
+To fix, either switch back to that profile in MLO, or close and reopen MLO so it records the profile you are actually using.`;
+}
+function judgeProfile(observed) {
+  if (!observed) return { ok: false, reason: "no-profile", message: PROBE_FAILED };
+  const candidate = observed.lastDbFile;
+  if (!candidate) return { ok: false, reason: "no-profile", message: NO_PROFILE_AT_ALL };
+  if (!observed.lastDbFileExists) {
+    return {
+      ok: false,
+      reason: "no-profile",
+      message: `MLO's settings point at ${candidate}, which no longer exists. Open the profile you want to use in MLO so the server can detect it.`
+    };
+  }
+  if (!observed.appRunning) return { ok: true, dataFile: candidate };
+  const openNames = openProfileNames(observed.windowTitles);
+  const wanted = path11.win32.basename(candidate).toLowerCase();
+  const titleRefutes = openNames.length > 0 && !openNames.some((n) => n.toLowerCase() === wanted);
+  const lockRefutes = observed.lastDbFileHeldByOther === false;
+  if (titleRefutes || lockRefutes) {
+    return { ok: false, reason: "profile-switched", message: switchedMessage(candidate, openNames) };
+  }
+  return { ok: true, dataFile: candidate };
+}
+function probeScript(processName) {
+  const name = processName.replaceAll("'", "''");
+  return [
+    "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8",
+    "$ErrorActionPreference='SilentlyContinue'",
+    "$last=(Get-ItemProperty 'HKCU:\\Software\\MyLifeOrganized.net\\MyLife\\Settings').LastDBFile",
+    "$exists=$false; $held=$null",
+    "if ($last) { $exists=[bool](Test-Path -LiteralPath $last -PathType Leaf)",
+    // FileAccess::Read so a read-only profile is not mistaken for a held one;
+    // FileShare::None so the open fails precisely when someone else holds it.
+    "  if ($exists) { try { $h=[System.IO.File]::Open($last,[System.IO.FileMode]::Open,[System.IO.FileAccess]::Read,[System.IO.FileShare]::None); $h.Close(); $held=$false }",
+    "    catch { $held=$true } } }",
+    // Filtered enumeration, not -Name: -Name takes wildcards, and an exe named
+    // with a bracket or star would silently match unrelated processes.
+    `$procs=@(Get-Process | Where-Object { $_.ProcessName -ieq '${name}' })`,
+    "[pscustomobject]@{ lastDbFile=$last; lastDbFileExists=$exists; appRunning=($procs.Count -gt 0); windowTitles=@($procs | ForEach-Object { $_.MainWindowTitle }); lastDbFileHeldByOther=$held } | ConvertTo-Json -Compress"
+  ].join("\n");
+}
+function psArgs(processName) {
+  return ["-NoProfile", "-NonInteractive", "-Command", probeScript(processName)];
+}
+var PROBE_FIELDS = [
+  "lastDbFile",
+  "lastDbFileExists",
+  "appRunning",
+  "windowTitles",
+  "lastDbFileHeldByOther"
+];
+function parseObservation(stdout) {
+  const text2 = stdout.replace(/^\uFEFF/, "").trim();
+  if (!text2.startsWith("{")) return void 0;
+  let raw;
+  try {
+    raw = JSON.parse(text2);
+  } catch {
+    return void 0;
+  }
+  if (!PROBE_FIELDS.every((field2) => field2 in raw)) return void 0;
+  const file = typeof raw.lastDbFile === "string" ? raw.lastDbFile.trim() : "";
+  const titles = raw.windowTitles;
+  return {
+    lastDbFile: file || void 0,
+    lastDbFileExists: raw.lastDbFileExists === true,
+    appRunning: raw.appRunning === true,
+    windowTitles: (Array.isArray(titles) ? titles : typeof titles === "string" ? [titles] : []).filter(
+      (t) => typeof t === "string"
+    ),
+    lastDbFileHeldByOther: typeof raw.lastDbFileHeldByOther === "boolean" ? raw.lastDbFileHeldByOther : void 0
+  };
+}
+function processNameFor(mloExePath) {
+  return path11.win32.basename(mloExePath).replace(/\.exe$/i, "");
+}
+var PROBE_TIMEOUT_MS = 1e4;
+function probeProfileSync(mloExePath) {
   if (process.platform !== "win32") return void 0;
-  const result = spawnSync("powershell.exe", LAST_DB_FILE_PS_ARGS, {
+  const result = spawnSync("powershell.exe", psArgs(processNameFor(mloExePath)), {
     encoding: "utf8",
     windowsHide: true,
-    timeout: 1e4
+    timeout: PROBE_TIMEOUT_MS
   });
-  if (result.status !== 0 || !result.stdout) return void 0;
-  return parseLastDbFile(result.stdout);
+  return result.stdout ? parseObservation(result.stdout) : void 0;
 }
-function detectRunningProfileAsync() {
+function probeProfile(mloExePath) {
   if (process.platform !== "win32") return Promise.resolve(void 0);
   return new Promise((resolve) => {
     execFile2(
       "powershell.exe",
-      LAST_DB_FILE_PS_ARGS,
-      { encoding: "utf8", windowsHide: true, timeout: 1e4 },
-      (err2, stdout) => resolve(err2 ? void 0 : parseLastDbFile(stdout))
+      psArgs(processNameFor(mloExePath)),
+      { encoding: "utf8", windowsHide: true, timeout: PROBE_TIMEOUT_MS },
+      (_err, stdout) => resolve(stdout ? parseObservation(stdout) : void 0)
     );
   });
 }
-function resolveDataFile() {
+function detectProfileSync(mloExePath) {
+  return judgeProfile(probeProfileSync(mloExePath));
+}
+async function detectProfile(mloExePath) {
+  return judgeProfile(await probeProfile(mloExePath));
+}
+
+// src/config.ts
+var DEFAULT_EXE = "C:\\Program Files (x86)\\MyLifeOrganized.net\\MLO\\mlo.exe";
+function resolveDataFile(mloExePath) {
   const pin = process.argv.find((a) => a.startsWith("--data-file="));
   if (pin) return { dataFile: pin.slice("--data-file=".length), autoDetected: false };
-  const detected = detectRunningProfile();
-  if (detected) {
-    log(`auto-detected MLO profile: ${detected}`);
-    return { dataFile: detected, autoDetected: true };
-  }
-  throw new Error(
-    "No MLO profile found: MLO's settings record no last-opened profile. Open your profile in MLO once so the server can detect it."
-  );
+  const verdict = detectProfileSync(mloExePath);
+  if (!verdict.ok) throw new Error(verdict.message);
+  log(`auto-detected MLO profile: ${verdict.dataFile}`);
+  return { dataFile: verdict.dataFile, autoDetected: true };
 }
 function resolveStateRoot() {
   if (process.env.MLO_CLOUD_STATE_ROOT) return process.env.MLO_CLOUD_STATE_ROOT;
-  if (process.env.LOCALAPPDATA) return path11.join(process.env.LOCALAPPDATA, "mlo-mcp", "cloud");
-  return path11.join(os2.homedir(), ".mlo-mcp", "cloud");
+  if (process.env.LOCALAPPDATA) return path12.join(process.env.LOCALAPPDATA, "mlo-mcp", "cloud");
+  return path12.join(os2.homedir(), ".mlo-mcp", "cloud");
 }
 function loadCloudConfig() {
   const cloudPort = Number(process.env.MLO_CLOUD_PORT ?? String(DEFAULT_CLOUD_PORT));
@@ -18800,12 +18886,13 @@ function loadCloudConfig() {
   };
 }
 function loadConfig() {
-  const { dataFile, autoDetected } = resolveDataFile();
+  const mloExePath = process.env.MLO_EXE_PATH || DEFAULT_EXE;
+  const { dataFile, autoDetected } = resolveDataFile(mloExePath);
   return {
-    mloExePath: process.env.MLO_EXE_PATH ?? DEFAULT_EXE,
+    mloExePath,
     dataFile,
     dataFileAutoDetected: autoDetected,
-    exportDir: process.env.MLO_EXPORT_DIR ?? path11.join(os2.tmpdir(), "mlo-mcp"),
+    exportDir: process.env.MLO_EXPORT_DIR ?? path12.join(os2.tmpdir(), "mlo-mcp"),
     cacheStaleMs: Number(process.env.MLO_CACHE_STALE_MS) || 3e4,
     // Only needed when the capture inbox is NOT MLO's own <Inbox> node (e.g. a
     // hand-made "Входящие" folder). MLO itself hardcodes the caption "<Inbox>"
@@ -18818,7 +18905,7 @@ function loadConfig() {
 // src/mlo-cli.ts
 import { spawn } from "node:child_process";
 import { promises as fs11 } from "node:fs";
-import path12 from "node:path";
+import path13 from "node:path";
 var EXIT_MESSAGES = {
   1: "invalid command-line argument",
   2: "target file already exists (mlo.exe -saveXML/-saveML never overwrite)",
@@ -18932,7 +19019,7 @@ function exportXml(config2, taskGuid) {
   return withMloFileLock(config2, async () => {
     await ensureDataFile(config2);
     await fs11.mkdir(config2.exportDir, { recursive: true });
-    const target = path12.join(config2.exportDir, `export-${process.pid}-${++exportCounter}.xml`);
+    const target = path13.join(config2.exportDir, `export-${process.pid}-${++exportCounter}.xml`);
     await fs11.rm(target, { force: true });
     const args = [config2.dataFile];
     if (taskGuid) args.push(`-task=${taskGuid}`);
@@ -19008,7 +19095,7 @@ function num(v) {
   return v === void 0 || v === "" ? void 0 : Number(v);
 }
 function toModel(raw, id, parentPath, depth) {
-  const path14 = [...parentPath, raw["@_Caption"]];
+  const path15 = [...parentPath, raw["@_Caption"]];
   const node = {
     id,
     Guid: raw.IDD,
@@ -19034,10 +19121,10 @@ function toModel(raw, id, parentPath, depth) {
     CompleteSubTasksInOrder: delphiBool(raw.CompleteSubTasksInOrder),
     DependsOn: raw.Dependency?.UID ?? [],
     Children: [],
-    Path: path14,
+    Path: path15,
     Depth: depth
   };
-  node.Children = (raw.TaskNode ?? []).map((c, i2) => toModel(c, `${id}.${i2 + 1}`, path14, depth + 1));
+  node.Children = (raw.TaskNode ?? []).map((c, i2) => toModel(c, `${id}.${i2 + 1}`, path15, depth + 1));
   return node;
 }
 function buildTaskTree(doc) {
@@ -19713,8 +19800,8 @@ function getErrorMap() {
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path14, errorMaps, issueData } = params;
-  const fullPath = [...path14, ...issueData.path || []];
+  const { data, path: path15, errorMaps, issueData } = params;
+  const fullPath = [...path15, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -19830,11 +19917,11 @@ var errorUtil;
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path14, key) {
+  constructor(parent, value, path15, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path14;
+    this._path = path15;
     this._key = key;
   }
   get path() {
@@ -27546,7 +27633,7 @@ var searchTasksTool = defineTool({
 });
 
 // src/cloud/log-projection.ts
-import path13 from "node:path";
+import path14 from "node:path";
 function rowValue(known, column) {
   const index = known.header.indexOf(column);
   return index < 0 ? "" : known.row[index] ?? "";
@@ -27580,7 +27667,7 @@ function latestFullRows(documents) {
   return rows;
 }
 async function knownCloudProjection(state) {
-  const snapshot = await new SnapshotStore(path13.join(state.stateDir, "snapshot")).load();
+  const snapshot = await new SnapshotStore(path14.join(state.stateDir, "snapshot")).load();
   const entries = await state.entriesAfter(snapshot?.version ?? ZERO_CURSOR);
   const merged = mergeDeltas([
     ...snapshot ? [snapshot.document] : [],
@@ -28499,7 +28586,7 @@ import { spawn as spawn2 } from "node:child_process";
 import net2 from "node:net";
 var RESIDENT_FLAG = "--serve-cloud";
 var ENDPOINT_RECOVERY = "A new MCP client session starts one automatically, so restarting this client is the fix; a session already running will not start one by itself.";
-var PROBE_TIMEOUT_MS = 2e3;
+var PROBE_TIMEOUT_MS2 = 2e3;
 var START_TIMEOUT_MS = 15e3;
 var VENDOR_TIMEOUT_MS = 12e4;
 var POLL_INTERVAL_MS = 100;
@@ -28531,7 +28618,7 @@ function portIsTaken(host, port, timeoutMs) {
 async function askStatus(host, port) {
   let response;
   try {
-    response = await fetch(`http://${host}:${port}/v1/status`, { signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
+    response = await fetch(`http://${host}:${port}/v1/status`, { signal: AbortSignal.timeout(PROBE_TIMEOUT_MS2) });
   } catch (error2) {
     return { kind: "foreign", detail: `it accepts connections but does not answer /v1/status (${error2 instanceof Error ? error2.message : String(error2)})` };
   }
@@ -28559,7 +28646,7 @@ async function readStatus(host, port) {
   return answer.kind === "endpoint" ? answer.status : void 0;
 }
 async function probe(host, port) {
-  if (!await portIsTaken(host, port, PROBE_TIMEOUT_MS)) return { kind: "free" };
+  if (!await portIsTaken(host, port, PROBE_TIMEOUT_MS2)) return { kind: "free" };
   return askStatus(host, port);
 }
 async function waitFor(deadlineMs, attempt) {
@@ -28589,7 +28676,7 @@ async function ensureEndpoint(options) {
     }
     log(`resident endpoint on ${host}:${port} is ${theirVersion ?? "an older build"}; this session is ${ourVersion} \u2014 replacing it`);
     const asked = await endpoint.requestShutdown().then(() => true, () => false);
-    const freed = asked && await waitFor(START_TIMEOUT_MS, async () => await portIsTaken(host, port, PROBE_TIMEOUT_MS) ? void 0 : true);
+    const freed = asked && await waitFor(START_TIMEOUT_MS, async () => await portIsTaken(host, port, PROBE_TIMEOUT_MS2) ? void 0 : true);
     if (!freed) {
       log(`the endpoint on ${host}:${port} did not step aside \u2014 attaching to it instead of replacing it`);
       endpoint.adopt(found.status);
@@ -28677,7 +28764,7 @@ var ResidentEndpoint = class {
    * to attaching to, not one worth blocking a session's startup on.
    */
   async requestShutdown() {
-    await this.post("/v1/shutdown", {}, PROBE_TIMEOUT_MS);
+    await this.post("/v1/shutdown", {}, PROBE_TIMEOUT_MS2);
   }
   async post(route, body, timeoutMs = VENDOR_TIMEOUT_MS) {
     let response;
@@ -29053,9 +29140,15 @@ function watchOwnBuild() {
 function watchProfileSwitch(config2) {
   if (!config2.dataFileAutoDetected) return;
   const timer = setInterval(async () => {
-    const current = await detectRunningProfileAsync();
-    if (current && current !== config2.dataFile && !isMloBusy()) {
-      log(`MLO switched profiles (${config2.dataFile} \u2192 ${current}) \u2014 exiting so the client restarts against it`);
+    if (isMloBusy()) return;
+    const verdict = await detectProfile(config2.mloExePath);
+    if (isMloBusy()) return;
+    if (verdict.ok && verdict.dataFile !== config2.dataFile) {
+      log(`MLO switched profiles (${config2.dataFile} \u2192 ${verdict.dataFile}) \u2014 exiting so the client restarts against it`);
+      process.exit(0);
+    }
+    if (!verdict.ok && verdict.reason === "profile-switched") {
+      log(`MLO no longer has ${config2.dataFile} open \u2014 exiting rather than serving it`);
       process.exit(0);
     }
   }, 6e4);

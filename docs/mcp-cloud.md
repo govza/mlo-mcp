@@ -244,11 +244,13 @@ between mlo-mcp processes, not part of what MLO ever sees.
 ## Configuration
 
 No configuration is needed: the data file is auto-detected from the profile
-MLO has open (registry `LastDBFile`), follows profile switches, and the
-server refuses to start when no profile was ever opened — the app's open
-profile is the only one the server can fully operate on (reads drive
-`mlo.exe`, writes ride that profile's sync), so there is no profile setting;
-the test suite pins temp copies with an internal `--data-file=` argument.
+MLO has open — the registry's `LastDBFile` proposes it and the running app
+confirms it ([ADR-0004](adr/0004-ground-truth-the-open-profile.md)) — it
+follows profile switches, and the server refuses to start when it cannot
+establish which profile the app has open. The app's open profile is the only
+one the server can fully operate on (reads drive `mlo.exe`, writes ride that
+profile's sync), so there is no profile setting; the test suite pins temp
+copies with an internal `--data-file=` argument.
 A profile's authority mode
 is not configuration at all: `cloud_bootstrap` always sets up the vendor-
 in-the-loop architecture; only the dev script can bind a profile local.
