@@ -4,10 +4,11 @@ import path from "node:path";
 import http from "node:http";
 import net from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
-import { startCloudServer, startOrAttachCloudServer, type CloudServerHandle } from "../../src/cloud/server.js";
+import { startCloudServer, type CloudServerHandle } from "../../src/cloud/server.js";
 import { CloudGateway } from "../../src/cloud/gateway.js";
 import { buildTaskAddDelta } from "../../src/cloud/delta.js";
 import { packEnvelope, unpackEnvelope } from "../../src/cloud/envelope.js";
+import { SERVER_INFO } from "../../src/version.js";
 
 const handles: CloudServerHandle[] = [];
 const dirs: string[] = [];
@@ -28,27 +29,6 @@ describe("cloud HTTP server", () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-bind-")); dirs.push(dir);
     await expect(startCloudServer({ host: "0.0.0.0", port: 0, stateRoot: dir }))
       .rejects.toThrow("must bind to a loopback host");
-  });
-
-  it("attaches instead of failing when the port is held by another mlo-mcp endpoint", async () => {
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-attach-")); dirs.push(dir);
-    const first = await startCloudServer({ host: "127.0.0.1", port: 0, stateRoot: dir }); handles.push(first);
-    const second = await startOrAttachCloudServer({ host: "127.0.0.1", port: first.port, stateRoot: dir });
-    expect(second).toBeUndefined();
-  });
-
-  it("still fails when the port is held by something that is not a cloud endpoint", async () => {
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-attach-other-")); dirs.push(dir);
-    const other = http.createServer((_request, response) => { response.writeHead(200); response.end("not mlo"); });
-    await new Promise<void>((resolve) => other.listen(0, "127.0.0.1", resolve));
-    const address = other.address();
-    if (!address || typeof address === "string") throw new Error("missing address");
-    try {
-      await expect(startOrAttachCloudServer({ host: "127.0.0.1", port: address.port, stateRoot: dir }))
-        .rejects.toThrow(/EADDRINUSE/);
-    } finally {
-      await new Promise<void>((resolve, reject) => other.close((error) => error ? reject(error) : resolve()));
-    }
   });
 
   it("intercepts supported vendor SOAP operations instead of forwarding credentials", async () => {
@@ -153,8 +133,12 @@ describe("cloud HTTP server", () => {
     expect((await post(handle, "/v1/push", { client: "mlo-app", baseline: "2", envelope: Buffer.from("garbage").toString("base64") })).status).toBe(400);
     expect(await handle.state.highWater()).toBe(before);
 
-    // The app pulled through cursor 2, so nothing is pending for it.
+    // The app pulled through cursor 2, so nothing is pending for it. The build
+    // and the contact inventory are what an attaching session reads from here.
     const status = await fetch(`http://${handle.host}:${handle.port}/v1/status`);
-    expect(await status.json()).toMatchObject({ cursor: "2", entries: { mcp: 1, app: 1 }, pendingForApp: 0, stateRoot: dir, partitions: [] });
+    expect(await status.json()).toMatchObject({
+      cursor: "2", entries: { mcp: 1, app: 1 }, pendingForApp: 0, stateRoot: dir, partitions: [],
+      version: SERVER_INFO.version, contactUids: [],
+    });
   });
 });

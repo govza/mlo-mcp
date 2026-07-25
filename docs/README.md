@@ -10,7 +10,7 @@ MCP server (this project):
 | [server-architecture.md](server-architecture.md) | How the MCP server is built: locking, reads, the queue→QuickSync→verify write loop, tool design |
 | [mcp-cloud.md](mcp-cloud.md) | The local cloud-sync endpoint: wire contract, delta log, merge rules, how the app gets wired to it via MLO's proxy setting |
 | [agents/](agents/) | Conventions for AI agent skills: issue tracker, triage labels, domain-doc consumer rules (glossary/entry point: [/CONTEXT.md](../CONTEXT.md)) |
-| [adr/](adr/) | Architecture decision records — decisions made since this index was written ([ADR-0001](adr/0001-distribution-surfaces.md): distribution surfaces; [ADR-0002](adr/0002-report-binding-mismatch-never-repair-it.md): report a binding mismatch, never repair it) |
+| [adr/](adr/) | Architecture decision records — decisions made since this index was written ([ADR-0001](adr/0001-distribution-surfaces.md): distribution surfaces; [ADR-0002](adr/0002-report-binding-mismatch-never-repair-it.md): report a binding mismatch, never repair it; [ADR-0003](adr/0003-resident-endpoint.md): the endpoint is a resident process) |
 
 The **canonical usage guide for the tools is not in this directory**: it is the MCP `instructions` string in [`mcp-server/src/server.ts`](../mcp-server/src/server.ts), which every client receives at connection time, plus the per-tool descriptions and schemas (`pnpm tools`). `tools.md` describes the surface for a human reader; `instructions` is what an agent is actually told, and it is the copy to change first.
 

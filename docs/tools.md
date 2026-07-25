@@ -63,9 +63,9 @@ shapes. If they ever disagree on a shape, the catalog is right.
   with usage counts.
 - **`cloud_status`** — binding (`dataFileUID`, mode), bootstrap lifecycle,
   cursor and per-origin delta counts, last local stamp, endpoint-mismatch
-  count, partition inventory, mirror coverage/health, whether this process
-  owns the sync endpoint (`endpointRole`), and whether MLO is syncing a
-  different `dataFileUID` than the bound one (`bindingMismatch`,
+  count, partition inventory, mirror coverage/health, whether the resident sync
+  endpoint is reachable and at what build (`endpoint`), and whether MLO is
+  syncing a different `dataFileUID` than the bound one (`bindingMismatch`,
   `unboundSightings` — see [mcp-cloud.md](mcp-cloud.md#when-the-app-syncs-a-uid-the-server-does-not-manage)).
 
 ## Write tools

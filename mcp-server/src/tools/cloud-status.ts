@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { BindingMismatch } from "../cloud/gateway.js";
 import type { UnboundSighting } from "../cloud/sightings.js";
 import { cursorToDecimalString } from "../cloud/cursor.js";
+import { ENDPOINT_RECOVERY } from "../cloud/endpoint.js";
 import { localStampToString } from "../cloud/local-stamp.js";
 import { defineTool, resolveReadCloudState, textResult } from "./shared.js";
 
@@ -21,12 +22,16 @@ export const cloudStatusTool = defineTool({
     mode: z.string(),
     lifecycle: z.string().optional().describe("uninitialized | bootstrap-required | ready (bound partitions only)"),
     dataFileUID: z.string().optional().describe("The partition this profile is BOUND to (from the binding)"),
-    endpointRole: z
-      .string()
+    endpoint: z
+      .object({
+        url: z.string(),
+        reachable: z.boolean(),
+        version: z.string().optional(),
+      })
       .optional()
       .describe(
-        'owner = this process serves the endpoint | attached = another MCP client does. Vendor credentials ' +
-          "live in the owner's memory only, so cloud_bootstrap and upstream writes work only there",
+        "The resident sync endpoint every session attaches to: MLO's proxy target and the only holder of the " +
+          "vendor credentials. Unreachable means MLO cannot sync and writes are refused; reads still work",
       ),
     bindingMismatch: z
       .boolean()
@@ -63,13 +68,23 @@ export const cloudStatusTool = defineTool({
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   async execute(_args, ctx) {
     const state = await resolveReadCloudState(ctx);
-    const [cursor, entries, pendingForApp, mismatches, lastStamp] = await Promise.all([
+    // Probed rather than remembered: the resident process can exit between two
+    // tool calls, and "is it up" is the whole question this field answers.
+    const [cursor, entries, pendingForApp, mismatches, lastStamp, endpointStatus] = await Promise.all([
       state.highWater(),
       state.counts(),
       state.pendingFor("app"),
       state.endpointMismatchCount(),
       state.lastLocalStamp(),
+      ctx.endpoint?.status(),
     ]);
+    const endpoint = ctx.endpoint
+      ? {
+          url: ctx.endpoint.url,
+          reachable: endpointStatus !== undefined,
+          ...(endpointStatus?.version ? { version: endpointStatus.version } : {}),
+        }
+      : undefined;
     const gateway = ctx.cloud;
     let mode = "unpartitioned"; // only in gateway-less unit-test contexts
     let lifecycle: string | undefined;
@@ -123,7 +138,7 @@ export const cloudStatusTool = defineTool({
       mode,
       ...(lifecycle ? { lifecycle } : {}),
       ...(dataFileUID ? { dataFileUID } : {}),
-      ...(ctx.endpointRole ? { endpointRole: ctx.endpointRole } : {}),
+      ...(endpoint ? { endpoint } : {}),
       bindingMismatch: mismatch !== undefined,
       ...(sightings.length ? { unboundSightings: sightings } : {}),
       endpointMismatches: mismatches,
@@ -141,10 +156,17 @@ export const cloudStatusTool = defineTool({
     const bindingMismatchNote = mismatch
       ? `; BINDING MISMATCH: bound to ${mismatch.boundDataFileUID} but MLO is syncing ` +
         `${mismatch.observedDataFileUIDs.join(", ")} — writes are refused until the binding is repaired ` +
-        "(cloud_bootstrap { rebind: true }, from the endpoint owner)"
+        "(cloud_bootstrap { rebind: true })"
       : "";
+    // Named before the binding: an unreachable endpoint means MLO's sync has
+    // nowhere to connect at all, which outranks anything about this profile.
+    const endpointNote = !endpoint
+      ? ""
+      : endpoint.reachable
+        ? `; endpoint reachable${endpoint.version ? ` (${endpoint.version})` : ""}`
+        : `; ENDPOINT UNREACHABLE — MLO cannot sync through it and writes are refused. ${ENDPOINT_RECOVERY}`;
     return textResult(
-      `Cloud endpoint ${result.host}:${result.port}; ${bindingNote}; cursor ${result.cursor}; ` +
+      `Cloud endpoint ${result.host}:${result.port}${endpointNote}; ${bindingNote}; cursor ${result.cursor}; ` +
         `${result.pendingForApp} pending for app${cursorMismatchNote}${bindingMismatchNote}.`,
       result,
     );

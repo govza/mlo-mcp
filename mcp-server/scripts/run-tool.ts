@@ -6,11 +6,13 @@
  *   pnpm tool list_tasks '{"format":"flat"}'
  *   pnpm tool add_task '{"caption":"Test task"}'
  */
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { loadConfig } from "../src/config.js";
 import { MloStore } from "../src/store.js";
 import { allTools } from "../src/tools/registry.js";
 import { CloudGateway } from "../src/cloud/gateway.js";
+import { ensureEndpoint, residentSpawner } from "../src/cloud/endpoint.js";
 import { renderList } from "./tool-catalog.js";
 
 const [name, json] = process.argv.slice(2);
@@ -28,10 +30,15 @@ if (!tool) {
 
 const config = loadConfig();
 const cloud = new CloudGateway({ stateRoot: config.cloudStateRoot });
-// This script starts no listener, so it holds no vendor contacts of its own —
-// the same position an attached MCP client is in, and the refusals that flow
-// from that are the accurate ones here.
-const ctx = { config, store: new MloStore(config), cloudState: cloud.defaultState(), cloud, endpointRole: "attached" as const };
+// Attaches to the resident endpoint exactly like an MCP session, because it is
+// one in every way that matters: it drives the same tools, and writes and
+// bootstrap here should behave the same as they do in a client.
+const endpoint = await ensureEndpoint({
+  host: config.cloudHost,
+  port: config.cloudPort,
+  spawn: residentSpawner(fileURLToPath(new URL("../src/index.ts", import.meta.url))),
+});
+const ctx = { config, store: new MloStore(config), cloudState: cloud.defaultState(), cloud, endpoint };
 const args = z.object(tool.inputSchema).parse(JSON.parse(json ?? "{}"));
 
 const result = await tool.execute(args, ctx);

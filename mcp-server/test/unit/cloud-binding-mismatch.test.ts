@@ -7,11 +7,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildTaskAddDelta, mergeDeltas } from "../../src/cloud/delta.js";
 import { packEnvelope } from "../../src/cloud/envelope.js";
 import { CloudGateway } from "../../src/cloud/gateway.js";
+import { ResidentEndpoint } from "../../src/cloud/endpoint.js";
 import { startCloudServer, type CloudServerHandle } from "../../src/cloud/server.js";
 import { addTaskTool } from "../../src/tools/add-task.js";
 import { cloudBootstrapTool } from "../../src/tools/cloud-bootstrap.js";
 import { cloudStatusTool } from "../../src/tools/cloud-status.js";
 import { requireWriteChannel, resolveReadCloudState, type ToolContext } from "../../src/tools/shared.js";
+import { SERVER_INFO } from "../../src/version.js";
 import type { MloConfig } from "../../src/types.js";
 
 /**
@@ -99,9 +101,13 @@ function contextFor(gateway: CloudGateway, extra?: Partial<ToolContext>): ToolCo
     store: undefined as never,
     cloudState: gateway.defaultState(),
     cloud: gateway,
-    endpointRole: "owner",
     ...extra,
   };
+}
+
+/** How an MCP session sees the endpoint: over loopback, never in-process. */
+function attachedTo(handle: CloudServerHandle): ResidentEndpoint {
+  return new ResidentEndpoint(handle.host, handle.port);
 }
 
 function syncRequestXml(uid: string): string {
@@ -258,16 +264,18 @@ describe("binding mismatch: the app syncs a dataFileUID the server does not mana
   it("keeps reporting the mismatch after a restart and from a process without the listener", async () => {
     const { gateway, handle, vendor } = await boundProfile();
     await syncAs(handle, vendor, UID_B);
+    const endpoint = attachedTo(handle);
     await handles.splice(handles.indexOf(handle), 1)[0]!.stop();
 
     // A fresh gateway over the same state root is what an attached MCP client
-    // (or the next server run) sees: no listener, no in-memory contacts.
+    // (or the next server run) sees: no listener, no in-memory contacts. The
+    // mismatch is persisted, so it survives the endpoint going away entirely.
     const attached = new CloudGateway({ stateRoot: gateway.stateRoot });
-    const ctx = contextFor(attached, { endpointRole: "attached" });
+    const ctx = contextFor(attached, { endpoint });
     expect(await status(ctx)).toMatchObject({
       dataFileUID: UID_A,
       bindingMismatch: true,
-      endpointRole: "attached",
+      endpoint: { reachable: false },
     });
     expect(await writeRefusal(ctx)).toMatch(/binding mismatch/i);
   });
@@ -296,10 +304,20 @@ describe("binding mismatch: the app syncs a dataFileUID the server does not mana
     expect(await writeRefusal(ctx)).toMatch(/binding mismatch/i);
   });
 
-  it("reports which process owns the endpoint", async () => {
-    const { gateway } = await boundProfile();
-    expect(await status(contextFor(gateway))).toMatchObject({ endpointRole: "owner" });
-    expect(await status(contextFor(gateway, { endpointRole: "attached" }))).toMatchObject({ endpointRole: "attached" });
+  it("reports whether the resident endpoint is reachable, and at what build", async () => {
+    const { gateway, handle } = await boundProfile();
+    const ctx = contextFor(gateway, { endpoint: attachedTo(handle) });
+
+    expect(await status(ctx)).toMatchObject({
+      endpoint: { url: `http://${handle.host}:${handle.port}`, reachable: true, version: SERVER_INFO.version },
+    });
+
+    // "Is this working" stays one call after the endpoint goes away, which is
+    // the state the old owner/attached role could not describe at all.
+    await handles.splice(handles.indexOf(handle), 1)[0]!.stop();
+    const down = await status(ctx);
+    expect(down).toMatchObject({ endpoint: { reachable: false } });
+    expect((down.endpoint as { version?: string }).version).toBeUndefined();
   });
 });
 
@@ -380,17 +398,19 @@ describe("a refused write leaves its words on disk", () => {
 });
 
 describe("cloud_bootstrap preconditions are checked before the binding moves", () => {
-  it("explains the ownership constraint from an attached process and changes nothing", async () => {
-    const { gateway } = await boundProfile();
-    const ctx = contextFor(gateway, { endpointRole: "attached" });
+  it("refuses when no endpoint is reachable to lend credentials, and changes nothing", async () => {
+    const { gateway, handle } = await boundProfile();
+    const endpoint = attachedTo(handle);
+    await handles.splice(handles.indexOf(handle), 1)[0]!.stop();
 
-    await expect(cloudBootstrapTool.execute({ rebind: true }, ctx)).rejects.toThrow(/owns the endpoint/);
+    await expect(cloudBootstrapTool.execute({ rebind: true }, contextFor(gateway, { endpoint })))
+      .rejects.toThrow(/not reachable/);
     expect((await gateway.bindings.forProfile(PROFILE))?.dataFileUID).toBe(UID_A);
   });
 
   it("leaves the binding intact when a rebind has no vendor contact to bootstrap from", async () => {
-    const { gateway } = await boundProfile();
-    const ctx = contextFor(gateway);
+    const { gateway, handle } = await boundProfile();
+    const ctx = contextFor(gateway, { endpoint: attachedTo(handle) });
 
     await expect(cloudBootstrapTool.execute({ rebind: true }, ctx)).rejects.toThrow(/no vendor sync traffic/);
     expect((await gateway.bindings.forProfile(PROFILE))?.dataFileUID).toBe(UID_A);
@@ -398,13 +418,17 @@ describe("cloud_bootstrap preconditions are checked before the binding moves", (
 
   it("re-pulls the cloud file a profile is already bound to when asked to rebind", async () => {
     const { gateway, handle, vendor } = await boundProfile(fullHistoryBase64());
-    const ctx = contextFor(gateway);
+    // A separate gateway over the same state root is what an attached session
+    // really has: no contacts of its own, so the pull can only come from the
+    // endpoint. Nothing here would pass if the bootstrap read them locally.
+    const session = new CloudGateway({ stateRoot: gateway.stateRoot });
+    const ctx = contextFor(session, { endpoint: attachedTo(handle) });
     // The profile's own sync is what exposes the vendor contact.
     expect(await syncAs(handle, vendor, UID_A)).toBe(200);
 
     const result = await cloudBootstrapTool.execute({ rebind: true }, ctx);
     expect(result.structuredContent).toMatchObject({ bootstrapped: true, version: "7", tasks: 1 });
-    expect((await gateway.bindings.forProfile(PROFILE))?.dataFileUID).toBe(UID_A);
-    expect(await (await gateway.registry.open(UID_A, "upstream")).lifecycle()).toBe("ready");
+    expect((await session.bindings.forProfile(PROFILE))?.dataFileUID).toBe(UID_A);
+    expect(await (await session.registry.open(UID_A, "upstream")).lifecycle()).toBe("ready");
   });
 });

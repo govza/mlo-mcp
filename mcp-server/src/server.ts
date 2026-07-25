@@ -38,8 +38,16 @@ existing task. cloud_status shows binding, lifecycle, and mirror coverage.
 If a write fails with "binding mismatch", MLO is syncing a different dataFileUID than the
 one this profile is bound to, so the queue it would land in is one the app never reads.
 Retrying cannot help and the failure is not partial. Report the two UIDs the message names
-and stop; repair is the user's call (cloud_bootstrap { rebind: true }, run from the MCP
-client that owns the endpoint — cloud_status reports \`endpointRole\` and \`bindingMismatch\`).
+and stop; repair is the user's call (cloud_bootstrap { rebind: true } — cloud_status reports
+\`bindingMismatch\` alongside the two UIDs).
+
+### The sync endpoint
+MLO's sync proxy points at a loopback endpoint that runs as its own long-lived process, shared
+by every client and started automatically. Writes and cloud_bootstrap borrow the vendor
+credentials it holds, so they fail with a clear reason when it is down; reads never need it.
+cloud_status reports \`endpoint\` (url, reachable, version). If a write is refused because the
+cloud file "moved while this write was being authored", something else changed it concurrently:
+retry once and it is re-authored from the current rows.
 
 ### Field support and refusals (fail fast, nothing queued)
 - add_task/update_task support Folder, Project, Starred, visibility/sequential

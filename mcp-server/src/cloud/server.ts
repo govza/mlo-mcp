@@ -9,9 +9,14 @@ import { CloudGateway } from "./gateway.js";
 import { SyncObserver } from "./sync-observer.js";
 import { handleSoapRequest, peekSoapFields, soapFault, soapOperationFailure, soapOperationFromAction } from "./soap.js";
 import { forwardVendorSoap } from "./upstream.js";
+import { CredentialLender } from "./credential-lending.js";
+import { SERVER_INFO } from "../version.js";
 import { log } from "../log.js";
 
 const BODY_LIMIT = 32 * 1024 * 1024;
+
+/** Long enough for the shutdown response to reach the session waiting on it. */
+const SHUTDOWN_GRACE_MS = 50;
 
 /** Default listen port; off the crowded 8080 so dev servers don't collide with it. */
 export const DEFAULT_CLOUD_PORT = 8181;
@@ -26,14 +31,6 @@ export interface CloudServerOptions {
   /** Hostname whose proxied traffic is structurally summarized (tests override the vendor default). */
   observeHost?: string;
 }
-
-/**
- * Which side of the single-owner endpoint this process is on. The listener is
- * a singleton on the loopback port: the first server process owns it, later
- * ones attach without one. Vendor contacts are captured in the OWNER's memory
- * only, so `cloud_bootstrap` and upstream writes can only run there.
- */
-export type EndpointRole = "owner" | "attached";
 
 export interface CloudServerHandle {
   server: http.Server;
@@ -217,6 +214,13 @@ function tunnelConnect(request: IncomingMessage, client: net.Socket, head: Buffe
   client.once("error", () => upstream.destroy());
 }
 
+/**
+ * Start the loopback endpoint. Under the resident model
+ * ([ADR-0003](../../../docs/adr/0003-resident-endpoint.md)) its only callers
+ * are the resident entrypoint and the tests: an MCP session never binds this
+ * port, which is what keeps ownership from drifting back to "whoever started
+ * first".
+ */
 export async function startCloudServer(options: CloudServerOptions): Promise<CloudServerHandle> {
   const host = options.host ?? "127.0.0.1";
   if (host !== "localhost" && host !== "::1" && !/^127(?:\.\d{1,3}){3}$/.test(host)) {
@@ -226,6 +230,8 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
   const gateway = options.gateway ?? new CloudGateway({ stateRoot: options.stateRoot! });
   const state = gateway.defaultState();
   const observer = new SyncObserver(gateway.observerDir(), options.observeHost);
+  const lender = new CredentialLender(gateway);
+  let stopped: Promise<void> | undefined;
   const server = http.createServer(async (request, response) => {
     try {
       if (isAbsoluteRequestTarget(request.url ?? "")) {
@@ -246,7 +252,25 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
           pendingForApp,
           stateRoot: gateway.stateRoot,
           partitions: await gateway.registry.list(),
+          // The two fields attaching sessions read: the build (so a newer one
+          // can replace a stale resident) and which cloud files this process
+          // can currently act as a client for.
+          version: SERVER_INFO.version,
+          contactUids: gateway.vendorContactUids(),
         });
+        return;
+      }
+      if (request.method === "POST" && url.pathname === "/v1/shutdown") {
+        // Answer first: the caller is a newer session waiting for the port.
+        json(response, 200, { ok: true });
+        setTimeout(
+          () => void stopSelf().catch((error) => log(`shutdown failed: ${error instanceof Error ? error.message : String(error)}`)),
+          SHUTDOWN_GRACE_MS,
+        );
+        return;
+      }
+      if (request.method === "POST" && url.pathname.startsWith("/v1/upstream/")) {
+        await handleUpstream(response, url.pathname, await readJson(request));
         return;
       }
       if (request.method !== "POST" || !["/v1/pull", "/v1/push", "/v1/finalize"].includes(url.pathname)) {
@@ -301,6 +325,50 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
     }
   });
   server.on("connect", (request, socket, head) => tunnelConnect(request, socket as net.Socket, head, observer, gateway));
+
+  /**
+   * The credential-lending routes: the three vendor round trips an attached
+   * MCP session cannot make for itself, because the contacts are captured in
+   * THIS process's memory and never written down. Everything else a session
+   * needs it already reaches through the shared state root.
+   *
+   * Unauthenticated by decision (ADR-0003): any local account can drive a
+   * write through here.
+   */
+  async function handleUpstream(response: ServerResponse, pathname: string, body: Record<string, unknown>): Promise<void> {
+    if (pathname === "/v1/upstream/refresh") {
+      json(response, 200, await lender.begin(requiredString(body, "dataFileUID")));
+      return;
+    }
+    if (pathname === "/v1/upstream/commit") {
+      const envelope = decodeEnvelope(requiredString(body, "envelope"));
+      json(response, 200, { version: await lender.commit(requiredString(body, "session"), envelope) });
+      return;
+    }
+    if (pathname === "/v1/upstream/history") {
+      const history = await lender.history(requiredString(body, "dataFileUID"));
+      json(response, 200, { version: history.version, envelope: history.envelope.toString("base64") });
+      return;
+    }
+    json(response, 404, { error: "not found" });
+  }
+
+  /** Idempotent: /v1/shutdown and an explicit stop() must not race each other. */
+  function stopSelf(): Promise<void> {
+    stopped ??= (async () => {
+      await lender.close();
+      await state.flush();
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => error ? reject(error) : resolve());
+        // Keep-alive sockets from attached sessions would otherwise hold the
+        // port open past close(), and a replacing session is waiting for it.
+        server.closeAllConnections();
+      });
+      log("cloud server stopped");
+    })();
+    return stopped;
+  }
+
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
     server.listen(options.port ?? DEFAULT_CLOUD_PORT, host, () => { server.off("error", reject); resolve(); });
@@ -308,44 +376,9 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
   const address = server.address();
   const port = typeof address === "object" && address ? address.port : options.port ?? DEFAULT_CLOUD_PORT;
   log(`cloud server listening on http://${host}:${port}`);
-  return {
-    server, state, gateway, host, port,
-    async stop() {
-      await state.flush();
-      await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-      log("cloud server stopped");
-    },
-  };
+  return { server, state, gateway, host, port, stop: stopSelf };
 }
 
 export function stopCloudServer(handle: CloudServerHandle): Promise<void> {
   return handle.stop();
-}
-
-/**
- * One session serves the HTTP endpoint; further sessions share the same delta
- * log through CloudState's cross-process locking and need no listener of
- * their own. When the port is held by a healthy mlo-mcp endpoint, return
- * undefined ("attached") instead of failing startup; any other listener on
- * the port is still a hard error.
- */
-export async function startOrAttachCloudServer(options: CloudServerOptions): Promise<CloudServerHandle | undefined> {
-  try {
-    return await startCloudServer(options);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "EADDRINUSE") throw error;
-    const host = options.host ?? "127.0.0.1";
-    const port = options.port ?? DEFAULT_CLOUD_PORT;
-    try {
-      const response = await fetch(`http://${host}:${port}/v1/status`, { signal: AbortSignal.timeout(2000) });
-      const body = await response.json() as { cursor?: unknown; entries?: unknown };
-      if (response.ok && typeof body.cursor === "string" && typeof body.entries === "object") {
-        log(`port ${port} already serves an mlo-mcp cloud endpoint — attaching to its shared state dir`);
-        return undefined;
-      }
-    } catch {
-      /* the port holder is not a cloud endpoint — report the original conflict */
-    }
-    throw error;
-  }
 }

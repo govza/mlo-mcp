@@ -14,12 +14,16 @@ Ubiquitous language for this repo. Terms are defined here in one or two lines; t
 - **Binding** — the persisted profile → `dataFileUID` pointer, attached only by an explicit bootstrap.
 - **Unbound sighting** — a `dataFileUID` seen syncing through the endpoint with no binding; recorded because the authority decision is the only place that learns the identity MLO actually syncs.
 - **Binding mismatch** — a bound profile syncing under a different identity: writes would queue into a partition the app never reads, so they are refused ([ADR-0002](docs/adr/0002-report-binding-mismatch-never-repair-it.md)).
-- **Endpoint role** — `owner` (this process serves the loopback listener) vs `attached` (another MCP client does). Vendor contacts live in the owner's memory only.
 
 ## The sync data plane
 
 - **mcp-cloud / the endpoint** — the server's loopback HTTP sync endpoint (`127.0.0.1:8181`) that MLO reaches through its proxy setting ([docs/mcp-cloud.md](docs/mcp-cloud.md)).
+- **Resident endpoint** — the long-lived process that owns the loopback listener and outlives every MCP session, auto-spawned by the first session that finds the port free ([ADR-0003](docs/adr/0003-resident-endpoint.md)). Started by re-invoking the server's own entry point with `--serve-cloud`.
+- **Attached session** — an MCP server process. Every one of them attaches to the resident endpoint and none ever listens, so which client you are in never decides what works.
+- **Credential-lending seam** — the only three things an attached session asks the resident for, because they need the vendor contact: refresh a mirror, commit a delta, pull a full history. Everything else runs in the session against the shared state root; the resident executes no tools.
+- **Stale-write refusal** — a commit refused because the mirror moved between refresh and commit: the authored rows are superseded, so nothing is uploaded and a retry re-authors from the current ones.
 - **Upstream mode** — the only real-profile architecture: `MLO ↔ mcp-cloud ↔ vendor Cloud`. The endpoint is a transparent proxy for MLO's own sessions and one more sync client for MCP reads/writes.
+- **Vendor contact** — a profile's own cloud credentials, scraped from its proxied sync traffic and held strictly in memory, never persisted. What lets the endpoint act as one more sync client, and the only state a second process cannot recover from disk.
 - **Local mode** — the endpoint as a replacement cloud, dev/test profiles only (`scripts/bootstrap-local.ts`). Switching a profile between sync authorities is unrecoverable ([docs/mlo/cloud-sync.md](docs/mlo/cloud-sync.md)).
 - **Delta / envelope** — the sync unit: a ZIP/`data.csv` carrying complete 82-column task rows ([docs/mlo/cloud-sync.md](docs/mlo/cloud-sync.md)).
 - **Mirror** — the passive per-`dataFileUID` capture of validated vendor envelopes, ordered by vendor-assigned versions.
@@ -28,6 +32,7 @@ Ubiquitous language for this repo. Terms are defined here in one or two lines; t
 - **QuickSync** — `mlo.exe -QuickSync`; how queued deltas reach the running app. Every write follows **queue → QuickSync → verify**.
 - **Verified flag** — advisory: `verified: true` means a fresh post-QuickSync export confirmed the change; `false` means durably queued, not failed.
 - **Tombstone** — a deletion record in a delta; `delete_task` tombstones a task and its whole subtree.
+- **Dead letter** — the raw text of a write the server refused, appended to a file in the state root so the words survive a failure that queued nothing. Never replayed automatically.
 
 ## Where the deep docs are
 

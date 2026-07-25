@@ -37,9 +37,9 @@ imports, then foreign-cursor rejections — see
 3. **Sync once, then bootstrap**: run one ordinary MLO sync (or `sync`), then
    call `cloud_bootstrap`. Until that bootstrap has completed, read tools work
    but every mutation tool refuses with a pointer to this procedure — an
-   ordinary sync alone can never enable writes. After every MCP **server
-   restart**, one ordinary proxied sync is needed again before writes resume
-   (the account contact is held in memory only, never on disk).
+   ordinary sync alone can never enable writes. One proxied sync arms writes
+   until the **resident endpoint** exits, not until the MCP client does (the
+   account contact is held in that process's memory only, never on disk).
 
 ## Normal operation (upstream)
 
@@ -73,12 +73,22 @@ its next QuickSync exactly like a remote edit from another device. The
 existing queue → QuickSync → verify loop confirms each write against a fresh
 export.
 
+Refresh and commit are two calls into the resident endpoint with the authoring
+in between, so the endpoint keeps one vendor session open across both and
+records the mirror version the author was handed. If the mirror has moved by
+commit time — MLO, mobile, or another session changed the cloud file — the rows
+this write carries are superseded, so **nothing is uploaded** and the caller is
+told to retry; the retry re-authors from the current rows. The mirror only
+advances on real content, so this fires exactly when a full-row rewrite would
+otherwise have clobbered a concurrent edit.
+
 **Operational precondition:** MLO's cloud login must have "Use secure
 connection" **unchecked**. A TLS `CONNECT` to the vendor sync host tunnels
 end-to-end, blinding the mirror and hiding the credentials the client sessions
 need; the endpoint records this and `cloud_status` reports
-`mirror.mirrorBlind: true`. Vendor contacts are per-server-run: after a
-restart, one proxied sync must happen before writes resume.
+`mirror.mirrorBlind: true`. Vendor contacts last as long as the resident
+endpoint process: after it restarts, one proxied sync must happen before writes
+resume.
 
 ## Local mode — dev/testing only (`scripts/bootstrap-local.ts`)
 
@@ -220,10 +230,16 @@ cross-checks only.
 Unchanged from the original `/v1` contract, with one addition: `pull`,
 `push`, and `finalize` bodies accept an optional `dataFileUID` addressing a
 specific partition (omitted = the unbound default state).
-`GET /v1/status` keeps its `{ cursor, entries, pendingForApp }` shape (the
-attach probe depends on it) and adds `stateRoot` and `partitions` in
-partitioned mode. Malformed envelopes are rejected with `400` and never
-appended.
+`GET /v1/status` keeps its `{ cursor, entries, pendingForApp }` shape and adds
+`stateRoot`, `partitions`, `version`, and `contactUids`. The attach probe
+recognises one of our endpoints by `cursor` and `entries` alone — the two fields
+every build has always served — which is what keeps a pre-resident build
+identifiable to a session that has to replace it. Malformed envelopes are
+rejected with `400` and never appended.
+
+The endpoint-lifecycle routes (`/v1/upstream/*`, `/v1/shutdown`) are described
+under [The resident endpoint](#the-resident-endpoint); they are a contract
+between mlo-mcp processes, not part of what MLO ever sees.
 
 ## Configuration
 
@@ -250,15 +266,58 @@ and must never seed any profile's baseline. Every profile — the repo demo
 included — gets a partition under the private root and goes through
 `cloud_bootstrap`.
 
-When the port is already held by another mlo-mcp session's endpoint (probed
-via `GET /v1/status`), the new session *attaches*: it runs without its own
-listener and shares bindings, partitions, and the persisted bootstrap window
-through the state root's cross-process locking. What it does **not** share is
-the vendor contacts — those are captured in the owning process's memory only,
-so `cloud_bootstrap` and upstream writes work from the owner alone.
-`cloud_status` reports which role the current process holds (`endpointRole`),
-and a bootstrap attempt from an attached process refuses with that explanation
-instead of "no vendor sync traffic observed since server start".
+## The resident endpoint
+
+The listener is **its own long-lived process**, not something an MCP session
+owns ([ADR-0003](adr/0003-resident-endpoint.md)). MLO's proxy points at the port
+permanently, so a listener that died with the agent session that happened to
+start it took MLO's sync down machine-wide.
+
+- **Sessions never bind the port.** Every MCP session probes `GET /v1/status`,
+  starts the resident detached if nothing answers, and attaches — on every path.
+  There is no `owner` / `attached` lottery left to reason about.
+- **Nothing new to install.** The resident is this same package's entry point
+  re-invoked with `--serve-cloud`, spawned detached, silent and windowless so it
+  survives the session that started it. If it ever dies, the next session starts
+  another. `scripts/serve-cloud.ts` still runs one in the foreground for
+  debugging.
+- **The boot window stays open** by decision: MLO launching and syncing before
+  any agent session has run since boot finds nothing listening. That is a failed
+  sync MLO retries, not data loss — the accepted price of auto-spawn over a
+  Scheduled Task.
+- **A newer session replaces a stale one.** `/v1/status` reports the build; a
+  session running a strictly newer version asks the resident to exit, waits for
+  the port, and starts its own. Equal or older versions attach quietly, so a
+  stale window cannot downgrade a fresh endpoint.
+- **A foreign listener on the port is still a hard error** — MLO's sync proxy
+  points there, so it has to be freed (or `MLO_CLOUD_PORT` changed and the proxy
+  repointed).
+
+Sessions share bindings, partitions, the mirror and the persisted bootstrap
+window through the state root's cross-process locking, and author their own
+deltas. The **only** thing they cannot do for themselves is act as a vendor sync
+client, because the account contacts are scraped from MLO's proxied traffic and
+held in the resident's memory alone. So exactly three operations are forwarded:
+
+| Route | What it lends |
+|---|---|
+| `POST /v1/upstream/refresh` | opens a vendor session, pulls into the mirror, returns a session token and the mirror version |
+| `POST /v1/upstream/commit` | uploads one authored envelope in that session (refuses if the mirror moved) |
+| `POST /v1/upstream/history` | the vendor's complete history from version 0, for `cloud_bootstrap` |
+
+`POST /v1/shutdown` exists for the version-skew handoff above. `GET /v1/status`
+additionally reports `version` and `contactUids` (which cloud files the endpoint
+can currently act as a client for — an inventory, never credentials).
+
+Validation, materialization, binding and delta authoring all stay in the calling
+session: the resident lends credentials, it does not execute tools.
+
+**These routes are unauthenticated, by decision.** `/v1/upstream/commit` lends
+stored vendor credentials to any caller, and loopback on Windows is reachable by
+every account on the machine — so any local account can drive writes to the
+user's cloud data through the endpoint. A shared token was considered and
+declined ([ADR-0003](adr/0003-resident-endpoint.md)); it is stated here so nobody
+assumes a protection that is not there.
 
 ## MCP tool surface
 
@@ -266,15 +325,17 @@ instead of "no vendor sync traffic observed since server start".
   profile binding, pulls the vendor's full history immediately, and returns
   `bootstrapped: true` with the materialized version and counts.
   `rebind: true` discards the current binding for a fresh partition (the old
-  one stays on disk as evidence). Every precondition — endpoint ownership, the
-  candidate UID, its vendor contact — is checked **before** the binding moves,
-  so a failed attempt leaves the existing binding exactly as it was.
+  one stays on disk as evidence). Every precondition — a reachable endpoint, the
+  candidate UID, its vendor contact, and the vendor pull itself — is checked
+  **before** the binding moves, so a failed attempt leaves the existing binding
+  exactly as it was. Works from any client.
   Local-mode arming is not part of this tool (`scripts/bootstrap-local.ts`).
 - `cloud_status` — endpoint config, binding (mode, `dataFileUID`), lifecycle,
   cursor and delta counts, last local stamp, endpoint-mismatch count
   (distinct from bootstrap-required), partition inventory, upstream mirror
-  coverage/health/blindness, the `endpointRole` of this process, and the
-  binding-mismatch signals (`bindingMismatch`, `unboundSightings`).
+  coverage/health/blindness, `endpoint` (url, whether the resident process is
+  reachable right now, and its build), and the binding-mismatch signals
+  (`bindingMismatch`, `unboundSightings`).
 - `add_task` / `add_tasks` / `update_task` / `complete_task` /
   `uncomplete_task` / `delete_task` — unchanged surface
   ([tools.md](tools.md)), gated on a bootstrapped (`ready`) partition. Local

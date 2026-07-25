@@ -53,8 +53,11 @@ handle beats a success message it will believe. Reads are unaffected: a user
 can still inspect the tree while sorting the binding out.
 
 **`cloud_status` answers the question directly**: the bound UID keeps its
-meaning and its source, and the observed UID(s), a `bindingMismatch` boolean,
-and the endpoint role (`owner` / `attached`) are reported beside it.
+meaning and its source, and the observed UID(s) and a `bindingMismatch` boolean
+are reported beside it. *(The endpoint role `owner` / `attached` was reported
+here too. [ADR-0003](0003-resident-endpoint.md) removed the role — every session
+now attaches — and replaced the field with `endpoint { url, reachable,
+version }`.)*
 
 **Bootstrap checks its preconditions before the binding moves.** The rebind
 path used to replace the binding and only then discover it had no vendor
@@ -102,6 +105,11 @@ human.
 - A user running two MCP clients gets a bootstrap refusal that explains the
   ownership constraint instead of "no vendor sync traffic observed since server
   start", which reads like a broken install.
+
+  *(Both of the above were made moot rather than wrong by
+  [ADR-0003](0003-resident-endpoint.md): with one resident endpoint and no
+  session-owned listeners, there is no client to run things "from". The
+  equivalent refusal today is "the resident endpoint is not reachable".)*
 - The state root gains one more marker file, `unbound-sightings.json`. It
   follows the shape of `mirror-blind.json` / `mirror-health.json` rather than
   introducing a second convention for the same idea, and keeps only the eight

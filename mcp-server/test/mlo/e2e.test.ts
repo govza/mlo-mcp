@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { mloInstalled, assertGuiClosed, makeTestEnv, type TestEnv } from "./helpers.js";
+import { mloInstalled, assertGuiClosed, makeTestEnv, reserveFreePort, stopResidentEndpoint, type TestEnv } from "./helpers.js";
 import { SERVER_INFO } from "../../src/version.js";
 
 const SERVER_ROOT = path.resolve(__dirname, "..", "..");
@@ -13,10 +13,14 @@ const SERVER_ROOT = path.resolve(__dirname, "..", "..");
 describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
   let env: TestEnv;
   let client: Client;
+  let cloudPort: number;
 
   beforeAll(async () => {
     assertGuiClosed();
     env = makeTestEnv();
+    // A real port on a temp state root: connecting spawns a real detached
+    // resident endpoint, which is the install-layout path no unit test covers.
+    cloudPort = await reserveFreePort();
     client = new Client({ name: "e2e-test", version: "0.0.0" });
     await client.connect(
       new StdioClientTransport({
@@ -27,7 +31,7 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
           ...process.env,
           MLO_EXE_PATH: env.config.mloExePath,
           MLO_EXPORT_DIR: env.config.exportDir,
-          MLO_CLOUD_PORT: "0",
+          MLO_CLOUD_PORT: String(cloudPort),
           MLO_CLOUD_STATE_ROOT: path.join(env.dir, "cloud-state"),
         },
         stderr: "pipe",
@@ -37,6 +41,8 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
 
   afterAll(async () => {
     await client?.close();
+    // The endpoint outlives the session by design, so the test has to end it.
+    if (cloudPort) await stopResidentEndpoint(cloudPort);
     env?.cleanup();
   });
 
@@ -90,7 +96,17 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
 
     const status = await client.callTool({ name: "cloud_status", arguments: {} });
     expect(status.isError).toBeFalsy();
-    const structured = status.structuredContent as { cursor: string };
+    const structured = status.structuredContent as {
+      cursor: string;
+      endpoint: { url: string; reachable: boolean; version?: string };
+    };
     expect(structured.cursor).toMatch(/^\d+$/);
+    // The session spawned a detached resident endpoint and attached to it —
+    // the whole point of the lifecycle, proven in a real install layout.
+    expect(structured.endpoint).toMatchObject({
+      url: `http://127.0.0.1:${cloudPort}`,
+      reachable: true,
+      version: SERVER_INFO.version,
+    });
   });
 });

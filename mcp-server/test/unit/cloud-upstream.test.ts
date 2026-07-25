@@ -5,13 +5,14 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { CloudGateway } from "../../src/cloud/gateway.js";
+import { ResidentEndpoint } from "../../src/cloud/endpoint.js";
 import { startCloudServer, type CloudServerHandle } from "../../src/cloud/server.js";
 import { buildTaskAddDelta, mergeDeltas } from "../../src/cloud/delta.js";
 import { packEnvelope } from "../../src/cloud/envelope.js";
 import { findSection, type SectionedCsv } from "../../src/cloud/csv.js";
 import { knownCloudProjection, rowValue } from "../../src/cloud/log-projection.js";
-import { bootstrapFromVendor } from "../../src/cloud/upstream.js";
-import { requireWriteChannel, resolveReadCloudState, type ToolContext } from "../../src/tools/shared.js";
+import { cloudBootstrapTool } from "../../src/tools/cloud-bootstrap.js";
+import { requireWriteChannel, type ToolContext } from "../../src/tools/shared.js";
 import type { MloConfig } from "../../src/types.js";
 
 const dirs: string[] = [];
@@ -232,68 +233,6 @@ describe("upstream transparent proxy", () => {
     expect(await gateway.mirrorBlind()).toBe(true);
   });
 
-  it("bootstraps from vendor history and commits MCP writes as one more vendor client", async () => {
-    const gateway = await upstreamGateway();
-    await gateway.bindings.create(PROFILE, "upstream");
-    const NEW_TASK = "{22222222-2222-2222-2222-222222222222}";
-    const vendor = await startVendor((operation, body) => {
-      if (operation === "GetModificationsBytesEx") {
-        // Full history from 0; nothing newer than 500 afterwards.
-        const fromZero = body.includes("<newerThan>0</newerThan>");
-        return {
-          body: vendorResponse(operation, {
-            GetModificationsBytesExResult: "true",
-            maxVersion: "500",
-            ...(fromZero ? { data: Buffer.from(packEnvelope(fullSnapshot())).toString("base64") } : {}),
-          }),
-        };
-      }
-      if (operation === "ApplyModificationsBytesEx") {
-        return { body: vendorResponse(operation, { ApplyModificationsBytesExResult: "true", newServerTimeStamp: "501" }) };
-      }
-      return { body: vendorResponse(operation, { ReleaseSyncSessionBytesResult: "true" }) };
-    });
-    const proxy = await startProxy(gateway);
-
-    // One ordinary proxied sync exposes the vendor contact (in memory only).
-    await proxied(proxy, vendor.port, "GetModificationsBytesEx", soapEnvelope("GetModificationsBytesEx", {
-      loginBytes: "bG9naW4=", passwordBytes: "cGFzcw==", sessionID: "app-session",
-      dataFileUID: UID, newerThan: "500",
-    }));
-    expect(gateway.vendorContactUids()).toEqual([UID]);
-
-    // Zero-touch bootstrap: pull the vendor's complete history as a client.
-    const result = await bootstrapFromVendor(gateway, PROFILE, UID);
-    expect(result.version).toBe("500");
-    const partition = await gateway.registry.open(UID);
-    expect(await partition.lifecycle()).toBe("ready");
-    expect((await gateway.bindings.forProfile(PROFILE))?.dataFileUID).toBe(UID);
-    expect(await partition.mirrorState.highWater()).toBe(500n);
-
-    // MCP write: refresh, author, commit in the endpoint's own vendor session.
-    const channel = await requireWriteChannel(contextFor(gateway), { tool: "add_tasks", content: "written by MCP" });
-    expect(channel.state).toBe(partition.mirrorState);
-    const version = await channel.commit(packEnvelope(mergeDeltas([
-      buildTaskAddDelta({ uid: NEW_TASK, caption: "written by MCP", createdDate: "2026-07-23T10:00:00", lastModified: "2026-07-23T10:00:00" }),
-    ])));
-    expect(version).toBe("501");
-    expect(await partition.mirrorState.highWater()).toBe(501n);
-
-    // The vendor saw a real client session: credentials, session id, opaque
-    // zero stamp, and the envelope; then a release.
-    const apply = vendor.calls.find((call) => call.operation === "ApplyModificationsBytesEx")!;
-    expect(apply.body).toContain("<loginBytes>bG9naW4=</loginBytes>");
-    expect(apply.body).toContain("<lastSyncTimestamp>0</lastSyncTimestamp>");
-    expect(apply.body).toContain(`<dataFileUID>${UID}</dataFileUID>`);
-    expect(vendor.calls.at(-1)!.operation).toBe("ReleaseSyncSessionBytes");
-
-    // The write is visible to projections immediately (and to MLO on its
-    // next QuickSync through the proxy).
-    const projection = await knownCloudProjection(channel.state);
-    expect(rowValue(projection.rows.get(NEW_TASK)!, "Caption")).toBe("written by MCP");
-    expect(rowValue(projection.rows.get(TASK_UID)!, "Caption")).toBe("Existing task");
-  });
-
   it("keeps an upstream mirror and a local partition with identical content fully separate", async () => {
     const gateway = await upstreamGateway();
     // Profile A: upstream-bound mirror.
@@ -315,5 +254,143 @@ describe("upstream transparent proxy", () => {
     // Their cursor namespaces are independent too.
     expect(await upstream.mirrorState.highWater()).toBe(50n);
     expect(await local.state.highWater()).toBe(1n);
+  });
+});
+
+/**
+ * The resident model, driven the way it actually runs: the endpoint holds the
+ * vendor contact, and the MCP session is a DIFFERENT gateway over the same
+ * state root with an empty contact map. Every assertion here would pass
+ * trivially if the session could still reach the credentials itself, so the
+ * separate gateway is the point of the fixture, not an incidental detail.
+ */
+describe("writes and bootstrap forwarded through the resident endpoint", () => {
+  const NEW_TASK = "{22222222-2222-2222-2222-222222222222}";
+
+  /** Answers a full history from 0, and assigns 501 to whatever is applied. */
+  function scriptedVendor() {
+    return startVendor((operation, body) => {
+      if (operation === "GetModificationsBytesEx") {
+        const fromZero = body.includes("<newerThan>0</newerThan>");
+        return {
+          body: vendorResponse(operation, {
+            GetModificationsBytesExResult: "true",
+            maxVersion: "500",
+            ...(fromZero ? { data: Buffer.from(packEnvelope(fullSnapshot())).toString("base64") } : {}),
+          }),
+        };
+      }
+      if (operation === "ApplyModificationsBytesEx") {
+        return { body: vendorResponse(operation, { ApplyModificationsBytesExResult: "true", newServerTimeStamp: "501" }) };
+      }
+      return { body: vendorResponse(operation, { ReleaseSyncSessionBytesResult: "true" }) };
+    });
+  }
+
+  /** An endpoint holding the contact, plus the session's own view of the root. */
+  async function attachedSession(): Promise<{
+    resident: CloudGateway;
+    session: CloudGateway;
+    ctx: ToolContext;
+    vendor: Awaited<ReturnType<typeof startVendor>>;
+  }> {
+    const resident = await upstreamGateway();
+    await resident.bindings.create(PROFILE, "upstream");
+    const vendor = await scriptedVendor();
+    const proxy = await startProxy(resident);
+    // One ordinary proxied sync is what exposes the contact — to the LISTENING
+    // process's memory, and nowhere else.
+    await proxied(proxy, vendor.port, "GetModificationsBytesEx", soapEnvelope("GetModificationsBytesEx", {
+      loginBytes: "bG9naW4=", passwordBytes: "cGFzcw==", sessionID: "app-session",
+      dataFileUID: UID, newerThan: "500",
+    }));
+    const session = new CloudGateway({ stateRoot: resident.stateRoot });
+    expect(session.vendorContactUids()).toEqual([]);
+    return {
+      resident,
+      session,
+      vendor,
+      ctx: { ...contextFor(session), endpoint: new ResidentEndpoint(proxy.host, proxy.port) },
+    };
+  }
+
+  it("bootstraps and commits as one more vendor client, with the credentials never leaving the endpoint", async () => {
+    const { session, ctx, vendor } = await attachedSession();
+
+    const bootstrapped = await cloudBootstrapTool.execute({}, ctx);
+    expect(bootstrapped.structuredContent).toMatchObject({ bootstrapped: true, version: "500" });
+    const partition = await session.registry.open(UID);
+    expect(await partition.lifecycle()).toBe("ready");
+    expect(await partition.mirrorState.highWater()).toBe(500n);
+
+    // Refresh, author, commit — the two round trips that straddle the process
+    // boundary, resolved against the mirror the session reads off disk.
+    const channel = await requireWriteChannel(ctx, { tool: "add_tasks", content: "written by MCP" });
+    expect(channel.state).toBe(partition.mirrorState);
+    const version = await channel.commit(packEnvelope(mergeDeltas([
+      buildTaskAddDelta({ uid: NEW_TASK, caption: "written by MCP", createdDate: "2026-07-23T10:00:00", lastModified: "2026-07-23T10:00:00" }),
+    ])));
+    expect(version).toBe("501");
+    expect(await partition.mirrorState.highWater()).toBe(501n);
+
+    // The vendor saw a real client session: credentials, session id, opaque
+    // zero stamp, and the envelope; then a release.
+    const apply = vendor.calls.find((call) => call.operation === "ApplyModificationsBytesEx")!;
+    expect(apply.body).toContain("<loginBytes>bG9naW4=</loginBytes>");
+    expect(apply.body).toContain("<lastSyncTimestamp>0</lastSyncTimestamp>");
+    expect(apply.body).toContain(`<dataFileUID>${UID}</dataFileUID>`);
+    expect(vendor.calls.at(-1)!.operation).toBe("ReleaseSyncSessionBytes");
+
+    // The write is visible to projections immediately (and to MLO on its next
+    // QuickSync through the proxy).
+    const projection = await knownCloudProjection(channel.state);
+    expect(rowValue(projection.rows.get(NEW_TASK)!, "Caption")).toBe("written by MCP");
+    expect(rowValue(projection.rows.get(TASK_UID)!, "Caption")).toBe("Existing task");
+  });
+
+  it("refuses the commit when the cloud file moved while the write was being authored", async () => {
+    const { session, ctx, vendor } = await attachedSession();
+    await cloudBootstrapTool.execute({}, ctx);
+    const partition = await session.registry.open(UID);
+
+    const channel = await requireWriteChannel(ctx, { tool: "add_tasks", content: "authored against version 500" });
+    // A mobile edit lands through MLO's own sync while the author is still
+    // reading rows. The rows this write carries are now superseded.
+    await partition.mirrorState.appendAtCursor("app", packEnvelope(fullSnapshot("changed on mobile")), 505n as never);
+
+    const applies = vendor.calls.filter((call) => call.operation === "ApplyModificationsBytesEx").length;
+    await expect(channel.commit(packEnvelope(mergeDeltas([
+      buildTaskAddDelta({ uid: NEW_TASK, caption: "written by MCP", createdDate: "2026-07-23T10:00:00", lastModified: "2026-07-23T10:00:00" }),
+    ])))).rejects.toThrow(/moved from version 500 to 505.*retry/s);
+
+    // Nothing was uploaded, and the mirror still ends at the mobile edit.
+    expect(vendor.calls.filter((call) => call.operation === "ApplyModificationsBytesEx")).toHaveLength(applies);
+    expect(await partition.mirrorState.highWater()).toBe(505n);
+  });
+
+  it("commits a local-mode write from an attached session with no contact involved", async () => {
+    const resident = await upstreamGateway();
+    const proxy = await startProxy(resident);
+    const LOCAL_PROFILE = "C:\\Profiles\\Scratch.ml";
+    const LOCAL_UID = "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}";
+    await resident.bindings.create(LOCAL_PROFILE, "local");
+    await resident.bindings.bindUid(LOCAL_PROFILE, LOCAL_UID);
+    await (await resident.registry.open(LOCAL_UID, "local")).setLifecycle("ready");
+
+    const session = new CloudGateway({ stateRoot: resident.stateRoot });
+    const ctx: ToolContext = {
+      ...contextFor(session),
+      config: { dataFile: LOCAL_PROFILE } as MloConfig,
+      endpoint: new ResidentEndpoint(proxy.host, proxy.port),
+    };
+
+    const channel = await requireWriteChannel(ctx, { tool: "add_task", content: "local write" });
+    const cursor = await channel.commit(packEnvelope(mergeDeltas([
+      buildTaskAddDelta({ uid: NEW_TASK, caption: "local write", createdDate: "2026-07-23T10:00:00", lastModified: "2026-07-23T10:00:00" }),
+    ])));
+
+    // Queued straight into the replacement log: no vendor session, no contact.
+    expect(cursor).toBe("1");
+    expect(await (await session.registry.open(LOCAL_UID, "local")).state.highWater()).toBe(1n);
   });
 });

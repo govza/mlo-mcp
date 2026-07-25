@@ -78,13 +78,32 @@ function resolveStateRoot(): string {
   return path.join(os.homedir(), ".mlo-mcp", "cloud");
 }
 
-export function loadConfig(): MloConfig {
-  const { dataFile, autoDetected } = resolveDataFile();
+export interface CloudConfig {
+  cloudHost: string;
+  cloudPort: number;
+  cloudStateRoot: string;
+}
 
+/**
+ * Everything the sync endpoint needs, and nothing else. The resident endpoint
+ * serves partitions keyed by `dataFileUID`, not profiles: it must come up (and
+ * stay up) across profile switches and before MLO has ever been opened, so it
+ * must not inherit `resolveDataFile()`'s refusal to start without one.
+ */
+export function loadCloudConfig(): CloudConfig {
   const cloudPort = Number(process.env.MLO_CLOUD_PORT ?? String(DEFAULT_CLOUD_PORT));
   if (!Number.isInteger(cloudPort) || cloudPort < 0 || cloudPort > 65535) {
     throw new Error("MLO_CLOUD_PORT must be an integer from 0 through 65535");
   }
+  return {
+    cloudHost: process.env.MLO_CLOUD_HOST ?? "127.0.0.1",
+    cloudPort,
+    cloudStateRoot: resolveStateRoot(),
+  };
+}
+
+export function loadConfig(): MloConfig {
+  const { dataFile, autoDetected } = resolveDataFile();
   return {
     mloExePath: process.env.MLO_EXE_PATH ?? DEFAULT_EXE,
     dataFile,
@@ -95,8 +114,6 @@ export function loadConfig(): MloConfig {
     // hand-made "Входящие" folder). MLO itself hardcodes the caption "<Inbox>"
     // in every UI language, so most profiles need no override.
     inboxCaption: process.env.MLO_INBOX_CAPTION || undefined,
-    cloudHost: process.env.MLO_CLOUD_HOST ?? "127.0.0.1",
-    cloudPort,
-    cloudStateRoot: resolveStateRoot(),
+    ...loadCloudConfig(),
   };
 }

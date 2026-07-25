@@ -71,7 +71,7 @@ switch-following.)
 
 Writes never touch the data file. Each write travels as a complete sync delta — normally committed to the real **vendor MLO Cloud** in the server's own sync session (the server proxies the app's cloud sync and additionally acts as one more sync client of the account) and delivered to MLO by the triggered QuickSync; **MLO's own merge logic** applies it while the app keeps running. Batches travel as ONE delta and are atomic (one bad id and nothing is queued). Results carry a `verified` flag — `false` means accepted but not yet confirmed in a fresh export, not failure.
 
-**One-time setup per profile:** back up the `.ml`, wire MLO's cloud sync proxy to the endpoint ("Use secure connection" unchecked), run one ordinary sync, then call `cloud_bootstrap` — it pulls the account's complete cloud history so every pre-existing task gets its stable UID and full record. Until then, mutation tools refuse (an ordinary sync alone never enables writes); after every server restart, one proxied sync is needed before writes resume. Written out step by step as Step 2 of the [root README](../README.md#step-2--enable-writes-one-time-per-profile); the rationale and failure modes are in [`../docs/mcp-cloud.md`](../docs/mcp-cloud.md), the tool semantics in [`../docs/tools.md`](../docs/tools.md). The server also sends a connection-time `instructions` guide teaching agents these conventions.
+**One-time setup per profile:** back up the `.ml`, wire MLO's cloud sync proxy to the endpoint ("Use secure connection" unchecked), run one ordinary sync, then call `cloud_bootstrap` — it pulls the account's complete cloud history so every pre-existing task gets its stable UID and full record. Until then, mutation tools refuse (an ordinary sync alone never enables writes); that proxied sync arms writes until the resident sync endpoint restarts, not until this server does. Written out step by step as Step 2 of the [root README](../README.md#step-2--enable-writes-one-time-per-profile); the rationale and failure modes are in [`../docs/mcp-cloud.md`](../docs/mcp-cloud.md), the tool semantics in [`../docs/tools.md`](../docs/tools.md). The server also sends a connection-time `instructions` guide teaching agents these conventions.
 
 Task ids are path-based (`1.2.3`) and shift when the tree changes — the server re-exports before every mutation, and `get_task` also reports each task's stable internal GUID, resolved by structural alignment of the export outline against the bootstrapped cloud tree (duplicate sibling captions resolve by position).
 
@@ -95,6 +95,15 @@ pnpm tools --json          # the same catalog as JSON
 pnpm tool list_tasks '{"format":"flat"}'   # actually call one (profile auto-detected, like the server)
 pnpm tool add_task '{"caption":"Test task"}'
 ```
+
+**The sync endpoint runs as its own background process** and is started
+automatically ([docs/adr/0003](../docs/adr/0003-resident-endpoint.md)). A
+session only replaces it when its own version is strictly newer, so **a plain
+rebuild does not restart it** — during development, stop it by hand
+(`Invoke-WebRequest -Method POST http://127.0.0.1:8181/v1/shutdown -Body '{}'
+-ContentType application/json`) after changing anything under `src/cloud/`, or
+run one in the foreground with `pnpm exec tsx scripts/serve-cloud.ts` and keep
+it there. Sessions and `pnpm tool` both attach to whichever one is up.
 
 ## Known quirks (verified against MLO 15.x)
 

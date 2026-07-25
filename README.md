@@ -67,8 +67,8 @@ Writes are applied by MLO's own sync merge rather than by editing your data file
 
 Writes are live from here. Two things worth knowing:
 
-- **After every server restart, one ordinary proxied sync is needed again before writes resume** — the account contact is held in memory only, never written to disk.
-- `cloud_status` reports the binding, the bootstrap lifecycle and the endpoint's cursor whenever you want to check where things stand.
+- **One ordinary proxied sync arms writes until the sync endpoint restarts** — the account contact is held in memory only, never written to disk. The endpoint is a background process that outlives your agent sessions, so closing or restarting a client does not disarm anything; a reboot does.
+- `cloud_status` reports the binding, the bootstrap lifecycle, the endpoint's cursor and whether the endpoint is up whenever you want to check where things stand.
 
 The full rationale, the merge rules, and what each failure mode looks like are in [docs/mcp-cloud.md](docs/mcp-cloud.md).
 

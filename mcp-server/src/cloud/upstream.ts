@@ -283,41 +283,53 @@ export class VendorClient {
 }
 
 /**
- * Bootstrap an upstream mirror WITHOUT touching the MLO UI: pull the vendor's
- * complete history from remote version 0 as a client, validate it as a full
- * snapshot (full by construction, so `Config` is not required), materialize
- * it, and bind the profile. Requires a contact captured from the profile's
- * own sync traffic since server start.
+ * A bootstrap in two halves, because only one of them needs credentials.
+ *
+ * Pull the vendor's complete history from remote version 0 as one more client
+ * — this is the half that runs in the resident endpoint, which is where the
+ * contact captured from the profile's own sync traffic lives. Taking the
+ * contact as an argument rather than reaching for it keeps that dependency
+ * visible in the signature, and leaves one place
+ * ([credential-lending.ts](credential-lending.ts)) reporting a missing one.
  */
-export async function bootstrapFromVendor(
-  gateway: CloudGateway,
-  profilePath: string,
-  rawUid: string,
-): Promise<{ version: string; stats: Record<string, number> }> {
-  const contact = gateway.vendorContact(rawUid);
-  if (!contact) {
-    throw new Error(
-      "no vendor sync credentials observed for this dataFileUID yet — run one sync in MLO through this proxy, then retry",
-    );
-  }
-  const partition = await gateway.registry.open(rawUid, "upstream");
-  const client = new VendorClient(contact, partition.uid);
+export async function pullVendorHistory(
+  contact: VendorContact,
+  uid: string,
+): Promise<{ version: CloudCursor; envelope: Buffer }> {
+  const client = new VendorClient(contact, uid);
   const sessionId = generateGuid();
   const pulled = await client.pull(sessionId, ZERO_CURSOR);
   await client.release(sessionId).catch(() => undefined);
   if (!pulled.data) throw new Error("vendor returned no payload for a full-history pull");
-  const document = unpackEnvelope(pulled.data);
+  return { version: pulled.maxVersion, envelope: pulled.data };
+}
+
+/**
+ * The other half: validate the pulled history as a full snapshot (full by
+ * construction, so `Config` is not required), materialize it as the read/write
+ * mirror, and bind the profile. Pure work against the shared state root, so it
+ * runs in the MCP session — which is the only side that knows the profile path.
+ * WITHOUT touching the MLO UI at any point.
+ */
+export async function materializeVendorHistory(
+  gateway: CloudGateway,
+  profilePath: string,
+  rawUid: string,
+  history: { version: CloudCursor; envelope: Uint8Array },
+): Promise<{ version: string; stats: Record<string, number> }> {
+  const partition = await gateway.registry.open(rawUid, "upstream");
+  const document = unpackEnvelope(history.envelope);
   const validation = validateFullSnapshot(document, { requireConfig: false });
   if (!validation.ok) {
     const preview = validation.errors.slice(0, 5).join("; ");
     throw new Error(`vendor full-history pull failed snapshot validation: ${preview}`);
   }
-  await partition.mirrorState.appendAtCursor("mcp", pulled.data, pulled.maxVersion);
-  await partition.mirrorSnapshots.materialize(document, pulled.maxVersion);
+  await partition.mirrorState.appendAtCursor("mcp", history.envelope, history.version);
+  await partition.mirrorSnapshots.materialize(document, history.version);
   await gateway.bindings.bindUid(profilePath, partition.uid);
   await partition.setLifecycle("ready");
-  log(`upstream mirror bootstrapped from vendor history at version ${cursorToDecimalString(pulled.maxVersion)} (${validation.stats.tasks} tasks)`);
-  return { version: cursorToDecimalString(pulled.maxVersion), stats: validation.stats };
+  log(`upstream mirror bootstrapped from vendor history at version ${cursorToDecimalString(history.version)} (${validation.stats.tasks} tasks)`);
+  return { version: cursorToDecimalString(history.version), stats: validation.stats };
 }
 
 /**
@@ -325,6 +337,11 @@ export async function bootstrapFromVendor(
  * authoring never starts from stale rows), then commit the MCP delta in the
  * endpoint's own vendor session. After the commit, MLO's next QuickSync
  * delivers the change back to the app like any other remote edit.
+ *
+ * The two calls straddle a process boundary — the session is opened in the
+ * resident endpoint and committed on the MCP client's behalf a round trip
+ * later ([write-broker.ts](write-broker.ts)) — so `release` is public: an
+ * author that never commits must still let the vendor session go.
  */
 export class UpstreamWriteSession {
   private readonly client: VendorClient;
@@ -351,7 +368,12 @@ export class UpstreamWriteSession {
   async commit(envelope: Uint8Array): Promise<string> {
     const version = await this.client.apply(this.sessionId, envelope);
     await this.partition.mirrorState.appendAtCursor("mcp", envelope, version);
-    await this.client.release(this.sessionId).catch(() => undefined);
+    await this.release();
     return cursorToDecimalString(version);
+  }
+
+  /** Give the vendor session back without committing anything. */
+  async release(): Promise<void> {
+    await this.client.release(this.sessionId).catch(() => undefined);
   }
 }

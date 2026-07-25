@@ -6,9 +6,8 @@ import type { MloStore } from "../store.js";
 import { log } from "../log.js";
 import type { CloudState } from "../cloud/state.js";
 import type { BindingMismatch, CloudGateway } from "../cloud/gateway.js";
-import type { EndpointRole } from "../cloud/server.js";
+import type { ResidentEndpoint } from "../cloud/endpoint.js";
 import { cursorToDecimalString } from "../cloud/cursor.js";
-import { UpstreamWriteSession } from "../cloud/upstream.js";
 
 export interface ToolContext {
   config: MloConfig;
@@ -18,11 +17,13 @@ export interface ToolContext {
   /** Partition-aware routing; absent only in old test fixtures. */
   cloud?: CloudGateway;
   /**
-   * Whether this process serves the loopback endpoint or is attached to one
-   * owned by another MCP client — the difference decides where bootstrap and
-   * upstream writes can run. Absent only in old test fixtures.
+   * The resident endpoint this session is attached to. Every session attaches
+   * and none ever listens ([ADR-0003](../../../docs/adr/0003-resident-endpoint.md)),
+   * so this is not a role won at startup — it is the one process holding the
+   * vendor credentials that upstream writes and bootstrap need to borrow.
+   * Absent only in old test fixtures.
    */
-  endpointRole?: EndpointRole;
+  endpoint?: ResidentEndpoint;
 }
 
 /**
@@ -71,8 +72,7 @@ function bindingMismatchRefusal(mismatch: BindingMismatch): Error {
       "partition could never reach the app, so nothing was queued. Either MLO has a different profile " +
       "open (sync the intended one and retry), or this profile's cloud identity changed (Re-synchronize, " +
       `a restored .ml file, a new cloud file): back up the .ml file, then run cloud_bootstrap { rebind: true } ` +
-      "from the MCP client that owns the endpoint to bind the observed UID. Rebinding changes which sync " +
-      "history the profile follows and cannot be undone.",
+      "to bind the observed UID. Rebinding changes which sync history the profile follows and cannot be undone.",
   );
 }
 
@@ -159,20 +159,24 @@ async function resolveWriteChannel(ctx: ToolContext, cloud: CloudGateway): Promi
     );
   }
   if (bound.binding.mode === "local") return localChannel(bound.partition.state);
-  const contact = cloud.vendorContact(bound.binding.dataFileUID!);
-  if (!contact) {
+  // Upstream mode alone needs the resident endpoint: it is the only process
+  // holding the profile's vendor credentials. Local mode coordinates through
+  // disk and needs no contact at all.
+  const endpoint = ctx.endpoint;
+  if (!endpoint) {
     throw new Error(
-      "upstream writes need the profile's vendor sync credentials, which are held in memory only: " +
-        "run one sync in MLO through this proxy since server start, then retry",
+      "upstream writes travel through the resident MLO sync endpoint, which holds the vendor credentials, and " +
+        "this session is not attached to one — nothing was queued",
     );
   }
-  const session = new UpstreamWriteSession(bound.partition, contact);
-  // Refresh the mirror before authoring so full-row rewrites never start
-  // from rows a mobile/vendor edit has already superseded.
-  await session.refresh();
+  // Refresh the mirror before authoring so full-row rewrites never start from
+  // rows a mobile/vendor edit has already superseded. The endpoint holds the
+  // vendor session open between here and commit(), and refuses the commit if
+  // the mirror moved in between (see cloud/write-broker.ts).
+  const opened = await endpoint.refreshUpstream(bound.binding.dataFileUID!);
   return {
     state: bound.partition.mirrorState,
-    commit: (bytes) => session.commit(bytes),
+    commit: (bytes) => endpoint.commitUpstream(opened.session, bytes),
   };
 }
 

@@ -37,6 +37,11 @@ src/
                     (upstream.ts), bootstrap window, snapshot store/validation,
                     structural identity (structure-align.ts), SOAP adapter, delta
                     log/state, CSV/envelope codecs, log-projection) — see mcp-cloud.md
+                    endpoint.ts   the SESSION side of the credential-lending seam:
+                                  probe/spawn/attach, version skew, and the client
+                                  for the three forwarded operations
+                    credential-lending.ts the RESIDENT side: held vendor sessions
+                                  and the stale-write check
   tools/*.ts        one declarative MloTool per file (shared.ts: contract +
                     registerTool; registry.ts: the authoritative tool list;
                     row-update.ts: shared queue→QuickSync→verify runner for the
@@ -46,7 +51,8 @@ scripts/
   tool-catalog.ts   registry → readable catalog, typed from the zod schemas
   tools.ts          browse it: `pnpm tools [<name>|--json]` (no MLO, no data file)
   cloud-client.ts   app-side cloud client CLI: `pnpm cloud pull/push/finalize/sync`
-  serve-cloud.ts    run the cloud endpoint standalone (no MCP client attached)
+  serve-cloud.ts    run the resident cloud endpoint in the FOREGROUND for debugging
+                    (sessions normally start it themselves: `index.js --serve-cloud`)
   bootstrap-local.ts DEV ONLY: arm a local-mode (replacement-server) bootstrap window
 ```
 
@@ -60,7 +66,7 @@ arrays) as ONE delta; batches are atomic (any bad id aborts before anything is q
 1. **In-process**: a promise-chain mutex serializes every mlo.exe invocation within one server.
 2. **Cross-process**: a lock *directory* next to the data file (`<file>.ml.mcp-lock`, atomic `mkdir`, stale-broken after 3 min) serializes invocations across multiple server processes — one per Claude session. Reentrant within a process via a held-flag. (The cloud delta log has its own lock directory in the state dir — see mcp-cloud.md.)
 
-Only the first session binds the cloud endpoint's port (default 8181); later sessions detect a healthy mlo-mcp endpoint there and attach — they run no listener and share the delta log through the state-dir lock.
+No session binds the cloud endpoint's port (default 8181). The listener is a separate long-lived process — this same entry point re-invoked with `--serve-cloud`, started detached by the first session that finds the port free ([ADR-0003](adr/0003-resident-endpoint.md)). Sessions attach to it, share the delta log through the state-dir lock, and forward the three operations that need the vendor credentials it holds (mcp-cloud.md).
 
 Why: MLO invocations racing each other trigger a modal "file is locked by another process" dialog and hang forever.
 
@@ -72,9 +78,12 @@ Why: MLO invocations racing each other trigger a modal "file is locked by anothe
 
 Write tools resolve a write channel (`requireWriteChannel`): normally the
 delta (a full task row, or tombstones) is committed to the real vendor Cloud
-in the endpoint's own sync session and MLO receives it on the triggered
-`mlo.exe -QuickSync`; local-mode test partitions append to the replacement
-log instead. A fresh export then checks whether MLO applied it. The
+in the resident endpoint's own sync session — the MCP process authors it but
+borrows the endpoint's credentials to upload it — and MLO receives it on the
+triggered `mlo.exe -QuickSync`; local-mode test partitions append to the
+replacement log instead. A commit is refused outright if the mirror moved while
+the rows were being authored (mcp-cloud.md). A fresh export then checks whether
+MLO applied it. The
 `verified` flag in every write result reports that check; `false` means
 *accepted, not yet applied* — MLO merges it on a later sync session. The MLO
 app keeps running throughout and nothing touches the `.ml` file directly.
@@ -98,9 +107,9 @@ mcp-cloud.md for why the XML export cannot be that source.
   long-running fault cannot grow it without limit. It is **never replayed** and
   never makes a refused write report success: a refusal means something is
   actually wrong, and replaying on top of it reinvents ADR-0002's failure mode.
-  Recovery is reading the file by hand. Unlike `unbound-sightings.json` it is
-  written by every attached session, not just the endpoint owner, so it takes
-  the same cross-process lock (`cloud/state-lock.ts`) the bindings use.
+  Recovery is reading the file by hand. It is written by every attached session,
+  so it takes the same cross-process lock (`cloud/state-lock.ts`) the bindings
+  use.
 - Annotations: `readOnlyHint` on list/search/get/status, `destructiveHint` on complete/update/delete, `idempotentHint` on sync, `openWorldHint` on every tool that triggers a sync session. All tools return `structuredContent` matching an `outputSchema`.
 
 ## Tests (vitest, 3 projects-in-2)
