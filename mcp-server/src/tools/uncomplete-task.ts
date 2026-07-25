@@ -37,6 +37,7 @@ export const uncompleteTaskTool = defineTool({
   execute({ ids }, ctx) {
     return runCloudRowUpdate(ctx, ids, {
       verb: "Reopening",
+      attempt: { tool: "uncomplete_task", content: `reopen ${ids.join(", ")}` },
       patchFor: ({ known }, now) => reopenPatch(known, now),
       verified: (task) => !task.CompletionDateTime,
     });

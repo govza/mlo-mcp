@@ -5,7 +5,7 @@ import { knownCloudProjection, type KnownCloudProjection, type KnownRow } from "
 import { buildUidResolver } from "../cloud/structure-align.js";
 import { quickSync } from "../mlo-cli.js";
 import { findById, flatten } from "../task-tree.js";
-import { nowIso, requireWriteChannel, textResult, type ToolContext } from "./shared.js";
+import { nowIso, requireWriteChannel, textResult, type ToolContext, type WriteAttempt } from "./shared.js";
 import type { TaskNode } from "../types.js";
 
 export interface CloudRowTarget {
@@ -20,6 +20,8 @@ export interface CloudRowTarget {
 export interface CloudRowUpdatePlan {
   /** Leads the human message: "<verb> of [1] "x" was queued …" */
   verb: string;
+  /** Caller text to preserve if the write is refused; required so no tool opts out. */
+  attempt: WriteAttempt;
   /** Runs once after target resolution, before guards — e.g. to resolve move destinations against the same snapshot. */
   prepare?(before: TaskNode[], targets: CloudRowTarget[], cloud: KnownCloudProjection): void;
   /** Throw to abort the whole batch before anything is queued. */
@@ -46,7 +48,7 @@ export async function runCloudRowUpdate(
   ids: readonly string[],
   plan: CloudRowUpdatePlan
 ): Promise<CallToolResult> {
-  const channel = await requireWriteChannel(ctx);
+  const channel = await requireWriteChannel(ctx, plan.attempt);
   // The pre-sync export supplies path ids; GUIDs come from binary/XML first,
   // then conservatively from the logged Caption/ParentUID path.
   const before = (await ctx.store.getSnapshot(true)).tasks;

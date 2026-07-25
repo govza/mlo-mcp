@@ -3,13 +3,13 @@ import { resolveNamed, rowValue, type KnownCloudProjection, type KnownRow } from
 import { buildUidResolver } from "../cloud/structure-align.js";
 import { flatten, findById } from "../task-tree.js";
 import { csvTruthy, runCloudRowUpdate, type CloudRowTarget } from "./row-update.js";
-import { defineTool, PATH_ID_CAVEAT } from "./shared.js";
+import { defineTool, NOTE_DESCRIPTION, PATH_ID_CAVEAT } from "./shared.js";
 import type { TaskNode } from "../types.js";
 
 const CloudUpdateEntry = z.object({
   id: z.string().describe(`Path-based task id from list_tasks/search_tasks; ${PATH_ID_CAVEAT}`),
   Caption: z.string().min(1).optional(),
-  Note: z.string().optional().describe('"" clears'),
+  Note: z.string().optional().describe(`${NOTE_DESCRIPTION}; "" clears`),
   Importance: z.number().min(0).max(200).optional().describe("0–200; 100 = normal"),
   Effort: z.number().min(0).max(200).optional(),
   DueDateTime: z.string().optional().describe('ISO like "2026-08-01T15:00:00"; "" clears'),
@@ -171,6 +171,9 @@ export const updateTaskTool = defineTool({
     const dependencyUids = new Map<string, string[]>();
     return runCloudRowUpdate(ctx, [...specs.keys()], {
       verb: "Update",
+      // Serialised whole: Caption and Note carry words a refusal would lose,
+      // and the rest is what says which task they were meant for.
+      attempt: { tool: "update_task", content: updates.map((spec) => JSON.stringify(spec)).join("\n") },
       prepare(before: TaskNode[], targets: CloudRowTarget[], cloud: KnownCloudProjection) {
         const resolveUid = buildUidResolver(before, cloud);
         let starIndex = nextStarredIndex(cloud);

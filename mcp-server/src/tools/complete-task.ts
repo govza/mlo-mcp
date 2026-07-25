@@ -47,6 +47,7 @@ export const completeTaskTool = defineTool({
   execute({ ids }, ctx) {
     return runCloudRowUpdate(ctx, ids, {
       verb: "Completion",
+      attempt: { tool: "complete_task", content: `complete ${ids.join(", ")}` },
       guard: guardNotRecurring,
       patchFor: ({ known }, now) => completionPatch(known, now),
       verified: (task) => Boolean(task.CompletionDateTime),

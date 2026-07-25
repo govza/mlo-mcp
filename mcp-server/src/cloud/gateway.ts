@@ -6,6 +6,7 @@ import { CloudState } from "./state.js";
 import { BindingStore, type ProfileBinding } from "./binding.js";
 import { BootstrapController } from "./bootstrap.js";
 import { SightingStore, type UnboundSighting } from "./sightings.js";
+import { DeadLetterStore } from "./dead-letter.js";
 import { normalizeDataFileUid, PartitionRegistry, type PartitionHandle, type PartitionLifecycle } from "./partition.js";
 import type { UpstreamContext, VendorContact } from "./upstream.js";
 import { log } from "../log.js";
@@ -45,6 +46,8 @@ export class CloudGateway {
   readonly bindings: BindingStore;
   readonly bootstrap: BootstrapController;
   readonly sightings: SightingStore;
+  /** Shared, not per-call: its write chain is what serialises concurrent refusals. */
+  readonly deadLetters: DeadLetterStore;
   readonly stateRoot: string;
   private unboundState?: CloudState;
   private rootPrepared = false;
@@ -63,6 +66,7 @@ export class CloudGateway {
     this.bindings = new BindingStore(options.stateRoot);
     this.bootstrap = new BootstrapController(options.stateRoot);
     this.sightings = new SightingStore(options.stateRoot);
+    this.deadLetters = new DeadLetterStore(options.stateRoot);
   }
 
   /** Where the sync observer writes its structural summaries. */

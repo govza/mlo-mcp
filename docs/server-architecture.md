@@ -89,6 +89,18 @@ mcp-cloud.md for why the XML export cannot be that source.
 ## Error handling & safety conventions
 
 - Tools return `{isError, content}` with actionable messages, never throw to the transport; stderr-only logging (stdout is JSON-RPC).
+- **Dead letter.** Every refusal in `requireWriteChannel` first records the
+  attempted write's text, the reason and a timestamp in `dead-letters.json` in
+  the state root, and the refusal names that path. It is applied at the shared
+  gate so every current and future write tool inherits it. Entries are only
+  ever appended, but the file is bounded both ways — the oldest are evicted
+  past 50 entries, and one entry's text is capped at 4000 characters — so a
+  long-running fault cannot grow it without limit. It is **never replayed** and
+  never makes a refused write report success: a refusal means something is
+  actually wrong, and replaying on top of it reinvents ADR-0002's failure mode.
+  Recovery is reading the file by hand. Unlike `unbound-sightings.json` it is
+  written by every attached session, not just the endpoint owner, so it takes
+  the same cross-process lock (`cloud/state-lock.ts`) the bindings use.
 - Annotations: `readOnlyHint` on list/search/get/status, `destructiveHint` on complete/update/delete, `idempotentHint` on sync, `openWorldHint` on every tool that triggers a sync session. All tools return `structuredContent` matching an `outputSchema`.
 
 ## Tests (vitest, 3 projects-in-2)

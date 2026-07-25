@@ -77,14 +77,71 @@ function bindingMismatchRefusal(mismatch: BindingMismatch): Error {
 }
 
 /**
+ * What a refused write would otherwise take with it. Stated by every write
+ * tool rather than left optional, so a tool cannot silently opt out of the
+ * dead letter — the same reasoning that puts the refusals themselves in this
+ * shared gate instead of in each tool.
+ */
+export interface WriteAttempt {
+  /** The tool that authored the attempt, recorded beside the words. */
+  tool: string;
+  /** The caller's own text: captions and notes, or whatever named the targets. */
+  content: string;
+}
+
+/**
+ * Preserve the words of a refused write and point the caller at them.
+ *
+ * The write is still refused and still queues nothing — the file is a
+ * consolation, not an outcome, and nothing in it is ever replayed. Applied
+ * here rather than per tool so every current and future write tool inherits
+ * it. See `cloud/dead-letter.ts` for why the channel, not the server, is what
+ * loses the text.
+ */
+async function refusalAfterDeadLetter(cloud: CloudGateway, attempt: WriteAttempt, error: unknown): Promise<Error> {
+  const refusal = error instanceof Error ? error : new Error(String(error));
+  const store = cloud.deadLetters;
+  try {
+    await cloud.ensureRoot();
+    await store.record({
+      at: new Date().toISOString(),
+      tool: attempt.tool,
+      reason: refusal.message,
+      content: attempt.content,
+    });
+  } catch (failure) {
+    // The refusal is what the caller must act on; failing to save the text
+    // must not replace it with a filesystem error.
+    log(`could not preserve the text of a refused ${attempt.tool}: ${failure instanceof Error ? failure.message : String(failure)}`);
+    return refusal;
+  }
+  const stated = /[.!?]$/.test(refusal.message) ? refusal.message : `${refusal.message}.`;
+  return new Error(
+    `${stated} The text of this write was preserved at ${store.file()} — nothing was queued, and that file is ` +
+      "never replayed automatically.",
+  );
+}
+
+/**
  * Resolve the write channel, failing fast — before anything is queued —
  * unless the profile's partition is bootstrapped, still the one the app
  * syncs, and, for upstream mode, the endpoint has observed the profile's
  * vendor sync traffic since server start (contacts are held in memory only).
+ *
+ * Any refusal preserves `attempt` on disk first; see refusalAfterDeadLetter().
  */
-export async function requireWriteChannel(ctx: ToolContext): Promise<CloudWriteChannel> {
+export async function requireWriteChannel(ctx: ToolContext, attempt: WriteAttempt): Promise<CloudWriteChannel> {
   if (!ctx.cloud) return localChannel(ctx.cloudState);
-  const bound = await ctx.cloud.boundPartition(ctx.config.dataFile);
+  const cloud = ctx.cloud;
+  try {
+    return await resolveWriteChannel(ctx, cloud);
+  } catch (error) {
+    throw await refusalAfterDeadLetter(cloud, attempt, error);
+  }
+}
+
+async function resolveWriteChannel(ctx: ToolContext, cloud: CloudGateway): Promise<CloudWriteChannel> {
+  const bound = await cloud.boundPartition(ctx.config.dataFile);
   if (bound.kind === "unbound") {
     throw new Error(
       "this profile has no bootstrapped cloud partition; run cloud_bootstrap " +
@@ -94,7 +151,7 @@ export async function requireWriteChannel(ctx: ToolContext): Promise<CloudWriteC
   }
   // Before the lifecycle check: a partition the app abandoned is a different
   // fault from one that was never bootstrapped, and says so.
-  const mismatch = await ctx.cloud.bindingMismatch(ctx.config.dataFile);
+  const mismatch = await cloud.bindingMismatch(ctx.config.dataFile);
   if (mismatch) throw bindingMismatchRefusal(mismatch);
   if (bound.lifecycle !== "ready") {
     throw new Error(
@@ -102,7 +159,7 @@ export async function requireWriteChannel(ctx: ToolContext): Promise<CloudWriteC
     );
   }
   if (bound.binding.mode === "local") return localChannel(bound.partition.state);
-  const contact = ctx.cloud.vendorContact(bound.binding.dataFileUID!);
+  const contact = cloud.vendorContact(bound.binding.dataFileUID!);
   if (!contact) {
     throw new Error(
       "upstream writes need the profile's vendor sync credentials, which are held in memory only: " +
@@ -117,11 +174,6 @@ export async function requireWriteChannel(ctx: ToolContext): Promise<CloudWriteC
     state: bound.partition.mirrorState,
     commit: (bytes) => session.commit(bytes),
   };
-}
-
-/** Back-compat shim for callers that only need the projection state. */
-export async function requireWritableCloudState(ctx: ToolContext): Promise<CloudState> {
-  return (await requireWriteChannel(ctx)).state;
 }
 
 /** All four hints are mandatory so every tool states its contract explicitly. */
@@ -189,6 +241,16 @@ export const DEFAULT_RESULT_LIMIT = 200;
  * to be surfaced at all. One constant so the copies cannot drift apart.
  */
 export const PATH_ID_CAVEAT = "ids shift when the tree changes";
+
+/**
+ * `note` is the one task field that can hold *why a task exists*, and it was
+ * the one field the schemas said nothing about — so a client reading schemas
+ * alone had no reason to reach for it. One constant across add/update, for the
+ * same anti-drift reason as PATH_ID_CAVEAT. Mechanics only: what the field
+ * carries, not how to work ([ADR-0001](../../../docs/adr/0001-distribution-surfaces.md)).
+ */
+export const NOTE_DESCRIPTION =
+  "Free-form text on the task — context that does not fit in the caption, such as where a captured idea came from";
 
 /** Machine-readable task summary used in structuredContent across tools. */
 export const TaskSummaryShape = {

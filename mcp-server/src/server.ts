@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { allTools } from "./tools/registry.js";
-import { registerTool, type ToolContext } from "./tools/shared.js";
+import { NOTE_DESCRIPTION, registerTool, type ToolContext } from "./tools/shared.js";
 import { SERVER_INFO } from "./version.js";
 
 /** Connection-time usage guide shown to the LLM (MCP `instructions`). */
@@ -50,6 +50,7 @@ client that owns the endpoint — cloud_status reports \`endpointRole\` and \`bi
 - delete_task removes each task AND its whole subtree.
 
 ### Field conventions
+- \`note\`: ${NOTE_DESCRIPTION}. Nothing infers it — pass it or leave it empty.
 - Dates are local ISO without timezone ("2026-08-01T15:00:00").
 - Importance/Effort are 0–200 (100 = normal).
 - Contexts are MLO "Places" (@Office); pass existing captions in \`Places\` after

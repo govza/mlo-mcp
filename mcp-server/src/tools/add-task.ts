@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { addTasksTool } from "./add-tasks.js";
-import { defineTool, textResult } from "./shared.js";
+import { defineTool, NOTE_DESCRIPTION, textResult } from "./shared.js";
 
 /**
  * Thin wrapper over add_tasks: one task is a single-entry batch. The caption
@@ -12,7 +12,7 @@ export const addTaskTool = defineTool({
   description: "Queue a full task delta, trigger QuickSync, and verify whether MLO applied it.",
   inputSchema: {
     caption: z.string().min(1),
-    note: z.string().optional(),
+    note: z.string().optional().describe(NOTE_DESCRIPTION),
     dueDateTime: z.string().optional(),
     startDateTime: z.string().optional(),
     parentUid: z.string().optional()

@@ -11,7 +11,7 @@ import { startCloudServer, type CloudServerHandle } from "../../src/cloud/server
 import { addTaskTool } from "../../src/tools/add-task.js";
 import { cloudBootstrapTool } from "../../src/tools/cloud-bootstrap.js";
 import { cloudStatusTool } from "../../src/tools/cloud-status.js";
-import { resolveReadCloudState, type ToolContext } from "../../src/tools/shared.js";
+import { requireWriteChannel, resolveReadCloudState, type ToolContext } from "../../src/tools/shared.js";
 import type { MloConfig } from "../../src/types.js";
 
 /**
@@ -146,13 +146,35 @@ async function status(ctx: ToolContext): Promise<Record<string, unknown>> {
 }
 
 /** What an agent asking for a write actually gets back. */
-async function writeRefusal(ctx: ToolContext): Promise<string> {
-  const result = await addTaskTool.execute({ caption: "written during a mismatch" }, ctx).then(
+async function writeRefusal(ctx: ToolContext, caption = "written during a mismatch"): Promise<string> {
+  const result = await addTaskTool.execute({ caption }, ctx).then(
     () => undefined,
     (error: Error) => error.message,
   );
   if (result === undefined) throw new Error("expected the write to be refused");
   return result;
+}
+
+/**
+ * The state-root file holding a refused write's text, located by its contents
+ * rather than by name: what a caller can act on is the path the refusal names,
+ * not where the server chose to put it.
+ */
+async function preserved(stateRoot: string, needle: string): Promise<{ file: string; text: string }> {
+  for (const entry of await fs.readdir(stateRoot, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    const file = path.join(stateRoot, entry.name);
+    const text = await fs.readFile(file, "utf8");
+    if (text.includes(needle)) return { file, text };
+  }
+  throw new Error(`nothing under ${stateRoot} preserved "${needle}"`);
+}
+
+async function anyFileMentions(stateRoot: string, needle: string): Promise<boolean> {
+  return preserved(stateRoot, needle).then(
+    () => true,
+    () => false,
+  );
 }
 
 /** A bound, ready upstream profile plus a running endpoint — the healthy state. */
@@ -278,6 +300,82 @@ describe("binding mismatch: the app syncs a dataFileUID the server does not mana
     const { gateway } = await boundProfile();
     expect(await status(contextFor(gateway))).toMatchObject({ endpointRole: "owner" });
     expect(await status(contextFor(gateway, { endpointRole: "attached" }))).toMatchObject({ endpointRole: "attached" });
+  });
+});
+
+/**
+ * A refusal is loud and queues nothing, which is right for an agent that will
+ * handle the error — and wrong for a capture, where the premise is that the
+ * user has already moved on and will never read the panel it lands in. The
+ * task is always re-addable; the sentence they typed is not.
+ */
+describe("a refused write leaves its words on disk", () => {
+  it("preserves the text and names the file, without claiming the write landed", async () => {
+    const { gateway, handle, vendor } = await boundProfile();
+    const ctx = contextFor(gateway);
+    await syncAs(handle, vendor, UID_B);
+
+    const refusal = await writeRefusal(ctx, "look into the retry thing");
+
+    const { file, text } = await preserved(gateway.stateRoot, "look into the retry thing");
+    // A path the user can open beats a reassurance they cannot act on.
+    expect(refusal).toContain(file);
+    // The reason and a timestamp sit beside the words, so a recovered capture
+    // says which fault dropped it and when.
+    expect(text).toMatch(/binding mismatch/i);
+    expect(text).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
+
+    // The file is a consolation, not an outcome: still a refusal, still nothing queued.
+    const partition = await gateway.registry.open(UID_A, "upstream");
+    expect(await partition.mirrorState.counts()).toEqual({ mcp: 0, app: 0 });
+  });
+
+  it("records the fault, so a first-run refusal is distinguishable from a mismatch", async () => {
+    const gateway = new CloudGateway({ stateRoot: await root() });
+    await gateway.ensureRoot();
+    const ctx = contextFor(gateway);
+
+    await writeRefusal(ctx, "capture before bootstrap");
+
+    const { text } = await preserved(gateway.stateRoot, "capture before bootstrap");
+    expect(text).toMatch(/cloud_bootstrap/);
+    expect(text).not.toMatch(/binding mismatch/i);
+  });
+
+  it("keeps every capture when several are refused at once", async () => {
+    const { gateway, handle, vendor } = await boundProfile();
+    const ctx = contextFor(gateway);
+    await syncAs(handle, vendor, UID_B);
+
+    const captures = [0, 1, 2, 3, 4].map((n) => `concurrent capture ${n}`);
+    await Promise.all(captures.map((caption) => writeRefusal(ctx, caption)));
+
+    // One capture must not be dropped because another was refused in the same
+    // moment — losing the words is the exact failure this file prevents.
+    for (const caption of captures) expect(await anyFileMentions(gateway.stateRoot, caption)).toBe(true);
+  });
+
+  it("stays bounded so a long-running fault cannot grow it without limit", async () => {
+    const { gateway, handle, vendor } = await boundProfile();
+    const ctx = contextFor(gateway);
+    await syncAs(handle, vendor, UID_B);
+
+    for (let attempt = 0; attempt < 60; attempt += 1) await writeRefusal(ctx, `capture ${attempt}`);
+
+    expect(await anyFileMentions(gateway.stateRoot, "capture 59")).toBe(true);
+    expect(await anyFileMentions(gateway.stateRoot, "capture 0\"")).toBe(false);
+  });
+
+  it("writes nothing when the write channel resolves", async () => {
+    const gateway = new CloudGateway({ stateRoot: await root() });
+    await gateway.bindings.create(PROFILE, "local");
+    await gateway.bindings.bindUid(PROFILE, UID_A);
+    await (await gateway.registry.open(UID_A, "local")).setLifecycle("ready");
+    const ctx = contextFor(gateway);
+
+    await requireWriteChannel(ctx, { tool: "add_task", content: "a write that was allowed" });
+
+    expect(await anyFileMentions(gateway.stateRoot, "a write that was allowed")).toBe(false);
   });
 });
 

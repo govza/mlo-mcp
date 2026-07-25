@@ -6,12 +6,12 @@ import { knownCloudProjection, resolveNamed, rowValue } from "../cloud/log-proje
 import { quickSync } from "../mlo-cli.js";
 import { flatten } from "../task-tree.js";
 import type { TaskNode } from "../types.js";
-import { defineTool, nowIso, requireWriteChannel, textResult } from "./shared.js";
+import { defineTool, NOTE_DESCRIPTION, nowIso, requireWriteChannel, textResult } from "./shared.js";
 
 const BatchTask = z.object({
   key: z.string().min(1).describe("Unique local key used by parentKey/dependsOnKeys within this call"),
   caption: z.string().min(1),
-  note: z.string().optional(),
+  note: z.string().optional().describe(NOTE_DESCRIPTION),
   dueDateTime: z.string().optional(),
   startDateTime: z.string().optional(),
   parentKey: z.string().optional().describe("Local key of another task in this batch"),
@@ -117,7 +117,12 @@ export const addTasksTool = defineTool({
       byKey.set(spec.key, spec);
     }
     validateGraph(tasks, byKey);
-    const channel = await requireWriteChannel(ctx);
+    // Captions and notes are the words a refused add would otherwise lose;
+    // everything else about the attempt is reconstructable.
+    const channel = await requireWriteChannel(ctx, {
+      tool: "add_tasks",
+      content: tasks.map((spec) => (spec.note ? `${spec.caption}\n${spec.note}` : spec.caption)).join("\n\n"),
+    });
     const uids = new Map(tasks.map((spec) => [spec.key, generateGuid()]));
     const cloud = await knownCloudProjection(channel.state);
     let starredIndex = Math.max(0, ...[...cloud.starredOrderByTask.values()].map(Number).filter(Number.isFinite)) + 500;

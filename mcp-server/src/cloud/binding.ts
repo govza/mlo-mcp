@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { normalizeDataFileUid, type PartitionMode } from "./partition.js";
+import { StateRootLock } from "./state-lock.js";
 
 /**
  * Persisted, explicit profile→partition bindings.
@@ -32,49 +33,18 @@ function canonicalProfilePath(profilePath: string): string {
 }
 
 export class BindingStore {
-  private chain: Promise<unknown> = Promise.resolve();
+  private readonly lock: StateRootLock;
 
-  constructor(readonly stateRoot: string) {}
+  constructor(readonly stateRoot: string) {
+    this.lock = new StateRootLock(stateRoot, "bindings");
+  }
 
   private file(): string {
     return path.join(this.stateRoot, "bindings.json");
   }
 
-  private async withLock<T>(operation: () => Promise<T>): Promise<T> {
-    const lockDir = path.join(this.stateRoot, ".bindings-lock");
-    const deadline = Date.now() + 10_000;
-    await fs.mkdir(this.stateRoot, { recursive: true });
-    for (;;) {
-      try {
-        await fs.mkdir(lockDir);
-        break;
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-        try {
-          const stat = await fs.stat(lockDir);
-          if (Date.now() - stat.mtimeMs > 30_000) {
-            await fs.rm(lockDir, { recursive: true, force: true });
-            continue;
-          }
-        } catch {
-          continue;
-        }
-        if (Date.now() >= deadline) throw new Error(`timed out waiting for bindings lock: ${lockDir}`);
-        await new Promise((resolve) => setTimeout(resolve, 25));
-      }
-    }
-    try {
-      return await operation();
-    } finally {
-      await fs.rm(lockDir, { recursive: true, force: true });
-    }
-  }
-
   private serialize<T>(operation: () => Promise<T>): Promise<T> {
-    const run = () => this.withLock(operation);
-    const next = this.chain.then(run, run);
-    this.chain = next.catch(() => undefined);
-    return next;
+    return this.lock.serialize(operation);
   }
 
   private async load(): Promise<ProfileBinding[]> {

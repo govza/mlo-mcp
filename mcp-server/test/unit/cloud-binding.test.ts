@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { BindingStore } from "../../src/cloud/binding.js";
 import { CloudGateway } from "../../src/cloud/gateway.js";
-import { requireWritableCloudState, resolveReadCloudState, type ToolContext } from "../../src/tools/shared.js";
+import { requireWriteChannel, resolveReadCloudState, type ToolContext } from "../../src/tools/shared.js";
 import type { MloConfig } from "../../src/types.js";
 
 const dirs: string[] = [];
@@ -69,10 +69,15 @@ describe("BindingStore", () => {
   });
 });
 
+/** The gate's projection state, stating an attempt like every real write tool. */
+function writableState(ctx: ToolContext) {
+  return requireWriteChannel(ctx, { tool: "add_task", content: "a write that was refused" }).then((c) => c.state);
+}
+
 describe("write gating by binding and lifecycle", () => {
   it("blocks writes for an unbound partitioned profile with a bootstrap-directed error", async () => {
     const gateway = new CloudGateway({ stateRoot: await root() });
-    await expect(requireWritableCloudState(contextFor(gateway, "C:\\a.ml")))
+    await expect(writableState(contextFor(gateway, "C:\\a.ml")))
       .rejects.toThrow(/no bootstrapped cloud partition.*cloud_bootstrap/s);
   });
 
@@ -81,15 +86,15 @@ describe("write gating by binding and lifecycle", () => {
     await gateway.bindings.create("C:\\a.ml", "upstream");
     await gateway.bindings.bindUid("C:\\a.ml", UID_A);
     // Bound but not bootstrapped: directed to cloud_bootstrap.
-    await expect(requireWritableCloudState(contextFor(gateway, "C:\\a.ml")))
+    await expect(writableState(contextFor(gateway, "C:\\a.ml")))
       .rejects.toThrow("not bootstrapped (uninitialized)");
     // Bootstrapped but no vendor sync traffic observed since server start:
     // the endpoint cannot act as a cloud client yet.
     await (await gateway.registry.open(UID_A, "upstream")).setLifecycle("ready");
-    await expect(requireWritableCloudState(contextFor(gateway, "C:\\a.ml")))
+    await expect(writableState(contextFor(gateway, "C:\\a.ml")))
       .rejects.toThrow(/vendor sync credentials.*run one sync/s);
     // A profile with no binding at all gets the bootstrap direction instead.
-    await expect(requireWritableCloudState(contextFor(gateway, "C:\\other.ml")))
+    await expect(writableState(contextFor(gateway, "C:\\other.ml")))
       .rejects.toThrow("no bootstrapped cloud partition");
   });
 
@@ -98,14 +103,14 @@ describe("write gating by binding and lifecycle", () => {
     await gateway.bindings.create("C:\\a.ml", "local");
     await gateway.bindings.bindUid("C:\\a.ml", UID_A);
     const ctx = contextFor(gateway, "C:\\a.ml");
-    await expect(requireWritableCloudState(ctx)).rejects.toThrow("not bootstrapped (uninitialized)");
+    await expect(writableState(ctx)).rejects.toThrow("not bootstrapped (uninitialized)");
 
     const partition = await gateway.registry.open(UID_A);
     await partition.setLifecycle("bootstrap-required");
-    await expect(requireWritableCloudState(ctx)).rejects.toThrow("not bootstrapped (bootstrap-required)");
+    await expect(writableState(ctx)).rejects.toThrow("not bootstrapped (bootstrap-required)");
 
     await partition.setLifecycle("ready");
-    const state = await requireWritableCloudState(ctx);
+    const state = await writableState(ctx);
     expect(state).toBe(partition.state);
     // Reads follow the same partition once bound.
     expect(await resolveReadCloudState(ctx)).toBe(partition.state);
@@ -114,7 +119,7 @@ describe("write gating by binding and lifecycle", () => {
   it("passes through for contexts without a gateway (unit-test fixtures)", async () => {
     const ctx = { ...contextFor(new CloudGateway({ stateRoot: await root() }), "C:\\a.ml") };
     delete (ctx as { cloud?: unknown }).cloud;
-    const state = await requireWritableCloudState(ctx);
+    const state = await writableState(ctx);
     expect(state).toBe(ctx.cloudState);
   });
 });

@@ -11,7 +11,7 @@ import { packEnvelope } from "../../src/cloud/envelope.js";
 import { findSection, type SectionedCsv } from "../../src/cloud/csv.js";
 import { knownCloudProjection, rowValue } from "../../src/cloud/log-projection.js";
 import { bootstrapFromVendor } from "../../src/cloud/upstream.js";
-import { requireWritableCloudState, requireWriteChannel, resolveReadCloudState, type ToolContext } from "../../src/tools/shared.js";
+import { requireWriteChannel, resolveReadCloudState, type ToolContext } from "../../src/tools/shared.js";
 import type { MloConfig } from "../../src/types.js";
 
 const dirs: string[] = [];
@@ -271,7 +271,7 @@ describe("upstream transparent proxy", () => {
     expect(await partition.mirrorState.highWater()).toBe(500n);
 
     // MCP write: refresh, author, commit in the endpoint's own vendor session.
-    const channel = await requireWriteChannel(contextFor(gateway));
+    const channel = await requireWriteChannel(contextFor(gateway), { tool: "add_tasks", content: "written by MCP" });
     expect(channel.state).toBe(partition.mirrorState);
     const version = await channel.commit(packEnvelope(mergeDeltas([
       buildTaskAddDelta({ uid: NEW_TASK, caption: "written by MCP", createdDate: "2026-07-23T10:00:00", lastModified: "2026-07-23T10:00:00" }),

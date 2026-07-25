@@ -91,7 +91,7 @@ export const deleteTaskTool = defineTool({
   async execute({ ids }, ctx) {
     // Unlike add_task, the pre-sync export is mandatory: it is the only
     // source for the path-id → GUID resolution the tombstones are made of.
-    const channel = await requireWriteChannel(ctx);
+    const channel = await requireWriteChannel(ctx, { tool: "delete_task", content: `delete ${ids.join(", ")}` });
     const before = (await ctx.store.getSnapshot(true)).tasks;
     const cloud = await knownCloudProjection(channel.state);
     const { targets, uids, missingGuid } = collectTombstones(before, ids, buildUidResolver(before, cloud));
