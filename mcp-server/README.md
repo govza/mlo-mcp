@@ -4,7 +4,7 @@ MCP server that lets AI agents manage tasks in the **MyLifeOrganized** (MLO) Win
 
 Full reference documentation lives in [`../docs/`](../docs/README.md): the mlo.exe CLI, the XML and `.ml` binary formats, and the server architecture. The server itself is methodology-neutral; customizable skills that layer GTD workflows on top of these tools live in a separate `gtd-skills` repo.
 
-**Installing the server as a user?** See the [root README](../README.md) — end users need only Node, not pnpm: the repo ships a committed self-contained bundle (`dist-bundle/mlo-mcp.js`) usable from any MCP client. This file covers development.
+**Installing the server as a user?** See the [root README](../README.md) — end users need only Node, not pnpm: the repo ships a committed single-file bundle (`dist-bundle/mlo-mcp.js`, dependency-free) usable from any MCP client. It also carries the two-step install, including the one-time proxy wiring and `cloud_bootstrap` that writes depend on. This file covers development.
 
 ## Requirements (development)
 
@@ -23,7 +23,7 @@ pnpm bundle    # esbuild → dist-bundle/mlo-mcp.js (the committed single-file d
 Register your working copy with Claude Code:
 
 ```powershell
-claude mcp add mlo -- node D:\dev\projects\oml\mcp-server\dist\index.js
+claude mcp add mlo -- node D:\dev\projects\oml\mlo-mcp\mcp-server\dist\index.js
 ```
 
 ### Configuration (env vars)
@@ -71,7 +71,7 @@ switch-following.)
 
 Writes never touch the data file. Each write travels as a complete sync delta — normally committed to the real **vendor MLO Cloud** in the server's own sync session (the server proxies the app's cloud sync and additionally acts as one more sync client of the account) and delivered to MLO by the triggered QuickSync; **MLO's own merge logic** applies it while the app keeps running. Batches travel as ONE delta and are atomic (one bad id and nothing is queued). Results carry a `verified` flag — `false` means accepted but not yet confirmed in a fresh export, not failure.
 
-**One-time setup per profile:** back up the `.ml`, wire MLO's cloud sync proxy to the endpoint ("Use secure connection" unchecked), run one ordinary sync, then call `cloud_bootstrap` — it pulls the account's complete cloud history so every pre-existing task gets its stable UID and full record. Until then, mutation tools refuse (an ordinary sync alone never enables writes); after every server restart, one proxied sync is needed before writes resume. See [`../docs/tools.md`](../docs/tools.md) and [`../docs/mcp-cloud.md`](../docs/mcp-cloud.md). The server also sends a connection-time `instructions` guide teaching agents these conventions.
+**One-time setup per profile:** back up the `.ml`, wire MLO's cloud sync proxy to the endpoint ("Use secure connection" unchecked), run one ordinary sync, then call `cloud_bootstrap` — it pulls the account's complete cloud history so every pre-existing task gets its stable UID and full record. Until then, mutation tools refuse (an ordinary sync alone never enables writes); after every server restart, one proxied sync is needed before writes resume. Written out step by step as Step 2 of the [root README](../README.md#step-2--enable-writes-one-time-per-profile); the rationale and failure modes are in [`../docs/mcp-cloud.md`](../docs/mcp-cloud.md), the tool semantics in [`../docs/tools.md`](../docs/tools.md). The server also sends a connection-time `instructions` guide teaching agents these conventions.
 
 Task ids are path-based (`1.2.3`) and shift when the tree changes — the server re-exports before every mutation, and `get_task` also reports each task's stable internal GUID, resolved by structural alignment of the export outline against the bootstrapped cloud tree (duplicate sibling captions resolve by position).
 

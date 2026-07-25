@@ -3,19 +3,23 @@
 MCP server for the **MyLifeOrganized** (MLO) Windows desktop app. AI agents (Claude Code, Codex, Cursor, Claude Desktop — anything that speaks MCP over stdio) manage your MLO task tree by driving `mlo.exe`'s undocumented command line locally. No cloud API, no account, your data never leaves the machine.
 
 - 13 tools: list/search/get tasks, contexts, single/atomic-outline add, update/complete/uncomplete/delete, QuickSync, cloud status/bootstrap
-- Writes never touch your data file: the server runs a local cloud-sync endpoint, queues changes as sync deltas, and MLO's **own** merge logic applies them via QuickSync — the app keeps running, and the append-only delta log is the durable record of every change (see [docs/mcp-cloud.md](docs/mcp-cloud.md), including the one-time proxy wiring that routes the app's sync to the local endpoint)
+- Writes never touch your data file: the server runs a local cloud-sync endpoint, queues changes as sync deltas, and MLO's **own** merge logic applies them via QuickSync — the app keeps running, and the append-only delta log is the durable record of every change
 - Methodology-neutral: the server ships primitives only. Opinionated GTD workflow skills (mindsweep, inbox processing, weekly review, standing conventions) live in a separate `gtd-skills` repo
-
-## Requirements
-
-- Windows with [MyLifeOrganized](https://www.mylifeorganized.net/) desktop installed
-- Node 22+ (that's all — the repo ships a self-contained bundle; no package manager needed)
 
 ## Install
 
-No configuration: the server operates on whatever profile MLO currently has open (auto-detected from MLO's own settings in the registry, followed across profile switches). **Try it with a copy of your profile first** if you're cautious — just open the copy in MLO; writes are applied by MLO's own sync merge, and every change is kept as a delta in the local message log.
+Installing is two steps. **Step 1 gets you reading** — tools that list, search and inspect tasks work as soon as the server is registered. **Step 2 enables writing**, and it is a one-time setup per profile that cannot be skipped: until it is done, every tool that changes anything refuses.
 
-### Any MCP client (via npx, straight from GitHub — no npm registry)
+### Requirements
+
+- Windows with [MyLifeOrganized](https://www.mylifeorganized.net/) desktop installed
+- Node 22+ — that's all. The repo ships a committed single-file bundle, so there is no package manager and no dependency install.
+
+### Step 1 — Register the server with your MCP client
+
+There is no profile setting. The server operates on whatever profile MLO currently has open (auto-detected from MLO's own settings in the registry) and follows you across profile switches.
+
+**Any MCP client** (via npx, straight from GitHub — no npm registry):
 
 ```jsonc
 {
@@ -30,9 +34,7 @@ No configuration: the server operates on whatever profile MLO currently has open
 
 npx caches the GitHub install; pin a tag (`github:govza/mlo-mcp#v0.3.0`) for reproducibility, and re-run with a newer tag to update.
 
-### Claude Code
-
-Either register directly:
+**Claude Code** — either register directly:
 
 ```powershell
 claude mcp add mlo -- npx -y github:govza/mlo-mcp
@@ -45,18 +47,34 @@ or install as a plugin (updates via `/plugin update`):
 /plugin install mlo@govza
 ```
 
-The plugin needs no configuration either.
-
-### From a clone (no npx)
+**From a clone** (no npx):
 
 ```powershell
 git clone https://github.com/govza/mlo-mcp
 claude mcp add mlo -- node C:\path\to\mlo-mcp\mcp-server\dist-bundle\mlo-mcp.js
 ```
 
+Read tools work now. Ask your agent to list your tasks to confirm.
+
+### Step 2 — Enable writes (one-time per profile)
+
+Writes are applied by MLO's own sync merge rather than by editing your data file, so the server has to sit in the app's sync path before it can change anything. Until this is finished, `add_task`, `update_task`, `complete_task` and friends all refuse with a pointer back here — an ordinary sync alone never enables them.
+
+1. **Back up your `.ml` profile** — a file copy while MLO is closed. Do this before the first bootstrap and before any sync experimentation. If you'd rather rehearse, open a *copy* of your profile in MLO and run the whole procedure against that.
+2. **Point MLO's cloud sync through the local endpoint:** set the sync profile's proxy to `127.0.0.1:8181`, and leave **"Use secure connection" unchecked**. This matters: with it checked MLO still syncs fine, but the endpoint only sees an opaque TLS tunnel, so bootstrap and every write silently stay dead. MLO's sync log prints *"secure connection is OFF for this sync profile"* when it is set correctly.
+3. **Run one ordinary sync in MLO** (or call the `sync` tool).
+4. **Call `cloud_bootstrap`** — just ask your agent to run it. It pulls your account's complete cloud history so every pre-existing task gets its stable UID and full record.
+
+Writes are live from here. Two things worth knowing:
+
+- **After every server restart, one ordinary proxied sync is needed again before writes resume** — the account contact is held in memory only, never written to disk.
+- `cloud_status` reports the binding, the bootstrap lifecycle and the endpoint's cursor whenever you want to check where things stand.
+
+The full rationale, the merge rules, and what each failure mode looks like are in [docs/mcp-cloud.md](docs/mcp-cloud.md).
+
 ### Configuration
 
-None required. The env vars that exist (`MLO_EXE_PATH`, `MLO_CLOUD_PORT`, … — all optional) are documented in [`mcp-server/README.md`](mcp-server/README.md), along with the one-time `cloud_bootstrap` setup (back up your `.ml` profile first).
+None required. The env vars that exist (`MLO_EXE_PATH`, `MLO_CLOUD_PORT`, … — all optional) are documented in [`mcp-server/README.md`](mcp-server/README.md).
 
 ## Documentation
 
