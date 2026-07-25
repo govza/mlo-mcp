@@ -1,0 +1,312 @@
+import { promises as fs } from "node:fs";
+import http from "node:http";
+import net from "node:net";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { buildTaskAddDelta, mergeDeltas } from "../../src/cloud/delta.js";
+import { packEnvelope } from "../../src/cloud/envelope.js";
+import { CloudGateway } from "../../src/cloud/gateway.js";
+import { startCloudServer, type CloudServerHandle } from "../../src/cloud/server.js";
+import { addTaskTool } from "../../src/tools/add-task.js";
+import { cloudBootstrapTool } from "../../src/tools/cloud-bootstrap.js";
+import { cloudStatusTool } from "../../src/tools/cloud-status.js";
+import { resolveReadCloudState, type ToolContext } from "../../src/tools/shared.js";
+import type { MloConfig } from "../../src/types.js";
+
+/**
+ * The binding-mismatch fault, driven at the only seam that reproduces it: a
+ * real server instance receiving MLO's SOAP sync for an unbound `dataFileUID`,
+ * observed through the public tool surface. Nothing here asserts on state
+ * files, log lines, or which internal method decided the authority.
+ */
+
+const PROFILE = "C:\\Profiles\\Personal.ml";
+const UID_A = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}";
+const UID_B = "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}";
+
+const handles: CloudServerHandle[] = [];
+const dirs: string[] = [];
+const vendors: Vendor[] = [];
+afterEach(async () => {
+  vi.restoreAllMocks();
+  await Promise.all(handles.splice(0).map((handle) => handle.stop()));
+  await Promise.all(vendors.splice(0).map((vendor) => vendor.close()));
+  await Promise.all(dirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
+});
+
+interface Vendor {
+  port: number;
+  requests: string[];
+  close(): Promise<void>;
+}
+
+function vendorResponse(dataBase64?: string): string {
+  return (
+    `<?xml version="1.0" encoding="utf-8"?>` +
+    `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body>` +
+    `<GetModificationsBytesExResponse xmlns="http://www.mylifeorganized.net/">` +
+    `<GetModificationsBytesExResult>true</GetModificationsBytesExResult><maxVersion>7</maxVersion>` +
+    (dataBase64 ? `<data>${dataBase64}</data>` : "") +
+    `</GetModificationsBytesExResponse></soap:Body></soap:Envelope>`
+  );
+}
+
+/** The vendor's complete history, as a client pull from version 0 receives it. */
+function fullHistoryBase64(): string {
+  const document = mergeDeltas([
+    buildTaskAddDelta({
+      uid: "{11111111-1111-1111-1111-111111111111}",
+      caption: "Existing project",
+      createdDate: "2026-07-01T08:00:00",
+      lastModified: "2026-07-01T08:00:00",
+    }),
+  ]);
+  return Buffer.from(packEnvelope(document)).toString("base64");
+}
+
+/** Stands in for the vendor cloud so the forward-to-vendor branch is real. */
+async function startVendor(dataBase64?: string): Promise<Vendor> {
+  const requests: string[] = [];
+  const server = http.createServer((request, response) => {
+    const chunks: Buffer[] = [];
+    request.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+    request.on("end", () => {
+      requests.push(Buffer.concat(chunks).toString("utf8"));
+      response.writeHead(200, { "content-type": "text/xml; charset=utf-8" });
+      response.end(vendorResponse(dataBase64));
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const vendor: Vendor = {
+    port: (server.address() as net.AddressInfo).port,
+    requests,
+    close: () => new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve()))),
+  };
+  vendors.push(vendor);
+  return vendor;
+}
+
+async function root(): Promise<string> {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-drift-"));
+  dirs.push(dir);
+  return dir;
+}
+
+function contextFor(gateway: CloudGateway, extra?: Partial<ToolContext>): ToolContext {
+  return {
+    config: { dataFile: PROFILE, cloudHost: "127.0.0.1", cloudPort: 0 } as MloConfig,
+    store: undefined as never,
+    cloudState: gateway.defaultState(),
+    cloud: gateway,
+    endpointRole: "owner",
+    ...extra,
+  };
+}
+
+function syncRequestXml(uid: string): string {
+  return (
+    `<?xml version="1.0" encoding="utf-8"?>` +
+    `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body>` +
+    `<GetModificationsBytesEx xmlns="http://www.mylifeorganized.net/">` +
+    `<loginBytes>bG9naW4=</loginBytes><passwordBytes>c2VjcmV0</passwordBytes>` +
+    `<dataFileUID>${uid}</dataFileUID><newerThan>0</newerThan>` +
+    `</GetModificationsBytesEx></soap:Body></soap:Envelope>`
+  );
+}
+
+/** One MLO sync operation, exactly as the app sends it through the proxy. */
+async function syncAs(handle: CloudServerHandle, vendor: Vendor, uid: string): Promise<number> {
+  const body = syncRequestXml(uid);
+  return new Promise<number>((resolve, reject) => {
+    const request = http.request(
+      {
+        host: handle.host,
+        port: handle.port,
+        method: "POST",
+        path: `http://127.0.0.1:${vendor.port}/mlo/MLOInetSync.asmx`,
+        headers: {
+          "content-type": "text/xml; charset=utf-8",
+          soapaction: '"http://www.mylifeorganized.net/GetModificationsBytesEx"',
+        },
+      },
+      (response) => {
+        response.resume();
+        response.on("end", () => resolve(response.statusCode!));
+      },
+    );
+    request.on("error", reject);
+    request.end(body);
+  });
+}
+
+async function status(ctx: ToolContext): Promise<Record<string, unknown>> {
+  const result = await cloudStatusTool.execute({}, ctx);
+  return result.structuredContent as Record<string, unknown>;
+}
+
+/** What an agent asking for a write actually gets back. */
+async function writeRefusal(ctx: ToolContext): Promise<string> {
+  const result = await addTaskTool.execute({ caption: "written during a mismatch" }, ctx).then(
+    () => undefined,
+    (error: Error) => error.message,
+  );
+  if (result === undefined) throw new Error("expected the write to be refused");
+  return result;
+}
+
+/** A bound, ready upstream profile plus a running endpoint — the healthy state. */
+async function boundProfile(dataBase64?: string): Promise<{ gateway: CloudGateway; handle: CloudServerHandle; vendor: Vendor }> {
+  const gateway = new CloudGateway({ stateRoot: await root() });
+  await gateway.bindings.create(PROFILE, "upstream");
+  await gateway.bindings.bindUid(PROFILE, UID_A);
+  await (await gateway.registry.open(UID_A, "upstream")).setLifecycle("ready");
+  const vendor = await startVendor(dataBase64);
+  const handle = await startCloudServer({ host: "127.0.0.1", port: 0, gateway, observeHost: "127.0.0.1" });
+  handles.push(handle);
+  return { gateway, handle, vendor };
+}
+
+describe("binding mismatch: the app syncs a dataFileUID the server does not manage", () => {
+  it("surfaces the observed UID in cloud_status and refuses writes into the abandoned partition", async () => {
+    const { gateway, handle, vendor } = await boundProfile();
+    const ctx = contextFor(gateway);
+
+    expect(await syncAs(handle, vendor, UID_B)).toBe(200);
+
+    // Routing is untouched: the unknown profile still reaches the vendor.
+    expect(vendor.requests).toEqual([syncRequestXml(UID_B)]);
+
+    const reported = await status(ctx);
+    expect(reported).toMatchObject({ dataFileUID: UID_A, bindingMismatch: true });
+    expect(reported.unboundSightings).toMatchObject([{ dataFileUID: UID_B, count: 1 }]);
+
+    // The write tool itself refuses, naming both UIDs, the profile, and the remedy.
+    const refusal = await writeRefusal(ctx);
+    expect(refusal).toMatch(/binding mismatch/i);
+    expect(refusal).toContain(UID_A);
+    expect(refusal).toContain(UID_B);
+    expect(refusal).toContain(PROFILE);
+    expect(refusal).toMatch(/rebind/);
+
+    // Nothing was queued into the partition the app abandoned.
+    const partition = await gateway.registry.open(UID_A, "upstream");
+    expect(await partition.mirrorState.counts()).toEqual({ mcp: 0, app: 0 });
+    expect(await partition.state.highWater()).toBe(0n);
+
+    // Reads keep working while the binding is sorted out.
+    expect(await resolveReadCloudState(ctx)).toBe(partition.mirrorState);
+  });
+
+  it("stays silent for a foreign profile when this profile has no binding of its own", async () => {
+    const gateway = new CloudGateway({ stateRoot: await root() });
+    const vendor = await startVendor();
+    const handle = await startCloudServer({ host: "127.0.0.1", port: 0, gateway, observeHost: "127.0.0.1" });
+    handles.push(handle);
+    const ctx = contextFor(gateway);
+
+    expect(await syncAs(handle, vendor, UID_B)).toBe(200);
+
+    expect(await status(ctx)).toMatchObject({ mode: "unbound", bindingMismatch: false });
+    // First-run setup and a mismatch must not share one message.
+    const refusal = await writeRefusal(ctx);
+    expect(refusal).toMatch(/no bootstrapped cloud partition/);
+    expect(refusal).not.toMatch(/binding mismatch/i);
+  });
+
+  it("refuses a local-mode profile the same way when it has synced against the vendor", async () => {
+    const gateway = new CloudGateway({ stateRoot: await root() });
+    await gateway.bindings.create(PROFILE, "local");
+    await gateway.bindings.bindUid(PROFILE, UID_A);
+    await (await gateway.registry.open(UID_A, "local")).setLifecycle("ready");
+    const vendor = await startVendor();
+    const handle = await startCloudServer({ host: "127.0.0.1", port: 0, gateway, observeHost: "127.0.0.1" });
+    handles.push(handle);
+    const ctx = contextFor(gateway);
+
+    // A local-mode profile that reached the vendor left the local authority —
+    // it is exactly the drift the local bootstrap script warns can't be undone.
+    await syncAs(handle, vendor, UID_B);
+
+    expect(await status(ctx)).toMatchObject({ mode: "local", bindingMismatch: true });
+    expect(await writeRefusal(ctx)).toMatch(/binding mismatch/i);
+    expect(await (await gateway.registry.open(UID_A, "local")).state.highWater()).toBe(0n);
+  });
+
+  it("keeps reporting the mismatch after a restart and from a process without the listener", async () => {
+    const { gateway, handle, vendor } = await boundProfile();
+    await syncAs(handle, vendor, UID_B);
+    await handles.splice(handles.indexOf(handle), 1)[0]!.stop();
+
+    // A fresh gateway over the same state root is what an attached MCP client
+    // (or the next server run) sees: no listener, no in-memory contacts.
+    const attached = new CloudGateway({ stateRoot: gateway.stateRoot });
+    const ctx = contextFor(attached, { endpointRole: "attached" });
+    expect(await status(ctx)).toMatchObject({
+      dataFileUID: UID_A,
+      bindingMismatch: true,
+      endpointRole: "attached",
+    });
+    expect(await writeRefusal(ctx)).toMatch(/binding mismatch/i);
+  });
+
+  it("clears once the binding names the UID the app is actually syncing", async () => {
+    const { gateway, handle, vendor } = await boundProfile();
+    const ctx = contextFor(gateway);
+    await syncAs(handle, vendor, UID_B);
+    expect(await status(ctx)).toMatchObject({ bindingMismatch: true });
+
+    await gateway.bindings.unbindUid(PROFILE);
+    await gateway.bindings.bindUid(PROFILE, UID_B);
+
+    const reported = await status(ctx);
+    expect(reported).toMatchObject({ dataFileUID: UID_B, bindingMismatch: false });
+    expect(reported.unboundSightings).toBeUndefined();
+  });
+
+  it("keeps refusing however long the app stays away, since nothing expires on a timer", async () => {
+    const { gateway, handle, vendor } = await boundProfile();
+    const ctx = contextFor(gateway);
+    await syncAs(handle, vendor, UID_B);
+
+    vi.spyOn(Date, "now").mockReturnValue(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    expect(await status(ctx)).toMatchObject({ bindingMismatch: true });
+    expect(await writeRefusal(ctx)).toMatch(/binding mismatch/i);
+  });
+
+  it("reports which process owns the endpoint", async () => {
+    const { gateway } = await boundProfile();
+    expect(await status(contextFor(gateway))).toMatchObject({ endpointRole: "owner" });
+    expect(await status(contextFor(gateway, { endpointRole: "attached" }))).toMatchObject({ endpointRole: "attached" });
+  });
+});
+
+describe("cloud_bootstrap preconditions are checked before the binding moves", () => {
+  it("explains the ownership constraint from an attached process and changes nothing", async () => {
+    const { gateway } = await boundProfile();
+    const ctx = contextFor(gateway, { endpointRole: "attached" });
+
+    await expect(cloudBootstrapTool.execute({ rebind: true }, ctx)).rejects.toThrow(/owns the endpoint/);
+    expect((await gateway.bindings.forProfile(PROFILE))?.dataFileUID).toBe(UID_A);
+  });
+
+  it("leaves the binding intact when a rebind has no vendor contact to bootstrap from", async () => {
+    const { gateway } = await boundProfile();
+    const ctx = contextFor(gateway);
+
+    await expect(cloudBootstrapTool.execute({ rebind: true }, ctx)).rejects.toThrow(/no vendor sync traffic/);
+    expect((await gateway.bindings.forProfile(PROFILE))?.dataFileUID).toBe(UID_A);
+  });
+
+  it("re-pulls the cloud file a profile is already bound to when asked to rebind", async () => {
+    const { gateway, handle, vendor } = await boundProfile(fullHistoryBase64());
+    const ctx = contextFor(gateway);
+    // The profile's own sync is what exposes the vendor contact.
+    expect(await syncAs(handle, vendor, UID_A)).toBe(200);
+
+    const result = await cloudBootstrapTool.execute({ rebind: true }, ctx);
+    expect(result.structuredContent).toMatchObject({ bootstrapped: true, version: "7", tasks: 1 });
+    expect((await gateway.bindings.forProfile(PROFILE))?.dataFileUID).toBe(UID_A);
+    expect(await (await gateway.registry.open(UID_A, "upstream")).lifecycle()).toBe("ready");
+  });
+});

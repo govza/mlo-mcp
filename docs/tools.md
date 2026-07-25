@@ -42,6 +42,12 @@ shapes. If they ever disagree on a shape, the catalog is right.
   task is editable after bootstrap; before it, mutation tools fail atomically
   with a pointer to the bootstrap procedure. Back up the `.ml` profile before
   the first bootstrap.
+- **A binding mismatch refuses writes.** If MLO starts syncing a different
+  `dataFileUID` than the profile is bound to, deltas would queue into a
+  partition the app never reads. Mutation tools refuse before queueing
+  anything, naming both UIDs and the remedy; reads are unaffected. Retrying
+  cannot help — see
+  [mcp-cloud.md](mcp-cloud.md#when-the-app-syncs-a-uid-the-server-does-not-manage).
 
 ## Read tools
 
@@ -57,7 +63,10 @@ shapes. If they ever disagree on a shape, the catalog is right.
   with usage counts.
 - **`cloud_status`** — binding (`dataFileUID`, mode), bootstrap lifecycle,
   cursor and per-origin delta counts, last local stamp, endpoint-mismatch
-  count, partition inventory, and mirror coverage/health.
+  count, partition inventory, mirror coverage/health, whether this process
+  owns the sync endpoint (`endpointRole`), and whether MLO is syncing a
+  different `dataFileUID` than the bound one (`bindingMismatch`,
+  `unboundSightings` — see [mcp-cloud.md](mcp-cloud.md#when-the-app-syncs-a-uid-the-server-does-not-manage)).
 
 ## Write tools
 

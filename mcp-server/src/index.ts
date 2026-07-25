@@ -8,16 +8,24 @@ import { MloStore } from "./store.js";
 import { log } from "./log.js";
 import { createMcpServer } from "./server.js";
 import { CloudGateway } from "./cloud/gateway.js";
-import { startOrAttachCloudServer, type CloudServerHandle } from "./cloud/server.js";
+import { startOrAttachCloudServer, type CloudServerHandle, type EndpointRole } from "./cloud/server.js";
 
 async function main(): Promise<void> {
   const config = loadConfig();
   const store = new MloStore(config);
   const cloud = new CloudGateway({ stateRoot: config.cloudStateRoot });
-  const ctx = { config, store, cloudState: cloud.defaultState(), cloud };
   // undefined = another session already serves the endpoint; this one shares
   // the delta log via CloudState's cross-process locking and needs no listener.
+  // The role is threaded into the tool context because vendor contacts live in
+  // the owner's memory only: bootstrap and upstream writes work there alone.
   const cloudServer = await startOrAttachCloudServer({ host: config.cloudHost, port: config.cloudPort, gateway: cloud });
+  const ctx = {
+    config,
+    store,
+    cloudState: cloud.defaultState(),
+    cloud,
+    endpointRole: (cloudServer ? "owner" : "attached") as EndpointRole,
+  };
 
   const server = createMcpServer(ctx);
   await server.connect(new StdioServerTransport());

@@ -5,6 +5,7 @@ import path from "node:path";
 import { CloudState } from "./state.js";
 import { BindingStore, type ProfileBinding } from "./binding.js";
 import { BootstrapController } from "./bootstrap.js";
+import { SightingStore, type UnboundSighting } from "./sightings.js";
 import { normalizeDataFileUid, PartitionRegistry, type PartitionHandle, type PartitionLifecycle } from "./partition.js";
 import type { UpstreamContext, VendorContact } from "./upstream.js";
 import { log } from "../log.js";
@@ -21,6 +22,13 @@ export type SoapAuthority =
 
 const SESSION_PIN_TTL_MS = 10 * 60 * 1000;
 
+/** The bound profile is syncing under a different identity: writes would be lost. */
+export interface BindingMismatch {
+  profilePath: string;
+  boundDataFileUID: string;
+  observedDataFileUIDs: string[];
+}
+
 /**
  * Routes every cloud-state access — SOAP, /v1, MCP tools, status — to the
  * per-`dataFileUID` partition it belongs to, under one private state root
@@ -36,6 +44,7 @@ export class CloudGateway {
   readonly registry: PartitionRegistry;
   readonly bindings: BindingStore;
   readonly bootstrap: BootstrapController;
+  readonly sightings: SightingStore;
   readonly stateRoot: string;
   private unboundState?: CloudState;
   private rootPrepared = false;
@@ -53,6 +62,7 @@ export class CloudGateway {
     this.registry = new PartitionRegistry(options.stateRoot);
     this.bindings = new BindingStore(options.stateRoot);
     this.bootstrap = new BootstrapController(options.stateRoot);
+    this.sightings = new SightingStore(options.stateRoot);
   }
 
   /** Where the sync observer writes its structural summaries. */
@@ -117,8 +127,42 @@ export class CloudGateway {
     // Unknown UID, nothing armed: stay out of the way — forward to the vendor
     // unchanged, touch nothing beyond the in-memory contact, and leave a
     // trace for the operator (upstream bootstrap pulls vendor history itself).
+    // The sighting is recorded because this decision is the only place that
+    // ever learns the identity MLO actually syncs; it changes no routing, and
+    // a failure to record it must never reach the app.
     log(`sync operation for unknown dataFileUID forwarded to the vendor without capture (no binding, no armed bootstrap)`);
+    await this.sightings.note(uid).catch(() => undefined);
     return { kind: "upstream", context: { capture: false } };
+  }
+
+  /**
+   * Recorded sightings whose UID is still unbound. A UID that has since been
+   * bound — by the bootstrap that repaired the fault — is no longer evidence
+   * of anything, so the signal clears itself without a second write path.
+   */
+  async unboundSightings(): Promise<UnboundSighting[]> {
+    const recorded = await this.sightings.all();
+    if (!recorded.length) return recorded;
+    const bound = new Set((await this.bindings.list()).map((binding) => binding.dataFileUID));
+    return recorded.filter((sighting) => !bound.has(sighting.dataFileUID));
+  }
+
+  /**
+   * The binding-mismatch fault: this profile IS bound, but the app has been
+   * seen syncing a different, unbound identity — so the bound partition is one
+   * MLO will never read and every write into it would vanish. A profile with
+   * no binding at all is first-run setup, not a mismatch, and stays silent;
+   * that is what preserves the "stay out of the way" guarantee for a profile
+   * this server was never asked to manage.
+   */
+  async bindingMismatch(profilePath: string): Promise<BindingMismatch | undefined> {
+    const binding = await this.bindings.forProfile(profilePath);
+    if (!binding?.dataFileUID) return undefined;
+    const observed = (await this.unboundSightings())
+      .filter((sighting) => sighting.dataFileUID !== binding.dataFileUID)
+      .map((sighting) => sighting.dataFileUID);
+    if (!observed.length) return undefined;
+    return { profilePath, boundDataFileUID: binding.dataFileUID, observedDataFileUIDs: observed };
   }
 
   noteVendorContact(rawUid: string, contact: VendorContact): void {

@@ -1,4 +1,6 @@
 import { z } from "zod";
+import type { BindingMismatch } from "../cloud/gateway.js";
+import type { UnboundSighting } from "../cloud/sightings.js";
 import { cursorToDecimalString } from "../cloud/cursor.js";
 import { localStampToString } from "../cloud/local-stamp.js";
 import { defineTool, resolveReadCloudState, textResult } from "./shared.js";
@@ -18,7 +20,29 @@ export const cloudStatusTool = defineTool({
     /** "unbound" before bootstrap, or the bound partition's mode. */
     mode: z.string(),
     lifecycle: z.string().optional().describe("uninitialized | bootstrap-required | ready (bound partitions only)"),
-    dataFileUID: z.string().optional(),
+    dataFileUID: z.string().optional().describe("The partition this profile is BOUND to (from the binding)"),
+    endpointRole: z
+      .string()
+      .optional()
+      .describe(
+        'owner = this process serves the endpoint | attached = another MCP client does. Vendor credentials ' +
+          "live in the owner's memory only, so cloud_bootstrap and upstream writes work only there",
+      ),
+    bindingMismatch: z
+      .boolean()
+      .describe(
+        "MLO is syncing a dataFileUID other than the bound one, so the bound partition is one the app never " +
+          "reads: writes are refused until the binding is repaired",
+      ),
+    unboundSightings: z
+      .array(z.object({
+        dataFileUID: z.string(),
+        firstSeen: z.string(),
+        lastSeen: z.string(),
+        count: z.number(),
+      }))
+      .optional()
+      .describe("dataFileUIDs seen syncing through the endpoint with no binding — what MLO actually presents"),
     /** Foreign-cursor rejections: the profile synced against a different server history. */
     endpointMismatches: z.number(),
     lastLocalStamp: z.string().optional(),
@@ -50,6 +74,8 @@ export const cloudStatusTool = defineTool({
     let mode = "unpartitioned"; // only in gateway-less unit-test contexts
     let lifecycle: string | undefined;
     let dataFileUID: string | undefined;
+    let sightings: UnboundSighting[] = [];
+    let mismatch: BindingMismatch | undefined;
     let partitions: { key: string; mode: string; lifecycle: string }[] | undefined;
     let mirror: { entries: { uploads: number; downloads: number }; lastVendorVersion: string; mirrorBlind: boolean; healthy: boolean } | undefined;
     if (gateway) {
@@ -81,6 +107,12 @@ export const cloudStatusTool = defineTool({
         mode: partition.mode,
         lifecycle: partition.lifecycle,
       }));
+      // Reported beside the bound UID, never instead of it: the binding is
+      // what the server acts on, the sighting is what the app actually syncs.
+      [sightings, mismatch] = await Promise.all([
+        gateway.unboundSightings(),
+        gateway.bindingMismatch(ctx.config.dataFile),
+      ]);
     }
     const result = {
       host: ctx.config.cloudHost,
@@ -91,6 +123,9 @@ export const cloudStatusTool = defineTool({
       mode,
       ...(lifecycle ? { lifecycle } : {}),
       ...(dataFileUID ? { dataFileUID } : {}),
+      ...(ctx.endpointRole ? { endpointRole: ctx.endpointRole } : {}),
+      bindingMismatch: mismatch !== undefined,
+      ...(sightings.length ? { unboundSightings: sightings } : {}),
       endpointMismatches: mismatches,
       ...(lastStamp !== undefined ? { lastLocalStamp: localStampToString(lastStamp) } : {}),
       ...(gateway?.stateRoot ? { stateRoot: gateway.stateRoot } : {}),
@@ -100,12 +135,17 @@ export const cloudStatusTool = defineTool({
     const bindingNote = mode === "unbound"
       ? "no partition bound — run cloud_bootstrap"
       : `${mode} partition, ${lifecycle ?? "n/a"}`;
-    const mismatchNote = mismatches
+    const cursorMismatchNote = mismatches
       ? `; ${mismatches} endpoint mismatch(es) — the profile synced against a different server history`
+      : "";
+    const bindingMismatchNote = mismatch
+      ? `; BINDING MISMATCH: bound to ${mismatch.boundDataFileUID} but MLO is syncing ` +
+        `${mismatch.observedDataFileUIDs.join(", ")} — writes are refused until the binding is repaired ` +
+        "(cloud_bootstrap { rebind: true }, from the endpoint owner)"
       : "";
     return textResult(
       `Cloud endpoint ${result.host}:${result.port}; ${bindingNote}; cursor ${result.cursor}; ` +
-        `${result.pendingForApp} pending for app${mismatchNote}.`,
+        `${result.pendingForApp} pending for app${cursorMismatchNote}${bindingMismatchNote}.`,
       result,
     );
   },

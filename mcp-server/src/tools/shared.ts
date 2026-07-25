@@ -5,7 +5,8 @@ import type { MloConfig, TaskNode } from "../types.js";
 import type { MloStore } from "../store.js";
 import { log } from "../log.js";
 import type { CloudState } from "../cloud/state.js";
-import type { CloudGateway } from "../cloud/gateway.js";
+import type { BindingMismatch, CloudGateway } from "../cloud/gateway.js";
+import type { EndpointRole } from "../cloud/server.js";
 import { cursorToDecimalString } from "../cloud/cursor.js";
 import { UpstreamWriteSession } from "../cloud/upstream.js";
 
@@ -16,6 +17,12 @@ export interface ToolContext {
   cloudState: CloudState;
   /** Partition-aware routing; absent only in old test fixtures. */
   cloud?: CloudGateway;
+  /**
+   * Whether this process serves the loopback endpoint or is attached to one
+   * owned by another MCP client — the difference decides where bootstrap and
+   * upstream writes can run. Absent only in old test fixtures.
+   */
+  endpointRole?: EndpointRole;
 }
 
 /**
@@ -51,10 +58,29 @@ function localChannel(state: CloudState): CloudWriteChannel {
 }
 
 /**
+ * Phrased once in the shared write path rather than per tool, so current and
+ * future write tools inherit it: a binding the app no longer syncs accepts
+ * deltas into a partition nothing will ever read, and reporting queued success
+ * for a change that can never arrive is worse than failing.
+ */
+function bindingMismatchRefusal(mismatch: BindingMismatch): Error {
+  const observed = mismatch.observedDataFileUIDs.join(", ");
+  return new Error(
+    `binding mismatch: profile ${mismatch.profilePath} is bound to dataFileUID ` +
+      `${mismatch.boundDataFileUID}, but MLO is syncing ${observed} — a delta queued into the bound ` +
+      "partition could never reach the app, so nothing was queued. Either MLO has a different profile " +
+      "open (sync the intended one and retry), or this profile's cloud identity changed (Re-synchronize, " +
+      `a restored .ml file, a new cloud file): back up the .ml file, then run cloud_bootstrap { rebind: true } ` +
+      "from the MCP client that owns the endpoint to bind the observed UID. Rebinding changes which sync " +
+      "history the profile follows and cannot be undone.",
+  );
+}
+
+/**
  * Resolve the write channel, failing fast — before anything is queued —
- * unless the profile's partition is bootstrapped and, for upstream mode, the
- * endpoint has observed the profile's vendor sync traffic since server start
- * (contacts are held in memory only).
+ * unless the profile's partition is bootstrapped, still the one the app
+ * syncs, and, for upstream mode, the endpoint has observed the profile's
+ * vendor sync traffic since server start (contacts are held in memory only).
  */
 export async function requireWriteChannel(ctx: ToolContext): Promise<CloudWriteChannel> {
   if (!ctx.cloud) return localChannel(ctx.cloudState);
@@ -66,6 +92,10 @@ export async function requireWriteChannel(ctx: ToolContext): Promise<CloudWriteC
         "as a cloud client) — an ordinary sync alone will not help",
     );
   }
+  // Before the lifecycle check: a partition the app abandoned is a different
+  // fault from one that was never bootstrapped, and says so.
+  const mismatch = await ctx.cloud.bindingMismatch(ctx.config.dataFile);
+  if (mismatch) throw bindingMismatchRefusal(mismatch);
   if (bound.lifecycle !== "ready") {
     throw new Error(
       `cloud partition is not bootstrapped (${bound.lifecycle}); run cloud_bootstrap — an ordinary sync will not help`,

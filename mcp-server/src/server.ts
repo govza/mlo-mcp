@@ -34,6 +34,13 @@ for upstream mode run one ordinary MLO sync through the proxy, then call cloud_b
 it pulls the vendor's complete history automatically and enables reads and writes for every
 existing task. cloud_status shows binding, lifecycle, and mirror coverage.
 
+### Binding mismatch (writes refused, nothing queued)
+If a write fails with "binding mismatch", MLO is syncing a different dataFileUID than the
+one this profile is bound to, so the queue it would land in is one the app never reads.
+Retrying cannot help and the failure is not partial. Report the two UIDs the message names
+and stop; repair is the user's call (cloud_bootstrap { rebind: true }, run from the MCP
+client that owns the endpoint — cloud_status reports \`endpointRole\` and \`bindingMismatch\`).
+
 ### Field support and refusals (fail fast, nothing queued)
 - add_task/update_task support Folder, Project, Starred, visibility/sequential
   booleans, existing Flag assignment, and existing contexts (Places).

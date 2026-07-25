@@ -11,6 +11,10 @@ Ubiquitous language for this repo. Terms are defined here in one or two lines; t
 - **Path id** — positional id like `"1.2.3"`; shifts whenever the tree changes, valid only for immediate follow-up calls. Never stored.
 - **GUID / UID** — a task's stable identity, resolved by structural alignment of a fresh export against the bootstrapped cloud tree ([docs/tools.md](docs/tools.md) → Shared semantics).
 - **dataFileUID** — a profile's sync identity; keys all cloud-side state.
+- **Binding** — the persisted profile → `dataFileUID` pointer, attached only by an explicit bootstrap.
+- **Unbound sighting** — a `dataFileUID` seen syncing through the endpoint with no binding; recorded because the authority decision is the only place that learns the identity MLO actually syncs.
+- **Binding mismatch** — a bound profile syncing under a different identity: writes would queue into a partition the app never reads, so they are refused ([ADR-0002](docs/adr/0002-report-binding-mismatch-never-repair-it.md)).
+- **Endpoint role** — `owner` (this process serves the loopback listener) vs `attached` (another MCP client does). Vendor contacts live in the owner's memory only.
 
 ## The sync data plane
 

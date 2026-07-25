@@ -5320,8 +5320,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path11) {
-      let input = path11;
+    function removeDotSegments(path12) {
+      let input = path12;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -5573,8 +5573,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path11, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path11 && path11 !== "/" ? path11 : void 0;
+        const [path12, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path12 && path12 !== "/" ? path12 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -8967,12 +8967,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs10, exportName) {
+    function addFormats(ajv, list, fs11, exportName) {
       var _a2;
       var _b2;
       (_a2 = (_b2 = ajv.opts.code).formats) !== null && _a2 !== void 0 ? _a2 : _b2.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs10[f]);
+        ajv.addFormat(f, fs11[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -8981,7 +8981,7 @@ var require_dist = __commonJS({
 });
 
 // src/index.ts
-import { promises as fs9 } from "node:fs";
+import { promises as fs10 } from "node:fs";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
@@ -9182,10 +9182,10 @@ function assignProp(target, prop, value) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path11) {
-  if (!path11)
+function getElementAtPath(obj, path12) {
+  if (!path12)
     return obj;
-  return path11.reduce((acc, key) => acc?.[key], obj);
+  return path12.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -9505,11 +9505,11 @@ function aborted(x2, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path11, issues) {
+function prefixIssues(path12, issues) {
   return issues.map((iss) => {
     var _a2;
     (_a2 = iss).path ?? (_a2.path = []);
-    iss.path.unshift(path11);
+    iss.path.unshift(path12);
     return iss;
   });
 }
@@ -15106,7 +15106,7 @@ var StdioServerTransport = class {
 };
 
 // src/config.ts
-import path8 from "node:path";
+import path9 from "node:path";
 import os2 from "node:os";
 import { existsSync } from "node:fs";
 import { execFile as execFile2, spawnSync } from "node:child_process";
@@ -16471,9 +16471,9 @@ function unpackEnvelope(bytes) {
 
 // src/cloud/gateway.ts
 import { execFile } from "node:child_process";
-import { promises as fs6 } from "node:fs";
+import { promises as fs7 } from "node:fs";
 import os from "node:os";
-import path6 from "node:path";
+import path7 from "node:path";
 
 // src/cloud/state.ts
 import { promises as fs } from "node:fs";
@@ -17236,11 +17236,64 @@ var BootstrapController = class {
   }
 };
 
+// src/cloud/sightings.ts
+import { promises as fs6 } from "node:fs";
+import path6 from "node:path";
+
 // src/log.ts
 function log(message) {
   process.stderr.write(`[mlo-mcp] ${message}
 `);
 }
+
+// src/cloud/sightings.ts
+var MAX_SIGHTINGS = 8;
+var SightingStore = class {
+  constructor(stateRoot) {
+    this.stateRoot = stateRoot;
+  }
+  stateRoot;
+  writes = Promise.resolve();
+  file() {
+    return path6.join(this.stateRoot, "unbound-sightings.json");
+  }
+  /** Every recorded sighting, most recently seen first. */
+  async all() {
+    try {
+      const parsed = JSON.parse(await fs6.readFile(this.file(), "utf8"));
+      return (parsed.sightings ?? []).filter((sighting) => typeof sighting?.dataFileUID === "string");
+    } catch (error2) {
+      if (error2.code !== "ENOENT") {
+        log(`could not read the unbound-sighting marker (treated as empty): ${error2 instanceof Error ? error2.message : String(error2)}`);
+      }
+      return [];
+    }
+  }
+  /** Record one sync by an unbound profile. `uid` must already be normalized. */
+  async note(uid) {
+    const run = async () => {
+      const sightings = await this.all();
+      const now = (/* @__PURE__ */ new Date()).toISOString();
+      const existing = sightings.find((sighting) => sighting.dataFileUID === uid);
+      if (existing) {
+        existing.lastSeen = now;
+        existing.count += 1;
+      } else {
+        sightings.push({ dataFileUID: uid, firstSeen: now, lastSeen: now, count: 1 });
+      }
+      sightings.sort((a, b) => Date.parse(b.lastSeen) - Date.parse(a.lastSeen));
+      const value = { sightings: sightings.slice(0, MAX_SIGHTINGS), at: now };
+      const target = this.file();
+      const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
+      await fs6.writeFile(temporary, `${JSON.stringify(value, null, 2)}
+`);
+      await fs6.rename(temporary, target);
+    };
+    const next = this.writes.then(run, run);
+    this.writes = next.catch(() => void 0);
+    await next;
+  }
+};
 
 // src/cloud/gateway.ts
 var SESSION_PIN_TTL_MS = 10 * 60 * 1e3;
@@ -17248,6 +17301,7 @@ var CloudGateway = class {
   registry;
   bindings;
   bootstrap;
+  sightings;
   stateRoot;
   unboundState;
   rootPrepared = false;
@@ -17264,6 +17318,7 @@ var CloudGateway = class {
     this.registry = new PartitionRegistry(options.stateRoot);
     this.bindings = new BindingStore(options.stateRoot);
     this.bootstrap = new BootstrapController(options.stateRoot);
+    this.sightings = new SightingStore(options.stateRoot);
   }
   /** Where the sync observer writes its structural summaries. */
   observerDir() {
@@ -17275,7 +17330,7 @@ var CloudGateway = class {
    * before a profile is bound. Never routed to by SOAP.
    */
   defaultState() {
-    this.unboundState ??= new CloudState(path6.join(this.stateRoot, "unbound"));
+    this.unboundState ??= new CloudState(path7.join(this.stateRoot, "unbound"));
     return this.unboundState;
   }
   /**
@@ -17322,7 +17377,34 @@ var CloudGateway = class {
     const window2 = await this.bootstrap.current();
     if (window2) return { kind: "local" };
     log(`sync operation for unknown dataFileUID forwarded to the vendor without capture (no binding, no armed bootstrap)`);
+    await this.sightings.note(uid).catch(() => void 0);
     return { kind: "upstream", context: { capture: false } };
+  }
+  /**
+   * Recorded sightings whose UID is still unbound. A UID that has since been
+   * bound — by the bootstrap that repaired the fault — is no longer evidence
+   * of anything, so the signal clears itself without a second write path.
+   */
+  async unboundSightings() {
+    const recorded = await this.sightings.all();
+    if (!recorded.length) return recorded;
+    const bound = new Set((await this.bindings.list()).map((binding) => binding.dataFileUID));
+    return recorded.filter((sighting) => !bound.has(sighting.dataFileUID));
+  }
+  /**
+   * The binding-mismatch fault: this profile IS bound, but the app has been
+   * seen syncing a different, unbound identity — so the bound partition is one
+   * MLO will never read and every write into it would vanish. A profile with
+   * no binding at all is first-run setup, not a mismatch, and stays silent;
+   * that is what preserves the "stay out of the way" guarantee for a profile
+   * this server was never asked to manage.
+   */
+  async bindingMismatch(profilePath) {
+    const binding = await this.bindings.forProfile(profilePath);
+    if (!binding?.dataFileUID) return void 0;
+    const observed = (await this.unboundSightings()).filter((sighting) => sighting.dataFileUID !== binding.dataFileUID).map((sighting) => sighting.dataFileUID);
+    if (!observed.length) return void 0;
+    return { profilePath, boundDataFileUID: binding.dataFileUID, observedDataFileUIDs: observed };
   }
   noteVendorContact(rawUid, contact) {
     try {
@@ -17344,14 +17426,14 @@ var CloudGateway = class {
   /** A CONNECT tunnel to the vendor sync host blinds the mirror; record it. */
   async noteVendorConnect() {
     await this.prepareRoot();
-    const target = path6.join(this.stateRoot, "mirror-blind.json");
-    await fs6.writeFile(target, `${JSON.stringify({ mirrorBlind: true, at: (/* @__PURE__ */ new Date()).toISOString() }, null, 2)}
+    const target = path7.join(this.stateRoot, "mirror-blind.json");
+    await fs7.writeFile(target, `${JSON.stringify({ mirrorBlind: true, at: (/* @__PURE__ */ new Date()).toISOString() }, null, 2)}
 `);
     log(`HTTPS CONNECT to the vendor sync host: sync is TLS-tunneled and the upstream mirror is blind \u2014 uncheck "Use secure connection" in MLO's cloud login`);
   }
   async mirrorBlind() {
     try {
-      await fs6.stat(path6.join(this.stateRoot, "mirror-blind.json"));
+      await fs7.stat(path7.join(this.stateRoot, "mirror-blind.json"));
       return true;
     } catch {
       return false;
@@ -17359,13 +17441,13 @@ var CloudGateway = class {
   }
   async noteMirrorUnhealthy() {
     await this.prepareRoot();
-    const target = path6.join(this.stateRoot, "mirror-health.json");
-    await fs6.writeFile(target, `${JSON.stringify({ healthy: false, at: (/* @__PURE__ */ new Date()).toISOString() }, null, 2)}
+    const target = path7.join(this.stateRoot, "mirror-health.json");
+    await fs7.writeFile(target, `${JSON.stringify({ healthy: false, at: (/* @__PURE__ */ new Date()).toISOString() }, null, 2)}
 `);
   }
   async mirrorHealthy() {
     try {
-      await fs6.stat(path6.join(this.stateRoot, "mirror-health.json"));
+      await fs7.stat(path7.join(this.stateRoot, "mirror-health.json"));
       return false;
     } catch {
       return true;
@@ -17400,11 +17482,11 @@ var CloudGateway = class {
     this.rootPrepared = true;
     let created = false;
     try {
-      await fs6.mkdir(this.stateRoot, { recursive: false });
+      await fs7.mkdir(this.stateRoot, { recursive: false });
       created = true;
     } catch (error2) {
       if (error2.code !== "EEXIST") {
-        await fs6.mkdir(this.stateRoot, { recursive: true });
+        await fs7.mkdir(this.stateRoot, { recursive: true });
         created = true;
       }
     }
@@ -17422,8 +17504,8 @@ var CloudGateway = class {
 };
 
 // src/cloud/sync-observer.ts
-import { promises as fs7 } from "node:fs";
-import path7 from "node:path";
+import { promises as fs8 } from "node:fs";
+import path8 from "node:path";
 import zlib from "node:zlib";
 var VENDOR_SYNC_HOST = "sync.mylifeorganized.net";
 var SUMMARY_FILE = "soap-summary.jsonl";
@@ -17552,7 +17634,7 @@ var SyncObserver = class {
   append(record2) {
     const line = `${JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), ...record2 })}
 `;
-    void fs7.mkdir(this.stateDir, { recursive: true }).then(() => fs7.appendFile(path7.join(this.stateDir, SUMMARY_FILE), line)).catch((error2) => log(`sync observer write failed: ${error2 instanceof Error ? error2.message : String(error2)}`));
+    void fs8.mkdir(this.stateDir, { recursive: true }).then(() => fs8.appendFile(path8.join(this.stateDir, SUMMARY_FILE), line)).catch((error2) => log(`sync observer write failed: ${error2 instanceof Error ? error2.message : String(error2)}`));
   }
 };
 
@@ -18511,8 +18593,8 @@ function resolveDataFile() {
 }
 function resolveStateRoot() {
   if (process.env.MLO_CLOUD_STATE_ROOT) return process.env.MLO_CLOUD_STATE_ROOT;
-  if (process.env.LOCALAPPDATA) return path8.join(process.env.LOCALAPPDATA, "mlo-mcp", "cloud");
-  return path8.join(os2.homedir(), ".mlo-mcp", "cloud");
+  if (process.env.LOCALAPPDATA) return path9.join(process.env.LOCALAPPDATA, "mlo-mcp", "cloud");
+  return path9.join(os2.homedir(), ".mlo-mcp", "cloud");
 }
 function loadConfig() {
   const { dataFile, autoDetected } = resolveDataFile();
@@ -18524,7 +18606,7 @@ function loadConfig() {
     mloExePath: process.env.MLO_EXE_PATH ?? DEFAULT_EXE,
     dataFile,
     dataFileAutoDetected: autoDetected,
-    exportDir: process.env.MLO_EXPORT_DIR ?? path8.join(os2.tmpdir(), "mlo-mcp"),
+    exportDir: process.env.MLO_EXPORT_DIR ?? path9.join(os2.tmpdir(), "mlo-mcp"),
     cacheStaleMs: Number(process.env.MLO_CACHE_STALE_MS) || 3e4,
     // Only needed when the capture inbox is NOT MLO's own <Inbox> node (e.g. a
     // hand-made "Входящие" folder). MLO itself hardcodes the caption "<Inbox>"
@@ -18538,8 +18620,8 @@ function loadConfig() {
 
 // src/mlo-cli.ts
 import { spawn } from "node:child_process";
-import { promises as fs8 } from "node:fs";
-import path9 from "node:path";
+import { promises as fs9 } from "node:fs";
+import path10 from "node:path";
 var EXIT_MESSAGES = {
   1: "invalid command-line argument",
   2: "target file already exists (mlo.exe -saveXML/-saveML never overwrite)",
@@ -18570,13 +18652,13 @@ async function withFileLock(config2, fn) {
   const deadline = Date.now() + 9e4;
   for (; ; ) {
     try {
-      await fs8.mkdir(lockDir);
+      await fs9.mkdir(lockDir);
       break;
     } catch {
       try {
-        const st = await fs8.stat(lockDir);
+        const st = await fs9.stat(lockDir);
         if (Date.now() - st.mtimeMs > 18e4) {
-          await fs8.rm(lockDir, { recursive: true, force: true });
+          await fs9.rm(lockDir, { recursive: true, force: true });
           continue;
         }
       } catch {
@@ -18595,7 +18677,7 @@ async function withFileLock(config2, fn) {
     return await fn();
   } finally {
     fileLockHeld = false;
-    await fs8.rm(lockDir, { recursive: true, force: true });
+    await fs9.rm(lockDir, { recursive: true, force: true });
   }
 }
 function withMloFileLock(config2, fn) {
@@ -18643,7 +18725,7 @@ function execMlo(config2, args, timeoutMs) {
 var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function ensureDataFile(config2) {
   try {
-    await fs8.access(config2.dataFile);
+    await fs9.access(config2.dataFile);
   } catch {
     throw new MloError(`MLO data file not found at "${config2.dataFile}"`);
   }
@@ -18652,17 +18734,17 @@ var exportCounter = 0;
 function exportXml(config2, taskGuid) {
   return withMloFileLock(config2, async () => {
     await ensureDataFile(config2);
-    await fs8.mkdir(config2.exportDir, { recursive: true });
-    const target = path9.join(config2.exportDir, `export-${process.pid}-${++exportCounter}.xml`);
-    await fs8.rm(target, { force: true });
+    await fs9.mkdir(config2.exportDir, { recursive: true });
+    const target = path10.join(config2.exportDir, `export-${process.pid}-${++exportCounter}.xml`);
+    await fs9.rm(target, { force: true });
     const args = [config2.dataFile];
     if (taskGuid) args.push(`-task=${taskGuid}`);
     args.push(`-saveXML=${target}`);
     try {
       await execMlo(config2, args, 3e4);
-      return await fs8.readFile(target, "utf8");
+      return await fs9.readFile(target, "utf8");
     } finally {
-      await fs8.rm(target, { force: true });
+      await fs9.rm(target, { force: true });
     }
   });
 }
@@ -18673,7 +18755,7 @@ function quickSync(config2) {
   });
 }
 function readDataFile(config2) {
-  return fs8.readFile(config2.dataFile);
+  return fs9.readFile(config2.dataFile);
 }
 
 // src/xml.ts
@@ -18729,7 +18811,7 @@ function num(v) {
   return v === void 0 || v === "" ? void 0 : Number(v);
 }
 function toModel(raw, id, parentPath, depth) {
-  const path11 = [...parentPath, raw["@_Caption"]];
+  const path12 = [...parentPath, raw["@_Caption"]];
   const node = {
     id,
     Guid: raw.IDD,
@@ -18755,10 +18837,10 @@ function toModel(raw, id, parentPath, depth) {
     CompleteSubTasksInOrder: delphiBool(raw.CompleteSubTasksInOrder),
     DependsOn: raw.Dependency?.UID ?? [],
     Children: [],
-    Path: path11,
+    Path: path12,
     Depth: depth
   };
-  node.Children = (raw.TaskNode ?? []).map((c, i2) => toModel(c, `${id}.${i2 + 1}`, path11, depth + 1));
+  node.Children = (raw.TaskNode ?? []).map((c, i2) => toModel(c, `${id}.${i2 + 1}`, path12, depth + 1));
   return node;
 }
 function buildTaskTree(doc) {
@@ -19434,8 +19516,8 @@ function getErrorMap() {
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path11, errorMaps, issueData } = params;
-  const fullPath = [...path11, ...issueData.path || []];
+  const { data, path: path12, errorMaps, issueData } = params;
+  const fullPath = [...path12, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -19551,11 +19633,11 @@ var errorUtil;
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path11, key) {
+  constructor(parent, value, path12, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path11;
+    this._path = path12;
     this._key = key;
   }
   get path() {
@@ -27060,6 +27142,12 @@ function localChannel(state) {
     commit: async (bytes) => cursorToDecimalString(await state.append("mcp", bytes))
   };
 }
+function bindingMismatchRefusal(mismatch) {
+  const observed = mismatch.observedDataFileUIDs.join(", ");
+  return new Error(
+    `binding mismatch: profile ${mismatch.profilePath} is bound to dataFileUID ${mismatch.boundDataFileUID}, but MLO is syncing ${observed} \u2014 a delta queued into the bound partition could never reach the app, so nothing was queued. Either MLO has a different profile open (sync the intended one and retry), or this profile's cloud identity changed (Re-synchronize, a restored .ml file, a new cloud file): back up the .ml file, then run cloud_bootstrap { rebind: true } from the MCP client that owns the endpoint to bind the observed UID. Rebinding changes which sync history the profile follows and cannot be undone.`
+  );
+}
 async function requireWriteChannel(ctx) {
   if (!ctx.cloud) return localChannel(ctx.cloudState);
   const bound = await ctx.cloud.boundPartition(ctx.config.dataFile);
@@ -27068,6 +27156,8 @@ async function requireWriteChannel(ctx) {
       "this profile has no bootstrapped cloud partition; run cloud_bootstrap (for the default upstream mode, run one sync in MLO through this proxy first so the endpoint can act as a cloud client) \u2014 an ordinary sync alone will not help"
     );
   }
+  const mismatch = await ctx.cloud.bindingMismatch(ctx.config.dataFile);
+  if (mismatch) throw bindingMismatchRefusal(mismatch);
   if (bound.lifecycle !== "ready") {
     throw new Error(
       `cloud partition is not bootstrapped (${bound.lifecycle}); run cloud_bootstrap \u2014 an ordinary sync will not help`
@@ -27231,7 +27321,7 @@ var searchTasksTool = defineTool({
 });
 
 // src/cloud/log-projection.ts
-import path10 from "node:path";
+import path11 from "node:path";
 function rowValue(known, column) {
   const index = known.header.indexOf(column);
   return index < 0 ? "" : known.row[index] ?? "";
@@ -27265,7 +27355,7 @@ function latestFullRows(documents) {
   return rows;
 }
 async function knownCloudProjection(state) {
-  const snapshot = await new SnapshotStore(path10.join(state.stateDir, "snapshot")).load();
+  const snapshot = await new SnapshotStore(path11.join(state.stateDir, "snapshot")).load();
   const entries = await state.entriesAfter(snapshot?.version ?? ZERO_CURSOR);
   const merged = mergeDeltas([
     ...snapshot ? [snapshot.document] : [],
@@ -28185,7 +28275,19 @@ var cloudStatusTool = defineTool({
     /** "unbound" before bootstrap, or the bound partition's mode. */
     mode: external_exports.string(),
     lifecycle: external_exports.string().optional().describe("uninitialized | bootstrap-required | ready (bound partitions only)"),
-    dataFileUID: external_exports.string().optional(),
+    dataFileUID: external_exports.string().optional().describe("The partition this profile is BOUND to (from the binding)"),
+    endpointRole: external_exports.string().optional().describe(
+      "owner = this process serves the endpoint | attached = another MCP client does. Vendor credentials live in the owner's memory only, so cloud_bootstrap and upstream writes work only there"
+    ),
+    bindingMismatch: external_exports.boolean().describe(
+      "MLO is syncing a dataFileUID other than the bound one, so the bound partition is one the app never reads: writes are refused until the binding is repaired"
+    ),
+    unboundSightings: external_exports.array(external_exports.object({
+      dataFileUID: external_exports.string(),
+      firstSeen: external_exports.string(),
+      lastSeen: external_exports.string(),
+      count: external_exports.number()
+    })).optional().describe("dataFileUIDs seen syncing through the endpoint with no binding \u2014 what MLO actually presents"),
     /** Foreign-cursor rejections: the profile synced against a different server history. */
     endpointMismatches: external_exports.number(),
     lastLocalStamp: external_exports.string().optional(),
@@ -28212,6 +28314,8 @@ var cloudStatusTool = defineTool({
     let mode = "unpartitioned";
     let lifecycle;
     let dataFileUID;
+    let sightings = [];
+    let mismatch;
     let partitions;
     let mirror;
     if (gateway) {
@@ -28243,6 +28347,10 @@ var cloudStatusTool = defineTool({
         mode: partition.mode,
         lifecycle: partition.lifecycle
       }));
+      [sightings, mismatch] = await Promise.all([
+        gateway.unboundSightings(),
+        gateway.bindingMismatch(ctx.config.dataFile)
+      ]);
     }
     const result = {
       host: ctx.config.cloudHost,
@@ -28253,6 +28361,9 @@ var cloudStatusTool = defineTool({
       mode,
       ...lifecycle ? { lifecycle } : {},
       ...dataFileUID ? { dataFileUID } : {},
+      ...ctx.endpointRole ? { endpointRole: ctx.endpointRole } : {},
+      bindingMismatch: mismatch !== void 0,
+      ...sightings.length ? { unboundSightings: sightings } : {},
       endpointMismatches: mismatches,
       ...lastStamp !== void 0 ? { lastLocalStamp: localStampToString(lastStamp) } : {},
       ...gateway?.stateRoot ? { stateRoot: gateway.stateRoot } : {},
@@ -28260,19 +28371,40 @@ var cloudStatusTool = defineTool({
       ...mirror ? { mirror } : {}
     };
     const bindingNote = mode === "unbound" ? "no partition bound \u2014 run cloud_bootstrap" : `${mode} partition, ${lifecycle ?? "n/a"}`;
-    const mismatchNote = mismatches ? `; ${mismatches} endpoint mismatch(es) \u2014 the profile synced against a different server history` : "";
+    const cursorMismatchNote = mismatches ? `; ${mismatches} endpoint mismatch(es) \u2014 the profile synced against a different server history` : "";
+    const bindingMismatchNote = mismatch ? `; BINDING MISMATCH: bound to ${mismatch.boundDataFileUID} but MLO is syncing ${mismatch.observedDataFileUIDs.join(", ")} \u2014 writes are refused until the binding is repaired (cloud_bootstrap { rebind: true }, from the endpoint owner)` : "";
     return textResult(
-      `Cloud endpoint ${result.host}:${result.port}; ${bindingNote}; cursor ${result.cursor}; ${result.pendingForApp} pending for app${mismatchNote}.`,
+      `Cloud endpoint ${result.host}:${result.port}; ${bindingNote}; cursor ${result.cursor}; ${result.pendingForApp} pending for app${cursorMismatchNote}${bindingMismatchNote}.`,
       result
     );
   }
 });
 
 // src/tools/cloud-bootstrap.ts
+async function bootstrapCandidates(gateway, ownUid) {
+  const candidates = [];
+  for (const candidate of gateway.vendorContactUids()) {
+    if (candidate === ownUid || !await gateway.bindings.forUid(candidate)) candidates.push(candidate);
+  }
+  return candidates;
+}
+function soleCandidate(candidates) {
+  if (candidates.length === 0) {
+    throw new Error(
+      'no vendor sync traffic observed since server start \u2014 run one ordinary sync in MLO through this proxy ("Use secure connection" unchecked), then retry cloud_bootstrap'
+    );
+  }
+  if (candidates.length > 1) {
+    throw new Error(
+      "multiple candidate dataFileUIDs have synced through this proxy \u2014 sync only the target profile, restart the server, and retry so exactly one candidate exists"
+    );
+  }
+  return candidates[0];
+}
 var cloudBootstrapTool = defineTool({
   name: "cloud_bootstrap",
   title: "Bootstrap the profile's cloud partition",
-  description: "One-time setup for cloud reads and writes: after one ordinary MLO sync through the proxy, pulls the vendor cloud's full history automatically and binds this profile. Back up the .ml profile before the first bootstrap.",
+  description: "One-time setup for cloud reads and writes: after one ordinary MLO sync through the proxy, pulls the vendor cloud's full history automatically and binds this profile. Back up the .ml profile before the first bootstrap. Must run from the MCP client that owns the sync endpoint (cloud_status reports endpointRole) \u2014 the credentials it needs are held in that process's memory only.",
   inputSchema: {
     rebind: external_exports.boolean().optional().describe(
       "Explicitly drop the current partition binding and bootstrap into a fresh one. The old partition directory is preserved as evidence."
@@ -28288,34 +28420,34 @@ var cloudBootstrapTool = defineTool({
   async execute({ rebind }, ctx) {
     const gateway = ctx.cloud;
     if (!gateway) throw new Error("no cloud gateway is attached to this server context");
+    if (ctx.endpointRole === "attached") {
+      throw new Error(
+        "this MCP client is attached to a cloud endpoint owned by another process, and the vendor credentials a bootstrap needs are held in that process's memory only \u2014 nothing was changed. Run cloud_bootstrap from the MCP client that owns the endpoint (cloud_status reports endpointRole), or close that client and retry here after one ordinary MLO sync"
+      );
+    }
     await gateway.ensureRoot();
-    const binding = rebind ? await gateway.bindings.replace(ctx.config.dataFile, "upstream") : await gateway.bindings.create(ctx.config.dataFile, "upstream");
-    if (binding.dataFileUID) {
-      const partition = await gateway.registry.open(binding.dataFileUID, binding.mode);
+    const existing = await gateway.bindings.forProfile(ctx.config.dataFile);
+    if (!rebind && existing && existing.mode !== "upstream") {
+      throw new Error(
+        `this profile is bound in "${existing.mode}" mode; switching sync authority requires an explicit cloud_bootstrap { rebind: true } into a fresh partition`
+      );
+    }
+    if (!rebind && existing?.dataFileUID) {
+      const partition = await gateway.registry.open(existing.dataFileUID, existing.mode);
       if (await partition.lifecycle() === "ready") {
         throw new Error(
           "this profile is already bootstrapped and ready; pass { rebind: true } to discard the binding and bootstrap into a fresh partition (the old partition stays on disk as evidence)"
         );
       }
     }
-    let uid = binding.dataFileUID;
-    if (!uid) {
-      const candidates = [];
-      for (const candidate of gateway.vendorContactUids()) {
-        if (!await gateway.bindings.forUid(candidate)) candidates.push(candidate);
-      }
-      if (candidates.length === 0) {
-        throw new Error(
-          'no vendor sync traffic observed since server start \u2014 run one ordinary sync in MLO through this proxy ("Use secure connection" unchecked), then retry cloud_bootstrap'
-        );
-      }
-      if (candidates.length > 1) {
-        throw new Error(
-          "multiple unbound dataFileUIDs have synced through this proxy \u2014 sync only the target profile, restart the server, and retry so exactly one candidate exists"
-        );
-      }
-      uid = candidates[0];
+    const uid = !rebind && existing?.dataFileUID ? existing.dataFileUID : soleCandidate(await bootstrapCandidates(gateway, existing?.dataFileUID));
+    if (!gateway.vendorContact(uid)) {
+      throw new Error(
+        `no vendor sync traffic observed for dataFileUID ${uid} since server start \u2014 run one ordinary sync in MLO through this proxy ("Use secure connection" unchecked), then retry cloud_bootstrap`
+      );
     }
+    if (rebind) await gateway.bindings.replace(ctx.config.dataFile, "upstream");
+    else await gateway.bindings.create(ctx.config.dataFile, "upstream");
     const result = await bootstrapFromVendor(gateway, ctx.config.dataFile, uid);
     const instructions = `Bootstrapped from the vendor cloud at remote version ${result.version} (${result.stats.tasks} tasks, ${result.stats.places} contexts, ${result.stats.flags} flags). Reads and writes are live: MCP writes go up as this endpoint's own vendor sync sessions and reach MLO on its next QuickSync; vendor and mobile sync are unaffected.`;
     return textResult(instructions, {
@@ -28390,6 +28522,13 @@ for upstream mode run one ordinary MLO sync through the proxy, then call cloud_b
 it pulls the vendor's complete history automatically and enables reads and writes for every
 existing task. cloud_status shows binding, lifecycle, and mirror coverage.
 
+### Binding mismatch (writes refused, nothing queued)
+If a write fails with "binding mismatch", MLO is syncing a different dataFileUID than the
+one this profile is bound to, so the queue it would land in is one the app never reads.
+Retrying cannot help and the failure is not partial. Report the two UIDs the message names
+and stop; repair is the user's call (cloud_bootstrap { rebind: true }, run from the MCP
+client that owns the endpoint \u2014 cloud_status reports \`endpointRole\` and \`bindingMismatch\`).
+
 ### Field support and refusals (fail fast, nothing queued)
 - add_task/update_task support Folder, Project, Starred, visibility/sequential
   booleans, existing Flag assignment, and existing contexts (Places).
@@ -28419,8 +28558,14 @@ async function main() {
   const config2 = loadConfig();
   const store = new MloStore(config2);
   const cloud = new CloudGateway({ stateRoot: config2.cloudStateRoot });
-  const ctx = { config: config2, store, cloudState: cloud.defaultState(), cloud };
   const cloudServer = await startOrAttachCloudServer({ host: config2.cloudHost, port: config2.cloudPort, gateway: cloud });
+  const ctx = {
+    config: config2,
+    store,
+    cloudState: cloud.defaultState(),
+    cloud,
+    endpointRole: cloudServer ? "owner" : "attached"
+  };
   const server = createMcpServer(ctx);
   await server.connect(new StdioServerTransport());
   log(`ready \u2014 data file: ${config2.dataFile}`);
@@ -28437,7 +28582,7 @@ function watchOwnBuild(cloudServer) {
   let startMtime;
   const timer = setInterval(async () => {
     try {
-      const mtime = (await fs9.stat(entry)).mtimeMs;
+      const mtime = (await fs10.stat(entry)).mtimeMs;
       startMtime ??= mtime;
       if (mtime !== startMtime && !isMloBusy()) {
         log("server build changed on disk \u2014 exiting so the client restarts the new version");

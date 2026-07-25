@@ -27,6 +27,14 @@ export interface CloudServerOptions {
   observeHost?: string;
 }
 
+/**
+ * Which side of the single-owner endpoint this process is on. The listener is
+ * a singleton on the loopback port: the first server process owns it, later
+ * ones attach without one. Vendor contacts are captured in the OWNER's memory
+ * only, so `cloud_bootstrap` and upstream writes can only run there.
+ */
+export type EndpointRole = "owner" | "attached";
+
 export interface CloudServerHandle {
   server: http.Server;
   /** The gateway's default (unbound) state; partition state is reached via `gateway`. */

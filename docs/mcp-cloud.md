@@ -113,6 +113,7 @@ best-effort `icacls` on creation):
 ```text
 <stateRoot>/
   bindings.json                 profile path -> { mode, dataFileUID?, boundAt }
+  unbound-sightings.json        dataFileUIDs seen syncing with no binding (+ first/last seen)
   soap-summary.jsonl            credential-safe structural traffic summaries
   bootstrap/armed.json          the persisted local-mode bootstrap window (+ staged.zip)
   clients/                      scripts/cloud-client cursor files (unbound default state)
@@ -140,6 +141,43 @@ Rules, all fail-closed:
   Mutation tools fail fast before queueing anything unless the partition is
   `ready`; their error directs to `cloud_bootstrap`, because an ordinary
   QuickSync cannot hydrate pre-existing tasks.
+- A **binding mismatch** — the bound profile syncing under a different
+  `dataFileUID` — refuses writes too, and is reported by `cloud_status`
+  ([ADR-0002](adr/0002-report-binding-mismatch-never-repair-it.md)). Nothing is
+  repaired automatically: rebinding changes which authority owns the profile's
+  history. See [When the app syncs a UID the server does not
+  manage](#when-the-app-syncs-a-uid-the-server-does-not-manage).
+
+## When the app syncs a UID the server does not manage
+
+An unbound `dataFileUID` in proxy position is forwarded to the vendor without
+capture — the endpoint stays out of the way of profiles it was not asked to
+manage. That branch is unchanged, but the observed UID and a timestamp are now
+recorded in `unbound-sightings.json`, because the authority decision is the
+only place that ever learns the identity MLO actually syncs.
+
+When the configured profile **is** bound and a still-unbound UID has been seen,
+that is a **binding mismatch**: the bound partition is one the app never reads,
+so every write into it would vanish while MLO's own sync keeps reporting
+success. `cloud_status` reports `bindingMismatch: true` alongside the bound
+`dataFileUID` and the `unboundSightings` list; write tools refuse before
+building or queueing anything, naming both UIDs, the profile, and the remedy.
+Reads keep working throughout, in any sync mode.
+
+A profile with **no** binding is first-run setup, not a mismatch: the sighting
+is recorded and listed (it is the bootstrap candidate), but no mismatch is
+raised and the write refusal stays the ordinary "run `cloud_bootstrap`" one.
+That rule is what keeps the "stay out of the way" guarantee intact.
+
+The remedy is never automatic. Back up the `.ml` profile, then
+`cloud_bootstrap { rebind: true }` from the MCP client that **owns** the
+endpoint binds the observed UID into a fresh partition; the old one stays on
+disk as evidence. Rebinding changes which sync history the profile follows and
+cannot be undone. The signal clears itself once the observed UID is bound —
+nothing expires on a timer, so a mismatch never stops refusing writes while the
+fault is still there ([ADR-0002](adr/0002-report-binding-mismatch-never-repair-it.md)).
+If the sighting turns out to be a genuinely foreign profile that synced through
+the same proxy, delete `unbound-sightings.json` from the state root.
 
 ## Bootstrap flows
 
@@ -215,7 +253,12 @@ included — gets a partition under the private root and goes through
 When the port is already held by another mlo-mcp session's endpoint (probed
 via `GET /v1/status`), the new session *attaches*: it runs without its own
 listener and shares bindings, partitions, and the persisted bootstrap window
-through the state root's cross-process locking.
+through the state root's cross-process locking. What it does **not** share is
+the vendor contacts — those are captured in the owning process's memory only,
+so `cloud_bootstrap` and upstream writes work from the owner alone.
+`cloud_status` reports which role the current process holds (`endpointRole`),
+and a bootstrap attempt from an attached process refuses with that explanation
+instead of "no vendor sync traffic observed since server start".
 
 ## MCP tool surface
 
@@ -223,12 +266,15 @@ through the state root's cross-process locking.
   profile binding, pulls the vendor's full history immediately, and returns
   `bootstrapped: true` with the materialized version and counts.
   `rebind: true` discards the current binding for a fresh partition (the old
-  one stays on disk as evidence). Local-mode arming is not part of this tool
-  (`scripts/bootstrap-local.ts`).
+  one stays on disk as evidence). Every precondition — endpoint ownership, the
+  candidate UID, its vendor contact — is checked **before** the binding moves,
+  so a failed attempt leaves the existing binding exactly as it was.
+  Local-mode arming is not part of this tool (`scripts/bootstrap-local.ts`).
 - `cloud_status` — endpoint config, binding (mode, `dataFileUID`), lifecycle,
   cursor and delta counts, last local stamp, endpoint-mismatch count
-  (distinct from bootstrap-required), partition inventory, and upstream
-  mirror coverage/health/blindness.
+  (distinct from bootstrap-required), partition inventory, upstream mirror
+  coverage/health/blindness, the `endpointRole` of this process, and the
+  binding-mismatch signals (`bindingMismatch`, `unboundSightings`).
 - `add_task` / `add_tasks` / `update_task` / `complete_task` /
   `uncomplete_task` / `delete_task` — unchanged surface
   ([tools.md](tools.md)), gated on a bootstrapped (`ready`) partition. Local

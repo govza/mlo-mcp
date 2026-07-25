@@ -28,7 +28,10 @@ if (!tool) {
 
 const config = loadConfig();
 const cloud = new CloudGateway({ stateRoot: config.cloudStateRoot });
-const ctx = { config, store: new MloStore(config), cloudState: cloud.defaultState(), cloud };
+// This script starts no listener, so it holds no vendor contacts of its own —
+// the same position an attached MCP client is in, and the refusals that flow
+// from that are the accurate ones here.
+const ctx = { config, store: new MloStore(config), cloudState: cloud.defaultState(), cloud, endpointRole: "attached" as const };
 const args = z.object(tool.inputSchema).parse(JSON.parse(json ?? "{}"));
 
 const result = await tool.execute(args, ctx);
