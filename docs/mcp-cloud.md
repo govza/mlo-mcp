@@ -84,6 +84,18 @@ told to retry; the retry re-authors from the current rows. The mirror only
 advances on real content, so this fires exactly when a full-row rewrite would
 otherwise have clobbered a concurrent edit.
 
+The commit trusts cursor movement, not the vendor's `Result` flag: the vendor
+has been observed answering `Result=true` while keeping `newServerTimeStamp`
+at the current high-water, which stores nothing any sync client will ever
+pull (observed live 2026-07-26; five writes vanished while reported as
+queued). Such an **unadvanced commit** — like a success response missing
+`newServerTimeStamp` entirely — is refused, the caller's words are preserved
+in the dead-letter file, and nothing is reported as queued. Every vendor
+exchange the endpoint makes as a client is journaled to
+`<stateRoot>/vendor-client.jsonl` (cursor values, result flags, payload
+sizes — never credentials), so a refused commit leaves durable evidence even
+though the resident's stderr dies with it.
+
 **Operational precondition:** MLO's cloud login must have "Use secure
 connection" **unchecked**. A TLS `CONNECT` to the vendor sync host tunnels
 end-to-end, blinding the mirror and hiding the credentials the client sessions
@@ -127,6 +139,8 @@ best-effort `icacls` on creation):
   bindings.json                 profile path -> { mode, dataFileUID?, boundAt }
   unbound-sightings.json        dataFileUIDs seen syncing with no binding (+ first/last seen)
   soap-summary.jsonl            credential-safe structural traffic summaries
+  vendor-client.jsonl           the endpoint's OWN vendor exchanges (cursor values,
+                                result flags, payload sizes — never credentials)
   bootstrap/armed.json          the persisted local-mode bootstrap window (+ staged.zip)
   clients/                      scripts/cloud-client cursor files (unbound default state)
   partitions/<key>/             key = sha256(normalized dataFileUID), first 16 hex

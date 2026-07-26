@@ -298,7 +298,10 @@ describe("writes and bootstrap forwarded through the resident endpoint", () => {
   }
 
   /** Answers a full history from 0, and assigns 501 to whatever is applied. */
-  function scriptedVendor(history: Uint8Array = packEnvelope(fullSnapshot())) {
+  function scriptedVendor(
+    history: Uint8Array = packEnvelope(fullSnapshot()),
+    applyFields: Record<string, string> = { ApplyModificationsBytesExResult: "true", newServerTimeStamp: "501" },
+  ) {
     return startVendor((operation, body) => {
       if (operation === "GetModificationsBytesEx") {
         const fromZero = body.includes("<newerThan>0</newerThan>");
@@ -311,14 +314,14 @@ describe("writes and bootstrap forwarded through the resident endpoint", () => {
         };
       }
       if (operation === "ApplyModificationsBytesEx") {
-        return { body: vendorResponse(operation, { ApplyModificationsBytesExResult: "true", newServerTimeStamp: "501" }) };
+        return { body: vendorResponse(operation, applyFields) };
       }
       return { body: vendorResponse(operation, { ReleaseSyncSessionBytesResult: "true" }) };
     });
   }
 
   /** An endpoint holding the contact, plus the session's own view of the root. */
-  async function attachedSession(history?: Uint8Array): Promise<{
+  async function attachedSession(history?: Uint8Array, applyFields?: Record<string, string>): Promise<{
     resident: CloudGateway;
     session: CloudGateway;
     ctx: ToolContext;
@@ -326,7 +329,7 @@ describe("writes and bootstrap forwarded through the resident endpoint", () => {
   }> {
     const resident = await upstreamGateway();
     await resident.bindings.create(PROFILE, "upstream");
-    const vendor = await scriptedVendor(history);
+    const vendor = await scriptedVendor(history, applyFields);
     const proxy = await startProxy(resident);
     // One ordinary proxied sync is what exposes the contact — to the LISTENING
     // process's memory, and nowhere else.
@@ -412,6 +415,58 @@ describe("writes and bootstrap forwarded through the resident endpoint", () => {
     // Nothing was uploaded, and the mirror still ends at the mobile edit.
     expect(vendor.calls.filter((call) => call.operation === "ApplyModificationsBytesEx")).toHaveLength(applies);
     expect(await partition.mirrorState.highWater()).toBe(505n);
+  });
+
+  it("refuses a commit the vendor accepted without advancing the cursor, and preserves the words", async () => {
+    // The live incident: Result=true, but newServerTimeStamp stays at the
+    // current high-water. Reporting that as "queued" is how five writes
+    // vanished without a trace on 2026-07-26.
+    const { session, ctx, vendor } = await attachedSession(undefined, {
+      ApplyModificationsBytesExResult: "true",
+      newServerTimeStamp: "500",
+    });
+    await cloudBootstrapTool.execute({}, ctx);
+    const partition = await session.registry.open(UID);
+
+    const channel = await requireWriteChannel(ctx, { tool: "add_tasks", content: "the words of the write" });
+    await expect(channel.commit(packEnvelope(mergeDeltas([
+      buildTaskAddDelta({ uid: NEW_TASK, caption: "silently dropped", createdDate: "2026-07-23T10:00:00", lastModified: "2026-07-23T10:00:00" }),
+    ])))).rejects.toThrow(/does not advance past the mirror high-water 500.*preserved at/s);
+
+    // Nothing pretends to be queued: the mirror still ends at the bootstrap.
+    expect(await partition.mirrorState.highWater()).toBe(500n);
+    // The caller's words survived the refusal.
+    const letters = await session.deadLetters.all();
+    expect(letters.at(-1)).toMatchObject({ tool: "add_tasks", content: "the words of the write" });
+    // The vendor session was still released.
+    expect(vendor.calls.at(-1)!.operation).toBe("ReleaseSyncSessionBytes");
+
+    // The durable journal holds the evidence — cursor values and flags, no
+    // credential material.
+    const journal = await fs.readFile(path.join(session.stateRoot, "vendor-client.jsonl"), "utf8");
+    const records = journal.trim().split("\n").map((line) => JSON.parse(line) as Record<string, unknown>);
+    const apply = records.find((record) => record.operation === "ApplyModificationsBytesEx")!;
+    expect(apply).toMatchObject({ result: "true", newServerTimeStamp: "500", status: 200 });
+    expect((apply.request as Record<string, unknown>).lastSyncTimestamp).toBe("0");
+    expect(journal).not.toContain("bG9naW4=");
+    expect(journal).not.toContain("cGFzcw==");
+  });
+
+  it("refuses a commit whose success response carries no newServerTimeStamp", async () => {
+    const { session, ctx } = await attachedSession(undefined, {
+      ApplyModificationsBytesExResult: "true",
+    });
+    await cloudBootstrapTool.execute({}, ctx);
+    const partition = await session.registry.open(UID);
+
+    const channel = await requireWriteChannel(ctx, { tool: "add_tasks", content: "words against a malformed answer" });
+    await expect(channel.commit(packEnvelope(mergeDeltas([
+      buildTaskAddDelta({ uid: NEW_TASK, caption: "never stored", createdDate: "2026-07-23T10:00:00", lastModified: "2026-07-23T10:00:00" }),
+    ])))).rejects.toThrow(/without a newServerTimeStamp.*preserved at/s);
+
+    expect(await partition.mirrorState.highWater()).toBe(500n);
+    const letters = await session.deadLetters.all();
+    expect(letters.at(-1)).toMatchObject({ tool: "add_tasks", content: "words against a malformed answer" });
   });
 
   it("commits a local-mode write from an attached session with no contact involved", async () => {

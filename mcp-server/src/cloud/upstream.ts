@@ -210,10 +210,20 @@ function xmlEscape(value: string): string {
 
 const MLO_NAMESPACE = "http://www.mylifeorganized.net/";
 
+/**
+ * Durable observation of one vendor-client exchange: operation, cursor values,
+ * result flags and payload sizes — never credential fields, which are built
+ * inside the request and never reach the observer. The resident endpoint logs
+ * to stderr, which dies with the process; this is what a post-mortem of a
+ * failed write reads instead.
+ */
+export type VendorExchangeObserver = (record: Record<string, unknown>) => void | Promise<void>;
+
 export class VendorClient {
   constructor(
     readonly contact: VendorContact,
     readonly dataFileUID: string,
+    private readonly observe?: VendorExchangeObserver,
   ) {}
 
   private request(operation: SoapOperation, extra: [string, string][]): Promise<ForwardResult> {
@@ -245,9 +255,14 @@ export class VendorClient {
     }, Buffer.from(xml, "utf8"));
   }
 
-  private parse(operation: SoapOperation, result: ForwardResult): Record<string, unknown> {
+  /** One full round trip: send, observe durably, then enforce the result. */
+  private async call(operation: SoapOperation, extra: [string, string][]): Promise<Record<string, unknown>> {
+    const result = await this.request(operation, extra);
+    const fields = result.status === 200 ? responseFields(decodeBody(result), operation) : undefined;
+    // Awaited so the record is on disk before any caller acts on the answer —
+    // a refused commit must never outrun its own evidence.
+    await this.note(operation, extra, result.status, fields);
     if (result.status !== 200) throw new Error(`vendor ${operation} failed with HTTP ${result.status}`);
-    const fields = responseFields(decodeBody(result), operation);
     if (text(fields, `${operation}Result`) !== "true") {
       const message = text(fields, "errorMessage") ?? "vendor reported failure";
       throw new Error(`vendor ${operation} rejected: ${message}`);
@@ -255,12 +270,49 @@ export class VendorClient {
     return fields!;
   }
 
+  private async note(
+    operation: SoapOperation,
+    extra: [string, string][],
+    status: number,
+    fields: Record<string, unknown> | undefined,
+  ): Promise<void> {
+    if (!this.observe) return;
+    const request: Record<string, unknown> = {};
+    for (const [name, value] of extra) {
+      if (name === "data") request.dataBytes = value.length;
+      else request[name] = value;
+    }
+    const optional = (name: string, key = name) => {
+      const value = text(fields, name);
+      return value ? { [key]: value } : {};
+    };
+    try {
+      await this.observe({
+        operation,
+        dataFileUID: this.dataFileUID,
+        request,
+        status,
+        ...(fields
+          ? {
+              result: text(fields, `${operation}Result`) ?? "<absent>",
+              ...optional("errorMessage"),
+              ...optional("newServerTimeStamp"),
+              ...optional("maxVersion"),
+              ...(text(fields, "data") ? { responseDataBytes: text(fields, "data")!.length } : {}),
+            }
+          : {}),
+      });
+    } catch {
+      /* observation must never alter the exchange */
+    }
+  }
+
   /** Pull all changes newer than `newerThan`; returns the vendor version and payload. */
   async pull(sessionId: string, newerThan: CloudCursor): Promise<{ maxVersion: CloudCursor; data?: Buffer }> {
-    const fields = this.parse("GetModificationsBytesEx", await this.request("GetModificationsBytesEx", [
+    const fields = await this.call("GetModificationsBytesEx", [
       ["sessionID", sessionId],
       ["newerThan", cursorToDecimalString(newerThan)],
-    ]));
+    ]);
     const maxVersion = parseCursor(text(fields, "maxVersion") ?? "0");
     const data = text(fields, "data");
     return { maxVersion, ...(data ? { data: Buffer.from(data.replace(/\s+/g, ""), "base64") } : {}) };
@@ -268,18 +320,25 @@ export class VendorClient {
 
   /** Upload one envelope; the vendor assigns and returns the new remote version. */
   async apply(sessionId: string, envelope: Uint8Array): Promise<CloudCursor> {
-    const fields = this.parse("ApplyModificationsBytesEx", await this.request("ApplyModificationsBytesEx", [
+    const fields = await this.call("ApplyModificationsBytesEx", [
       ["sessionID", sessionId],
       // Opaque local baseline of THIS client; zero mirrors a first-sync
       // client, which the vendor demonstrably accepts.
       ["lastSyncTimestamp", "0"],
       ["data", Buffer.from(envelope).toString("base64")],
-    ]));
-    return parseCursor(text(fields, "newServerTimeStamp") ?? "0");
+    ]);
+    const stamp = text(fields, "newServerTimeStamp");
+    if (!stamp) {
+      throw new Error(
+        "vendor ApplyModificationsBytesEx answered success without a newServerTimeStamp — a malformed response, " +
+          "so the upload cannot be trusted as stored",
+      );
+    }
+    return parseCursor(stamp);
   }
 
   async release(sessionId: string): Promise<void> {
-    this.parse("ReleaseSyncSessionBytes", await this.request("ReleaseSyncSessionBytes", [["sessionID", sessionId]]));
+    await this.call("ReleaseSyncSessionBytes", [["sessionID", sessionId]]);
   }
 }
 
@@ -296,8 +355,9 @@ export class VendorClient {
 export async function pullVendorHistory(
   contact: VendorContact,
   uid: string,
+  observe?: VendorExchangeObserver,
 ): Promise<{ version: CloudCursor; envelope: Buffer }> {
-  const client = new VendorClient(contact, uid);
+  const client = new VendorClient(contact, uid, observe);
   const sessionId = generateGuid();
   const pulled = await client.pull(sessionId, ZERO_CURSOR);
   await client.release(sessionId).catch(() => undefined);
@@ -414,8 +474,9 @@ export class UpstreamWriteSession {
   constructor(
     readonly partition: PartitionHandle,
     contact: VendorContact,
+    observe?: VendorExchangeObserver,
   ) {
-    this.client = new VendorClient(contact, partition.uid);
+    this.client = new VendorClient(contact, partition.uid, observe);
   }
 
   /** Pull vendor changes newer than the mirror and capture them. */
@@ -428,12 +489,39 @@ export class UpstreamWriteSession {
     }
   }
 
-  /** Upload one MCP-authored envelope; returns the vendor-assigned version. */
+  /**
+   * Upload one MCP-authored envelope; returns the vendor-assigned version.
+   *
+   * `Result=true` alone is NOT durability: the vendor has been observed
+   * answering success while keeping its cursor still, and a delta committed
+   * at an unadvanced version exists in no history any sync client will ever
+   * pull. So the one proof of storage this client accepts is the cursor
+   * moving — an unadvanced commit is a refusal, however the response is
+   * worded. The session is released either way; an author whose commit was
+   * refused must not leave the vendor session held.
+   */
   async commit(envelope: Uint8Array): Promise<string> {
-    const version = await this.client.apply(this.sessionId, envelope);
-    await this.partition.mirrorState.appendAtCursor("mcp", envelope, version);
-    await this.release();
-    return cursorToDecimalString(version);
+    try {
+      const baseline = await this.partition.mirrorState.highWater();
+      const version = await this.client.apply(this.sessionId, envelope);
+      if (version <= baseline) {
+        throw new Error(
+          `the vendor answered this upload with Result=true but newServerTimeStamp ` +
+            `${cursorToDecimalString(version)}, which does not advance past the mirror high-water ` +
+            `${cursorToDecimalString(baseline)} — an unadvanced commit: the vendor stored nothing any sync ` +
+            "client will ever pull, so the write was refused",
+        );
+      }
+      if (!(await this.partition.mirrorState.appendAtCursor("mcp", envelope, version))) {
+        // The advancement check passed, so a refused append can only mean a
+        // concurrent capture already recorded this version or newer — the
+        // vendor's history contains the delta and the commit is durable.
+        log(`vendor version ${cursorToDecimalString(version)} was already covered by a concurrent mirror capture`);
+      }
+      return cursorToDecimalString(version);
+    } finally {
+      await this.release();
+    }
   }
 
   /** Give the vendor session back without committing anything. */

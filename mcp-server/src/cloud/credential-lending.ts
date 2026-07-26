@@ -38,13 +38,16 @@ function refuse(status: number, message: string): Error {
 
 export class CredentialLender {
   private pending = new Map<string, PendingWrite>();
+  /** Every vendor round trip made on a session's behalf lands in the durable journal. */
+  private readonly observe = (record: Record<string, unknown>): Promise<void> =>
+    this.gateway.noteVendorExchange(record);
 
   constructor(private readonly gateway: CloudGateway) {}
 
   /** Refresh the mirror and hold the vendor session open for one commit. */
   async begin(rawUid: string): Promise<{ session: string; cursor: string }> {
     const partition = await this.partitionFor(rawUid);
-    const session = new UpstreamWriteSession(partition, this.contactFor(rawUid));
+    const session = new UpstreamWriteSession(partition, this.contactFor(rawUid), this.observe);
     await session.refresh();
     const baseline = await partition.mirrorState.highWater();
     const token = generateGuid();
@@ -84,7 +87,7 @@ export class CredentialLender {
    * Creates no partition: what to do with the bytes is the session's decision.
    */
   async history(rawUid: string): Promise<{ version: string; envelope: Buffer }> {
-    const pulled = await pullVendorHistory(this.contactFor(rawUid), this.normalizedUid(rawUid));
+    const pulled = await pullVendorHistory(this.contactFor(rawUid), this.normalizedUid(rawUid), this.observe);
     return { version: cursorToDecimalString(pulled.version), envelope: pulled.envelope };
   }
 

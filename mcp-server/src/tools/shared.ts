@@ -133,11 +133,25 @@ async function refusalAfterDeadLetter(cloud: CloudGateway, attempt: WriteAttempt
 export async function requireWriteChannel(ctx: ToolContext, attempt: WriteAttempt): Promise<CloudWriteChannel> {
   if (!ctx.cloud) return localChannel(ctx.cloudState);
   const cloud = ctx.cloud;
+  let channel: CloudWriteChannel;
   try {
-    return await resolveWriteChannel(ctx, cloud);
+    channel = await resolveWriteChannel(ctx, cloud);
   } catch (error) {
     throw await refusalAfterDeadLetter(cloud, attempt, error);
   }
+  // Commit-time refusals — an unadvanced commit, rows gone stale, a vendor
+  // session that vanished — lose the caller's words exactly as
+  // resolution-time ones do, so the same dead-letter gate wraps the commit.
+  return {
+    state: channel.state,
+    commit: async (bytes) => {
+      try {
+        return await channel.commit(bytes);
+      } catch (error) {
+        throw await refusalAfterDeadLetter(cloud, attempt, error);
+      }
+    },
+  };
 }
 
 async function resolveWriteChannel(ctx: ToolContext, cloud: CloudGateway): Promise<CloudWriteChannel> {

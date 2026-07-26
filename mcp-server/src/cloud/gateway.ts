@@ -23,6 +23,9 @@ export type SoapAuthority =
 
 const SESSION_PIN_TTL_MS = 10 * 60 * 1000;
 
+/** The endpoint's own vendor-client exchange journal, one JSON record per line. */
+export const VENDOR_CLIENT_FILE = "vendor-client.jsonl";
+
 /** The bound profile is syncing under a different identity: writes would be lost. */
 export interface BindingMismatch {
   profilePath: string;
@@ -72,6 +75,24 @@ export class CloudGateway {
   /** Where the sync observer writes its structural summaries. */
   observerDir(): string {
     return this.stateRoot;
+  }
+
+  /**
+   * Append one of the endpoint's OWN vendor-client exchanges to
+   * `vendor-client.jsonl` — operations, cursor values, result flags and
+   * payload sizes; credential fields never reach this seam. The resident
+   * logs to stderr, which dies with the process; this file is what the
+   * post-mortem of a failed write reads. Awaitable so an exchange's record
+   * is on disk before its outcome is acted on; a failure to record only logs.
+   */
+  async noteVendorExchange(record: Record<string, unknown>): Promise<void> {
+    try {
+      await this.prepareRoot();
+      const line = `${JSON.stringify({ at: new Date().toISOString(), ...record })}\n`;
+      await fs.appendFile(path.join(this.stateRoot, VENDOR_CLIENT_FILE), line);
+    } catch (error) {
+      log(`vendor exchange log write failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   /**
