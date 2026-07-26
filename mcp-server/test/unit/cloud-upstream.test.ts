@@ -9,7 +9,7 @@ import { ResidentEndpoint } from "../../src/cloud/endpoint.js";
 import { startCloudServer, type CloudServerHandle } from "../../src/cloud/server.js";
 import { buildTaskAddDelta, mergeDeltas } from "../../src/cloud/delta.js";
 import { packEnvelope } from "../../src/cloud/envelope.js";
-import { findSection, type SectionedCsv } from "../../src/cloud/csv.js";
+import { emitSectionedCsv, findSection, type SectionedCsv } from "../../src/cloud/csv.js";
 import { knownCloudProjection, rowValue } from "../../src/cloud/log-projection.js";
 import { cloudBootstrapTool } from "../../src/tools/cloud-bootstrap.js";
 import { requireWriteChannel, type ToolContext } from "../../src/tools/shared.js";
@@ -267,8 +267,38 @@ describe("upstream transparent proxy", () => {
 describe("writes and bootstrap forwarded through the resident endpoint", () => {
   const NEW_TASK = "{22222222-2222-2222-2222-222222222222}";
 
+  /**
+   * A pull from vendor version 0 returns the service's database-shaped full
+   * projection, not the ZIP/delta shape used for ordinary Get responses.
+   * Stable cloud columns are all present, but database-only columns are mixed
+   * in, Hotkey is absent, and empty tombstone sections may be omitted.
+   */
+  function rawVendorHistory(): Uint8Array {
+    const document = fullSnapshot();
+    const places = findSection(document, "Places")!;
+    const placeHeader = places.header;
+    places.header = ["PlaceID", ...placeHeader.filter((column) => column !== "Hotkey"), "Timestamp"];
+    places.rows = places.rows.map((row) => [
+      "",
+      ...row.filter((_, index) => placeHeader[index] !== "Hotkey"),
+      "",
+    ]);
+
+    const flags = findSection(document, "Flags")!;
+    flags.header = ["FlagID", ...flags.header, "Timestamp"];
+    flags.rows = flags.rows.map((row) => ["", ...row, ""]);
+
+    const tasks = findSection(document, "TodoItems")!;
+    tasks.header = ["TodoItemID", "ParentItemID", "IsComplete", ...tasks.header, "Timestamp", "FlagID"];
+    tasks.rows = tasks.rows.map((row) => ["", "", "", ...row, "", ""]);
+    document.sections = document.sections.filter(
+      (section) => section.name !== "Places.Deleted" && section.name !== "Flags.Deleted",
+    );
+    return emitSectionedCsv(document);
+  }
+
   /** Answers a full history from 0, and assigns 501 to whatever is applied. */
-  function scriptedVendor() {
+  function scriptedVendor(history: Uint8Array = packEnvelope(fullSnapshot())) {
     return startVendor((operation, body) => {
       if (operation === "GetModificationsBytesEx") {
         const fromZero = body.includes("<newerThan>0</newerThan>");
@@ -276,7 +306,7 @@ describe("writes and bootstrap forwarded through the resident endpoint", () => {
           body: vendorResponse(operation, {
             GetModificationsBytesExResult: "true",
             maxVersion: "500",
-            ...(fromZero ? { data: Buffer.from(packEnvelope(fullSnapshot())).toString("base64") } : {}),
+            ...(fromZero ? { data: Buffer.from(history).toString("base64") } : {}),
           }),
         };
       }
@@ -288,7 +318,7 @@ describe("writes and bootstrap forwarded through the resident endpoint", () => {
   }
 
   /** An endpoint holding the contact, plus the session's own view of the root. */
-  async function attachedSession(): Promise<{
+  async function attachedSession(history?: Uint8Array): Promise<{
     resident: CloudGateway;
     session: CloudGateway;
     ctx: ToolContext;
@@ -296,7 +326,7 @@ describe("writes and bootstrap forwarded through the resident endpoint", () => {
   }> {
     const resident = await upstreamGateway();
     await resident.bindings.create(PROFILE, "upstream");
-    const vendor = await scriptedVendor();
+    const vendor = await scriptedVendor(history);
     const proxy = await startProxy(resident);
     // One ordinary proxied sync is what exposes the contact — to the LISTENING
     // process's memory, and nowhere else.
@@ -345,6 +375,22 @@ describe("writes and bootstrap forwarded through the resident endpoint", () => {
     // QuickSync through the proxy).
     const projection = await knownCloudProjection(channel.state);
     expect(rowValue(projection.rows.get(NEW_TASK)!, "Caption")).toBe("written by MCP");
+    expect(rowValue(projection.rows.get(TASK_UID)!, "Caption")).toBe("Existing task");
+  });
+
+  it("normalizes the vendor's raw full-history projection before bootstrapping", async () => {
+    const { session, ctx } = await attachedSession(rawVendorHistory());
+
+    const bootstrapped = await cloudBootstrapTool.execute({}, ctx);
+    expect(bootstrapped.structuredContent).toMatchObject({
+      bootstrapped: true,
+      version: "500",
+      tasks: 1,
+    });
+    const partition = await session.registry.open(UID);
+    expect(await partition.lifecycle()).toBe("ready");
+
+    const projection = await knownCloudProjection(partition.mirrorState);
     expect(rowValue(projection.rows.get(TASK_UID)!, "Caption")).toBe("Existing task");
   });
 

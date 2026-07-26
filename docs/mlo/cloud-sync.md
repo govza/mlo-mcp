@@ -63,7 +63,8 @@ MLO native profile (.ml)
   |  select objects by local logical modification stamp
   v
 sectioned UTF-8 data.csv
-  |  ZIP method 8, entry name data.csv
+  |  ordinary Get/Apply: ZIP method 8, entry name data.csv
+  |  vendor history from version 0: raw full-history projection
   v
 base64 SOAP field
   |  Get / Apply / Release operations
@@ -227,7 +228,9 @@ Semantics:
 
 - `newerThan` is the remote Cloud cursor already accepted by this profile.
 - `maxVersion` is the remote version represented by the response.
-- `data` is base64 of the ZIP envelope described below.
+- For ordinary incremental pulls, `data` is base64 of the ZIP envelope
+  described below. A direct vendor full-history pull from `newerThan=0` is the
+  exception described under [Vendor full-history pull](#vendor-full-history-pull).
 - With no newer changes, the logged client expects the returned remote version
   not to advance. Captured response shapes still included `data`; it may be an
   empty section skeleton.
@@ -497,6 +500,29 @@ Inventing GUIDs or building partial task rows from XML is not equivalent. A
 partial `TodoItems` replacement can erase recurrence, reminders, formatting,
 ordering, review state, or other fields absent from XML exports.
 
+### Vendor full-history pull
+
+**Captured (controlled live run):** asking the vendor for the complete history
+with `newerThan=0` returned base64 of raw sectioned UTF-8 CSV, not a ZIP
+envelope. The projection is database-shaped but losslessly convertible to the
+Cloud delta shape:
+
+- `TodoItems` contains every canonical 82-column Cloud field, reordered among
+  five database-only fields (`TodoItemID`, `ParentItemID`, `IsComplete`,
+  `Timestamp`, and `FlagID`);
+- `Places` contains stable `UID`s but omits `Hotkey` and adds `PlaceID` and
+  `Timestamp`;
+- `Flags` adds `FlagID` and `Timestamp`;
+- empty `Places.Deleted` and `Flags.Deleted` sections may be omitted;
+- stable UID relationship, dependency, ordering, tombstone, `Config`, and
+  `SysVersions` sections remain present.
+
+A bootstrap client can normalize this safely by projecting known columns into
+the canonical Cloud order, blanking only genuinely absent fields, adding
+omitted empty sections, preserving unknown columns/sections, and then wrapping
+the result in the standard ZIP envelope. The normalized snapshot must still
+pass the same full-snapshot validation before it becomes authoritative.
+
 ### Switching endpoints is not a reconnect
 
 A controlled experiment synced one profile against the vendor Cloud, then
@@ -526,8 +552,9 @@ Consequences for a compatible server:
 
 ## ZIP payload envelope
 
-**Captured:** the `data` SOAP element is standard base64 of a standard ZIP
-archive.
+**Captured:** ordinary Get responses and Apply requests carry standard base64
+of a standard ZIP archive. The vendor full-history exception is documented
+above.
 
 Observed requirements:
 

@@ -3,8 +3,9 @@ import https from "node:https";
 import zlib from "node:zlib";
 import { XMLParser } from "fast-xml-parser";
 import { cursorToDecimalString, parseCursor, ZERO_CURSOR, type CloudCursor } from "./cursor.js";
-import { generateGuid } from "./delta.js";
-import { unpackEnvelope } from "./envelope.js";
+import { generateGuid, SECTION_HEADERS } from "./delta.js";
+import { findSection, parseSectionedCsv, type SectionedCsv } from "./csv.js";
+import { packEnvelope, unpackEnvelope } from "./envelope.js";
 import { validateFullSnapshot } from "./snapshot-validate.js";
 import type { SoapOperation } from "./soap.js";
 import type { PartitionHandle } from "./partition.js";
@@ -305,6 +306,68 @@ export async function pullVendorHistory(
 }
 
 /**
+ * A vendor pull from version 0 uses a database-shaped raw CSV projection,
+ * unlike ordinary Get responses and Apply requests, which use ZIP envelopes.
+ * It contains all stable cloud columns, mixed with local database columns;
+ * some empty cloud sections may be omitted and Places may omit Hotkey.
+ *
+ * Normalize that projection into the canonical cloud section/header order,
+ * preserving every extra column and unknown section, and ZIP it so the mirror
+ * has one representation regardless of how the vendor supplied the history.
+ */
+function normalizeVendorHistory(
+  bytes: Uint8Array,
+): { document: SectionedCsv; envelope: Uint8Array } {
+  if (
+    bytes.length >= 4 &&
+    bytes[0] === 0x50 &&
+    bytes[1] === 0x4b &&
+    bytes[2] === 0x03 &&
+    bytes[3] === 0x04
+  ) {
+    return { document: unpackEnvelope(bytes), envelope: bytes };
+  }
+
+  let raw: SectionedCsv;
+  try {
+    raw = parseSectionedCsv(bytes);
+  } catch (error) {
+    throw new Error(
+      "invalid vendor full-history payload: expected a ZIP envelope or raw sectioned CSV " +
+        `(${error instanceof Error ? error.message : String(error)})`,
+    );
+  }
+
+  const canonicalNames = new Set<string>(SECTION_HEADERS.map(([name]) => name));
+  const sections: SectionedCsv["sections"] = SECTION_HEADERS.map(([name, canonicalHeader]) => {
+    const required: readonly string[] = canonicalHeader;
+    const source = findSection(raw, name);
+    if (!source) return { name, header: [...required], rows: [] };
+    const extras = source.header.filter((column) => !required.includes(column));
+    const header = [...required, ...extras];
+    return {
+      name,
+      header,
+      rows: source.rows.map((row) =>
+        header.map((column) => {
+          const index = source.header.indexOf(column);
+          return index < 0 ? "" : row[index] ?? "";
+        })
+      ),
+    };
+  });
+  sections.push(...raw.sections
+    .filter((section) => !canonicalNames.has(section.name))
+    .map((section) => ({
+      name: section.name,
+      header: [...section.header],
+      rows: section.rows.map((row) => [...row]),
+    })));
+  const document = { sections };
+  return { document, envelope: packEnvelope(document) };
+}
+
+/**
  * The other half: validate the pulled history as a full snapshot (full by
  * construction, so `Config` is not required), materialize it as the read/write
  * mirror, and bind the profile. Pure work against the shared state root, so it
@@ -318,13 +381,14 @@ export async function materializeVendorHistory(
   history: { version: CloudCursor; envelope: Uint8Array },
 ): Promise<{ version: string; stats: Record<string, number> }> {
   const partition = await gateway.registry.open(rawUid, "upstream");
-  const document = unpackEnvelope(history.envelope);
+  const normalized = normalizeVendorHistory(history.envelope);
+  const document = normalized.document;
   const validation = validateFullSnapshot(document, { requireConfig: false });
   if (!validation.ok) {
     const preview = validation.errors.slice(0, 5).join("; ");
     throw new Error(`vendor full-history pull failed snapshot validation: ${preview}`);
   }
-  await partition.mirrorState.appendAtCursor("mcp", history.envelope, history.version);
+  await partition.mirrorState.appendAtCursor("mcp", normalized.envelope, history.version);
   await partition.mirrorSnapshots.materialize(document, history.version);
   await gateway.bindings.bindUid(profilePath, partition.uid);
   await partition.setLifecycle("ready");

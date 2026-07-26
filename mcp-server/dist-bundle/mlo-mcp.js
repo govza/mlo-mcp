@@ -18281,15 +18281,54 @@ async function pullVendorHistory(contact, uid) {
   if (!pulled.data) throw new Error("vendor returned no payload for a full-history pull");
   return { version: pulled.maxVersion, envelope: pulled.data };
 }
+function normalizeVendorHistory(bytes) {
+  if (bytes.length >= 4 && bytes[0] === 80 && bytes[1] === 75 && bytes[2] === 3 && bytes[3] === 4) {
+    return { document: unpackEnvelope(bytes), envelope: bytes };
+  }
+  let raw;
+  try {
+    raw = parseSectionedCsv(bytes);
+  } catch (error2) {
+    throw new Error(
+      `invalid vendor full-history payload: expected a ZIP envelope or raw sectioned CSV (${error2 instanceof Error ? error2.message : String(error2)})`
+    );
+  }
+  const canonicalNames = new Set(SECTION_HEADERS.map(([name]) => name));
+  const sections = SECTION_HEADERS.map(([name, canonicalHeader]) => {
+    const required2 = canonicalHeader;
+    const source = findSection(raw, name);
+    if (!source) return { name, header: [...required2], rows: [] };
+    const extras = source.header.filter((column) => !required2.includes(column));
+    const header = [...required2, ...extras];
+    return {
+      name,
+      header,
+      rows: source.rows.map(
+        (row) => header.map((column) => {
+          const index = source.header.indexOf(column);
+          return index < 0 ? "" : row[index] ?? "";
+        })
+      )
+    };
+  });
+  sections.push(...raw.sections.filter((section) => !canonicalNames.has(section.name)).map((section) => ({
+    name: section.name,
+    header: [...section.header],
+    rows: section.rows.map((row) => [...row])
+  })));
+  const document = { sections };
+  return { document, envelope: packEnvelope(document) };
+}
 async function materializeVendorHistory(gateway, profilePath, rawUid, history) {
   const partition = await gateway.registry.open(rawUid, "upstream");
-  const document = unpackEnvelope(history.envelope);
+  const normalized = normalizeVendorHistory(history.envelope);
+  const document = normalized.document;
   const validation = validateFullSnapshot(document, { requireConfig: false });
   if (!validation.ok) {
     const preview = validation.errors.slice(0, 5).join("; ");
     throw new Error(`vendor full-history pull failed snapshot validation: ${preview}`);
   }
-  await partition.mirrorState.appendAtCursor("mcp", history.envelope, history.version);
+  await partition.mirrorState.appendAtCursor("mcp", normalized.envelope, history.version);
   await partition.mirrorSnapshots.materialize(document, history.version);
   await gateway.bindings.bindUid(profilePath, partition.uid);
   await partition.setLifecycle("ready");

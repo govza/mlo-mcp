@@ -61,9 +61,11 @@ The architecture is `MLO ↔ mcp-cloud ↔ vendor Cloud`, with no side demoted:
 
 **Bootstrap (zero-touch):** after the one ordinary proxied sync,
 `cloud_bootstrap` pulls the vendor's complete history from remote version 0
-as a client, validates it as a full snapshot, materializes it as the mirror
-baseline, and binds the profile. Every existing task resolves to its stable
-UID and complete record afterwards. No MLO interaction is required.
+as a client, normalizes the vendor's raw database-shaped history projection
+into the canonical ZIP/Cloud schema, validates it as a full snapshot,
+materializes it as the mirror baseline, and binds the profile. Every existing
+task resolves to its stable UID and complete record afterwards. No MLO
+interaction is required.
 
 **Writes:** a mutation tool refreshes the mirror from the vendor (so full-row
 authoring never starts from rows a mobile edit superseded), authors complete
