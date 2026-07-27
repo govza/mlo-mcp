@@ -24,7 +24,7 @@ Ubiquitous language for this repo. Terms are defined here in one or two lines; t
 
 ## The sync data plane
 
-- **mcp-cloud / the endpoint** — the server's loopback HTTP sync endpoint (`127.0.0.1:8181`) that MLO reaches through its proxy setting ([docs/mcp-cloud.md](docs/mcp-cloud.md)).
+- **mcp-cloud / the endpoint** — the server's loopback HTTP sync endpoint (`127.0.0.1:8181` installed, `:8282` from a source checkout) that MLO reaches through its proxy setting ([docs/mcp-cloud.md](docs/mcp-cloud.md)).
 - **Resident endpoint** — the long-lived process that owns the loopback listener and outlives every MCP session, auto-spawned by the first session that finds the port free ([ADR-0003](docs/adr/0003-resident-endpoint.md)). Started by re-invoking the server's own entry point with `--serve-cloud`.
 - **Attached session** — an MCP server process. Every one of them attaches to the resident endpoint and none ever listens, so which client you are in never decides what works.
 - **Injection** — how a write reaches the profile: the resident splices pending queue rows into a forwarded `Get` response for the bound `dataFileUID` only, presenting `vendorVersion + 1`, so MLO applies them as if another device had written them. Everything else runs in the session against the shared state root; the resident executes no tools.

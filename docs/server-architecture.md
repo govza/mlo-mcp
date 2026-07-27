@@ -112,7 +112,8 @@ Both live in the `MloCli` driver, as module-level singletons — process-wide by
 nature, not per-instance. The state root has its own cross-process lock
 (`cloud/state-lock.ts`) for the files several sessions write.
 
-No session binds the endpoint's port (default 8181): the listener is a separate
+No session binds the endpoint's port (8181 installed, 8282 from a source
+checkout — see `mcp-server/README.md`): the listener is a separate
 long-lived process, started detached by the first session that finds the port
 free ([ADR-0003](adr/0003-resident-endpoint.md)), attached to by every session
 on every path.

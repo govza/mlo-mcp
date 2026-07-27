@@ -289,7 +289,7 @@ must come up before MLO has ever been opened.
 | Env var | Default | Meaning |
 |---|---|---|
 | `MLO_CLOUD_HOST` | `127.0.0.1` | bind address (loopback only by design) |
-| `MLO_CLOUD_PORT` | `8181` | listen port; MLO's proxy must match |
+| `MLO_CLOUD_PORT` | `8181` installed / `8282` from source | listen port; MLO's proxy must match |
 | `MLO_CLOUD_STATE_ROOT` | `%LOCALAPPDATA%\mlo-mcp\cloud` | override for tests and unusual installs only |
 | `MLO_WRITE_TTL_MINUTES` | `15` | how long an accepted write may wait for MLO's Apply |
 

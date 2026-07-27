@@ -13,6 +13,10 @@ await build({
   format: "esm",
   target: "node22",
   outfile: "dist-bundle/mlo-mcp.js",
+  // The one thing that tells the shipped server apart from a source checkout,
+  // and the only reason it matters: DEFAULT_CLOUD_PORT (8181 installed, 8282
+  // from source) — see src/config.ts.
+  define: { __MLO_BUNDLED__: "true" },
   banner: {
     js: [
       "#!/usr/bin/env node",

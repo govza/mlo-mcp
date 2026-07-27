@@ -7,8 +7,26 @@ import type { MloConfig } from "./types.js";
 /** Exported so tests can name the real default instead of restating the literal. */
 export const DEFAULT_EXE = "C:\\Program Files (x86)\\MyLifeOrganized.net\\MLO\\mlo.exe";
 
-/** Default listen port; off the crowded 8080 so dev servers don't collide with it. */
-export const DEFAULT_CLOUD_PORT = 8181;
+/**
+ * Set to `true` by esbuild when it produces dist-bundle/mlo-mcp.js — the only
+ * artifact `files` ships, so it is exactly the "installed" case. Running from
+ * source (tsx, `pnpm tool`, the tsc output under dist/) leaves it undefined.
+ */
+declare const __MLO_BUNDLED__: boolean | undefined;
+const BUNDLED = typeof __MLO_BUNDLED__ !== "undefined" && __MLO_BUNDLED__;
+
+/**
+ * Default listen port; off the crowded 8080 so dev servers don't collide with it.
+ *
+ * Two defaults, because a contributor's checkout and their installed server run
+ * against the same machine and the same MLO: an installed server takes 8181,
+ * which is the port every install doc tells users to point MLO's proxy at, and
+ * a source checkout takes 8282, the port the disposable Demo profile and the
+ * live-write harness already use. So working on the code cannot take over the
+ * listener the installed server owns, and MLO's two profiles each reach the
+ * endpoint they mean. `MLO_CLOUD_PORT` overrides either one.
+ */
+export const DEFAULT_CLOUD_PORT = BUNDLED ? 8181 : 8282;
 
 /**
  * How long an accepted write may wait for MLO's Apply before it expires into

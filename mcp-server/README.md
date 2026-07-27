@@ -34,10 +34,21 @@ claude mcp add mlo -- node D:\dev\projects\oml\mlo-mcp\mcp-server\dist\index.js
 | `MLO_EXPORT_DIR` | no | `%TEMP%\mlo-mcp` | Scratch dir for XML exports |
 | `MLO_CACHE_STALE_MS` | no | `30000` | Task-tree cache lifetime |
 | `MLO_CLOUD_HOST` | no | `127.0.0.1` | Local sync endpoint bind address (loopback only by design) |
-| `MLO_CLOUD_PORT` | no | `8181` | Local sync endpoint port (`0` = random); MLO profiles configured against the old 8080 default need their sync URL/proxy updated |
+| `MLO_CLOUD_PORT` | no | `8181` installed, `8282` from source | Local sync endpoint port (`0` = random); MLO profiles configured against the old 8080 default need their sync URL/proxy updated |
 | `MLO_CLOUD_STATE_ROOT` | no | `%LOCALAPPDATA%\mlo-mcp\cloud` | Partitioned sync-state root (override for tests/unusual installs only) |
 | `MLO_WRITE_TTL_MINUTES` | no | `15` | How long an accepted write may wait for MLO's Apply before it expires into the dead-letter record |
 | `MLO_INBOX_CAPTION` | no | MLO's own `<Inbox>` | Caption of the task acting as the capture inbox, for profiles with a hand-made one |
+
+The two port defaults are deliberate. `dist-bundle/mlo-mcp.js` — the only file
+this package ships, so the one every install runs — defaults to **8181**, the
+port the install docs tell users to point MLO's sync proxy at. Everything run
+from a checkout (`pnpm dev`, `pnpm tool`, `scripts/serve-cloud.ts`, the tsc
+output under `dist/`) defaults to **8282**, which is what the disposable Demo
+profile and the live-write harness already use. A contributor can therefore
+work on the code without seizing the listener their installed server owns, and
+each MLO profile reaches the endpoint it means. `MLO_CLOUD_PORT` overrides
+both; the switch is a build-time `define` in `scripts/bundle.mjs`, not a
+runtime guess.
 
 There is no profile setting. The server operates on the profile MLO itself
 has open, logs the detected path to stderr on startup, and refuses to start

@@ -15240,7 +15240,8 @@ function log(message) {
 
 // src/config.ts
 var DEFAULT_EXE = "C:\\Program Files (x86)\\MyLifeOrganized.net\\MLO\\mlo.exe";
-var DEFAULT_CLOUD_PORT = 8181;
+var BUNDLED = true;
+var DEFAULT_CLOUD_PORT = BUNDLED ? 8181 : 8282;
 var DEFAULT_WRITE_TTL_MS = 15 * 6e4;
 function resolveDataFile(mloExePath) {
   const pin = process.argv.find((a) => a.startsWith("--data-file="));
@@ -15965,8 +15966,18 @@ function repoFailureFromProblem(problem) {
   };
 }
 
-// src/cloud/delta.ts
+// src/cloud/guid.ts
 import { randomUUID } from "node:crypto";
+function normalizeGuid(uid) {
+  const raw = uid.replace(/^\{/, "").replace(/\}$/, "");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
+    throw new Error(`invalid GUID: "${uid}"`);
+  }
+  return `{${raw.toUpperCase()}}`;
+}
+function generateGuid() {
+  return `{${randomUUID().toUpperCase()}}`;
+}
 
 // src/cloud/csv.ts
 function parseRecords(input) {
@@ -16062,7 +16073,7 @@ function findSection(document, name) {
   return document.sections.find((section) => section.name === name);
 }
 
-// src/cloud/delta.ts
+// src/cloud/mlo-schema.ts
 var FILE_VERSION = "3";
 var PROGRAM_VERSION = "6.1.3";
 var EDITION = "MLO-Windows";
@@ -16109,16 +16120,6 @@ function createDeltaSkeleton() {
       rows: name === "SysVersions" ? [[FILE_VERSION, PROGRAM_VERSION, EDITION]] : []
     }))
   };
-}
-function normalizeGuid(uid) {
-  const raw = uid.replace(/^\{/, "").replace(/\}$/, "");
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
-    throw new Error(`invalid GUID: "${uid}"`);
-  }
-  return `{${raw.toUpperCase()}}`;
-}
-function generateGuid() {
-  return `{${randomUUID().toUpperCase()}}`;
 }
 function buildTaskAddDelta(input) {
   const document = createDeltaSkeleton();
@@ -16232,109 +16233,6 @@ function deltaRowsFromDocument(document) {
     }
   }
   return rows;
-}
-var KEYS = {
-  Places: ["UID"],
-  PlaceRelations: ["PlaceUID", "ParentPlaceUID"],
-  "Places.Deleted": ["PlaceUID"],
-  Flags: ["UID"],
-  "Flags.Deleted": ["FlagUID"],
-  TodoItems: ["UID"],
-  TodoItemPlaces: ["TodoItemUID", "PlaceUID"],
-  "TodoItems.Dependency": ["TaskUID", "DependencyUID"],
-  "TodoItems.Deleted": ["TodoItemUID"],
-  "TodoView.ManualOrdering.Starred": ["UID"]
-};
-function rowKey(section, row, columns) {
-  return columns.map((column2) => row[section.header.indexOf(column2)] ?? "").join("\0");
-}
-function mergeDeltas(entries) {
-  const result = createDeltaSkeleton();
-  const knownNames = new Set(SECTION_HEADERS.map(([name]) => name));
-  const targets = new Map(result.sections.map((section) => [section.name, section]));
-  for (const document of entries) {
-    for (const section of document.sections) {
-      const target = targets.get(section.name);
-      if (!target) continue;
-      for (const column2 of section.header) if (!target.header.includes(column2)) target.header.push(column2);
-    }
-  }
-  const maps = /* @__PURE__ */ new Map();
-  for (const [name] of SECTION_HEADERS) maps.set(name, /* @__PURE__ */ new Map());
-  const unknown2 = /* @__PURE__ */ new Map();
-  for (const document of entries) {
-    const taskSection = findSection(document, "TodoItems");
-    const deletedSection = findSection(document, "TodoItems.Deleted");
-    const changedUids = /* @__PURE__ */ new Set();
-    const deletedUids = /* @__PURE__ */ new Set();
-    if (taskSection) {
-      const uidIndex = taskSection.header.indexOf("UID");
-      for (const row of taskSection.rows) changedUids.add((row[uidIndex] ?? "").toUpperCase());
-    }
-    if (deletedSection) {
-      const uidIndex = deletedSection.header.indexOf("TodoItemUID");
-      for (const row of deletedSection.rows) deletedUids.add((row[uidIndex] ?? "").toUpperCase());
-    }
-    const purgeRelations = (sectionName, uids) => {
-      const map = maps.get(sectionName);
-      for (const key of [...map.keys()]) if (uids.has(key.split("\0", 1)[0].toUpperCase())) map.delete(key);
-    };
-    purgeRelations("TodoItemPlaces", changedUids);
-    purgeRelations("TodoItems.Dependency", changedUids);
-    purgeRelations("TodoItemPlaces", deletedUids);
-    purgeRelations("TodoItems.Dependency", deletedUids);
-    const starredOrder = maps.get("TodoView.ManualOrdering.Starred");
-    for (const uid of deletedUids) starredOrder.delete(uid);
-    if (taskSection) {
-      const uidIndex = taskSection.header.indexOf("UID");
-      const starredIndex = taskSection.header.indexOf("Starred");
-      if (starredIndex >= 0) {
-        for (const row of taskSection.rows) {
-          if ((row[starredIndex] ?? "") === "0") starredOrder.delete((row[uidIndex] ?? "").toUpperCase());
-        }
-      }
-    }
-    for (const section of document.sections) {
-      if (section.name === "SysVersions") continue;
-      if (!knownNames.has(section.name)) {
-        const target = unknown2.get(section.name);
-        if (target) {
-          for (const column2 of section.header) {
-            if (!target.header.includes(column2)) {
-              target.header.push(column2);
-              for (const row of target.rows) row.push("");
-            }
-          }
-          target.rows.push(...section.rows.map((row) => target.header.map((column2) => {
-            const index2 = section.header.indexOf(column2);
-            return index2 < 0 ? "" : row[index2] ?? "";
-          })));
-        } else unknown2.set(section.name, { name: section.name, header: [...section.header], rows: section.rows.map((row) => [...row]) });
-        continue;
-      }
-      const keys = KEYS[section.name];
-      if (!keys) continue;
-      const map = maps.get(section.name);
-      for (const row of section.rows) {
-        const key = rowKey(section, row, keys);
-        if ((section.name === "TodoItemPlaces" || section.name === "TodoItems.Dependency") && deletedUids.has((row[0] ?? "").toUpperCase())) continue;
-        const targetHeader = targets.get(section.name).header;
-        const projected = targetHeader.map((column2) => {
-          const index2 = section.header.indexOf(column2);
-          return index2 < 0 ? "" : row[index2] ?? "";
-        });
-        map.set(key, projected);
-        if (section.name === "TodoItems.Deleted") maps.get("TodoItems").delete(key);
-        if (section.name === "Places.Deleted") maps.get("Places").delete(key);
-        if (section.name === "Flags.Deleted") maps.get("Flags").delete(key);
-      }
-    }
-  }
-  for (const section of result.sections) {
-    if (section.name !== "SysVersions") section.rows = [...maps.get(section.name)?.values() ?? []];
-  }
-  result.sections.push(...unknown2.values());
-  return result;
 }
 
 // src/repo/pending-overlay.ts
@@ -17017,6 +16915,111 @@ function expandContext(places, caption) {
     for (const child of byCaption.get(next)?.includes ?? []) queue.push(normalizeContext(child));
   }
   return reached;
+}
+
+// src/cloud/delta-merge.ts
+var KEYS = {
+  Places: ["UID"],
+  PlaceRelations: ["PlaceUID", "ParentPlaceUID"],
+  "Places.Deleted": ["PlaceUID"],
+  Flags: ["UID"],
+  "Flags.Deleted": ["FlagUID"],
+  TodoItems: ["UID"],
+  TodoItemPlaces: ["TodoItemUID", "PlaceUID"],
+  "TodoItems.Dependency": ["TaskUID", "DependencyUID"],
+  "TodoItems.Deleted": ["TodoItemUID"],
+  "TodoView.ManualOrdering.Starred": ["UID"]
+};
+function rowKey(section, row, columns) {
+  return columns.map((column2) => row[section.header.indexOf(column2)] ?? "").join("\0");
+}
+function mergeDeltas(entries) {
+  const result = createDeltaSkeleton();
+  const knownNames = new Set(SECTION_HEADERS.map(([name]) => name));
+  const targets = new Map(result.sections.map((section) => [section.name, section]));
+  for (const document of entries) {
+    for (const section of document.sections) {
+      const target = targets.get(section.name);
+      if (!target) continue;
+      for (const column2 of section.header) if (!target.header.includes(column2)) target.header.push(column2);
+    }
+  }
+  const maps = /* @__PURE__ */ new Map();
+  for (const [name] of SECTION_HEADERS) maps.set(name, /* @__PURE__ */ new Map());
+  const unknown2 = /* @__PURE__ */ new Map();
+  for (const document of entries) {
+    const taskSection = findSection(document, "TodoItems");
+    const deletedSection = findSection(document, "TodoItems.Deleted");
+    const changedUids = /* @__PURE__ */ new Set();
+    const deletedUids = /* @__PURE__ */ new Set();
+    if (taskSection) {
+      const uidIndex = taskSection.header.indexOf("UID");
+      for (const row of taskSection.rows) changedUids.add((row[uidIndex] ?? "").toUpperCase());
+    }
+    if (deletedSection) {
+      const uidIndex = deletedSection.header.indexOf("TodoItemUID");
+      for (const row of deletedSection.rows) deletedUids.add((row[uidIndex] ?? "").toUpperCase());
+    }
+    const purgeRelations = (sectionName, uids) => {
+      const map = maps.get(sectionName);
+      for (const key of [...map.keys()]) if (uids.has(key.split("\0", 1)[0].toUpperCase())) map.delete(key);
+    };
+    purgeRelations("TodoItemPlaces", changedUids);
+    purgeRelations("TodoItems.Dependency", changedUids);
+    purgeRelations("TodoItemPlaces", deletedUids);
+    purgeRelations("TodoItems.Dependency", deletedUids);
+    const starredOrder = maps.get("TodoView.ManualOrdering.Starred");
+    for (const uid of deletedUids) starredOrder.delete(uid);
+    if (taskSection) {
+      const uidIndex = taskSection.header.indexOf("UID");
+      const starredIndex = taskSection.header.indexOf("Starred");
+      if (starredIndex >= 0) {
+        for (const row of taskSection.rows) {
+          if ((row[starredIndex] ?? "") === "0") starredOrder.delete((row[uidIndex] ?? "").toUpperCase());
+        }
+      }
+    }
+    for (const section of document.sections) {
+      if (section.name === "SysVersions") continue;
+      if (!knownNames.has(section.name)) {
+        const target = unknown2.get(section.name);
+        if (target) {
+          for (const column2 of section.header) {
+            if (!target.header.includes(column2)) {
+              target.header.push(column2);
+              for (const row of target.rows) row.push("");
+            }
+          }
+          target.rows.push(...section.rows.map((row) => target.header.map((column2) => {
+            const index2 = section.header.indexOf(column2);
+            return index2 < 0 ? "" : row[index2] ?? "";
+          })));
+        } else unknown2.set(section.name, { name: section.name, header: [...section.header], rows: section.rows.map((row) => [...row]) });
+        continue;
+      }
+      const keys = KEYS[section.name];
+      if (!keys) continue;
+      const map = maps.get(section.name);
+      for (const row of section.rows) {
+        const key = rowKey(section, row, keys);
+        if ((section.name === "TodoItemPlaces" || section.name === "TodoItems.Dependency") && deletedUids.has((row[0] ?? "").toUpperCase())) continue;
+        const targetHeader = targets.get(section.name).header;
+        const projected = targetHeader.map((column2) => {
+          const index2 = section.header.indexOf(column2);
+          return index2 < 0 ? "" : row[index2] ?? "";
+        });
+        map.set(key, projected);
+        if (section.name === "TodoItems.Deleted") maps.get("TodoItems").delete(key);
+        if (section.name === "Places.Deleted") maps.get("Places").delete(key);
+        if (section.name === "Flags.Deleted") maps.get("Flags").delete(key);
+      }
+    }
+  }
+  for (const section of result.sections) {
+    if (section.name !== "SysVersions") section.rows = [...maps.get(section.name)?.values() ?? []];
+  }
+  result.sections.push(...unknown2.values());
+  return result;
 }
 
 // src/services/outline-authoring.ts
@@ -27824,6 +27827,12 @@ var CloudGateway = class {
    * Everything the endpoint can attribute forwards to the vendor; only
    * requests it cannot route at all are rejected. The decision is pinned per
    * sessionID so a binding change can never switch authorities mid-session.
+   *
+   * The forward path reads nothing that can refuse (the non-interference
+   * invariant, spec section 6): this is the one read it makes, so an
+   * unreadable binding store or state root fails OPEN to a plain forward
+   * rather than becoming a failure MLO can observe. Only the deliberate
+   * refusals below reject.
    */
   async decideAuthority(fields) {
     const sessionId = typeof fields.sessionID === "string" && fields.sessionID.length ? fields.sessionID : void 0;
@@ -27836,7 +27845,10 @@ var CloudGateway = class {
       }
       this.sessionAuthorities.delete(sessionId);
     }
-    const authority = await this.computeAuthority(fields);
+    const authority = await this.computeAuthority(fields).catch((error2) => {
+      log(`authority decision failed, forwarding to the vendor: ${error2 instanceof Error ? error2.message : String(error2)}`);
+      return { kind: "upstream" };
+    });
     if (sessionId) {
       for (const [key, value] of this.sessionAuthorities) if (value.expires <= now) this.sessionAuthorities.delete(key);
       this.sessionAuthorities.set(sessionId, { authority, expires: now + SESSION_PIN_TTL_MS });
@@ -30141,6 +30153,7 @@ var WritePath = class {
 // src/cloud/server.ts
 var BODY_LIMIT = 32 * 1024 * 1024;
 var SHUTDOWN_GRACE_MS = 50;
+var DEFAULT_INJECTION_BUDGET_MS = 2e3;
 function json(response, status, body) {
   response.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   response.end(JSON.stringify(body));
@@ -30170,7 +30183,25 @@ function problemJson(response, status, problem) {
   response.writeHead(status, { "content-type": `${PROBLEM_CONTENT_TYPE}; charset=utf-8` });
   response.end(problemBody(problem));
 }
-async function interceptVendorSoap(request, response, gateway, observer, writePath, autoInit) {
+async function withinBudget(work, budgetMs, label) {
+  const guarded = work.catch((error2) => {
+    log(`${label} skipped (forward path unaffected): ${error2 instanceof Error ? error2.message : String(error2)}`);
+    return void 0;
+  });
+  let timer;
+  const budget = new Promise((resolve) => {
+    timer = setTimeout(() => {
+      log(`${label} abandoned after ${budgetMs} ms (forward path unaffected)`);
+      resolve(void 0);
+    }, budgetMs);
+  });
+  try {
+    return await Promise.race([guarded, budget]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+async function interceptVendorSoap(request, response, gateway, observer, writePath, autoInit, injectionBudgetMs) {
   if (request.method !== "POST") return false;
   let target;
   try {
@@ -30198,10 +30229,11 @@ async function interceptVendorSoap(request, response, gateway, observer, writePa
     let body = result.body;
     let headers = result.headers;
     if (operation === "GetModificationsBytesEx") {
-      const enriched = await writePath.enrichGetResponse(fields, result).catch((error2) => {
-        log(`injection skipped (forward path unaffected): ${error2 instanceof Error ? error2.message : String(error2)}`);
-        return void 0;
-      });
+      const enriched = await withinBudget(
+        writePath.enrichGetResponse(fields, result),
+        injectionBudgetMs,
+        "injection"
+      );
       if (enriched) {
         body = Buffer.from(enriched);
         headers = { "content-type": "text/xml; charset=utf-8", "content-length": String(body.byteLength) };
@@ -30211,13 +30243,17 @@ async function interceptVendorSoap(request, response, gateway, observer, writePa
     exchange.finish(result.status, headers);
     response.writeHead(result.status, headers);
     response.end(body);
-    void captureVendorSession(gateway, operation, fields, result);
-    if (operation === "ApplyModificationsBytesEx") {
-      void writePath.observeApply(fields, result).catch((error2) => log(`apply observation failed (forward path unaffected): ${error2 instanceof Error ? error2.message : String(error2)}`));
-    }
-    if (operation === "ReleaseSyncSessionBytes") {
-      writePath.observeRelease(fields);
-      void autoInit?.serviceAfterSession(soapFieldText(fields, "dataFileUID"));
+    try {
+      void captureVendorSession(gateway, operation, fields, result);
+      if (operation === "ApplyModificationsBytesEx") {
+        void writePath.observeApply(fields, result).catch((error2) => log(`apply observation failed (forward path unaffected): ${error2 instanceof Error ? error2.message : String(error2)}`));
+      }
+      if (operation === "ReleaseSyncSessionBytes") {
+        writePath.observeRelease(fields);
+        void autoInit?.serviceAfterSession(soapFieldText(fields, "dataFileUID"))?.catch((error2) => log(`post-session cloud-plane service failed: ${error2 instanceof Error ? error2.message : String(error2)}`));
+      }
+    } catch (error2) {
+      log(`post-response tap failed (MLO's answer already sent): ${error2 instanceof Error ? error2.message : String(error2)}`);
     }
   } catch (error2) {
     const message = `vendor forward failed: ${error2 instanceof Error ? error2.message : String(error2)}`;
@@ -30226,7 +30262,7 @@ async function interceptVendorSoap(request, response, gateway, observer, writePa
   }
   return true;
 }
-async function interceptGetFileTs(request, response, observer, writePath) {
+async function interceptGetFileTs(request, response, observer, writePath, injectionBudgetMs) {
   if (request.method !== "POST") return false;
   let target;
   try {
@@ -30244,10 +30280,7 @@ async function interceptGetFileTs(request, response, observer, writePath) {
     const result = await forwardBuffered(target, "POST", request.headers, requestBytes);
     let body = result.body;
     let headers = result.headers;
-    const nudged = await writePath.nudgeFileTs(fields, result).catch((error2) => {
-      log(`GetFileTS nudge skipped (forward path unaffected): ${error2 instanceof Error ? error2.message : String(error2)}`);
-      return void 0;
-    });
+    const nudged = await withinBudget(writePath.nudgeFileTs(fields, result), injectionBudgetMs, "GetFileTS nudge");
     if (nudged) {
       body = Buffer.from(nudged);
       headers = { "content-type": "text/xml; charset=utf-8", "content-length": String(body.byteLength) };
@@ -30332,12 +30365,13 @@ async function startCloudServer(options) {
     ...options.now ? { now: options.now } : {},
     ...autoInit ? { autoInit } : {}
   });
+  const injectionBudgetMs = options.injectionBudgetMs ?? DEFAULT_INJECTION_BUDGET_MS;
   let stopped;
   const server = http2.createServer(async (request, response) => {
     try {
       if (isAbsoluteRequestTarget(request.url ?? "")) {
-        if (await interceptVendorSoap(request, response, gateway, observer, writePath, autoInit)) return;
-        if (await interceptGetFileTs(request, response, observer, writePath)) return;
+        if (await interceptVendorSoap(request, response, gateway, observer, writePath, autoInit, injectionBudgetMs)) return;
+        if (await interceptGetFileTs(request, response, observer, writePath, injectionBudgetMs)) return;
         forwardRequest(request, response, observer);
         return;
       }
