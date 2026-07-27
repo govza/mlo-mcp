@@ -4,7 +4,8 @@ import { listTasksTool } from "../../src/tools/list-tasks.js";
 import { searchTasksTool } from "../../src/tools/search-tasks.js";
 import type { ToolContext } from "../../src/tools/contract.js";
 import { OutlineService } from "../../src/services/outline.js";
-import { EMPTY_ROW_STORE_VIEW, IdentityService } from "../../src/services/identity.js";
+import { IdentityService } from "../../src/services/identity.js";
+import { EMPTY_ROW_STORE_VIEW } from "../../src/cloud/row-store.js";
 import { FakeMloRepository } from "../fakes/fake-mlo-repository.js";
 import type { TaskNode } from "../../src/types.js";
 

@@ -1,9 +1,14 @@
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { atomicWrite } from "./atomic-file.js";
+import { FileCaptureJournal, type CaptureJournal } from "./capture-journal.js";
+import { FileInjectionQueue, type InjectionQueue } from "./injection-queue.js";
+import { FileRowStore, type RowStore } from "./row-store.js";
 
 /**
- * Per-`dataFileUID` cloud state.
+ * Per-`dataFileUID` cloud state, reachable only through the PartitionStore
+ * handle — its on-disk layout is private (spec section 4).
  *
  * The vendor protocol identifies each remote logical database with
  * `dataFileUID`; a compatible server must partition every piece of sync state
@@ -45,18 +50,32 @@ export interface PartitionSummary extends PartitionMeta {
   key: string;
 }
 
-async function atomicWrite(target: string, text: string): Promise<void> {
-  const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
-  await fs.writeFile(temporary, text);
-  await fs.rename(temporary, target);
-}
+/**
+ * The per-cloud-file handle (the reshaped mirror, spec section 4): the row
+ * store, the capture journal, and the injection queue live under it. It
+ * mirrors nothing — reads come from the local export; what is held here is
+ * what the write path structurally needs (latest full rows for authoring,
+ * durable pending writes for injection) plus the gauge source. The small
+ * binding / sightings / dead-letter stores sit beside it at the state root,
+ * because they are keyed by profile or shared across partitions.
+ */
+export class PartitionStore {
+  /** UID -> latest full captured TodoItems row (authoring source for update/complete). */
+  readonly rows: RowStore;
+  /** Timestamped capture outcomes — the gauge source, never a latch. */
+  readonly journal: CaptureJournal;
+  /** Durably accepted writes awaiting injection into a forwarded Get. */
+  readonly queue: InjectionQueue;
 
-export class PartitionHandle {
   constructor(
     readonly uid: string,
     readonly key: string,
     readonly dir: string,
-  ) {}
+  ) {
+    this.rows = new FileRowStore(dir);
+    this.journal = new FileCaptureJournal(dir);
+    this.queue = new FileInjectionQueue(dir);
+  }
 
   private metaPath(): string {
     return path.join(this.dir, "meta.json");
@@ -82,7 +101,7 @@ export class PartitionHandle {
 }
 
 export class PartitionRegistry {
-  private handles = new Map<string, PartitionHandle>();
+  private handles = new Map<string, PartitionStore>();
 
   constructor(readonly stateRoot: string) {}
 
@@ -95,14 +114,14 @@ export class PartitionRegistry {
    * `createMode` labels a NEWLY created partition (from the binding or the
    * armed window that introduced it); an existing partition keeps its meta.
    */
-  async open(rawUid: string, createMode: PartitionMode = "upstream"): Promise<PartitionHandle> {
+  async open(rawUid: string, createMode: PartitionMode = "upstream"): Promise<PartitionStore> {
     const uid = normalizeDataFileUid(rawUid);
     const key = partitionKey(uid);
     const cached = this.handles.get(key);
     if (cached) return cached;
     const dir = path.join(this.partitionsDir(), key);
     await fs.mkdir(dir, { recursive: true });
-    const handle = new PartitionHandle(uid, key, dir);
+    const handle = new PartitionStore(uid, key, dir);
     try {
       const meta = await handle.meta();
       if (normalizeDataFileUid(meta.dataFileUID) !== uid) {
@@ -123,7 +142,7 @@ export class PartitionRegistry {
   }
 
   /** Resolve a partition only if it already exists on disk. */
-  async resolveExisting(rawUid: string): Promise<PartitionHandle | undefined> {
+  async resolveExisting(rawUid: string): Promise<PartitionStore | undefined> {
     const uid = normalizeDataFileUid(rawUid);
     const key = partitionKey(uid);
     const cached = this.handles.get(key);

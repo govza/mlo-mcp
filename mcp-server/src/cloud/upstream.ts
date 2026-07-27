@@ -6,7 +6,7 @@ import { cursorToDecimalString, parseCursor, ZERO_CURSOR, type CloudCursor } fro
 import { generateGuid, SECTION_HEADERS } from "./delta.js";
 import { findSection, parseSectionedCsv, type SectionedCsv } from "./csv.js";
 import { packEnvelope, unpackEnvelope } from "./envelope.js";
-import type { SoapOperation } from "./soap.js";
+import { soapFieldText, type SoapOperation } from "./soap.js";
 import type { CloudGateway } from "./gateway.js";
 
 /**
@@ -83,7 +83,8 @@ export async function forwardBuffered(
   });
 }
 
-function decodeBody(result: ForwardResult): string {
+/** The forwarded body as text, undoing the vendor's transfer compression. */
+export function decodeForwardBody(result: ForwardResult): string {
   const encoding = (result.headers["content-encoding"] ?? "").toString().toLowerCase();
   if (encoding.includes("gzip")) return zlib.gunzipSync(result.body).toString("utf8");
   if (encoding.includes("deflate")) return zlib.inflateSync(result.body).toString("utf8");
@@ -112,8 +113,7 @@ function responseFields(xml: string, operation: SoapOperation): Record<string, u
 }
 
 function text(fields: Record<string, unknown> | undefined, name: string): string | undefined {
-  const value = fields?.[name];
-  return typeof value === "string" && value.length ? value : undefined;
+  return fields ? soapFieldText(fields, name) : undefined;
 }
 
 /**
@@ -208,7 +208,7 @@ export class VendorClient {
   /** One full round trip: send, observe durably, then enforce the result. */
   private async call(operation: SoapOperation, extra: [string, string][]): Promise<Record<string, unknown>> {
     const result = await this.request(operation, extra);
-    const fields = result.status === 200 ? responseFields(decodeBody(result), operation) : undefined;
+    const fields = result.status === 200 ? responseFields(decodeForwardBody(result), operation) : undefined;
     // Awaited so the record is on disk before any caller acts on the answer —
     // a refused commit must never outrun its own evidence.
     await this.note(operation, extra, result.status, fields);

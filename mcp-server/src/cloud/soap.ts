@@ -40,7 +40,7 @@ function field(name: string, value: string): string {
   return `<${name}>${escapeXml(value)}</${name}>`;
 }
 
-function parseFields(xml: string, expected: SoapOperation): Record<string, unknown> {
+function parseFields(xml: string, expected: string): Record<string, unknown> {
   const document = parser.parse(xml) as Record<string, unknown>;
   const envelopeNode = document.Envelope;
   if (!envelopeNode || typeof envelopeNode !== "object") throw new Error("SOAP Envelope is missing");
@@ -62,6 +62,21 @@ export function peekSoapFields(xml: string, operation: SoapOperation): Record<st
   } catch {
     return {};
   }
+}
+
+/** Parsed `<operation>Response` fields; {} when the body is malformed. */
+export function peekSoapResponseFields(xml: string, operation: SoapOperation): Record<string, unknown> {
+  try {
+    return parseFields(xml, `${operation}Response`);
+  } catch {
+    return {};
+  }
+}
+
+/** A peeked field as non-empty text, or undefined. */
+export function soapFieldText(fields: Record<string, unknown>, name: string): string | undefined {
+  const value = fields[name];
+  return typeof value === "string" && value.length ? value : undefined;
 }
 
 /** A protocol-level failure envelope, for policy rejections outside the forward path. */

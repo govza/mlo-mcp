@@ -40,7 +40,13 @@ const endpoint = await ensureEndpoint({
   port: config.cloudPort,
   spawn: residentSpawner(fileURLToPath(new URL("../src/index.ts", import.meta.url))),
 });
-const ctx = createToolContext(config, new LocalMloRepository(config, new SystemMloCli(config)), cloud, endpoint);
+const ctx = createToolContext(
+  config,
+  new LocalMloRepository(config, new SystemMloCli(config)),
+  cloud,
+  endpoint,
+  await cloud.boundRowStoreView(config.dataFile),
+);
 const args = z.object(tool.inputSchema).parse(JSON.parse(json ?? "{}"));
 
 const result = await tool.execute(args, ctx);

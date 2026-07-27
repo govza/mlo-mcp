@@ -1,18 +1,7 @@
 import type { TaskNode } from "../types.js";
 import type { Snapshot } from "../repo/mlo-repository.js";
+import type { RowStoreView } from "../cloud/row-store.js";
 import { findById, flatten } from "../task-tree.js";
-
-/**
- * The identity service's view of the row store: UID -> latest captured caption.
- * PartitionStore (ticket 05) provides the real one; until then the composition
- * root wires an empty view and every resolution reads as "unconfirmed".
- */
-export interface RowStoreView {
-  captionOf(uid: string): string | undefined;
-}
-
-/** A RowStoreView that knows nothing — every resolution is unconfirmed. */
-export const EMPTY_ROW_STORE_VIEW: RowStoreView = { captionOf: () => undefined };
 
 export type UidResolution =
   | {

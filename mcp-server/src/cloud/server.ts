@@ -5,6 +5,7 @@ import { CloudGateway } from "./gateway.js";
 import { SyncObserver } from "./sync-observer.js";
 import { peekSoapFields, soapFault, soapOperationFailure, soapOperationFromAction } from "./soap.js";
 import { forwardVendorSoap } from "./upstream.js";
+import { captureTlsConnectSeen, captureVendorSession } from "./capture.js";
 import { DEFAULT_CLOUD_PORT } from "../config.js";
 import { SERVER_INFO } from "../version.js";
 import { log } from "../log.js";
@@ -95,6 +96,9 @@ async function interceptVendorSoap(
     exchange.finish(result.status, result.headers);
     response.writeHead(result.status, result.headers);
     response.end(result.body);
+    // After the response is on its way, never before: capture is a contained
+    // tap (spec section 6) and must not add a millisecond to MLO's session.
+    void captureVendorSession(gateway, operation, fields, result);
   } catch (error) {
     const message = `vendor forward failed: ${error instanceof Error ? error.message : String(error)}`;
     exchange.finish(502, {});
@@ -138,7 +142,13 @@ function forwardRequest(request: IncomingMessage, response: ServerResponse, obse
   request.pipe(upstream);
 }
 
-function tunnelConnect(request: IncomingMessage, client: net.Socket, head: Buffer, observer: SyncObserver): void {
+function tunnelConnect(
+  request: IncomingMessage,
+  client: net.Socket,
+  head: Buffer,
+  observer: SyncObserver,
+  gateway: CloudGateway,
+): void {
   const separator = (request.url ?? "").lastIndexOf(":");
   const host = separator > 0 ? request.url!.slice(0, separator) : "";
   const port = Number(separator > 0 ? request.url!.slice(separator + 1) : "");
@@ -152,6 +162,7 @@ function tunnelConnect(request: IncomingMessage, client: net.Socket, head: Buffe
     // observed or injected. Loud, because the whole write path rides the
     // plain-HTTP forward.
     log('HTTPS CONNECT to the vendor sync host: sync is TLS-tunneled and invisible to the endpoint — uncheck "Use secure connection" in MLO\'s cloud login');
+    void captureTlsConnectSeen(gateway, host, port);
   }
   const upstream = net.connect(port, host);
   upstream.once("connect", () => {
@@ -215,7 +226,7 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
       json(response, status, { error: error instanceof Error ? error.message : String(error) });
     }
   });
-  server.on("connect", (request, socket, head) => tunnelConnect(request, socket as net.Socket, head, observer));
+  server.on("connect", (request, socket, head) => tunnelConnect(request, socket as net.Socket, head, observer, gateway));
 
   /** Idempotent: /v1/shutdown and an explicit stop() must not race each other. */
   function stopSelf(): Promise<void> {

@@ -5,7 +5,8 @@ import path from "node:path";
 import { BindingStore, type ProfileBinding } from "./binding.js";
 import { SightingStore, type UnboundSighting } from "./sightings.js";
 import { DeadLetterStore } from "./dead-letter.js";
-import { normalizeDataFileUid, PartitionRegistry, type PartitionHandle, type PartitionLifecycle } from "./partition.js";
+import { normalizeDataFileUid, PartitionRegistry, type PartitionStore, type PartitionLifecycle } from "./partition.js";
+import type { RowStoreView } from "./row-store.js";
 import type { VendorContact } from "./upstream.js";
 import { log } from "../log.js";
 
@@ -197,13 +198,24 @@ export class CloudGateway {
   /** The partition bound to a profile, or a description of why none is. */
   async boundPartition(profilePath: string): Promise<
     | { kind: "unbound"; binding?: ProfileBinding }
-    | { kind: "bound"; binding: ProfileBinding; partition: PartitionHandle; lifecycle: PartitionLifecycle }
+    | { kind: "bound"; binding: ProfileBinding; partition: PartitionStore; lifecycle: PartitionLifecycle }
   > {
     const binding = await this.bindings.forProfile(profilePath);
     if (!binding?.dataFileUID) return { kind: "unbound", ...(binding ? { binding } : {}) };
     await this.prepareRoot();
     const partition = await this.registry.open(binding.dataFileUID, binding.mode);
     return { kind: "bound", binding, partition, lifecycle: await partition.lifecycle() };
+  }
+
+  /**
+   * The bound partition's row store view for a session's identity service, or
+   * undefined when the profile is unbound (or the root unreadable) — under
+   * which every resolution honestly reads as unconfirmed. Resolved once at
+   * composition time; a binding that appears later reaches new sessions.
+   */
+  async boundRowStoreView(profilePath: string): Promise<RowStoreView | undefined> {
+    const bound = await this.boundPartition(profilePath).catch(() => undefined);
+    return bound?.kind === "bound" ? bound.partition.rows.view() : undefined;
   }
 
   /**
