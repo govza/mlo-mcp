@@ -3,9 +3,18 @@ import https from "node:https";
 import net from "node:net";
 import { CloudGateway } from "./gateway.js";
 import { SyncObserver } from "./sync-observer.js";
-import { peekSoapFields, soapFault, soapOperationFailure, soapOperationFromAction } from "./soap.js";
-import { forwardVendorSoap } from "./upstream.js";
+import {
+  GET_FILE_TS,
+  isGetFileTsAction,
+  peekSoapFields,
+  soapFault,
+  soapOperationFailure,
+  soapOperationFromAction,
+} from "./soap.js";
+import { forwardBuffered, forwardVendorSoap } from "./upstream.js";
 import { captureTlsConnectSeen, captureVendorSession } from "./capture.js";
+import { WritePath } from "./write-path.js";
+import { PROBLEM_CONTENT_TYPE, problemBody, type Problem } from "./problem.js";
 import { DEFAULT_CLOUD_PORT } from "../config.js";
 import { SERVER_INFO } from "../version.js";
 import { log } from "../log.js";
@@ -24,11 +33,17 @@ export interface CloudServerOptions {
   stateRoot?: string;
   /** Hostname whose proxied traffic is structurally summarized (tests override the vendor default). */
   observeHost?: string;
+  /** TTL for accepted writes (spec section 2 mechanic 7); default 15 minutes. */
+  writeTtlMs?: number;
+  /** Injectable clock for the write path (tests drive TTL expiry with it). */
+  now?: () => Date;
 }
 
 export interface CloudServerHandle {
   server: http.Server;
   gateway: CloudGateway;
+  /** The resident write path — exposed for in-process suites (sabotage, contract). */
+  writePath: WritePath;
   host: string;
   port: number;
   stop(): Promise<void>;
@@ -63,11 +78,17 @@ function isAbsoluteRequestTarget(target: string): boolean {
   return /^https?:\/\//i.test(target);
 }
 
+function problemJson(response: ServerResponse, status: number, problem: Problem): void {
+  response.writeHead(status, { "content-type": `${PROBLEM_CONTENT_TYPE}; charset=utf-8` });
+  response.end(problemBody(problem));
+}
+
 async function interceptVendorSoap(
   request: IncomingMessage,
   response: ServerResponse,
   gateway: CloudGateway,
   observer: SyncObserver,
+  writePath: WritePath,
 ): Promise<boolean> {
   if (request.method !== "POST") return false;
   let target: URL;
@@ -92,13 +113,82 @@ async function interceptVendorSoap(
   }
   try {
     const result = await forwardVendorSoap(gateway, target, request.headers, requestBytes, fields);
-    exchange.addResponseChunk(result.body);
-    exchange.finish(result.status, result.headers);
-    response.writeHead(result.status, result.headers);
-    response.end(result.body);
-    // After the response is on its way, never before: capture is a contained
-    // tap (spec section 6) and must not add a millisecond to MLO's session.
+    let body = result.body;
+    let headers: IncomingMessage["headers"] = result.headers;
+    if (operation === "GetModificationsBytesEx") {
+      // Injection is a best-effort transform whose mandatory fallback is the
+      // vendor's original payload (spec section 6): any failure in here
+      // forwards verbatim, and MLO never learns the difference.
+      const enriched = await writePath.enrichGetResponse(fields, result).catch((error) => {
+        log(`injection skipped (forward path unaffected): ${error instanceof Error ? error.message : String(error)}`);
+        return undefined;
+      });
+      if (enriched) {
+        body = Buffer.from(enriched);
+        // Fresh headers: the rebuilt body is neither compressed nor the
+        // vendor's length.
+        headers = { "content-type": "text/xml; charset=utf-8", "content-length": String(body.byteLength) };
+      }
+    }
+    exchange.addResponseChunk(body);
+    exchange.finish(result.status, headers);
+    response.writeHead(result.status, headers);
+    response.end(body);
+    // After the response is on its way, never before: capture and Apply
+    // observation are contained taps (spec section 6) and must not add a
+    // millisecond to MLO's session.
     void captureVendorSession(gateway, operation, fields, result);
+    if (operation === "ApplyModificationsBytesEx") {
+      void writePath.observeApply(fields, result).catch((error) =>
+        log(`apply observation failed (forward path unaffected): ${error instanceof Error ? error.message : String(error)}`));
+    }
+    if (operation === "ReleaseSyncSessionBytes") writePath.observeRelease(fields);
+  } catch (error) {
+    const message = `vendor forward failed: ${error instanceof Error ? error.message : String(error)}`;
+    exchange.finish(502, {});
+    xml(response, 502, soapFault(message));
+  }
+  return true;
+}
+
+/**
+ * MLO's ~90 s background GetFileTS poll. Forwarded like any vendor exchange;
+ * the write path may answer it advanced while the injection queue is
+ * non-empty (the nudge, spec section 2 mechanic 4), verbatim otherwise.
+ */
+async function interceptGetFileTs(
+  request: IncomingMessage,
+  response: ServerResponse,
+  observer: SyncObserver,
+  writePath: WritePath,
+): Promise<boolean> {
+  if (request.method !== "POST") return false;
+  let target: URL;
+  try { target = new URL(request.url ?? ""); }
+  catch { return false; }
+  if (!observer.matches(target.hostname) || !/\/MLOInetSync\.asmx$/i.test(target.pathname)) return false;
+  if (!isGetFileTsAction(request.headers.soapaction)) return false;
+
+  const requestBytes = await readBytes(request);
+  const exchange = observer.begin(request.method, target, request.headers);
+  exchange.addRequestChunk(requestBytes);
+  const fields = peekSoapFields(requestBytes.toString("utf8"), GET_FILE_TS);
+  try {
+    const result = await forwardBuffered(target, "POST", request.headers, requestBytes);
+    let body = result.body;
+    let headers: IncomingMessage["headers"] = result.headers;
+    const nudged = await writePath.nudgeFileTs(fields, result).catch((error) => {
+      log(`GetFileTS nudge skipped (forward path unaffected): ${error instanceof Error ? error.message : String(error)}`);
+      return undefined;
+    });
+    if (nudged) {
+      body = Buffer.from(nudged);
+      headers = { "content-type": "text/xml; charset=utf-8", "content-length": String(body.byteLength) };
+    }
+    exchange.addResponseChunk(body);
+    exchange.finish(result.status, headers);
+    response.writeHead(result.status, headers);
+    response.end(body);
   } catch (error) {
     const message = `vendor forward failed: ${error instanceof Error ? error.message : String(error)}`;
     exchange.finish(502, {});
@@ -190,15 +280,67 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
   if (!options.gateway && !options.stateRoot) throw new Error("cloud server needs a gateway or a stateRoot");
   const gateway = options.gateway ?? new CloudGateway({ stateRoot: options.stateRoot! });
   const observer = new SyncObserver(gateway.observerDir(), options.observeHost);
+  const writePath = new WritePath(gateway, {
+    ...(options.writeTtlMs !== undefined ? { ttlMs: options.writeTtlMs } : {}),
+    ...(options.now ? { now: options.now } : {}),
+  });
   let stopped: Promise<void> | undefined;
   const server = http.createServer(async (request, response) => {
     try {
       if (isAbsoluteRequestTarget(request.url ?? "")) {
-        if (await interceptVendorSoap(request, response, gateway, observer)) return;
+        if (await interceptVendorSoap(request, response, gateway, observer, writePath)) return;
+        if (await interceptGetFileTs(request, response, observer, writePath)) return;
         forwardRequest(request, response, observer);
         return;
       }
       const url = new URL(request.url ?? "/", "http://localhost");
+      // The complete non-proxy surface (spec section 4): POST /v1/write,
+      // GET /v1/write/:id, GET /v1/status, POST /v1/shutdown. Nothing else —
+      // every deleted route answers 404.
+      if (request.method === "POST" && url.pathname === "/v1/write") {
+        let parsed: Record<string, unknown> | undefined;
+        try {
+          const value = JSON.parse((await readBytes(request)).toString("utf8")) as unknown;
+          if (value && typeof value === "object" && !Array.isArray(value)) parsed = value as Record<string, unknown>;
+        } catch { /* refused below */ }
+        if (!parsed) {
+          problemJson(response, 400, {
+            kind: "invalid-request",
+            title: "the write body must be a JSON object",
+            retryable: false,
+          });
+          return;
+        }
+        const outcome = await writePath.accept(parsed.profile, parsed.rows);
+        if (outcome.kind === "refused") {
+          problemJson(response, outcome.httpStatus, outcome.problem);
+          return;
+        }
+        json(response, 200, {
+          writeId: outcome.writeId,
+          uid: outcome.uid,
+          verb: outcome.verb,
+          ...(outcome.caption ? { caption: outcome.caption } : {}),
+          status: "accepted",
+          expiresAt: outcome.expiresAt,
+        });
+        return;
+      }
+      const writeStatusMatch = url.pathname.match(/^\/v1\/write\/([^/]+)$/);
+      if (request.method === "GET" && writeStatusMatch) {
+        const writeId = decodeURIComponent(writeStatusMatch[1]!);
+        const lookup = await writePath.status(writeId);
+        if (!lookup) {
+          problemJson(response, 404, {
+            kind: "unknown-write",
+            title: `no write with id "${writeId}" — receipts age out of the outcome ring eventually`,
+            retryable: false,
+          });
+          return;
+        }
+        json(response, 200, lookup);
+        return;
+      }
       if (request.method === "GET" && url.pathname === "/v1/status") {
         json(response, 200, {
           stateRoot: gateway.stateRoot,
@@ -249,7 +391,7 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
   const address = server.address();
   const port = typeof address === "object" && address ? address.port : options.port ?? DEFAULT_CLOUD_PORT;
   log(`cloud server listening on http://${host}:${port}`);
-  return { server, gateway, host, port, stop: stopSelf };
+  return { server, gateway, writePath, host, port, stop: stopSelf };
 }
 
 export function stopCloudServer(handle: CloudServerHandle): Promise<void> {

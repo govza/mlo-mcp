@@ -38,6 +38,28 @@ export interface PendingWrite {
 export type WriteStatus = "accepted" | "delivered" | "verified" | "expired" | "superseded";
 
 /**
+ * A typed write refusal crossing the repository seam. Interim carrier until
+ * the error-contract ticket turns every service boundary into
+ * `ServiceResult` unions: the refusal is already a plain tagged value
+ * (rehydrated problem+json from the resident, or the client-side
+ * `endpoint-down`), only the transport up through the repository is still a
+ * throw.
+ */
+export interface WriteRefusal {
+  kind: string;
+  title: string;
+  retryable: boolean | "after-user-action";
+  remedy?: string;
+}
+
+export class WriteRefusedError extends Error {
+  constructor(readonly refusal: WriteRefusal) {
+    super(refusal.remedy ? `${refusal.title} — ${refusal.remedy}` : refusal.title);
+    this.name = "WriteRefusedError";
+  }
+}
+
+/**
  * The one seam over MLO-as-database ([spec section 4](../../../docs/adr/0005-target-architecture-spec.md)):
  * the only code above the driver tier that touches mlo.exe, the state root, or
  * the resident process. No service ever learns a resident exists. Deliberately

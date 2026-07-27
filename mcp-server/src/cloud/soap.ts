@@ -11,6 +11,16 @@ export const SOAP_OPERATIONS = [
 
 export type SoapOperation = typeof SOAP_OPERATIONS[number];
 
+/**
+ * The undocumented fourth operation: MLO's ~90 s background poll for the cloud
+ * file's current version. Request carries `dataFileUID`; the response's
+ * `GetFileTSResult` is the bare version number. Not a session operation — it
+ * gates nothing by itself — but the write path answers it advanced while the
+ * injection queue is non-empty, which is what induces a session for a
+ * pure-MCP write on a quiet MLO (spec section 2, mechanic 4).
+ */
+export const GET_FILE_TS = "GetFileTS";
+
 const OPERATIONS = new Set<string>(SOAP_OPERATIONS);
 const parser = new XMLParser({
   removeNSPrefix: true,
@@ -29,7 +39,7 @@ function escapeXml(value: string): string {
     .replaceAll("'", "&apos;");
 }
 
-function envelope(operation: SoapOperation, fields: string): Uint8Array {
+function envelope(operation: string, fields: string): Uint8Array {
   const xml = `<?xml version="1.0" encoding="utf-8"?>` +
     `<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="${SOAP_NAMESPACE}">` +
     `<soap:Body><${operation}Response xmlns="${MLO_NAMESPACE}">${fields}</${operation}Response></soap:Body></soap:Envelope>`;
@@ -56,7 +66,7 @@ function parseFields(xml: string, expected: string): Record<string, unknown> {
 }
 
 /** Parsed operation fields for routing decisions; {} when the body is malformed. */
-export function peekSoapFields(xml: string, operation: SoapOperation): Record<string, unknown> {
+export function peekSoapFields(xml: string, operation: string): Record<string, unknown> {
   try {
     return parseFields(xml, operation);
   } catch {
@@ -65,7 +75,7 @@ export function peekSoapFields(xml: string, operation: SoapOperation): Record<st
 }
 
 /** Parsed `<operation>Response` fields; {} when the body is malformed. */
-export function peekSoapResponseFields(xml: string, operation: SoapOperation): Record<string, unknown> {
+export function peekSoapResponseFields(xml: string, operation: string): Record<string, unknown> {
   try {
     return parseFields(xml, `${operation}Response`);
   } catch {
@@ -84,12 +94,36 @@ export function soapOperationFailure(operation: SoapOperation, message: string):
   return envelope(operation, field(`${operation}Result`, "false") + field("errorMessage", message));
 }
 
-export function soapOperationFromAction(action: string | string[] | undefined): SoapOperation | undefined {
+function actionName(action: string | string[] | undefined): string | undefined {
   const value = Array.isArray(action) ? action[0] : action;
   if (!value) return undefined;
   const normalized = value.trim().replace(/^"|"$/g, "");
-  const name = normalized.slice(normalized.lastIndexOf("/") + 1);
-  return OPERATIONS.has(name) ? name as SoapOperation : undefined;
+  return normalized.slice(normalized.lastIndexOf("/") + 1);
+}
+
+export function soapOperationFromAction(action: string | string[] | undefined): SoapOperation | undefined {
+  const name = actionName(action);
+  return name !== undefined && OPERATIONS.has(name) ? name as SoapOperation : undefined;
+}
+
+export function isGetFileTsAction(action: string | string[] | undefined): boolean {
+  return actionName(action) === GET_FILE_TS;
+}
+
+/** A rebuilt GetFileTS response presenting `version` — the nudge's answer. */
+export function buildGetFileTsResponse(version: string): Uint8Array {
+  return envelope(GET_FILE_TS, field(`${GET_FILE_TS}Result`, version));
+}
+
+/**
+ * A rebuilt Get response carrying an injected payload: the same three fields
+ * every captured vendor answer carries, nothing else.
+ */
+export function buildGetModificationsResponse(maxVersion: string, dataBase64: string): Uint8Array {
+  return envelope(
+    "GetModificationsBytesEx",
+    field("GetModificationsBytesExResult", "true") + field("maxVersion", maxVersion) + field("data", dataBase64),
+  );
 }
 
 export function soapFault(message: string): Uint8Array {

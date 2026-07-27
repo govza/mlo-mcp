@@ -11,6 +11,7 @@ import { z } from "zod";
 import { loadConfig } from "../src/config.js";
 import { SystemMloCli } from "../src/repo/mlo-cli.js";
 import { LocalMloRepository } from "../src/repo/local-mlo-repository.js";
+import { HttpResidentClient } from "../src/repo/resident-client.js";
 import { createToolContext } from "../src/context.js";
 import { allTools } from "../src/tools/registry.js";
 import { CloudGateway } from "../src/cloud/gateway.js";
@@ -35,14 +36,19 @@ const cloud = new CloudGateway({ stateRoot: config.cloudStateRoot });
 // Attaches to the resident endpoint exactly like an MCP session, because it is
 // one in every way that matters: it drives the same tools, and writes and
 // bootstrap here should behave the same as they do in a client.
+const spawn = residentSpawner(fileURLToPath(new URL("../src/index.ts", import.meta.url)));
 const endpoint = await ensureEndpoint({
   host: config.cloudHost,
   port: config.cloudPort,
-  spawn: residentSpawner(fileURLToPath(new URL("../src/index.ts", import.meta.url))),
+  spawn,
 });
 const ctx = createToolContext(
   config,
-  new LocalMloRepository(config, new SystemMloCli(config)),
+  new LocalMloRepository(
+    config,
+    new SystemMloCli(config),
+    new HttpResidentClient({ host: config.cloudHost, port: config.cloudPort, spawn }),
+  ),
   cloud,
   endpoint,
   await cloud.boundRowStoreView(config.dataFile),

@@ -10,6 +10,13 @@ export const DEFAULT_EXE = "C:\\Program Files (x86)\\MyLifeOrganized.net\\MLO\\m
 /** Default listen port; off the crowded 8080 so dev servers don't collide with it. */
 export const DEFAULT_CLOUD_PORT = 8181;
 
+/**
+ * How long an accepted write may wait for MLO's Apply before it expires into
+ * the dead-letter file (spec section 2, mechanic 7). 15 minutes by default;
+ * MLO_WRITE_TTL_MINUTES overrides.
+ */
+export const DEFAULT_WRITE_TTL_MS = 15 * 60_000;
+
 // The app's open profile is the only one the server can fully operate on
 // (reads drive mlo.exe, writes ride that profile's sync), so there is no
 // profile setting: detect it or refuse to start. Detection grounds the
@@ -40,6 +47,7 @@ export interface CloudConfig {
   cloudHost: string;
   cloudPort: number;
   cloudStateRoot: string;
+  writeTtlMs: number;
 }
 
 /**
@@ -53,10 +61,12 @@ export function loadCloudConfig(): CloudConfig {
   if (!Number.isInteger(cloudPort) || cloudPort < 0 || cloudPort > 65535) {
     throw new Error("MLO_CLOUD_PORT must be an integer from 0 through 65535");
   }
+  const ttlMinutes = Number(process.env.MLO_WRITE_TTL_MINUTES ?? "");
   return {
     cloudHost: process.env.MLO_CLOUD_HOST ?? "127.0.0.1",
     cloudPort,
     cloudStateRoot: resolveStateRoot(),
+    writeTtlMs: Number.isFinite(ttlMinutes) && ttlMinutes > 0 ? ttlMinutes * 60_000 : DEFAULT_WRITE_TTL_MS,
   };
 }
 

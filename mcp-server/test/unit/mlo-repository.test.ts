@@ -108,10 +108,10 @@ describe("LocalMloRepository snapshot coalescing", () => {
   });
 });
 
-describe("LocalMloRepository write path stubs", () => {
-  it("refuses writes until the resident injection queue lands", async () => {
+describe("LocalMloRepository without a ResidentClient", () => {
+  it("refuses writes loudly in a read-only wiring", async () => {
     const repo = new LocalMloRepository(config, new ScriptedMloCli());
-    await expect(repo.write([])).rejects.toThrow(/not wired yet/);
-    await expect(repo.status("w1")).rejects.toThrow(/not wired yet/);
+    await expect(repo.write([])).rejects.toThrow(/without a ResidentClient/);
+    await expect(repo.status("w1")).rejects.toThrow(/without a ResidentClient/);
   });
 });

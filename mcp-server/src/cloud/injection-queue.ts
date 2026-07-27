@@ -12,11 +12,13 @@ import type { DeltaRow, WriteId } from "../repo/mlo-repository.js";
  * this module owns only the durable state.
  */
 
+export type WriteVerb = "add" | "update" | "complete" | "delete";
+
 export interface QueuedWrite {
   writeId: WriteId;
   /** The row UID the write targets — the injection gate compares against the binding, delivery against Apply. */
   uid: string;
-  verb: "add" | "update" | "complete" | "delete";
+  verb: WriteVerb;
   /** For the dead-letter record a TTL expiry writes — the human-readable identity of the attempt. */
   caption?: string;
   rows: DeltaRow[];

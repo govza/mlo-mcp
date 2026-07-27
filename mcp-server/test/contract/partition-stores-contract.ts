@@ -3,6 +3,7 @@ import { buildTaskAddDelta, buildTaskDeleteDelta } from "../../src/cloud/delta.j
 import type { CaptureJournal } from "../../src/cloud/capture-journal.js";
 import type { InjectionQueue, QueuedWrite } from "../../src/cloud/injection-queue.js";
 import type { RowStore } from "../../src/cloud/row-store.js";
+import type { WriteOutcome, WriteOutcomeStore } from "../../src/cloud/write-outcomes.js";
 import type { BindingStoreApi, DeadLetterStoreApi, SightingStoreApi } from "../fakes/fake-state-stores.js";
 
 /**
@@ -181,6 +182,44 @@ export function describeInjectionQueueContract(
       expect(removed?.writeId).toBe("w1");
       expect((await queue.pending()).map((write) => write.writeId)).toEqual(["w2"]);
       expect(await queue.remove("w1")).toBeUndefined();
+    });
+  });
+}
+
+function sampleOutcome(writeId: string, status: WriteOutcome["status"]): WriteOutcome {
+  return {
+    writeId,
+    uid: UID_A,
+    verb: "update",
+    caption: "resolved task",
+    status,
+    at: "2026-07-27T10:20:00Z",
+    detail: `${status} in a test`,
+  };
+}
+
+export function describeWriteOutcomeStoreContract(
+  name: string,
+  makeStore: (cap?: number) => WriteOutcomeStore | Promise<WriteOutcomeStore>,
+): void {
+  describe(`WriteOutcomeStore contract — ${name}`, () => {
+    it("answers byId with the recorded resolution", async () => {
+      const store = await makeStore();
+      await store.record(sampleOutcome("w1", "delivered"));
+      await store.record(sampleOutcome("w2", "superseded"));
+      expect((await store.byId("w1"))?.status).toBe("delivered");
+      expect((await store.byId("w2"))?.status).toBe("superseded");
+      expect(await store.byId("w3")).toBeUndefined();
+      expect((await store.all()).map((outcome) => outcome.writeId)).toEqual(["w1", "w2"]);
+    });
+
+    it("is a bounded ring: the oldest receipts fall off past the cap", async () => {
+      const store = await makeStore(2);
+      await store.record(sampleOutcome("w1", "expired"));
+      await store.record(sampleOutcome("w2", "expired"));
+      await store.record(sampleOutcome("w3", "expired"));
+      expect(await store.byId("w1")).toBeUndefined();
+      expect((await store.all()).map((outcome) => outcome.writeId)).toEqual(["w2", "w3"]);
     });
   });
 }

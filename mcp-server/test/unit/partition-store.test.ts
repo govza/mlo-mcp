@@ -12,7 +12,8 @@ import { DeadLetterStore } from "../../src/cloud/dead-letter.js";
 import { FakeRowStore } from "../fakes/fake-row-store.js";
 import { FakeCaptureJournal } from "../fakes/fake-capture-journal.js";
 import { FakeInjectionQueue } from "../fakes/fake-injection-queue.js";
-import { FakeBindingStore, FakeDeadLetterStore, FakeSightingStore } from "../fakes/fake-state-stores.js";
+import { FileWriteOutcomes } from "../../src/cloud/write-outcomes.js";
+import { FakeBindingStore, FakeDeadLetterStore, FakeSightingStore, FakeWriteOutcomeStore } from "../fakes/fake-state-stores.js";
 import {
   addDocument,
   describeBindingStoreContract,
@@ -21,6 +22,7 @@ import {
   describeInjectionQueueContract,
   describeRowStoreContract,
   describeSightingStoreContract,
+  describeWriteOutcomeStoreContract,
   sampleWrite,
 } from "../contract/partition-stores-contract.js";
 
@@ -45,6 +47,8 @@ describeCaptureJournalContract("file-backed", async (now, cap) => new FileCaptur
 describeCaptureJournalContract("fake", (now, cap) => new FakeCaptureJournal(cap, now));
 describeInjectionQueueContract("file-backed", async () => new FileInjectionQueue(await tempDir()));
 describeInjectionQueueContract("fake", () => new FakeInjectionQueue());
+describeWriteOutcomeStoreContract("file-backed", async (cap) => new FileWriteOutcomes(await tempDir(), cap));
+describeWriteOutcomeStoreContract("fake", (cap) => new FakeWriteOutcomeStore(cap));
 describeBindingStoreContract("file-backed", async () => new BindingStore(await tempDir()));
 describeBindingStoreContract("fake", () => new FakeBindingStore());
 describeSightingStoreContract("file-backed", async () => new SightingStore(await tempDir()));

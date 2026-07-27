@@ -3,6 +3,7 @@ import type { BindingStore, ProfileBinding } from "../../src/cloud/binding.js";
 import type { DeadLetter, DeadLetterStore } from "../../src/cloud/dead-letter.js";
 import type { SightingStore, UnboundSighting } from "../../src/cloud/sightings.js";
 import { normalizeDataFileUid, type PartitionMode } from "../../src/cloud/partition.js";
+import { DEFAULT_OUTCOME_CAP, type WriteOutcome, type WriteOutcomeStore } from "../../src/cloud/write-outcomes.js";
 
 /**
  * Trivial in-memory fakes for the small stores beside PartitionStore (spec
@@ -107,6 +108,24 @@ export class FakeSightingStore implements SightingStoreApi {
     }
     this.sightings.sort((a, b) => Date.parse(b.lastSeen) - Date.parse(a.lastSeen));
     this.sightings = this.sightings.slice(0, this.max);
+  }
+}
+
+export class FakeWriteOutcomeStore implements WriteOutcomeStore {
+  private outcomes: WriteOutcome[] = [];
+
+  constructor(private readonly cap = DEFAULT_OUTCOME_CAP) {}
+
+  async record(outcome: WriteOutcome): Promise<void> {
+    this.outcomes = [...this.outcomes, outcome].slice(-this.cap);
+  }
+
+  async all(): Promise<WriteOutcome[]> {
+    return [...this.outcomes];
+  }
+
+  async byId(writeId: string): Promise<WriteOutcome | undefined> {
+    return this.outcomes.findLast((outcome) => outcome.writeId === writeId);
   }
 }
 

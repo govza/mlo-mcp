@@ -183,6 +183,56 @@ export function buildTaskUpdatesDelta(updates: readonly TaskRowUpdate[]): Sectio
   return document;
 }
 
+/**
+ * One row of a sync delta addressed to its section — the shape the repository
+ * seam carries (structurally identical to `DeltaRow` in the repo tier, stated
+ * here so the domain model does not import upward). Values align with the
+ * section's CANONICAL header; shorter rows pad with blanks, longer rows are
+ * invalid because the extra cells have no column to live in.
+ */
+export interface SectionRow {
+  section: string;
+  values: string[];
+}
+
+const CANONICAL_HEADERS = new Map<string, readonly string[]>(SECTION_HEADERS);
+
+/** Rebuild a delta document from seam rows. Throws on rows no envelope can carry. */
+export function documentFromDeltaRows(rows: readonly SectionRow[]): SectionedCsv {
+  const document = createDeltaSkeleton();
+  for (const row of rows) {
+    const header = CANONICAL_HEADERS.get(row.section);
+    if (!header || row.section === "SysVersions") throw new Error(`unknown delta section "${row.section}"`);
+    if (row.values.length > header.length) {
+      throw new Error(`a "${row.section}" row carries ${row.values.length} values for ${header.length} canonical columns`);
+    }
+    findSection(document, row.section)!.rows.push(
+      header.map((_, index) => row.values[index] ?? ""),
+    );
+  }
+  return document;
+}
+
+/** Flatten a delta document into seam rows, projecting onto canonical headers. */
+export function deltaRowsFromDocument(document: SectionedCsv): SectionRow[] {
+  const rows: SectionRow[] = [];
+  for (const section of document.sections) {
+    if (section.name === "SysVersions") continue;
+    const header = CANONICAL_HEADERS.get(section.name);
+    if (!header || !section.rows.length) continue;
+    for (const row of section.rows) {
+      rows.push({
+        section: section.name,
+        values: header.map((column) => {
+          const index = section.header.indexOf(column);
+          return index < 0 ? "" : row[index] ?? "";
+        }),
+      });
+    }
+  }
+  return rows;
+}
+
 const KEYS: Record<string, string[]> = {
   Places: ["UID"],
   PlaceRelations: ["PlaceUID", "ParentPlaceUID"],

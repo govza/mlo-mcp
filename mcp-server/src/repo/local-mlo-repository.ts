@@ -4,14 +4,24 @@ import { buildTaskTree } from "../task-tree.js";
 import { annotateGuids } from "../guids.js";
 import { log } from "../log.js";
 import type { MloCli } from "./mlo-cli.js";
-import type { DeltaRow, MloRepository, PendingWrite, Snapshot, WriteId, WriteStatus } from "./mlo-repository.js";
+import type { ResidentClient } from "./resident-client.js";
+import {
+  WriteRefusedError,
+  type DeltaRow,
+  type MloRepository,
+  type PendingWrite,
+  type Snapshot,
+  type WriteId,
+  type WriteStatus,
+} from "./mlo-repository.js";
 
 /**
  * The session-side MloRepository implementation. Reads go through the
  * constructor-injected MloCli driver with a short-lived snapshot cache that
- * only smooths bursts of reads. `write`/`status` are stubs until the resident
- * injection queue lands (ADR-0005 migration step 6) — the seam shape is what
- * exists today.
+ * only smooths bursts of reads. Writes cross the process seam through the
+ * constructor-injected ResidentClient driver: `write` is the resident's
+ * durable accept, `status` its five-state answer, and every refusal arrives
+ * as a typed value the driver rehydrated from problem+json.
  */
 export class LocalMloRepository implements MloRepository {
   private snap?: Snapshot;
@@ -19,7 +29,9 @@ export class LocalMloRepository implements MloRepository {
 
   constructor(
     private readonly config: MloConfig,
-    private readonly cli: MloCli
+    private readonly cli: MloCli,
+    /** Absent only in read-only wirings (tests); writes then refuse loudly. */
+    private readonly resident?: ResidentClient,
   ) {}
 
   async snapshot(fresh = false): Promise<Snapshot> {
@@ -61,12 +73,28 @@ export class LocalMloRepository implements MloRepository {
     this.pending = undefined;
   }
 
-  async write(_rows: DeltaRow[]): Promise<PendingWrite> {
-    throw new Error("the write path is not wired yet — writes land with the resident injection queue (ADR-0005 migration step 6)");
+  private requireResident(): ResidentClient {
+    if (!this.resident) {
+      throw new Error("this repository was wired without a ResidentClient — a read-only wiring cannot write");
+    }
+    return this.resident;
   }
 
-  async status(_id: WriteId): Promise<WriteStatus> {
-    throw new Error("the write path is not wired yet — writes land with the resident injection queue (ADR-0005 migration step 6)");
+  async write(rows: DeltaRow[]): Promise<PendingWrite> {
+    const result = await this.requireResident().postWrite({ profile: this.config.dataFile, rows });
+    if (!result.ok) throw new WriteRefusedError(result.refusal);
+    // Best-effort accelerator, never load-bearing (spec section 2 mechanic 5):
+    // fire-and-forget so the accept receipt returns now, and a QuickSync that
+    // fails or no-ops just leaves delivery to MLO's own cadence.
+    void this.quickSync().catch((error) =>
+      log(`QuickSync nudge after accept failed (delivery rides MLO's own cadence): ${error instanceof Error ? error.message : String(error)}`));
+    return { writeId: result.value.writeId, expiresAt: result.value.expiresAt };
+  }
+
+  async status(id: WriteId): Promise<WriteStatus> {
+    const result = await this.requireResident().writeStatus(id);
+    if (!result.ok) throw new WriteRefusedError(result.refusal);
+    return result.value.status;
   }
 
   async quickSync(): Promise<void> {

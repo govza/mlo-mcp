@@ -24,7 +24,8 @@ src/
   config.ts         config (data file: auto-detected via profile-detect.ts or refuse to
                     start; --data-file= pins it for the test harness only; env:
                     MLO_EXE_PATH, MLO_EXPORT_DIR, MLO_CACHE_STALE_MS,
-                    MLO_CLOUD_HOST/PORT; the partitioned state root is automatic)
+                    MLO_CLOUD_HOST/PORT, MLO_WRITE_TTL_MINUTES; the partitioned
+                    state root is automatic)
   profile-detect.ts which profile MLO actually has open: the registry's LastDBFile
                     proposes a candidate, the running app's window title and its hold
                     on the file can refute it, and a refuted candidate is a refusal to

@@ -6,6 +6,7 @@ import { detectProfile } from "./profile-detect.js";
 import type { MloConfig } from "./types.js";
 import { isMloBusy, SystemMloCli } from "./repo/mlo-cli.js";
 import { LocalMloRepository } from "./repo/local-mlo-repository.js";
+import { HttpResidentClient } from "./repo/resident-client.js";
 import { createToolContext } from "./context.js";
 import { log } from "./log.js";
 import { createMcpServer } from "./server.js";
@@ -20,8 +21,13 @@ async function main(): Promise<void> {
   if (process.argv.includes(RESIDENT_FLAG)) return serveResidentEndpoint();
 
   const config = loadConfig();
-  // The MloCli driver is wired here and nowhere else — above the repository it does not exist.
-  const repo = new LocalMloRepository(config, new SystemMloCli(config));
+  // The drivers are wired here and nowhere else — above the repository they do
+  // not exist. The ResidentClient attaches (and spawns) lazily on the call
+  // that needs it, so a resident that dies mid-session comes back on the next
+  // write instead of requiring a client restart.
+  const spawn = residentSpawner(fileURLToPath(import.meta.url));
+  const resident = new HttpResidentClient({ host: config.cloudHost, port: config.cloudPort, spawn });
+  const repo = new LocalMloRepository(config, new SystemMloCli(config), resident);
   const cloud = new CloudGateway({ stateRoot: config.cloudStateRoot });
   // Never a listener of its own: MLO's proxy points at this port permanently,
   // so a session that owned it would take the app's sync down when it closed.
@@ -29,7 +35,7 @@ async function main(): Promise<void> {
   const endpoint = await ensureEndpoint({
     host: config.cloudHost,
     port: config.cloudPort,
-    spawn: residentSpawner(fileURLToPath(import.meta.url)),
+    spawn,
   });
   const ctx = createToolContext(config, repo, cloud, endpoint, await cloud.boundRowStoreView(config.dataFile));
 
@@ -54,7 +60,12 @@ async function main(): Promise<void> {
 async function serveResidentEndpoint(): Promise<void> {
   const config = loadCloudConfig();
   const gateway = new CloudGateway({ stateRoot: config.cloudStateRoot });
-  const handle = await startCloudServer({ host: config.cloudHost, port: config.cloudPort, gateway });
+  const handle = await startCloudServer({
+    host: config.cloudHost,
+    port: config.cloudPort,
+    gateway,
+    writeTtlMs: config.writeTtlMs,
+  });
   log(`resident cloud endpoint serving on http://${handle.host}:${handle.port} (state root: ${config.cloudStateRoot})`);
   const stop = () => void handle.stop().finally(() => process.exit(0));
   process.once("SIGINT", stop);

@@ -5,6 +5,7 @@ import { atomicWrite } from "./atomic-file.js";
 import { FileCaptureJournal, type CaptureJournal } from "./capture-journal.js";
 import { FileInjectionQueue, type InjectionQueue } from "./injection-queue.js";
 import { FileRowStore, type RowStore } from "./row-store.js";
+import { FileWriteOutcomes, type WriteOutcomeStore } from "./write-outcomes.js";
 
 /**
  * Per-`dataFileUID` cloud state, reachable only through the PartitionStore
@@ -66,6 +67,8 @@ export class PartitionStore {
   readonly journal: CaptureJournal;
   /** Durably accepted writes awaiting injection into a forwarded Get. */
   readonly queue: InjectionQueue;
+  /** Writes that left the queue: delivered / superseded / expired receipts. */
+  readonly outcomes: WriteOutcomeStore;
 
   constructor(
     readonly uid: string,
@@ -75,6 +78,7 @@ export class PartitionStore {
     this.rows = new FileRowStore(dir);
     this.journal = new FileCaptureJournal(dir);
     this.queue = new FileInjectionQueue(dir);
+    this.outcomes = new FileWriteOutcomes(dir);
   }
 
   private metaPath(): string {
