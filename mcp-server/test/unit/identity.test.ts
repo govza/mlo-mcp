@@ -61,3 +61,71 @@ describe("IdentityService", () => {
     expect(resolver.dependentsOf(UID_B).map((t) => t.id)).toEqual(["1"]);
   });
 });
+
+describe("structural alignment (the identity authority)", () => {
+  const UID_1 = "{11111111-0000-0000-0000-000000000001}";
+  const UID_2 = "{22222222-0000-0000-0000-000000000002}";
+  const UID_3 = "{33333333-0000-0000-0000-000000000003}";
+
+  it("resolves a GUID-less export against captured rows positionally, children included", () => {
+    const rows = new FakeRowStore();
+    rows.set(UID_1, "parent", { itemIndex: 100 });
+    rows.set(UID_2, "child", { parentUid: UID_1, itemIndex: 100 });
+    rows.set(UID_3, "sibling", { itemIndex: 200 });
+    const child = task("1.1", "child", { Depth: 1, Path: ["parent", "child"] });
+    const parent = task("1", "parent", { Children: [child] });
+    const sibling = task("2", "sibling");
+    const resolver = new IdentityService(rows.view()).resolverFor(snapshotOf([parent, sibling]));
+    // No task carries a binary GUID — the zero-footer profile.
+    expect(resolver.uidFor("1")).toEqual({ kind: "resolved", uid: UID_1, confidence: "confirmed" });
+    expect(resolver.uidFor("1.1")).toEqual({ kind: "resolved", uid: UID_2, confidence: "confirmed" });
+    expect(resolver.uidFor("2")).toEqual({ kind: "resolved", uid: UID_3, confidence: "confirmed" });
+    expect(resolver.taskFor(UID_2)?.id).toBe("1.1");
+  });
+
+  it("orders cloud siblings by ItemIndex, not row order", () => {
+    const rows = new FakeRowStore();
+    rows.set(UID_2, "second", { itemIndex: 200 });
+    rows.set(UID_1, "first", { itemIndex: 100 });
+    const resolver = new IdentityService(rows.view()).resolverFor(
+      snapshotOf([task("1", "first"), task("2", "second")]),
+    );
+    expect(resolver.uidFor("1")).toMatchObject({ uid: UID_1 });
+    expect(resolver.uidFor("2")).toMatchObject({ uid: UID_2 });
+  });
+
+  it("in a drifted slot pairs only captions unique on both sides — duplicates refuse", () => {
+    const rows = new FakeRowStore();
+    rows.set(UID_1, "twin", { itemIndex: 100 });
+    rows.set(UID_2, "twin", { itemIndex: 200 });
+    rows.set(UID_3, "lone", { itemIndex: 300 });
+    // Export has one fewer child: counts differ, so positional pairing is off.
+    const resolver = new IdentityService(rows.view()).resolverFor(
+      snapshotOf([task("1", "twin"), task("2", "lone")]),
+    );
+    expect(resolver.uidFor("1")).toMatchObject({ kind: "unresolvable", reason: "no-recoverable-guid" });
+    expect(resolver.uidFor("2")).toEqual({ kind: "resolved", uid: UID_3, confidence: "confirmed" });
+  });
+
+  it("structural wins over a contradicting binary GUID", () => {
+    const rows = new FakeRowStore();
+    rows.set(UID_1, "aligned", { itemIndex: 100 });
+    const resolver = new IdentityService(rows.view()).resolverFor(
+      snapshotOf([task("1", "aligned", { Guid: UID_2 })]),
+    );
+    expect(resolver.uidFor("1")).toEqual({ kind: "resolved", uid: UID_1, confidence: "confirmed" });
+    expect(resolver.taskFor(UID_1)?.id).toBe("1");
+  });
+
+  it("falls back to the binary GUID only where alignment left the node unplaced", () => {
+    const rows = new FakeRowStore();
+    rows.set(UID_1, "twin", { itemIndex: 100 });
+    rows.set(UID_2, "twin", { itemIndex: 200 });
+    // Drifted slot + duplicate caption: unplaceable structurally, but this one
+    // carries a recovered GUID.
+    const resolver = new IdentityService(rows.view()).resolverFor(
+      snapshotOf([task("1", "twin", { Guid: UID_2 })]),
+    );
+    expect(resolver.uidFor("1")).toEqual({ kind: "resolved", uid: UID_2, confidence: "confirmed" });
+  });
+});

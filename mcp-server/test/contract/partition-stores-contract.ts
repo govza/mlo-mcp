@@ -124,6 +124,26 @@ export function describeRowStoreContract(name: string, makeStore: () => RowStore
       expect(view.captionOf(UID_B)).toBeUndefined();
       expect(view.captionOf("not-a-guid")).toBeUndefined();
     });
+
+    it("view serves every row's alignment columns", async () => {
+      const store = await makeStore();
+      await store.ingest(addDocument(UID_A, "parent"), "vendor-get");
+      await store.ingest(
+        buildTaskAddDelta({
+          uid: UID_B,
+          caption: "child",
+          parentUid: UID_A,
+          itemIndex: "250",
+          createdDate: "2026-07-27T10:00:00",
+          lastModified: "2026-07-27T10:00:00",
+        }),
+        "vendor-get",
+      );
+      const rows = store.view().alignmentRows();
+      expect(rows).toHaveLength(2);
+      expect(rows).toContainEqual({ uid: UID_A, caption: "parent", parentUid: "", itemIndex: 100 });
+      expect(rows).toContainEqual({ uid: UID_B, caption: "child", parentUid: UID_A, itemIndex: 250 });
+    });
   });
 }
 

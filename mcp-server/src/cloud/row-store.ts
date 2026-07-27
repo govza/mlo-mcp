@@ -82,16 +82,49 @@ export function unknownRowRefusal(uid: string): UnknownRowRefusal {
 }
 
 /**
- * The identity service's synchronous port: UID -> latest captured caption.
- * Answers from the last state loaded off disk and refreshes in the background,
- * so a miss is honestly "unconfirmed", never a blocking read.
+ * What structural alignment needs of a captured row: enough to rebuild the
+ * outline tree the cloud knows (UID/ParentUID for shape, ItemIndex for sibling
+ * order) and pair it against a fresh export by caption.
+ */
+export interface AlignmentRow {
+  uid: string;
+  caption: string;
+  /** Normalized parent UID; "" for a root row (or an unparseable parent). */
+  parentUid: string;
+  /** Numeric sibling-order key; MAX_SAFE_INTEGER when the row carries none. */
+  itemIndex: number;
+}
+
+/** The one reading of a stored row's alignment columns, shared by the file store and its fake. */
+export function alignmentRowOf(uid: string, header: readonly string[], cells: readonly string[]): AlignmentRow {
+  const cell = (column: string): string => {
+    const index = header.indexOf(column);
+    return index >= 0 ? (cells[index] ?? "") : "";
+  };
+  const rawIndex = cell("ItemIndex");
+  const index = Number(rawIndex);
+  return {
+    uid,
+    caption: cell("Caption"),
+    parentUid: keyOf(cell("ParentUID")) ?? "",
+    itemIndex: rawIndex !== "" && Number.isFinite(index) ? index : Number.MAX_SAFE_INTEGER,
+  };
+}
+
+/**
+ * The identity service's synchronous port. Answers from the last state loaded
+ * off disk and refreshes in the background — never a blocking read: alignment
+ * against a store that has not caught up honestly resolves less, and a
+ * caption miss honestly reads "unconfirmed".
  */
 export interface RowStoreView {
   captionOf(uid: string): string | undefined;
+  /** Every stored row's alignment columns — the cloud side of structural alignment. */
+  alignmentRows(): AlignmentRow[];
 }
 
 /** A RowStoreView that knows nothing — every resolution reads unconfirmed. */
-export const EMPTY_ROW_STORE_VIEW: RowStoreView = { captionOf: () => undefined };
+export const EMPTY_ROW_STORE_VIEW: RowStoreView = { captionOf: () => undefined, alignmentRows: () => [] };
 
 export interface RowStore {
   /**
@@ -452,6 +485,10 @@ export class FileRowStore implements RowStore {
         if (!stored) return undefined;
         const captionIndex = (this.headers[stored.h] ?? []).indexOf("Caption");
         return captionIndex >= 0 ? stored.cells[captionIndex] : undefined;
+      },
+      alignmentRows: (): AlignmentRow[] => {
+        void this.ensureFresh().catch(() => undefined);
+        return [...this.rows].map(([uid, stored]) => alignmentRowOf(uid, this.headers[stored.h] ?? [], stored.cells));
       },
     };
   }

@@ -463,17 +463,18 @@ export class OutlineService {
   async delete(id: string): Promise<OutlineWrite> {
     const opened = await this.authoring();
     if (opened.isErrored) return opened;
-    const { snapshot } = opened.value;
+    const { snapshot, resolver } = opened.value;
     const task = findById(snapshot.tasks, id);
     if (!task) return failed(unresolvable(id, `no task with id "${id}" in this snapshot`));
     const uids: string[] = [];
     for (const node of flatten([task])) {
-      if (!node.Guid) {
+      const resolution = resolver.uidFor(node.id);
+      if (resolution.kind !== "resolved") {
         return failed(
-          unresolvable(node.id, `no recoverable GUID for "${node.Caption}" in the branch under "${task.Caption}"`),
+          unresolvable(node.id, `${resolution.detail} (in the branch under "${task.Caption}")`),
         );
       }
-      uids.push(normalizeGuid(node.Guid));
+      uids.push(normalizeGuid(resolution.uid));
     }
     return this.commit(deltaRowsFromDocument(buildTaskDeleteDelta(uids)), uids);
   }
@@ -647,12 +648,14 @@ export class OutlineService {
     const indices: number[] = [];
     let unknown = 0;
     for (const sibling of siblings) {
-      const lookup = sibling.Guid ? await rows.latest(sibling.Guid) : undefined;
+      const resolution = resolver.uidFor(sibling.id);
+      const siblingUid = resolution.kind === "resolved" ? resolution.uid : undefined;
+      const lookup = siblingUid ? await rows.latest(siblingUid) : undefined;
       if (lookup?.kind !== "row") {
         unknown += 1;
         continue;
       }
-      if (excludeUid && sibling.Guid!.toUpperCase() === excludeUid.toUpperCase()) continue;
+      if (excludeUid && siblingUid!.toUpperCase() === excludeUid.toUpperCase()) continue;
       const index = Number(rowValue(lookup, "ItemIndex"));
       if (Number.isFinite(index)) indices.push(index);
       else unknown += 1;

@@ -1,10 +1,12 @@
 import type { SectionedCsv } from "../../src/cloud/csv.js";
 import { normalizeGuid } from "../../src/cloud/guid.js";
 import {
+  alignmentRowOf,
   applyCatalog,
   harvestTaskRows,
   maxStarredOrderIndex,
   unknownRowRefusal,
+  type AlignmentRow,
   type CapturedRow,
   type RowCatalog,
   type RowLookup,
@@ -23,9 +25,18 @@ export class FakeRowStore implements RowStore {
   private readonly places = new Map<string, string>();
   private readonly flags = new Map<string, string>();
 
-  /** Seed one row directly — the minimal header a caption lookup needs. */
-  set(uid: string, caption: string): void {
-    this.setRow(uid, ["UID", "Caption"], [normalizeGuid(uid), caption]);
+  /** Seed one row directly — the minimal header a caption lookup or alignment needs. */
+  set(uid: string, caption: string, structure: { parentUid?: string; itemIndex?: number } = {}): void {
+    this.setRow(
+      uid,
+      ["UID", "Caption", "ParentUID", "ItemIndex"],
+      [
+        normalizeGuid(uid),
+        caption,
+        structure.parentUid ? normalizeGuid(structure.parentUid) : "",
+        structure.itemIndex !== undefined ? String(structure.itemIndex) : "",
+      ],
+    );
   }
 
   setRow(
@@ -109,6 +120,8 @@ export class FakeRowStore implements RowStore {
         const captionIndex = row.header.indexOf("Caption");
         return captionIndex >= 0 ? row.cells[captionIndex] : undefined;
       },
+      alignmentRows: (): AlignmentRow[] =>
+        [...this.rows].map(([uid, row]) => alignmentRowOf(uid, row.header, row.cells)),
     };
   }
 

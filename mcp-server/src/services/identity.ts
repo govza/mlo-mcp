@@ -1,7 +1,9 @@
 import type { TaskNode } from "../types.js";
 import type { Snapshot } from "../repo/mlo-repository.js";
 import type { RowStoreView } from "../cloud/row-store.js";
+import { alignExportToRows, type AlignedIdentity } from "./structure-align.js";
 import { findById, flatten } from "../task-tree.js";
+import { log } from "../log.js";
 
 export type UidResolution =
   | {
@@ -9,9 +11,10 @@ export type UidResolution =
       uid: string;
       /**
        * confirmed: the row store holds this UID, so update/complete can author
-       * from its latest full row. unconfirmed: recovered from the binary but
-       * absent from the row store — a write against it will refuse with the
-       * `repull` remedy (ticket 07).
+       * from its latest full row — structural resolutions are confirmed by
+       * construction (the UID came from the store). unconfirmed: recovered
+       * from the binary but absent from the row store — a write against it
+       * will refuse with the `repull` remedy (ticket 07).
        */
       confidence: "confirmed" | "unconfirmed";
     }
@@ -19,10 +22,13 @@ export type UidResolution =
 
 /**
  * One owner for "which row is this id" (spec section 3): a resolver built once
- * per snapshot, aligning the export (path ids + binary-recovered GUIDs)
- * against the row store. The GUID recovery itself (guids.ts) runs where the
- * snapshot is built and arrives here as annotations — this class cross-checks
- * them against captured rows, it never re-derives them.
+ * per snapshot, aligning the export against the row store — structural
+ * alignment (UID/ParentUID/ItemIndex vs the export tree) is the identity
+ * authority, and the binary-recovered GUID annotation (guids.ts, run where the
+ * snapshot is built) is the cross-check and the fallback for nodes alignment
+ * could not place. A contradiction logs and structural wins: chain recovery
+ * misaligns exactly when the tree drifts, and its footer marker is known to
+ * misread on some files.
  *
  * OutlineService (writes) depends on this; read services never do.
  */
@@ -44,6 +50,7 @@ export class IdentityService {
 
 export class SnapshotResolver {
   private readonly byUid = new Map<string, TaskNode>();
+  private readonly aligned: AlignedIdentity;
   private readonly all: TaskNode[];
 
   constructor(
@@ -51,8 +58,16 @@ export class SnapshotResolver {
     private readonly rows: RowStoreView
   ) {
     this.all = flatten(tasks);
+    this.aligned = alignExportToRows(tasks, rows.alignmentRows());
+    // uid -> task mirrors the ladder: structural claims first, annotations
+    // fill only the UIDs alignment left unclaimed.
     for (const task of this.all) {
-      if (task.Guid) this.byUid.set(task.Guid.toUpperCase(), task);
+      const structural = this.aligned.byPathId.get(task.id);
+      if (structural) this.byUid.set(structural.toUpperCase(), task);
+    }
+    for (const task of this.all) {
+      const binary = task.Guid?.toUpperCase();
+      if (binary && !this.byUid.has(binary)) this.byUid.set(binary, task);
     }
   }
 
@@ -62,16 +77,28 @@ export class SnapshotResolver {
     if (!task) {
       return { kind: "unresolvable", reason: "unknown-id", detail: `no task with id "${pathId}" in this snapshot` };
     }
-    if (!task.Guid) {
-      return {
-        kind: "unresolvable",
-        reason: "no-recoverable-guid",
-        detail: `"${task.Caption}" has no recoverable GUID — MLO has not re-serialized it yet`,
-      };
+    const structural = this.aligned.byPathId.get(task.id);
+    const binary = task.Guid?.toUpperCase();
+    if (structural) {
+      if (binary && binary !== structural.toUpperCase()) {
+        log(
+          `GUID cross-check mismatch for [${task.id}] "${task.Caption}": ` +
+            `binary ${binary} vs structural ${structural} — using structural`,
+        );
+      }
+      return { kind: "resolved", uid: structural, confidence: "confirmed" };
     }
-    const uid = task.Guid.toUpperCase();
-    const confidence = this.rows.captionOf(uid) !== undefined ? "confirmed" : "unconfirmed";
-    return { kind: "resolved", uid, confidence };
+    if (binary) {
+      const confidence = this.rows.captionOf(binary) !== undefined ? "confirmed" : "unconfirmed";
+      return { kind: "resolved", uid: binary, confidence };
+    }
+    return {
+      kind: "unresolvable",
+      reason: "no-recoverable-guid",
+      detail:
+        `"${task.Caption}" aligns to no captured row and has no recoverable GUID — ` +
+        `sync so the endpoint captures it, then retry`,
+    };
   }
 
   taskFor(uid: string): TaskNode | undefined {
