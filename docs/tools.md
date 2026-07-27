@@ -19,10 +19,12 @@ shapes. If they ever disagree on a shape, the catalog is right.
 - **Ids are path-based** (`"1.2.3"` = position in the tree) and shift whenever
   the tree changes. They are valid only for immediate follow-up calls; after
   any write, re-run `list_tasks`/`search_tasks`. GUIDs (`{…}`) are the stable
-  identity, resolved by STRUCTURAL alignment of the fresh export outline
-  against the bootstrapped cloud tree (`UID`/`ParentUID`/`ItemIndex`) — so
-  duplicate sibling captions resolve by position; the binary `.ml` recovery
-  and the caption-path walk are cross-checks only. Every tool input takes a
+  identity, resolved by aligning the fresh export against the **row store** —
+  the full task rows the endpoint captured from MLO's own sync traffic — with
+  the binary `.ml` GUID recovery as the cross-check. A task the row store has
+  seen resolves `confirmed` and can be authored against; one recovered only
+  from the binary resolves `unconfirmed`, and a write against it refuses with
+  the `repull` remedy. Every tool input takes a
   **Path id**; GUIDs appear in output only (a write's receipt names the `uid`
   it addressed, and `get_task` reports one when it is recoverable).
 - **Writes never touch the data file.** Every write travels as a complete
@@ -122,6 +124,7 @@ All return at durable accept (see Shared semantics); none waits on MLO.
 - **`delete_task`** — tombstones the task *and its whole subtree*; every task in
   the branch must resolve to its stable UID, else nothing is queued. MLO's own
   recycle bin is the only undo.
-- **`sync`** — run MLO QuickSync on demand. Every write already fires one
-  best-effort; this reruns it. Never load-bearing — MLO's own sync cadence is
-  what delivers a write.
+- **`sync`** — run MLO QuickSync on demand. Never load-bearing: it opens no
+  session at all when MLO believes nothing changed, and what actually delivers a
+  pending write is MLO's own sync cadence (which the endpoint nudges when the
+  queue is non-empty). No write fires it.

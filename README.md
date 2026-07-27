@@ -2,8 +2,8 @@
 
 MCP server for the **MyLifeOrganized** (MLO) Windows desktop app. AI agents (Claude Code, Codex, Cursor, Claude Desktop — anything that speaks MCP over stdio) manage your MLO task tree by driving `mlo.exe`'s undocumented command line locally. No cloud API, no account, your data never leaves the machine.
 
-- 13 tools: list/search/get tasks, contexts, single/atomic-outline add, update/complete/uncomplete/delete, QuickSync, cloud status/bootstrap
-- Writes never touch your data file: the server runs a local cloud-sync endpoint, queues changes as sync deltas, and MLO's **own** merge logic applies them via QuickSync — the app keeps running, and the append-only delta log is the durable record of every change
+- 15 tools: list/search/get tasks, contexts, rapid capture, single/atomic-outline add, update/complete/uncomplete/move/delete, write status, QuickSync, cloud status
+- Writes never touch your data file: the server runs a local sync endpoint that queues each change as a sync delta and hands it to MLO inside the app's *own* next sync session, so MLO's **own** merge logic applies it — the app keeps running, and every accepted write has a receipt you can look up
 - Methodology-neutral: the server ships primitives only. Opinionated GTD workflow skills (mindsweep, inbox processing, weekly review, standing conventions) live in a separate `gtd-skills` repo
 
 ## Install
@@ -58,17 +58,17 @@ Read tools work now. Ask your agent to list your tasks to confirm.
 
 ### Step 2 — Enable writes (one-time per profile)
 
-Writes are applied by MLO's own sync merge rather than by editing your data file, so the server has to sit in the app's sync path before it can change anything. Until this is finished, `add_task`, `update_task`, `complete_task` and friends all refuse with a pointer back here — an ordinary sync alone never enables them.
+Writes are applied by MLO's own sync merge rather than by editing your data file, so the server has to sit in the app's sync path before it can change anything. Until this is finished, `add_task`, `update_task`, `complete_task` and friends all refuse, each naming what is still missing.
 
-1. **Back up your `.ml` profile** — a file copy while MLO is closed. Do this before the first bootstrap and before any sync experimentation. If you'd rather rehearse, open a *copy* of your profile in MLO and run the whole procedure against that.
-2. **Point MLO's cloud sync through the local endpoint:** set the sync profile's proxy to `127.0.0.1:8181`, and leave **"Use secure connection" unchecked**. This matters: with it checked MLO still syncs fine, but the endpoint only sees an opaque TLS tunnel, so bootstrap and every write silently stay dead. MLO's sync log prints *"secure connection is OFF for this sync profile"* when it is set correctly.
-3. **Run one ordinary sync in MLO** (or call the `sync` tool).
-4. **Call `cloud_bootstrap`** — just ask your agent to run it. It pulls your account's complete cloud history so every pre-existing task gets its stable UID and full record.
+1. **Back up your `.ml` profile** — a file copy while MLO is closed. Do this before the first sync through the endpoint and before any sync experimentation. If you'd rather rehearse, open a *copy* of your profile in MLO and run the whole procedure against that.
+2. **Point MLO's cloud sync through the local endpoint:** set the sync profile's proxy to `127.0.0.1:8181`, and leave **"Use secure connection" unchecked**. This matters: with it checked MLO still syncs fine, but the endpoint only sees an opaque TLS tunnel, so setup and every write silently stay dead. MLO's sync log prints *"secure connection is OFF for this sync profile"* when it is set correctly.
+3. **Run one ordinary sync in MLO** (or call the `sync` tool). That is the last step: the endpoint recognizes your cloud file, checks that it really is the profile MLO has open, pulls your account's complete history so every pre-existing task gets its stable UID and full record, and only then binds. There is nothing to call.
 
-Writes are live from here. Two things worth knowing:
+Writes are live from here. Three things worth knowing:
 
-- **One ordinary proxied sync arms writes until the sync endpoint restarts** — the account contact is held in memory only, never written to disk. The endpoint is a background process that outlives your agent sessions, so closing or restarting a client does not disarm anything; a reboot does.
-- `cloud_status` reports the binding, the bootstrap lifecycle, the endpoint's cursor and whether the endpoint is up whenever you want to check where things stand.
+- **A write returns as soon as it is durably queued, not when MLO has applied it.** MLO picks it up on its own next sync — usually within about 90 seconds, which the endpoint nudges along. `write_status` tells you where a given write got to.
+- **The setup survives client restarts.** The endpoint is a background process that outlives your agent sessions; your account credentials stay in its memory and are never written to disk, so a reboot means one more ordinary sync before writes work again.
+- `cloud_status` reports the binding, the partition lifecycle, whether the endpoint is up, and the write queue's health whenever you want to check where things stand.
 
 The full rationale, the merge rules, and what each failure mode looks like are in [docs/mcp-cloud.md](docs/mcp-cloud.md).
 

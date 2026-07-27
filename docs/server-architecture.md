@@ -2,126 +2,231 @@
 
 TypeScript MCP server (`mcp-server/`) over stdio. Node 22, pnpm, ESM, strict TS; `@modelcontextprotocol/sdk` + `fast-xml-parser` + `zod`. Model types keep MLO's original Delphi PascalCase field names.
 
-All writes flow through the local cloud-sync endpoint specified in
-[mcp-cloud.md](mcp-cloud.md) — the server never rewrites the `.ml` data file.
-What each tool is for is defined in [tools.md](tools.md); this document covers
-the server internals around that loop.
+Reads come from `mlo.exe`'s XML export. Writes land in the local sync endpoint
+specified in [mcp-cloud.md](mcp-cloud.md) and reach the profile through MLO's
+own sync session — the server never rewrites the `.ml` data file. What each tool
+is for is defined in [tools.md](tools.md); this document covers the internals.
+
+## Layers
+
+The architecture and its rules are [ADR-0005](adr/0005-layered-rearchitecture-local-landing-writes.md)
+and its [target-architecture spec](adr/0005-target-architecture-spec.md):
+
+```text
+tools (controllers)     schema validation + one service call, nothing else
+  |
+services                domain rules; GTD-intent slicing; ServiceResult out
+  |
+repositories            the only code touching mlo.exe, the state root,
+  |                     or the resident process
+drivers (internal)      named seams inside repository impls (MloCli, ResidentClient)
+
+domain model            pure functions/types importable by any layer
+composition root        wiring, process infra (spawn/skew/shutdown/watchers)
+```
+
+- Calls run strictly downward. Services never call each other; the one shared
+  computation is the internal `AvailabilityEngine`.
+- `ToolContext` is **required services only** — `{ outline, nextActions, review,
+  admin, config, log }`. No repositories, no optional fields: the historic
+  "cloud absent, silently downgrade" branch is unrepresentable. Repositories are
+  wired into services once, at the composition root.
+- No service ever learns that a resident process exists.
 
 ## Module map
 
 ```
 src/
-  index.ts          process lifecycle: stdio transport, starts the cloud endpoint;
-                    idle-exit watchers (rebuilt bundle, auto-detected profile switch or
-                    a profile MLO no longer has open) make the client respawn a current
-                    server on the next tool call
-  server.ts         the protocol surface — server identity (version.ts), the
-                    connection-time instructions string, and tool registration from
-                    tools/registry.ts; separate from index.ts so a test can connect a
-                    real client to it in memory
-  version.ts        the reported version, derived from mcp-server/package.json so the
-                    copy a client sees cannot drift from the one that ships
-  config.ts         config (data file: auto-detected via profile-detect.ts or refuse to
-                    start; --data-file= pins it for the test harness only; env:
-                    MLO_EXE_PATH, MLO_EXPORT_DIR, MLO_CACHE_STALE_MS,
-                    MLO_CLOUD_HOST/PORT, MLO_WRITE_TTL_MINUTES; the partitioned
-                    state root is automatic)
-  profile-detect.ts which profile MLO actually has open: the registry's LastDBFile
-                    proposes a candidate, the running app's window title and its hold
-                    on the file can refute it, and a refuted candidate is a refusal to
-                    start (ADR-0004). One PowerShell round trip gathers the
-                    observation; judgeProfile() is the pure policy over it
-  mlo-cli.ts        mlo.exe invocation: Delphi quoting, timeouts, exit-code mapping,
-                    both locks, -saveXML export, -QuickSync
-  xml.ts            parse/build (fast-xml-parser), RawTaskNode
-  task-tree.ts      RawTaskNode → TaskNode model, path ids, find/flatten/search/render
-  guids.ts          Caption→GUID recovery from the .ml binary (cross-check only;
-                    see mlo/ml-binary-format.md)
-  store.ts          cached snapshot: export → parse → tree → GUID annotation
-  cloud/            the cloud endpoint (gateway + per-dataFileUID partitions and
-                    bindings, vendor proxy + mirror + vendor client sessions
-                    (upstream.ts), bootstrap window, snapshot store/validation,
-                    structural identity (structure-align.ts), SOAP adapter, delta
-                    log/state, CSV/envelope codecs, log-projection) — see mcp-cloud.md
-                    endpoint.ts   the SESSION side of the credential-lending seam:
-                                  probe/spawn/attach, version skew, and the client
-                                  for the three forwarded operations
-                    credential-lending.ts the RESIDENT side: held vendor sessions
-                                  and the stale-write check
-  tools/*.ts        one declarative MloTool per file (shared.ts: contract +
-                    registerTool; registry.ts: the authoritative tool list;
-                    row-update.ts: shared queue→QuickSync→verify runner for the
-                    full-row edit tools)
+  index.ts          composition root: wires drivers -> repositories -> services,
+                    connects the stdio transport, and re-invokes itself with
+                    --serve-cloud as the resident endpoint. Idle-exit watchers
+                    (rebuilt bundle, profile switch) make the client respawn a
+                    current server on the next tool call
+  server.ts         the protocol surface — identity (version.ts), the
+                    connection-time instructions string, tool registration from
+                    tools/registry.ts; separate from index.ts so a test can
+                    connect a real client in memory
+  config.ts         MloConfig + CloudConfig (data file: auto-detected via
+                    profile-detect.ts or refuse to start; --data-file= pins it
+                    for the test harness only; env: MLO_EXE_PATH,
+                    MLO_EXPORT_DIR, MLO_CACHE_STALE_MS, MLO_INBOX_CAPTION,
+                    MLO_CLOUD_HOST/PORT/STATE_ROOT, MLO_WRITE_TTL_MINUTES)
+  context.ts        ToolContext construction — the required-services struct
+  error-contract.ts the four-tier failure table AS DATA, plus the per-boundary
+                    unions derived from it (see below)
+  result.ts         ServiceResult carrier: ok/failed, advisories
+  profile-detect.ts which profile MLO actually has open: the registry's
+                    LastDBFile proposes a candidate, the running app's window
+                    title and its hold on the file can refute it, and a refuted
+                    candidate is a refusal to start (ADR-0004). One PowerShell
+                    round trip gathers the observation; judgeProfile() is the
+                    pure policy over it
+  tools/*.ts        one declarative MloTool per file; contract.ts = defineTool /
+                    registerTool / guard (controller infra); registry.ts = the
+                    authoritative tool list
+  services/         outline.ts (all writes) + outline-authoring.ts (row/patch
+                    authoring), next-actions.ts, review.ts, availability.ts
+                    (internal engine), identity.ts (one owner of "which row is
+                    this id"), admin.ts (the cloud plane), failures.ts
+  repo/             mlo-repository.ts (the interface: snapshot/write/status),
+                    local-mlo-repository.ts (impl), pending-overlay.ts
+                    (read-your-own-writes composition), and the two drivers:
+                    mlo-cli.ts, resident-client.ts
+  cloud/            the resident endpoint and the partition state it owns:
+                    server.ts (SOAP proxy + /v1), gateway.ts (authority
+                    decision, bindings, contacts), write-path.ts (queue,
+                    injection, GetFileTS nudge, Apply observation, TTL),
+                    auto-init.ts (guarded initialization), partition.ts +
+                    row-store / capture-journal / injection-queue /
+                    write-outcomes / binding / sightings / dead-letter,
+                    upstream.ts (forward half + the one guarded vendor pull),
+                    soap.ts, capture.ts, sync-observer.ts, problem.ts,
+                    atomic-file.ts, state-lock.ts, profile-backup.ts
+                    — see mcp-cloud.md
+  domain model      mlo-schema.ts (section headers, the 82-column TodoItems
+                    contract, row authoring), guid.ts, delta-merge.ts, csv.ts,
+                    envelope.ts, cursor.ts (all under cloud/); task-tree.ts,
+                    task-summary.ts, xml.ts, places.ts, guids.ts
 scripts/
   run-tool.ts       invoke any tool directly, no MCP client: `pnpm tool <name> '<json>'`
   tool-catalog.ts   registry → readable catalog, typed from the zod schemas
   tools.ts          browse it: `pnpm tools [<name>|--json]` (no MLO, no data file)
-  cloud-client.ts   app-side cloud client CLI: `pnpm cloud pull/push/finalize/sync`
-  serve-cloud.ts    run the resident cloud endpoint in the FOREGROUND for debugging
+  serve-cloud.ts    run the resident endpoint in the FOREGROUND for debugging
                     (sessions normally start it themselves: `index.js --serve-cloud`)
-  bootstrap-local.ts DEV ONLY: arm a local-mode (replacement-server) bootstrap window
 ```
 
-Tools are declarative objects (`defineTool` in `tools/shared.ts`: name, schemas, all four
-MCP annotation hints, `execute(args, ctx)`) — callable without a server, which is what
-`scripts/run-tool.ts` uses. Batch-capable write tools send the whole batch (`ids`/`updates`
-arrays) as ONE delta; batches are atomic (any bad id aborts before anything is queued).
+Tools are declarative objects (`defineTool` in `tools/contract.ts`: name, schemas,
+all four MCP annotation hints, `execute(args, ctx)`) — callable without a server,
+which is what `scripts/run-tool.ts` uses. Batch-capable write tools send the
+whole batch (`ids`/`updates` arrays) as ONE delta; batches are atomic (any bad id
+refuses before anything is queued).
 
 ## Concurrency: two locks
 
 1. **In-process**: a promise-chain mutex serializes every mlo.exe invocation within one server.
-2. **Cross-process**: a lock *directory* next to the data file (`<file>.ml.mcp-lock`, atomic `mkdir`, stale-broken after 3 min) serializes invocations across multiple server processes — one per Claude session. Reentrant within a process via a held-flag. (The cloud delta log has its own lock directory in the state dir — see mcp-cloud.md.)
-
-No session binds the cloud endpoint's port (default 8181). The listener is a separate long-lived process — this same entry point re-invoked with `--serve-cloud`, started detached by the first session that finds the port free ([ADR-0003](adr/0003-resident-endpoint.md)). Sessions attach to it, share the delta log through the state-dir lock, and forward the three operations that need the vendor credentials it holds (mcp-cloud.md).
+2. **Cross-process**: a lock *directory* next to the data file (`<file>.mcp-lock`, atomic `mkdir`, stale-broken after 3 min, 90 s acquisition deadline) serializes invocations across multiple server processes — one per Claude session. Reentrant within a process via a held-flag.
 
 Why: MLO invocations racing each other trigger a modal "file is locked by another process" dialog and hang forever.
 
+Both live in the `MloCli` driver, as module-level singletons — process-wide by
+nature, not per-instance. The state root has its own cross-process lock
+(`cloud/state-lock.ts`) for the files several sessions write.
+
+No session binds the endpoint's port (default 8181): the listener is a separate
+long-lived process, started detached by the first session that finds the port
+free ([ADR-0003](adr/0003-resident-endpoint.md)), attached to by every session
+on every path.
+
 ## Reads
 
-`store.ts` keeps a snapshot (XML export → parsed doc → TaskNode tree → GUIDs annotated from the binary) cached for `MLO_CACHE_STALE_MS` (default 30 s). Every write invalidates it. Ids are path-based (`1.2.3` = position, root excluded) and shift when the tree changes — tools tell agents to re-list before mutating.
+`LocalMloRepository.snapshot()` is the one read: XML export → parsed doc →
+`TaskNode` tree → GUIDs annotated from the `.ml` binary, cached for
+`MLO_CACHE_STALE_MS` (default 30 s) and composed with the pending-write overlay
+at read time (`repo/pending-overlay.ts`). Every service sees the same picture,
+so read-your-own-writes needs no per-tool opt-in: an add appears as a phantom
+row, an update merged, a completion completed, a delete hidden, each carrying
+`pending: true` and its `writeId`. The overlay is derived, never stored — it
+self-empties as the queue drains, and an expired or superseded entry simply
+disappears (the loudness lives in `write_status` / `cloud_status`).
 
-## Writes: queue → QuickSync → verify
+Ids are path-based (`1.2.3` = position, root excluded) and shift when the tree
+changes — tools tell agents to re-list before mutating. `IdentityService` is the
+one owner of "which row is this id": one resolver per snapshot, aligning the
+export and its binary-recovered GUIDs against the **row store**, reporting
+`confirmed` when the store holds that UID's full row and `unconfirmed` when only
+the binary recovered it.
 
-Write tools resolve a write channel (`requireWriteChannel`): normally the
-delta (a full task row, or tombstones) is committed to the real vendor Cloud
-in the resident endpoint's own sync session — the MCP process authors it but
-borrows the endpoint's credentials to upload it — and MLO receives it on the
-triggered `mlo.exe -QuickSync`; local-mode test partitions append to the
-replacement log instead. A commit is refused outright if the mirror moved while
-the rows were being authored (mcp-cloud.md). A fresh export then checks whether
-MLO applied it. The
-`verified` flag in every write result reports that check; `false` means
-*accepted, not yet applied* — MLO merges it on a later sync session. The MLO
-app keeps running throughout and nothing touches the `.ml` file directly.
-Still: **back up the profile before the first bootstrap** — sync flows
-rewrite sync state inside the `.ml`.
+Read services on top: `NextActionsService` (Engage — the To-Do list MLO would
+show), `ReviewService` (Reflect — review-due, stalled projects, waiting-for,
+hygiene), both over the internal `AvailabilityEngine` (leaf rule, Folder/Hide
+flags, complete-in-order, dependency blocking, start dates, context hours,
+computed score).
 
-Full-row edits (`update_task`, `complete_task`, `uncomplete_task`) source the
-82-column record from the bootstrapped baseline + later deltas via
-`cloud/log-projection.ts` and share the runner in `tools/row-update.ts`; see
-mcp-cloud.md for why the XML export cannot be that source.
+## Writes: author, accept, ride MLO's sync
+
+`OutlineService` authors complete 82-column rows — adds from scratch,
+update/complete from the row store's latest captured row, delete as a tombstone
+— and calls `MloRepository.write(rows)`, which resolves once the rows are
+fsync'd into the resident's injection queue. **That is the whole synchronous
+part**: the tool returns `{ uid, writeId, status: "accepted", expiresAt }` and
+nothing waits. The resident injects the rows into MLO's next forwarded sync
+session, observes MLO's own Apply to call them `delivered` (content compare, not
+UID alone), and expires them at TTL if no session ever carries them
+([mcp-cloud.md](mcp-cloud.md) has the mechanics). There is no post-write
+QuickSync-and-diff and no `verified` boolean; `write_status(writeId)` is where
+an outcome lives.
+
+The MLO app keeps running throughout and nothing touches the `.ml` file
+directly. Still: **back up the profile before first use** — sync flows rewrite
+sync state inside the `.ml`.
 
 ## Error handling & safety conventions
 
-- Tools return `{isError, content}` with actionable messages, never throw to the transport; stderr-only logging (stdout is JSON-RPC).
-- **Dead letter.** Every refusal in `requireWriteChannel` first records the
-  attempted write's text, the reason and a timestamp in `dead-letters.json` in
-  the state root, and the refusal names that path. It is applied at the shared
-  gate so every current and future write tool inherits it. Entries are only
-  ever appended, but the file is bounded both ways — the oldest are evicted
-  past 50 entries, and one entry's text is capped at 4000 characters — so a
-  long-running fault cannot grow it without limit. It is **never replayed** and
-  never makes a refused write report success: a refusal means something is
-  actually wrong, and replaying on top of it reinvents ADR-0002's failure mode.
-  Recovery is reading the file by hand. It is written by every attached session,
-  so it takes the same cross-process lock (`cloud/state-lock.ts`) the bindings
-  use.
-- Annotations: `readOnlyHint` on list/search/get/status, `destructiveHint` on complete/update/delete, `idempotentHint` on sync, `openWorldHint` on every tool that triggers a sync session. All tools return `structuredContent` matching an `outputSchema`.
+- **One carrier.** `ServiceResult<T, F>` — `{ isErrored: false, value, advisories? }`
+  or `{ isErrored: true, failure }`, plain tagged objects (class identity dies at
+  the HTTP seam). One closed union per boundary: repositories return infra kinds,
+  services map them into domain kinds and forward infra kinds under their own
+  names, and the tool layer is the only place a failure becomes prose — once, as
+  `detail — remedy [kind]`. Genuine invariant violations stay exceptions.
+- **The four-tier table is data** (`src/error-contract.ts`): one row per kind
+  with its tier (Event / op refusal / write-gate refusal / startup verdict),
+  `retryable`, meaning, and the observation that ends it. The boundary unions are
+  derived from the table, so a union and the table cannot drift, and the review
+  gates run as tests (`test/unit/error-contract.test.ts`). Post-startup, no
+  failure stops the server.
+- **Across the process seam**, refusals are RFC 9457 problem+json and rehydrate
+  into failures; an unknown `type` degrades to `{ kind: "unknown", ... }` rather
+  than throwing (`wireType` and the problem's extension members survive onto the
+  failure).
+- **No automatic retries anywhere.** `retryable`/`remedy` are producer-declared
+  caller metadata. Lazy attach-and-spawn removed the whole "restart the client"
+  remedy class.
+- **Dead letter.** A refused write records its text, the tool, the reason and a
+  timestamp in `dead-letters.json` in the state root, and the refusal names that
+  path. Bounded both ways (oldest evicted past 50 entries, one entry's text
+  capped), **never replayed** and never makes a refused write report success:
+  replaying on top of a refusal reinvents [ADR-0002](adr/0002-report-binding-mismatch-never-repair-it.md)'s
+  failure mode. Recovery is reading the file by hand.
+- Tools return `{isError, content}` with actionable messages, never throw to the
+  transport; stderr-only logging (stdout is JSON-RPC).
+- Annotations: `readOnlyHint` on list/search/get/status, `destructiveHint` on
+  complete/update/delete, `idempotentHint` on sync, `openWorldHint` on every tool
+  that can reach the vendor through MLO. All tools return `structuredContent`
+  matching an `outputSchema`.
 
-## Tests (vitest, 3 projects-in-2)
+## Tests (vitest, two projects)
 
-- **unit** — parser/builder round-trip, tree ids, filters (fixture is a real export); the whole cloud protocol layer (CSV/envelope codecs, delta building/merging, log state and projection, HTTP server, SOAP adapter, tool helpers); profile detection, whose policy is a pure function over one observation. One suite there is the exception to "no live machine": `profile-detect`'s probe-contract block runs the real PowerShell probe, because the seam it pins (the script's JSON shape) has no other test. It is Windows-gated and read-only — registry, process list, and a read handle on the recorded profile — and needs no mlo.exe, so unlike the **mlo** project it runs with the GUI open.
-- **mlo** (serial, slow) — real mlo.exe against a temp copy of the test profile: export, exit codes, GUID recovery.
-- **e2e** (inside mlo project) — real MCP client over stdio: tool listing/annotations, instructions, read tools, cloud_status. Write tools need the app's sync proxy wired to the local endpoint and are exercised outside this headless suite.
-
-GUI must be closed for the mlo project (guarded with a clear failure message).
+- **unit** — the domain model (CSV/envelope codecs, delta schema and merge, tree
+  ids and filters against a real export fixture), the services, the resident's
+  HTTP surface and write path, profile detection, and the error-contract gates.
+  Two suites earn their own mention:
+  - the **sabotage suite** instantiates the resident's handler stack in-process,
+    feeds it a canned vendor session, and fault-injects capture, the row store,
+    the queue, the binding and every service in turn, asserting the proxied sync
+    still completes with the vendor's payload intact — the non-interference
+    invariant, executable;
+  - the **auto-init suite** fault-injects each pull stage (pull, validate,
+    ground-truth) and asserts no binding is written on any partial failure.
+  One suite is the exception to "no live machine": `profile-detect`'s
+  probe-contract block runs the real PowerShell probe, because the seam it pins
+  (the script's JSON shape) has no other test. It is Windows-gated and read-only,
+  needs no mlo.exe, and so runs with the GUI open.
+- **mlo** (serial, slow) — real `mlo.exe` against a temp copy of the test
+  profile: export, exit codes, GUID recovery; plus the stdio E2E (tool
+  listing/annotations, instructions, read tools, `cloud_status`). **GUI must be
+  closed** (guarded with a clear failure message).
+- **Contract suites** (`test/contract/`) are one shared parameterized suite per
+  interface, run against the fakes in `unit` — typed refusal kinds and the
+  problem+json shape included, so a fake cannot drift from the real
+  implementation.
+- **Fakes** (`test/fakes/`, never shipped in `src/`): `FakeMloCli` (scriptable
+  exit codes, both live CLI traps), `FakeResidentClient` (problem+json refusals
+  by kind, incl. unknown), `FakeMloRepository` (in-memory tree plus a
+  hand-driven `transition(writeId, status)` over the five states, which is how
+  the conflict-skip and stalled-session outcomes are exercised without a
+  resident), plus row store, capture journal and state-store fakes.
+- **Live legs** behind `MLO_LIVE=1` (`test/mlo/live-write.test.ts`): the
+  `GetFileTS` nudge, verbatim answers once the queue empties, four-verb
+  propagation, TTL expiry. They mutate the profile they are pointed at and take
+  minutes. The conflict rounds stay a manual runbook:
+  [testing-conflict-runbook.md](testing-conflict-runbook.md).

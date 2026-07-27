@@ -4,7 +4,7 @@ MCP server that lets AI agents manage tasks in the **MyLifeOrganized** (MLO) Win
 
 Full reference documentation lives in [`../docs/`](../docs/README.md): the mlo.exe CLI, the XML and `.ml` binary formats, and the server architecture. The server itself is methodology-neutral; customizable skills that layer GTD workflows on top of these tools live in a separate `gtd-skills` repo.
 
-**Installing the server as a user?** See the [root README](../README.md) — end users need only Node, not pnpm: the repo ships a committed single-file bundle (`dist-bundle/mlo-mcp.js`, dependency-free) usable from any MCP client. It also carries the two-step install, including the one-time proxy wiring and `cloud_bootstrap` that writes depend on. This file covers development.
+**Installing the server as a user?** See the [root README](../README.md) — end users need only Node, not pnpm: the repo ships a committed single-file bundle (`dist-bundle/mlo-mcp.js`, dependency-free) usable from any MCP client. It also carries the two-step install, including the one-time proxy wiring that writes depend on. This file covers development.
 
 ## Requirements (development)
 
@@ -36,6 +36,8 @@ claude mcp add mlo -- node D:\dev\projects\oml\mlo-mcp\mcp-server\dist\index.js
 | `MLO_CLOUD_HOST` | no | `127.0.0.1` | Local sync endpoint bind address (loopback only by design) |
 | `MLO_CLOUD_PORT` | no | `8181` | Local sync endpoint port (`0` = random); MLO profiles configured against the old 8080 default need their sync URL/proxy updated |
 | `MLO_CLOUD_STATE_ROOT` | no | `%LOCALAPPDATA%\mlo-mcp\cloud` | Partitioned sync-state root (override for tests/unusual installs only) |
+| `MLO_WRITE_TTL_MINUTES` | no | `15` | How long an accepted write may wait for MLO's Apply before it expires into the dead-letter record |
+| `MLO_INBOX_CAPTION` | no | MLO's own `<Inbox>` | Caption of the task acting as the capture inbox, for profiles with a hand-made one |
 
 There is no profile setting. The server operates on the profile MLO itself
 has open, logs the detected path to stderr on startup, and refuses to start
@@ -72,21 +74,23 @@ argument; that bypasses these checks and disables the switch-following.)
 | `search_tasks` | read | text, context, due range, star, completion, project, flag |
 | `get_task` | read | full fields, GUID, children, dependencies |
 | `list_contexts` | read | contexts (Places) with usage counts |
-| `cloud_status` | read | binding, bootstrap lifecycle, cursor + delta counts, mirror coverage |
-| `cloud_bootstrap` | write | one-time setup: pulls the vendor cloud's full history and binds the profile |
-| `add_task` | write | one full-row task per call; parent by GUID; booleans, existing Flag/Places |
-| `add_tasks` | write | atomic 1–50 task outline; local parent/dependency keys + existing GUID links |
-| `sync` | write | `-QuickSync` |
+| `write_status` | read | where one accept receipt got to, by `writeId`: accepted/delivered/verified/expired/superseded |
+| `cloud_status` | read | binding + partition lifecycle, endpoint reachability and build, binding mismatch, the write aggregate |
+| `capture_task` | write | rapid entry: one line into the profile's `<Inbox>`, trailing `@context` tokens, note after a blank line |
+| `add_task` | write | one full-row task per call; parent by Path id; booleans, existing Flag/Places |
+| `add_tasks` | write | atomic 1–50 task outline; batch-local parent/dependency keys + links to existing tasks |
+| `move_task` | write | re-parent a task with its whole subtree, optionally into a slot among new siblings |
+| `sync` | write | `-QuickSync`; never load-bearing |
 | `complete_task` | destructive | `ids` batch, one delta; refuses recurring tasks |
 | `uncomplete_task` | destructive | reopens completed tasks, `ids` batch |
 | `update_task` | destructive | `updates` batch: fields, booleans, Flag/Places/dependencies + re-parenting |
 | `delete_task` | destructive | tombstones each task + whole subtree, `ids` batch |
 
-Writes never touch the data file. Each write travels as a complete sync delta — normally committed to the real **vendor MLO Cloud** in the server's own sync session (the server proxies the app's cloud sync and additionally acts as one more sync client of the account) and delivered to MLO by the triggered QuickSync; **MLO's own merge logic** applies it while the app keeps running. Batches travel as ONE delta and are atomic (one bad id and nothing is queued). Results carry a `verified` flag — `false` means accepted but not yet confirmed in a fresh export, not failure.
+Writes never touch the data file. Each write travels as a complete sync delta, durably queued in the resident endpoint and then injected into the app's **own** next sync session, so **MLO's own merge logic** applies it while the app keeps running — the server never uploads to the vendor itself. Batches travel as ONE delta and are atomic (one bad id and nothing is queued). A write tool answers at durable accept — `{ uid, writeId, status: "accepted", expiresAt, message }` — and `write_status(writeId)` is where the outcome lives.
 
-**One-time setup per profile:** back up the `.ml`, wire MLO's cloud sync proxy to the endpoint ("Use secure connection" unchecked), run one ordinary sync, then call `cloud_bootstrap` — it pulls the account's complete cloud history so every pre-existing task gets its stable UID and full record. Until then, mutation tools refuse (an ordinary sync alone never enables writes); that proxied sync arms writes until the resident sync endpoint restarts, not until this server does. Written out step by step as Step 2 of the [root README](../README.md#step-2--enable-writes-one-time-per-profile); the rationale and failure modes are in [`../docs/mcp-cloud.md`](../docs/mcp-cloud.md), the tool semantics in [`../docs/tools.md`](../docs/tools.md). The server also sends a connection-time `instructions` guide teaching agents these conventions.
+**One-time setup per profile:** back up the `.ml`, wire MLO's cloud sync proxy to the endpoint ("Use secure connection" unchecked), and run one ordinary sync. That is all: behind three guards the resident then pulls the account's complete cloud history — so every pre-existing task gets its stable UID and full record — and binds the profile, writing the binding last. Until a binding exists, mutation tools refuse with the guard that stopped them; the binding itself is persisted, so it survives restarts (the captured account contact is not, so a rebooted machine needs one more proxied sync before another initialization could run). Written out step by step as Step 2 of the [root README](../README.md#step-2--enable-writes-one-time-per-profile); the rationale and failure modes are in [`../docs/mcp-cloud.md`](../docs/mcp-cloud.md), the tool semantics in [`../docs/tools.md`](../docs/tools.md). The server also sends a connection-time `instructions` guide teaching agents these conventions.
 
-Task ids are path-based (`1.2.3`) and shift when the tree changes — the server re-exports before every mutation, and `get_task` also reports each task's stable internal GUID, resolved by structural alignment of the export outline against the bootstrapped cloud tree (duplicate sibling captions resolve by position).
+Task ids are path-based (`1.2.3`) and shift when the tree changes — the server re-exports before every mutation, and `get_task` also reports each task's stable internal GUID, resolved by aligning the export against the row store the endpoint captured from MLO's sync traffic, with the binary `.ml` recovery as cross-check.
 
 ## Tests & direct tool runs
 
