@@ -10,7 +10,11 @@ Ubiquitous language for this repo. Terms are defined here in one or two lines; t
 - **Refute (a candidate)** — what the running app's own evidence does to a stale candidate: a window title naming a different profile, or the candidate file being one MLO does not hold open. An *unavailable* signal never refutes.
 - **Profile verdict** — detection's answer: the accepted data file, or a refusal (`profile-switched` / `no-profile`). A refuted candidate refuses; it is never silently replaced with a guess.
 - **Task tree** — one deep outline; deep nesting is idiomatic. The task model (computed-score priority, contexts, dependencies, visibility) is in [docs/mlo/mlo-task-model.md](docs/mlo/mlo-task-model.md).
-- **Context (MLO "Place")** — `@Office`-style GTD context attached to tasks.
+- **Context (MLO "Place")** — `@Office`-style GTD context attached to tasks. Hierarchical (a context *includes* narrower ones) and optionally open only during declared hours.
+- **To-Do list** — the flattened, ranked action list derived from the task tree; only tasks with no uncompleted children appear ([docs/mlo/mlo-task-model.md](docs/mlo/mlo-task-model.md) §1).
+- **Next action** — a task the To-Do list would offer: a leaf that no flag, ordering rule, dependency, start date, or closed context is holding back.
+- **Available / deferred** — the two states of a To-Do-list task: actionable now, versus a real action that something defers (a dependency, a start date, a closed context).
+- **Container** — a task the outline declares as a grouping: a **project** (`IsProject`) or a **folder** (MLO's Folder flag — a bucket that never appears in the To-Do list itself, even once everything under it is done).
 - **Path id** — positional id like `"1.2.3"`; shifts whenever the tree changes, valid only for immediate follow-up calls. Never stored.
 - **GUID / UID** — a task's stable identity, resolved by structural alignment of a fresh export against the bootstrapped cloud tree ([docs/tools.md](docs/tools.md) → Shared semantics).
 - **dataFileUID** — a profile's sync identity; keys all cloud-side state.

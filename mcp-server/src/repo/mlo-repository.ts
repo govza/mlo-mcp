@@ -81,3 +81,11 @@ export interface MloRepository {
    */
   quickSync(): Promise<void>;
 }
+
+/**
+ * The repository as a read-only consumer sees it. The read services
+ * ([spec section 3](../../../docs/adr/0005-target-architecture-spec.md)) are
+ * forbidden to know the write channel at all, so the narrowing is what makes
+ * that structural rather than a promise in a comment.
+ */
+export type ReadRepository = Pick<MloRepository, "snapshot">;

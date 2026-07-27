@@ -93,6 +93,21 @@ export function findInbox(tasks: TaskNode[], configCaption?: string): TaskNode |
   return undefined;
 }
 
+/**
+ * The two kinds of container the outline itself declares: a **project**
+ * (`IsProject`) and a **folder** — MLO's Folder flag, stored as
+ * `HideInToDoThisTask`, a pure bucket that never appears in the To-Do list
+ * even once everything under it is done
+ * ([docs/mlo/mlo-task-model.md](../../docs/mlo/mlo-task-model.md) §3). One
+ * owner for that flag-to-meaning mapping, so the availability engine and the
+ * review queries cannot read it differently.
+ */
+export function containerKind(t: TaskNode): "project" | "folder" | undefined {
+  if (t.IsProject) return "project";
+  if (t.HideInToDoThisTask) return "folder";
+  return undefined;
+}
+
 export interface SearchFilters {
   /** Case-insensitive substring match against Caption and Note. */
   query?: string;

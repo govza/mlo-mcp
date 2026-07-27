@@ -19,6 +19,7 @@ import {
 import type { IdentityService, SnapshotResolver } from "./identity.js";
 import type { CapturedRow, RowCatalog, RowStore } from "../cloud/row-store.js";
 import type { SectionedCsv } from "../cloud/csv.js";
+import { readPlaces } from "../places.js";
 import {
   buildTaskAddDelta,
   buildTaskDeleteDelta,
@@ -62,11 +63,6 @@ export interface ContextUsage {
   /** Declared in the profile's places list (may carry open-hours schedules). */
   defined: boolean;
   tasksUsing: number;
-}
-
-interface RawTaskPlace {
-  "@_Caption": string;
-  [key: string]: unknown;
 }
 
 /**
@@ -198,8 +194,7 @@ export class OutlineService {
   /** The profile's contexts: defined Places plus any referenced by tasks, with usage counts. */
   async contexts(): Promise<ContextUsage[]> {
     const snap = await this.repo.snapshot();
-    const placesList = snap.doc["MyLifeOrganized-xml"].PlacesList as { TaskPlace?: RawTaskPlace[] } | undefined;
-    const defined = (placesList?.TaskPlace ?? []).map((p) => p["@_Caption"]);
+    const defined = readPlaces(snap.doc).map((p) => p.Caption);
 
     const usage = new Map<string, number>();
     for (const t of flatten(snap.tasks)) {
