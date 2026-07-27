@@ -149,8 +149,8 @@ export function annotateGuids(mlFile: Buffer, tasks: TaskNode[]): number {
     // innermost, for a recurring parent it is the outermost, and every
     // order-preserving assignment of k footers to n>k nested nodes is equally
     // consistent with the file. So assign none rather than guess. A blank GUID
-    // just falls back to the cloud delta log; a wrong one silently retargets
-    // writes and deletes at another task's subtree.
+    // just means the task's identity is not recoverable; a wrong one silently
+    // retargets writes and deletes at another task's subtree.
     //
     // A caption that did not match anywhere leaves the same ambiguity from the
     // other side — the node is still in the chain and may still own one of the

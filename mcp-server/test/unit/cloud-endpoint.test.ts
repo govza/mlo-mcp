@@ -83,7 +83,7 @@ describe("ensureEndpoint", () => {
     });
     expect(older.reachable).toBe(true);
     expect(spawner.calls).toHaveLength(0);
-    expect(await handle.state.highWater()).toBe(0n); // the original is still serving
+    expect(handle.server.listening).toBe(true); // the original is still serving
   });
 
   it("replaces a stale endpoint when this session is strictly newer", async () => {

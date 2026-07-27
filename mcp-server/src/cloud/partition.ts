@@ -1,8 +1,6 @@
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { SnapshotStore } from "./snapshot-store.js";
-import { CloudState } from "./state.js";
 
 /**
  * Per-`dataFileUID` cloud state.
@@ -54,44 +52,11 @@ async function atomicWrite(target: string, text: string): Promise<void> {
 }
 
 export class PartitionHandle {
-  private cloudState?: CloudState;
-  private snapshotStore?: SnapshotStore;
-  private mirrorCloudState?: CloudState;
-  private mirrorSnapshotStore?: SnapshotStore;
-
   constructor(
     readonly uid: string,
     readonly key: string,
     readonly dir: string,
   ) {}
-
-  /** Local-mode delta log; lives under `<partition>/local`. */
-  get state(): CloudState {
-    this.cloudState ??= new CloudState(path.join(this.dir, "local"));
-    return this.cloudState;
-  }
-
-  /** Materialized baseline beside the log (found by projections via the log dir). */
-  get snapshots(): SnapshotStore {
-    this.snapshotStore ??= new SnapshotStore(path.join(this.dir, "local", "snapshot"));
-    return this.snapshotStore;
-  }
-
-  /**
-   * Upstream-mode mirror: envelopes captured from the vendor flow, stored at
-   * the VENDOR-assigned versions ("app" = uploads, "mcp" = downloads — the
-   * mirror never serves pulls, so origins only label direction). Its
-   * materialized baseline sits beside it like any log's.
-   */
-  get mirrorState(): CloudState {
-    this.mirrorCloudState ??= new CloudState(path.join(this.dir, "mirror"));
-    return this.mirrorCloudState;
-  }
-
-  get mirrorSnapshots(): SnapshotStore {
-    this.mirrorSnapshotStore ??= new SnapshotStore(path.join(this.dir, "mirror", "snapshot"));
-    return this.mirrorSnapshotStore;
-  }
 
   private metaPath(): string {
     return path.join(this.dir, "meta.json");
@@ -113,19 +78,6 @@ export class PartitionHandle {
   async setLifecycle(next: PartitionLifecycle): Promise<void> {
     const current = await this.meta();
     await atomicWrite(this.metaPath(), `${JSON.stringify({ ...current, lifecycle: next }, null, 2)}\n`);
-  }
-
-  /** True when nothing was ever stored: no deltas, no pulls, no mirror entries. */
-  async isEmpty(): Promise<boolean> {
-    const state = this.state;
-    const [highWater, counts, lastPull, mirrorCounts] = await Promise.all([
-      state.highWater(),
-      state.counts(),
-      state.lastPullCursor("app"),
-      this.mirrorState.counts(),
-    ]);
-    return highWater === 0n && counts.mcp === 0 && counts.app === 0 && lastPull === 0n &&
-      mirrorCounts.mcp === 0 && mirrorCounts.app === 0;
   }
 }
 

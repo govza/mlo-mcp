@@ -12,14 +12,10 @@ import { SERVER_INFO } from "../version.js";
  * ([ADR-0003](../../../docs/adr/0003-resident-endpoint.md)); the process that
  * happened to start first no longer wins a listener by accident.
  *
- * The seam is deliberately narrow. What a session cannot do for itself is act
- * as a vendor sync client: the account contacts are scraped from MLO's own
- * proxied traffic and held strictly in the listening process's memory, never
- * on disk. So the resident lends credentials for three vendor round trips —
- * refresh a mirror, commit a delta, pull a full history — and executes no
- * tools. Reads, projections and delta authoring all stay in the session,
- * against the shared state root. A refresh/commit contract survives a version
- * gap between the two processes; a tool-dispatch contract would not, and
+ * The seam is deliberately narrow: the resident proxies MLO's vendor sync and
+ * answers status/shutdown, and executes no tools. Reads stay in the session,
+ * against mlo.exe exports. A narrow HTTP contract survives a version gap
+ * between the two processes; a tool-dispatch contract would not, and
  * auto-spawning makes stale resident processes inherent.
  */
 
@@ -38,8 +34,6 @@ export const ENDPOINT_RECOVERY =
 
 const PROBE_TIMEOUT_MS = 2_000;
 const START_TIMEOUT_MS = 15_000;
-/** Vendor round trips ride these calls; a full-history pull is the slow one. */
-const VENDOR_TIMEOUT_MS = 120_000;
 const POLL_INTERVAL_MS = 100;
 
 export interface EndpointStatus {
@@ -118,11 +112,14 @@ async function askStatus(host: string, port: number): Promise<Answer> {
   } catch {
     return { kind: "foreign", detail: "/v1/status did not answer with JSON" };
   }
-  // The two fields every build of this endpoint has always served: what makes
-  // the holder recognisably ours rather than some other local server, and what
-  // keeps a pre-resident build identifiable to a session that must replace it.
-  if (typeof body.cursor !== "string" || typeof body.entries !== "object" || body.entries === null) {
-    return { kind: "foreign", detail: "/v1/status answered without the cursor and entries fields" };
+  // What makes the holder recognisably ours rather than some other local
+  // server: current builds serve version + contactUids; builds from before the
+  // delta log was deleted served cursor + entries, and must stay identifiable
+  // so a newer session can replace them.
+  const currentShape = typeof body.version === "string" && Array.isArray(body.contactUids);
+  const legacyShape = typeof body.cursor === "string" && typeof body.entries === "object" && body.entries !== null;
+  if (!currentShape && !legacyShape) {
+    return { kind: "foreign", detail: "/v1/status answered without the fields an mlo-mcp endpoint serves" };
   }
   return {
     kind: "endpoint",
@@ -272,31 +269,6 @@ export class ResidentEndpoint {
   }
 
   /**
-   * Open a write session against the vendor: the resident pulls anything newer
-   * than the mirror (so full-row authoring never starts from superseded rows)
-   * and holds the vendor session open. The returned cursor is the mirror
-   * high-water the author is entitled to assume.
-   */
-  async refreshUpstream(dataFileUID: string): Promise<{ session: string; cursor: string }> {
-    return this.post("/v1/upstream/refresh", { dataFileUID });
-  }
-
-  /** Commit one authored envelope in the session `refreshUpstream` opened. */
-  async commitUpstream(session: string, envelope: Uint8Array): Promise<string> {
-    const result = await this.post<{ version: string }>("/v1/upstream/commit", {
-      session,
-      envelope: Buffer.from(envelope).toString("base64"),
-    });
-    return result.version;
-  }
-
-  /** The vendor's complete history for one cloud file, for a bootstrap. */
-  async vendorHistory(dataFileUID: string): Promise<{ version: string; envelope: Buffer }> {
-    const result = await this.post<{ version: string; envelope: string }>("/v1/upstream/history", { dataFileUID });
-    return { version: result.version, envelope: Buffer.from(result.envelope, "base64") };
-  }
-
-  /**
    * Ask a stale resident process to exit so a newer build can take the port.
    * Short timeout: a resident too wedged to answer is one the caller falls back
    * to attaching to, not one worth blocking a session's startup on.
@@ -305,7 +277,7 @@ export class ResidentEndpoint {
     await this.post("/v1/shutdown", {}, PROBE_TIMEOUT_MS);
   }
 
-  private async post<T>(route: string, body: unknown, timeoutMs = VENDOR_TIMEOUT_MS): Promise<T> {
+  private async post<T>(route: string, body: unknown, timeoutMs = PROBE_TIMEOUT_MS): Promise<T> {
     let response: Response;
     try {
       response = await fetch(`${this.url}${route}`, {
@@ -318,8 +290,7 @@ export class ResidentEndpoint {
       this.last = undefined;
       throw new Error(
         `the resident MLO sync endpoint at ${this.url} did not answer ` +
-          `(${error instanceof Error ? error.message : String(error)}) — it holds the vendor credentials, so nothing ` +
-          `was sent. ${ENDPOINT_RECOVERY}`,
+          `(${error instanceof Error ? error.message : String(error)}). ${ENDPOINT_RECOVERY}`,
       );
     }
     const payload = await response.json().catch(() => ({})) as { error?: unknown };

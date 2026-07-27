@@ -93,41 +93,6 @@ export function findInbox(tasks: TaskNode[], configCaption?: string): TaskNode |
   return undefined;
 }
 
-/** The inbox as a RawTaskNode inside a parsed document (for mutation callbacks). */
-export function findRawInbox(doc: MloDocument, configCaption?: string): RawTaskNode | undefined {
-  const top = rootNode(doc).TaskNode ?? [];
-  for (const cap of inboxCaptions(configCaption)) {
-    const hit = top.find((n) => n["@_Caption"] === cap);
-    if (hit) return hit;
-  }
-  return undefined;
-}
-
-/**
- * Locate the RawTaskNode for a path id inside the parsed document, together
- * with its parent's child array and index — what a mutation needs.
- */
-export interface FoundRaw {
-  raw: RawTaskNode;
-  siblings: RawTaskNode[];
-  index: number;
-}
-
-export function findRawById(doc: MloDocument, id: string): FoundRaw | undefined {
-  const parts = id.split(".").map((p) => Number(p));
-  if (parts.length === 0 || parts.some((p) => !Number.isInteger(p) || p < 1)) return undefined;
-  let siblings = rootNode(doc).TaskNode ?? [];
-  let raw: RawTaskNode | undefined;
-  let index = -1;
-  for (let i = 0; i < parts.length; i++) {
-    index = parts[i] - 1;
-    raw = siblings[index];
-    if (!raw) return undefined;
-    if (i < parts.length - 1) siblings = raw.TaskNode ?? [];
-  }
-  return raw ? { raw, siblings, index } : undefined;
-}
-
 export interface SearchFilters {
   /** Case-insensitive substring match against Caption and Note. */
   query?: string;

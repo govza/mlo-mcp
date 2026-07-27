@@ -6,18 +6,15 @@ import { cursorToDecimalString, parseCursor, ZERO_CURSOR, type CloudCursor } fro
 import { generateGuid, SECTION_HEADERS } from "./delta.js";
 import { findSection, parseSectionedCsv, type SectionedCsv } from "./csv.js";
 import { packEnvelope, unpackEnvelope } from "./envelope.js";
-import { validateFullSnapshot } from "./snapshot-validate.js";
 import type { SoapOperation } from "./soap.js";
-import type { PartitionHandle } from "./partition.js";
 import type { CloudGateway } from "./gateway.js";
-import { log } from "../log.js";
 
 /**
- * Upstream mode: the endpoint is a TRANSPARENT proxy for the three vendor
- * sync operations — the vendor stays the only cursor authority, requests and
- * responses pass through byte-for-byte, and the mirror capture is strictly
- * passive. All three operations of one profile session belong to the same
- * authority; nothing here may generate, rebase, or adopt a cursor.
+ * The endpoint is a TRANSPARENT proxy for the three vendor sync operations —
+ * the vendor stays the only cursor authority, and requests and responses pass
+ * through byte-for-byte. All three operations of one profile session belong
+ * to the same authority; nothing here may generate, rebase, or adopt a
+ * cursor.
  */
 export interface ForwardResult {
   status: number;
@@ -119,84 +116,37 @@ function text(fields: Record<string, unknown> | undefined, name: string): string
   return typeof value === "string" && value.length ? value : undefined;
 }
 
-export interface UpstreamContext {
-  partition?: PartitionHandle;
-  /** Capture into the bound partition's mirror. */
-  capture: boolean;
-}
-
 /**
- * Forward one vendor sync operation and passively capture the flow. Capture
- * failures never alter what the client receives — the vendor's response is
- * returned verbatim in every case.
+ * Forward one vendor sync operation. The vendor's response is returned
+ * verbatim in every case; the only side effect is remembering how to reach
+ * the vendor as a client for this cloud file (in-memory only) — what powers
+ * the bootstrap pull.
  */
 export async function forwardVendorSoap(
   gateway: CloudGateway,
-  context: UpstreamContext,
   target: URL,
-  operation: SoapOperation,
   requestHeaders: IncomingHttpHeaders,
   requestBytes: Buffer,
   requestFields: Record<string, unknown>,
 ): Promise<ForwardResult> {
-  // Remember how to reach the vendor as a client for this cloud file
-  // (in-memory only) — this is what powers pull-bootstrap and MCP writes.
   const rawUid = typeof requestFields.dataFileUID === "string" ? requestFields.dataFileUID : undefined;
   const contact = contactFromRequest(target, requestFields);
   if (rawUid && contact) gateway.noteVendorContact(rawUid, contact);
 
-  const result = await forwardBuffered(target, "POST", requestHeaders, requestBytes);
-  if (!context.capture || !context.partition || result.status !== 200) return result;
-  try {
-    await captureExchange(context, operation, requestFields, result);
-  } catch (error) {
-    log(`upstream mirror capture failed (response passed through unchanged): ${error instanceof Error ? error.message : String(error)}`);
-    await gateway.noteMirrorUnhealthy();
-  }
-  return result;
-}
-
-async function captureExchange(
-  context: UpstreamContext,
-  operation: SoapOperation,
-  requestFields: Record<string, unknown>,
-  result: ForwardResult,
-): Promise<void> {
-  const partition = context.partition!;
-  const fields = responseFields(decodeBody(result), operation);
-  if (text(fields, `${operation}Result`) !== "true") return;
-
-  if (operation === "ApplyModificationsBytesEx") {
-    const version = text(fields, "newServerTimeStamp");
-    const data = typeof requestFields.data === "string" ? requestFields.data : undefined;
-    if (!version || !data) return;
-    const bytes = Buffer.from(data.replace(/\s+/g, ""), "base64");
-    unpackEnvelope(bytes); // validates the envelope shape
-    await partition.mirrorState.appendAtCursor("app", bytes, parseCursor(version));
-    return;
-  }
-
-  if (operation === "GetModificationsBytesEx") {
-    const version = text(fields, "maxVersion");
-    const data = text(fields, "data");
-    if (!version || !data) return;
-    const bytes = Buffer.from(data.replace(/\s+/g, ""), "base64");
-    unpackEnvelope(bytes);
-    await partition.mirrorState.appendAtCursor("mcp", bytes, parseCursor(version));
-  }
+  return forwardBuffered(target, "POST", requestHeaders, requestBytes);
 }
 
 
 /* ------------------------------------------------------------------------- *
- * The endpoint as a vendor sync client.
+ * The endpoint as a vendor sync client — initialization only.
  *
- * The vendor cloud is a multi-client system by design (desktop + mobile).
- * Acting as one more client is therefore the protocol-supported way to give
- * MCP a write path that keeps MLO, the vendor, and mobile in sync: pushes go
- * up in the endpoint's OWN sessions (the vendor assigns the real remote
- * version), and MLO receives them on its next QuickSync like any other
- * remote change. Nothing here invents, rebases, or compares cursors — the
- * vendor stays the single authority.
+ * The vendor cloud is a multi-client system by design (desktop + mobile), so
+ * acting as one more client is protocol-supported. Under ADR-0005 the
+ * endpoint initiates vendor calls only during initialization (the guarded
+ * auto-init full-history pull, or an explicit rebind/repull); in steady state
+ * every vendor exchange is MLO-initiated and merely forwarded. Nothing here
+ * invents, rebases, or compares cursors — the vendor stays the single
+ * authority.
  * ------------------------------------------------------------------------- */
 
 function xmlEscape(value: string): string {
@@ -343,14 +293,11 @@ export class VendorClient {
 }
 
 /**
- * A bootstrap in two halves, because only one of them needs credentials.
- *
  * Pull the vendor's complete history from remote version 0 as one more client
- * — this is the half that runs in the resident endpoint, which is where the
- * contact captured from the profile's own sync traffic lives. Taking the
- * contact as an argument rather than reaching for it keeps that dependency
- * visible in the signature, and leaves one place
- * ([credential-lending.ts](credential-lending.ts)) reporting a missing one.
+ * — this runs in the resident endpoint, which is where the contact captured
+ * from the profile's own sync traffic lives. Taking the contact as an
+ * argument rather than reaching for it keeps that dependency visible in the
+ * signature.
  */
 export async function pullVendorHistory(
   contact: VendorContact,
@@ -372,10 +319,12 @@ export async function pullVendorHistory(
  * some empty cloud sections may be omitted and Places may omit Hotkey.
  *
  * Normalize that projection into the canonical cloud section/header order,
- * preserving every extra column and unknown section, and ZIP it so the mirror
- * has one representation regardless of how the vendor supplied the history.
+ * preserving every extra column and unknown section, and ZIP it so consumers
+ * see one representation regardless of how the vendor supplied the history.
+ * (No caller right now: the guarded auto-init pull materializes the row store
+ * from this — ADR-0005 spec section 5.)
  */
-function normalizeVendorHistory(
+export function normalizeVendorHistory(
   bytes: Uint8Array,
 ): { document: SectionedCsv; envelope: Uint8Array } {
   if (
@@ -427,105 +376,3 @@ function normalizeVendorHistory(
   return { document, envelope: packEnvelope(document) };
 }
 
-/**
- * The other half: validate the pulled history as a full snapshot (full by
- * construction, so `Config` is not required), materialize it as the read/write
- * mirror, and bind the profile. Pure work against the shared state root, so it
- * runs in the MCP session — which is the only side that knows the profile path.
- * WITHOUT touching the MLO UI at any point.
- */
-export async function materializeVendorHistory(
-  gateway: CloudGateway,
-  profilePath: string,
-  rawUid: string,
-  history: { version: CloudCursor; envelope: Uint8Array },
-): Promise<{ version: string; stats: Record<string, number> }> {
-  const partition = await gateway.registry.open(rawUid, "upstream");
-  const normalized = normalizeVendorHistory(history.envelope);
-  const document = normalized.document;
-  const validation = validateFullSnapshot(document, { requireConfig: false });
-  if (!validation.ok) {
-    const preview = validation.errors.slice(0, 5).join("; ");
-    throw new Error(`vendor full-history pull failed snapshot validation: ${preview}`);
-  }
-  await partition.mirrorState.appendAtCursor("mcp", normalized.envelope, history.version);
-  await partition.mirrorSnapshots.materialize(document, history.version);
-  await gateway.bindings.bindUid(profilePath, partition.uid);
-  await partition.setLifecycle("ready");
-  log(`upstream mirror bootstrapped from vendor history at version ${cursorToDecimalString(history.version)} (${validation.stats.tasks} tasks)`);
-  return { version: cursorToDecimalString(history.version), stats: validation.stats };
-}
-
-/**
- * A write session against the vendor: refresh the mirror first (so full-row
- * authoring never starts from stale rows), then commit the MCP delta in the
- * endpoint's own vendor session. After the commit, MLO's next QuickSync
- * delivers the change back to the app like any other remote edit.
- *
- * The two calls straddle a process boundary — the session is opened in the
- * resident endpoint and committed on the MCP client's behalf a round trip
- * later ([write-broker.ts](write-broker.ts)) — so `release` is public: an
- * author that never commits must still let the vendor session go.
- */
-export class UpstreamWriteSession {
-  private readonly client: VendorClient;
-  private readonly sessionId = generateGuid();
-
-  constructor(
-    readonly partition: PartitionHandle,
-    contact: VendorContact,
-    observe?: VendorExchangeObserver,
-  ) {
-    this.client = new VendorClient(contact, partition.uid, observe);
-  }
-
-  /** Pull vendor changes newer than the mirror and capture them. */
-  async refresh(): Promise<void> {
-    const newerThan = await this.partition.mirrorState.highWater();
-    const pulled = await this.client.pull(this.sessionId, newerThan);
-    if (pulled.data && pulled.maxVersion > newerThan) {
-      unpackEnvelope(pulled.data);
-      await this.partition.mirrorState.appendAtCursor("mcp", pulled.data, pulled.maxVersion);
-    }
-  }
-
-  /**
-   * Upload one MCP-authored envelope; returns the vendor-assigned version.
-   *
-   * `Result=true` alone is NOT durability: the vendor has been observed
-   * answering success while keeping its cursor still, and a delta committed
-   * at an unadvanced version exists in no history any sync client will ever
-   * pull. So the one proof of storage this client accepts is the cursor
-   * moving — an unadvanced commit is a refusal, however the response is
-   * worded. The session is released either way; an author whose commit was
-   * refused must not leave the vendor session held.
-   */
-  async commit(envelope: Uint8Array): Promise<string> {
-    try {
-      const baseline = await this.partition.mirrorState.highWater();
-      const version = await this.client.apply(this.sessionId, envelope);
-      if (version <= baseline) {
-        throw new Error(
-          `the vendor answered this upload with Result=true but newServerTimeStamp ` +
-            `${cursorToDecimalString(version)}, which does not advance past the mirror high-water ` +
-            `${cursorToDecimalString(baseline)} — an unadvanced commit: the vendor stored nothing any sync ` +
-            "client will ever pull, so the write was refused",
-        );
-      }
-      if (!(await this.partition.mirrorState.appendAtCursor("mcp", envelope, version))) {
-        // The advancement check passed, so a refused append can only mean a
-        // concurrent capture already recorded this version or newer — the
-        // vendor's history contains the delta and the commit is durable.
-        log(`vendor version ${cursorToDecimalString(version)} was already covered by a concurrent mirror capture`);
-      }
-      return cursorToDecimalString(version);
-    } finally {
-      await this.release();
-    }
-  }
-
-  /** Give the vendor session back without committing anything. */
-  async release(): Promise<void> {
-    await this.client.release(this.sessionId).catch(() => undefined);
-  }
-}

@@ -1,4 +1,4 @@
-import { XMLParser, XMLBuilder } from "fast-xml-parser";
+import { XMLParser } from "fast-xml-parser";
 
 /**
  * Raw shape of a <TaskNode> element as parsed by fast-xml-parser.
@@ -59,14 +59,6 @@ const parser = new XMLParser({
   isArray: (name: string) => name === "TaskNode" || name === "Place" || name === "TaskPlace" || name === "UID",
 });
 
-const builder = new XMLBuilder({
-  ...SHARED_OPTIONS,
-  format: true,
-  indentBy: "  ",
-  suppressEmptyNode: true,
-  suppressBooleanAttributes: false,
-});
-
 /**
  * With trimValues:false the parser records inter-element whitespace as "#text"
  * entries on every container element. Drop the whitespace-only ones (real mixed
@@ -97,60 +89,4 @@ export function parseMloXml(xml: string): MloDocument {
 /** Root TaskNode (Caption="") whose children are the top-level tasks. */
 export function rootNode(doc: MloDocument): RawTaskNode {
   return doc["MyLifeOrganized-xml"].TaskTree.TaskNode[0];
-}
-
-/** Element order used by MLO's own exports; unknown elements keep their place before children. */
-const FIELD_ORDER = [
-  "IDD",
-  "Note",
-  "Dependency",
-  "Importance",
-  "Effort",
-  "CompletionDateTime",
-  "DueDateTime",
-  "StartDateTime",
-  "IsProject",
-  "ProjectStatus",
-  "Starred",
-  "Flag",
-  "Places",
-  "EstimateMin",
-  "EstimateMax",
-  "TheGoal",
-  "HideInToDo",
-  "HideInToDoThisTask",
-  "ScheduleType",
-  "LeadTime",
-  "CompleteSubTasksInOrder",
-];
-
-/**
- * Set (value !== undefined) or remove (value === undefined) a scalar field,
- * rebuilding the node's key order so new elements serialize before the nested
- * <TaskNode> children, matching MLO's own layout.
- */
-export function setRawField(node: RawTaskNode, key: string, value: unknown): void {
-  if (value === undefined) {
-    delete node[key];
-  } else {
-    node[key] = value;
-  }
-  const children = node.TaskNode;
-  delete node.TaskNode;
-  const entries = Object.entries(node);
-  for (const k of Object.keys(node)) delete node[k];
-  const rank = (k: string) => {
-    if (k.startsWith("@_")) return -1;
-    const i = FIELD_ORDER.indexOf(k);
-    return i === -1 ? FIELD_ORDER.length : i;
-  };
-  entries.sort((a, b) => rank(a[0]) - rank(b[0]));
-  for (const [k, v] of entries) node[k] = v;
-  if (children) node.TaskNode = children;
-}
-
-export function buildMloXml(doc: MloDocument): string {
-  // The parsed "?xml" declaration key does not rebuild reliably; emit it ourselves.
-  const { "?xml": _decl, ...rest } = doc as Record<string, unknown>;
-  return '<?xml version="1.0" encoding="UTF-8"?>\n' + builder.build(rest);
 }

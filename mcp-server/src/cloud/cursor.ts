@@ -13,9 +13,3 @@ export function parseCursor(value: string): CloudCursor {
   return parsed as CloudCursor;
 }
 
-export function compareCursors(a: CloudCursor, b: CloudCursor): -1 | 0 | 1 {
-  return a < b ? -1 : a > b ? 1 : 0;
-}
-
-export const cursorAfter = (a: CloudCursor, b: CloudCursor): boolean => a > b;
-export const cursorAtOrBefore = (a: CloudCursor, b: CloudCursor): boolean => a <= b;

@@ -38,7 +38,7 @@ const endpoint = await ensureEndpoint({
   port: config.cloudPort,
   spawn: residentSpawner(fileURLToPath(new URL("../src/index.ts", import.meta.url))),
 });
-const ctx = { config, store: new MloStore(config), cloudState: cloud.defaultState(), cloud, endpoint };
+const ctx = { config, store: new MloStore(config), cloud, endpoint };
 const args = z.object(tool.inputSchema).parse(JSON.parse(json ?? "{}"));
 
 const result = await tool.execute(args, ctx);

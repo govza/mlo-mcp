@@ -2,13 +2,11 @@ import { execFile } from "node:child_process";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { CloudState } from "./state.js";
 import { BindingStore, type ProfileBinding } from "./binding.js";
-import { BootstrapController } from "./bootstrap.js";
 import { SightingStore, type UnboundSighting } from "./sightings.js";
 import { DeadLetterStore } from "./dead-letter.js";
 import { normalizeDataFileUid, PartitionRegistry, type PartitionHandle, type PartitionLifecycle } from "./partition.js";
-import type { UpstreamContext, VendorContact } from "./upstream.js";
+import type { VendorContact } from "./upstream.js";
 import { log } from "../log.js";
 
 /**
@@ -17,8 +15,7 @@ import { log } from "../log.js";
  * session is one logical unit), so decisions are pinned per `sessionID`.
  */
 export type SoapAuthority =
-  | { kind: "local" }
-  | { kind: "upstream"; context: UpstreamContext }
+  | { kind: "upstream" }
   | { kind: "reject"; message: string };
 
 const SESSION_PIN_TTL_MS = 10 * 60 * 1000;
@@ -34,11 +31,9 @@ export interface BindingMismatch {
 }
 
 /**
- * Routes every cloud-state access — SOAP, /v1, MCP tools, status — to the
+ * Routes every cloud-state access — SOAP, MCP tools, status — to the
  * per-`dataFileUID` partition it belongs to, under one private state root
- * outside any checkout. A profile's MODE (vendor-proxy "upstream" vs
- * replacement-server "local") lives in its persisted binding, chosen at
- * `cloud_bootstrap` time — it is not server configuration.
+ * outside any checkout.
  */
 export interface CloudGatewayOptions {
   stateRoot: string;
@@ -47,12 +42,10 @@ export interface CloudGatewayOptions {
 export class CloudGateway {
   readonly registry: PartitionRegistry;
   readonly bindings: BindingStore;
-  readonly bootstrap: BootstrapController;
   readonly sightings: SightingStore;
   /** Shared, not per-call: its write chain is what serialises concurrent refusals. */
   readonly deadLetters: DeadLetterStore;
   readonly stateRoot: string;
-  private unboundState?: CloudState;
   private rootPrepared = false;
   private sessionAuthorities = new Map<string, { authority: SoapAuthority; expires: number }>();
   /**
@@ -67,7 +60,6 @@ export class CloudGateway {
     this.stateRoot = options.stateRoot;
     this.registry = new PartitionRegistry(options.stateRoot);
     this.bindings = new BindingStore(options.stateRoot);
-    this.bootstrap = new BootstrapController(options.stateRoot);
     this.sightings = new SightingStore(options.stateRoot);
     this.deadLetters = new DeadLetterStore(options.stateRoot);
   }
@@ -96,21 +88,10 @@ export class CloudGateway {
   }
 
   /**
-   * Placeholder log for callers that address no specific partition, so
-   * `/v1/status` (the attach probe) and tool contexts keep a stable shape
-   * before a profile is bound. Never routed to by SOAP.
-   */
-  defaultState(): CloudState {
-    this.unboundState ??= new CloudState(path.join(this.stateRoot, "unbound"));
-    return this.unboundState;
-  }
-
-  /**
    * Decide the authority for one SOAP sync operation from its parsed fields.
-   * Local termination answers local-mode partitions (and malformed requests,
-   * which it fails properly); upstream-bound and unknown windowless
-   * dataFileUIDs belong to the vendor. The decision is pinned per sessionID
-   * so a binding change can never switch authorities mid-session.
+   * Everything the endpoint can attribute forwards to the vendor; only
+   * requests it cannot route at all are rejected. The decision is pinned per
+   * sessionID so a binding change can never switch authorities mid-session.
    */
   async decideAuthority(fields: Record<string, unknown>): Promise<SoapAuthority> {
     const sessionId = typeof fields.sessionID === "string" && fields.sessionID.length ? fields.sessionID : undefined;
@@ -133,37 +114,39 @@ export class CloudGateway {
 
   private async computeAuthority(fields: Record<string, unknown>): Promise<SoapAuthority> {
     const rawUid = typeof fields.dataFileUID === "string" && fields.dataFileUID.length ? fields.dataFileUID : undefined;
-    if (!rawUid) return { kind: "local" }; // local handling reports the missing UID
+    if (!rawUid) return { kind: "reject", message: "dataFileUID is required to route this sync operation" };
     let uid: string;
     try {
       uid = normalizeDataFileUid(rawUid);
-    } catch {
-      return { kind: "local" }; // local handling reports the invalid UID
+    } catch (error) {
+      return { kind: "reject", message: error instanceof Error ? error.message : String(error) };
     }
     await this.prepareRoot();
     const binding = await this.bindings.forUid(uid);
-    if (binding) {
-      if (binding.mode === "local") return { kind: "local" };
-      const partition = await this.registry.open(uid, binding.mode);
-      return { kind: "upstream", context: { partition, capture: true } };
+    if (binding?.mode === "local") {
+      // The local replacement server was deleted with the delta log
+      // (ADR-0005); a partition bound to it has no authority left to answer.
+      return {
+        kind: "reject",
+        message: "this dataFileUID is bound in the removed local mode; the endpoint only proxies vendor sync now",
+      };
     }
-    const window = await this.bootstrap.current();
-    if (window) return { kind: "local" }; // local-mode bootstrap window
-    // Unknown UID, nothing armed: stay out of the way — forward to the vendor
-    // unchanged, touch nothing beyond the in-memory contact, and leave a
-    // trace for the operator (upstream bootstrap pulls vendor history itself).
-    // The sighting is recorded because this decision is the only place that
-    // ever learns the identity MLO actually syncs; it changes no routing, and
-    // a failure to record it must never reach the app.
-    log(`sync operation for unknown dataFileUID forwarded to the vendor without capture (no binding, no armed bootstrap)`);
-    await this.sightings.note(uid).catch(() => undefined);
-    return { kind: "upstream", context: { capture: false } };
+    if (!binding) {
+      // Unknown UID: stay out of the way — forward to the vendor unchanged,
+      // touch nothing beyond the in-memory contact, and leave a trace for the
+      // operator. The sighting is recorded because this decision is the only
+      // place that ever learns the identity MLO actually syncs; it changes no
+      // routing, and a failure to record it must never reach the app.
+      log(`sync operation for unknown dataFileUID forwarded to the vendor (no binding)`);
+      await this.sightings.note(uid).catch(() => undefined);
+    }
+    return { kind: "upstream" };
   }
 
   /**
    * Recorded sightings whose UID is still unbound. A UID that has since been
-   * bound — by the bootstrap that repaired the fault — is no longer evidence
-   * of anything, so the signal clears itself without a second write path.
+   * bound is no longer evidence of anything, so the signal clears itself
+   * without a second write path.
    */
   async unboundSightings(): Promise<UnboundSighting[]> {
     const recorded = await this.sightings.all();
@@ -211,38 +194,6 @@ export class CloudGateway {
     return [...this.vendorContacts.keys()];
   }
 
-  /** A CONNECT tunnel to the vendor sync host blinds the mirror; record it. */
-  async noteVendorConnect(): Promise<void> {
-    await this.prepareRoot();
-    const target = path.join(this.stateRoot, "mirror-blind.json");
-    await fs.writeFile(target, `${JSON.stringify({ mirrorBlind: true, at: new Date().toISOString() }, null, 2)}\n`);
-    log("HTTPS CONNECT to the vendor sync host: sync is TLS-tunneled and the upstream mirror is blind — uncheck \"Use secure connection\" in MLO's cloud login");
-  }
-
-  async mirrorBlind(): Promise<boolean> {
-    try {
-      await fs.stat(path.join(this.stateRoot, "mirror-blind.json"));
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  async noteMirrorUnhealthy(): Promise<void> {
-    await this.prepareRoot();
-    const target = path.join(this.stateRoot, "mirror-health.json");
-    await fs.writeFile(target, `${JSON.stringify({ healthy: false, at: new Date().toISOString() }, null, 2)}\n`);
-  }
-
-  async mirrorHealthy(): Promise<boolean> {
-    try {
-      await fs.stat(path.join(this.stateRoot, "mirror-health.json"));
-      return false;
-    } catch {
-      return true;
-    }
-  }
-
   /** The partition bound to a profile, or a description of why none is. */
   async boundPartition(profilePath: string): Promise<
     | { kind: "unbound"; binding?: ProfileBinding }
@@ -253,14 +204,6 @@ export class CloudGateway {
     await this.prepareRoot();
     const partition = await this.registry.open(binding.dataFileUID, binding.mode);
     return { kind: "bound", binding, partition, lifecycle: await partition.lifecycle() };
-  }
-
-  /** Resolve the state for a `/v1` call with an optional `dataFileUID`. */
-  async stateForV1(rawUid: string | undefined): Promise<CloudState> {
-    if (rawUid === undefined) return this.defaultState();
-    await this.prepareRoot();
-    const partition = await this.registry.open(rawUid);
-    return partition.state;
   }
 
   /**

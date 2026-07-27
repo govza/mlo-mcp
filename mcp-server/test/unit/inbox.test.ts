@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { parseMloXml } from "../../src/xml.js";
-import { buildTaskTree, findInbox, findRawInbox, looksLikeInbox, renderLine } from "../../src/task-tree.js";
+import { buildTaskTree, findInbox, looksLikeInbox, renderLine } from "../../src/task-tree.js";
 import type { TaskNode } from "../../src/types.js";
 
 const FIXTURE = path.join(__dirname, "..", "fixtures", "export.xml");
@@ -53,14 +53,6 @@ describe("findInbox", () => {
 
   it("returns undefined when no inbox exists", () => {
     expect(findInbox([top("Business")])).toBeUndefined();
-  });
-});
-
-describe("findRawInbox", () => {
-  it("locates the raw <Inbox> node for mutation", () => {
-    const raw = findRawInbox(doc);
-    expect(raw).toBeDefined();
-    expect(raw!["@_Caption"]).toBe("<Inbox>");
   });
 });
 

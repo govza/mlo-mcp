@@ -1,12 +1,14 @@
 import path from "node:path";
 import os from "node:os";
-import { DEFAULT_CLOUD_PORT } from "./cloud/server.js";
 import { detectProfileSync } from "./profile-detect.js";
 import { log } from "./log.js";
 import type { MloConfig } from "./types.js";
 
 /** Exported so tests can name the real default instead of restating the literal. */
 export const DEFAULT_EXE = "C:\\Program Files (x86)\\MyLifeOrganized.net\\MLO\\mlo.exe";
+
+/** Default listen port; off the crowded 8080 so dev servers don't collide with it. */
+export const DEFAULT_CLOUD_PORT = 8181;
 
 // The app's open profile is the only one the server can fully operate on
 // (reads drive mlo.exe, writes ride that profile's sync), so there is no

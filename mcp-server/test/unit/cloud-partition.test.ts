@@ -2,47 +2,15 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { CloudGateway } from "../../src/cloud/gateway.js";
 import { normalizeDataFileUid, partitionKey, PartitionRegistry } from "../../src/cloud/partition.js";
-import { startCloudServer, type CloudServerHandle } from "../../src/cloud/server.js";
-import { handleSoapRequest } from "../../src/cloud/soap.js";
-import { buildTaskAddDelta } from "../../src/cloud/delta.js";
-import { packEnvelope, unpackEnvelope } from "../../src/cloud/envelope.js";
-import { findSection } from "../../src/cloud/csv.js";
 
 const dirs: string[] = [];
-const handles: CloudServerHandle[] = [];
 afterEach(async () => {
-  await Promise.all(handles.splice(0).map((handle) => handle.stop()));
   await Promise.all(dirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
 });
 
 const UID_A = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}";
 const UID_B = "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}";
-/** The same task identity in both partitions — isolation must keep them apart. */
-const TASK_UID = "{12345678-1234-1234-1234-123456789ABC}";
-
-function taskDelta(caption: string): Uint8Array {
-  return packEnvelope(buildTaskAddDelta({
-    uid: TASK_UID,
-    caption,
-    createdDate: "2026-07-19T12:00:00",
-    lastModified: "2026-07-19T12:00:00",
-  }));
-}
-
-function soapRequest(operation: string, fields: Record<string, string>): string {
-  const xml = Object.entries(fields).map(([name, value]) => `<${name}>${value}</${name}>`).join("");
-  return `<?xml version="1.0" encoding="utf-8"?>` +
-    `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body>` +
-    `<${operation} xmlns="http://www.mylifeorganized.net/">${xml}</${operation}>` +
-    `</soap:Body></soap:Envelope>`;
-}
-
-function responseField(bytes: Uint8Array, name: string): string | undefined {
-  const match = new RegExp(`<${name}>([\\s\\S]*?)</${name}>`).exec(Buffer.from(bytes).toString("utf8"));
-  return match?.[1];
-}
 
 describe("dataFileUID normalization and partition keys", () => {
   it("normalizes braces and case, and rejects non-GUID input", () => {
@@ -72,146 +40,21 @@ describe("partition registry", () => {
     expect(partition.uid).toBe(UID_A);
     expect(await partition.lifecycle()).toBe("uninitialized");
     expect(await partition.mode()).toBe("local");
-    expect(await partition.isEmpty()).toBe(true);
     expect(await registry.resolveExisting(UID_A)).toBe(partition);
     const listed = await registry.list();
     expect(listed).toHaveLength(1);
     expect(listed[0]!.dataFileUID).toBe(UID_A);
   });
 
-  it("keeps two partitions holding identical task UIDs and captions fully isolated", async () => {
+  it("keeps two partitions in separate directories with independent meta", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-root-")); dirs.push(root);
     const registry = new PartitionRegistry(root);
     const a = await registry.open(UID_A, "local");
-    const b = await registry.open(UID_B, "local");
+    const b = await registry.open(UID_B);
     expect(a.dir).not.toBe(b.dir);
-
-    await a.state.append("app", taskDelta("caption in A"));
-    expect(await a.isEmpty()).toBe(false);
-    expect(await b.isEmpty()).toBe(true);
-    expect(await b.state.highWater()).toBe(0n);
-
-    await b.state.append("app", taskDelta("caption in B"));
-    const fromA = await a.state.entriesAfter(0n as never);
-    const fromB = await b.state.entriesAfter(0n as never);
-    const captionOf = (bytes: Uint8Array) => {
-      const tasks = findSection(unpackEnvelope(bytes), "TodoItems")!;
-      return tasks.rows[0]?.[tasks.header.indexOf("Caption")];
-    };
-    expect(fromA).toHaveLength(1);
-    expect(fromB).toHaveLength(1);
-    expect(captionOf(fromA[0]!.bytes)).toBe("caption in A");
-    expect(captionOf(fromB[0]!.bytes)).toBe("caption in B");
+    await a.setLifecycle("ready");
+    expect(await a.lifecycle()).toBe("ready");
+    expect(await b.lifecycle()).toBe("uninitialized");
+    expect(await b.mode()).toBe("upstream");
   });
-});
-
-describe("SOAP partition routing", () => {
-  it("routes ready-bound dataFileUIDs to their own partitions and keeps histories apart", async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-root-")); dirs.push(root);
-    const gateway = new CloudGateway({ stateRoot: root });
-    for (const [profile, uid] of [["C:\\a.ml", UID_A], ["C:\\b.ml", UID_B]] as const) {
-      await gateway.bindings.create(profile, "local");
-      await gateway.bindings.bindUid(profile, uid);
-      await (await gateway.registry.open(uid)).setLifecycle("ready");
-    }
-
-    const apply = async (uid: string, caption: string) => handleSoapRequest(gateway, "ApplyModificationsBytesEx", soapRequest("ApplyModificationsBytesEx", {
-      dataFileUID: uid,
-      lastSyncTimestamp: "0",
-      data: Buffer.from(taskDelta(caption)).toString("base64"),
-    }));
-    expect(responseField(await apply(UID_A, "caption in A"), "newServerTimeStamp")).toBe("1");
-    expect(responseField(await apply(UID_B, "caption in B"), "newServerTimeStamp")).toBe("1");
-
-    // A pull from partition A must never see partition B's rows even though
-    // both hold the identical task UID.
-    const a = await gateway.registry.open(UID_A);
-    const entries = await a.state.entriesAfter(0n as never);
-    expect(entries).toHaveLength(1);
-    const tasks = findSection(unpackEnvelope(entries[0]!.bytes), "TodoItems")!;
-    expect(tasks.rows[0]?.[tasks.header.indexOf("Caption")]).toBe("caption in A");
-  });
-
-  it("fails a sync operation without a dataFileUID in partitioned mode", async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-root-")); dirs.push(root);
-    const gateway = new CloudGateway({ stateRoot: root });
-    const response = await handleSoapRequest(gateway, "GetModificationsBytesEx", soapRequest("GetModificationsBytesEx", {
-      newerThan: "0",
-    }));
-    expect(responseField(response, "GetModificationsBytesExResult")).toBe("false");
-    expect(responseField(response, "errorMessage")).toContain("dataFileUID is required");
-  });
-
-  it("fails an unknown dataFileUID closed when no bootstrap window is armed", async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-root-")); dirs.push(root);
-    const gateway = new CloudGateway({ stateRoot: root });
-    const response = await handleSoapRequest(gateway, "GetModificationsBytesEx", soapRequest("GetModificationsBytesEx", {
-      dataFileUID: UID_A,
-      newerThan: "0",
-    }));
-    expect(responseField(response, "GetModificationsBytesExResult")).toBe("false");
-    expect(responseField(response, "errorMessage")).toContain("no profile is bound");
-    // Fail-closed means no partition state was created for the unknown UID.
-    expect(await gateway.registry.resolveExisting(UID_A)).toBeUndefined();
-  });
-});
-
-describe("/v1 partition addressing", () => {
-  it("routes by dataFileUID in partitioned mode and stays isolated", async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-root-")); dirs.push(root);
-    const gateway = new CloudGateway({ stateRoot: root });
-    const handle = await startCloudServer({ host: "127.0.0.1", port: 0, gateway }); handles.push(handle);
-    const base = `http://${handle.host}:${handle.port}`;
-
-    const push = async (uid: string, caption: string) => {
-      const response = await fetch(`${base}/v1/push`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          client: "test-client",
-          dataFileUID: uid,
-          baseline: "0",
-          envelope: Buffer.from(taskDelta(caption)).toString("base64"),
-        }),
-      });
-      expect(response.status).toBe(200);
-      return (await response.json() as { cursor: string }).cursor;
-    };
-    expect(await push(UID_A, "caption in A")).toBe("1");
-    // Same starting cursor in B proves the cursor namespaces are independent.
-    expect(await push(UID_B, "caption in B")).toBe("1");
-
-    const pull = async (uid: string) => {
-      const response = await fetch(`${base}/v1/pull`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ client: "mlo-app", dataFileUID: uid, cursor: "0" }),
-      });
-      expect(response.status).toBe(200);
-      const value = await response.json() as { cursor: string; envelope?: string };
-      const tasks = findSection(unpackEnvelope(Buffer.from(value.envelope!, "base64")), "TodoItems")!;
-      return tasks.rows[0]?.[tasks.header.indexOf("Caption")];
-    };
-    expect(await pull(UID_A)).toBe("caption in A");
-    expect(await pull(UID_B)).toBe("caption in B");
-
-    const status = await (await fetch(`${base}/v1/status`)).json() as Record<string, unknown>;
-    expect(status.cursor).toBe("0"); // default (unbound) state is untouched
-    expect(status.stateRoot).toBe(root);
-    expect((status.partitions as unknown[]).length).toBe(2);
-  });
-
-  it("rejects an invalid dataFileUID without touching any state", async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-root-")); dirs.push(root);
-    const gateway = new CloudGateway({ stateRoot: root });
-    const handle = await startCloudServer({ host: "127.0.0.1", port: 0, gateway }); handles.push(handle);
-    const response = await fetch(`http://${handle.host}:${handle.port}/v1/pull`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ client: "x", dataFileUID: "nope", cursor: "0" }),
-    });
-    expect(response.status).toBe(400);
-    expect(((await response.json()) as { error: string }).error).toContain("invalid dataFileUID");
-  });
-
 });

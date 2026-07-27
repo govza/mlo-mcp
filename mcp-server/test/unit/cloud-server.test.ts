@@ -6,8 +6,6 @@ import net from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import { startCloudServer, type CloudServerHandle } from "../../src/cloud/server.js";
 import { CloudGateway } from "../../src/cloud/gateway.js";
-import { buildTaskAddDelta } from "../../src/cloud/delta.js";
-import { packEnvelope, unpackEnvelope } from "../../src/cloud/envelope.js";
 import { SERVER_INFO } from "../../src/version.js";
 
 const handles: CloudServerHandle[] = [];
@@ -17,42 +15,92 @@ afterEach(async () => {
   await Promise.all(dirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
 });
 
-async function post(handle: CloudServerHandle, route: string, body: unknown) {
-  const response = await fetch(`http://${handle.host}:${handle.port}${route}`, {
-    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+function soapRequest(operation: string, fields: Record<string, string>): string {
+  const xml = Object.entries(fields).map(([name, value]) => `<${name}>${value}</${name}>`).join("");
+  return `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body>` +
+    `<${operation} xmlns="http://www.mylifeorganized.net/">${xml}</${operation}>` +
+    `</soap:Body></soap:Envelope>`;
+}
+
+function postSoap(handle: CloudServerHandle, operation: string, body: string): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const request = http.request({
+      host: handle.host,
+      port: handle.port,
+      method: "POST",
+      path: "http://127.0.0.1:65530/mlo/MLOInetSync.asmx",
+      headers: { "content-type": "text/xml", soapaction: `"http://www.mylifeorganized.net/${operation}"` },
+    }, (response) => {
+      const chunks: Buffer[] = [];
+      response.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+      response.on("end", () => resolve({ status: response.statusCode!, body: Buffer.concat(chunks).toString("utf8") }));
+    });
+    request.on("error", reject);
+    request.end(body);
   });
-  return { status: response.status, body: await response.json() as Record<string, unknown> };
 }
 
 describe("cloud HTTP server", () => {
-  it("refuses non-loopback binding because the local SOAP adapter bypasses vendor authentication", async () => {
+  it("refuses non-loopback binding because the proxy endpoint is unauthenticated", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-bind-")); dirs.push(dir);
     await expect(startCloudServer({ host: "0.0.0.0", port: 0, stateRoot: dir }))
       .rejects.toThrow("must bind to a loopback host");
   });
 
-  it("intercepts supported vendor SOAP operations instead of forwarding credentials", async () => {
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-soap-proxy-")); dirs.push(dir);
+  it("rejects an unroutable sync operation with a protocol failure, never a transport fault", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-soap-reject-")); dirs.push(dir);
+    const gateway = new CloudGateway({ stateRoot: dir });
+    const handle = await startCloudServer({ host: "127.0.0.1", port: 0, gateway, observeHost: "127.0.0.1" });
+    handles.push(handle);
+
+    const missingUid = await postSoap(handle, "GetModificationsBytesEx",
+      soapRequest("GetModificationsBytesEx", { newerThan: "0" }));
+    expect(missingUid.status).toBe(200);
+    expect(missingUid.body).toContain("<GetModificationsBytesExResult>false</GetModificationsBytesExResult>");
+    expect(missingUid.body).toContain("dataFileUID is required");
+  });
+
+  it("rejects a dataFileUID still bound in the removed local mode", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-soap-local-")); dirs.push(dir);
     const gateway = new CloudGateway({ stateRoot: dir });
     const UID = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}";
     await gateway.bindings.create("C:\\demo.ml", "local");
     await gateway.bindings.bindUid("C:\\demo.ml", UID);
-    const partition = await gateway.registry.open(UID, "local");
-    await partition.setLifecycle("ready");
     const handle = await startCloudServer({ host: "127.0.0.1", port: 0, gateway, observeHost: "127.0.0.1" });
     handles.push(handle);
-    const delta = packEnvelope(buildTaskAddDelta({ uid: "{12345678-1234-1234-1234-123456789ABC}", caption: "queued", createdDate: "a", lastModified: "a" }));
-    await partition.state.append("mcp", delta);
-    const requestBody = `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body>` +
-      `<GetModificationsBytesEx xmlns="http://www.mylifeorganized.net/"><loginBytes>c2VjcmV0</loginBytes><dataFileUID>${UID}</dataFileUID><newerThan>50</newerThan></GetModificationsBytesEx>` +
-      `</soap:Body></soap:Envelope>`;
+
+    const result = await postSoap(handle, "GetModificationsBytesEx", soapRequest("GetModificationsBytesEx", {
+      loginBytes: "c2VjcmV0",
+      dataFileUID: UID,
+      newerThan: "50",
+    }));
+    expect(result.status).toBe(200);
+    expect(result.body).toContain("<GetModificationsBytesExResult>false</GetModificationsBytesExResult>");
+    expect(result.body).toContain("removed local mode");
+    expect(result.body).not.toContain("c2VjcmV0");
+  });
+
+  it("records a sighting and forwards an unknown dataFileUID to the vendor", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-soap-forward-")); dirs.push(dir);
+    // A real local "vendor" so the forward has somewhere to land.
+    const vendor = http.createServer((_request, response) => {
+      response.writeHead(200, { "content-type": "text/xml" });
+      response.end("<vendor-answer/>");
+    });
+    await new Promise<void>((resolve) => vendor.listen(0, "127.0.0.1", resolve));
+    const vendorAddress = vendor.address();
+    if (!vendorAddress || typeof vendorAddress === "string") throw new Error("missing vendor address");
+    const gateway = new CloudGateway({ stateRoot: dir });
+    const handle = await startCloudServer({ host: "127.0.0.1", port: 0, gateway, observeHost: "127.0.0.1" });
+    handles.push(handle);
+    const UID = "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}";
 
     const result = await new Promise<{ status: number; body: string }>((resolve, reject) => {
       const request = http.request({
         host: handle.host,
         port: handle.port,
         method: "POST",
-        path: "http://127.0.0.1:65530/mlo/MLOInetSync.asmx",
+        path: `http://127.0.0.1:${vendorAddress.port}/mlo/MLOInetSync.asmx`,
         headers: { "content-type": "text/xml", soapaction: '"http://www.mylifeorganized.net/GetModificationsBytesEx"' },
       }, (response) => {
         const chunks: Buffer[] = [];
@@ -60,13 +108,12 @@ describe("cloud HTTP server", () => {
         response.on("end", () => resolve({ status: response.statusCode!, body: Buffer.concat(chunks).toString("utf8") }));
       });
       request.on("error", reject);
-      request.end(requestBody);
+      request.end(soapRequest("GetModificationsBytesEx", { dataFileUID: UID, newerThan: "0" }));
     });
-
     expect(result.status).toBe(200);
-    expect(result.body).toContain("<GetModificationsBytesExResult>true</GetModificationsBytesExResult>");
-    expect(result.body).toContain("<maxVersion>51</maxVersion>");
-    expect(result.body).not.toContain("c2VjcmV0");
+    expect(result.body).toBe("<vendor-answer/>"); // verbatim
+    expect((await gateway.unboundSightings()).map((s) => s.dataFileUID)).toEqual([UID]);
+    await new Promise<void>((resolve, reject) => vendor.close((error) => error ? reject(error) : resolve()));
   });
 
   it("passes unrelated HTTP requests and CONNECT tunnels through", async () => {
@@ -112,33 +159,20 @@ describe("cloud HTTP server", () => {
     await new Promise<void>((resolve, reject) => upstream.close((error) => error ? reject(error) : resolve()));
   });
 
-  it("implements pull, push validation, filtering, and cursor rules", async () => {
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-server-")); dirs.push(dir);
+  it("serves the attach probe: build version, contact inventory, state root, partitions", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mlo-cloud-status-")); dirs.push(dir);
     const handle = await startCloudServer({ host: "127.0.0.1", port: 0, stateRoot: dir }); handles.push(handle);
-    expect(await post(handle, "/v1/pull", { client: "mlo-app", cursor: "0" })).toEqual({ status: 200, body: { cursor: "0" } });
 
-    const delta = packEnvelope(buildTaskAddDelta({ uid: "{12345678-1234-1234-1234-123456789ABC}", caption: "queued", createdDate: "a", lastModified: "a" }));
-    await handle.state.append("mcp", delta);
-    const pulled = await post(handle, "/v1/pull", { client: "mlo-app", cursor: "0" });
-    expect(pulled.status).toBe(200);
-    expect(pulled.body.cursor).toBe("1");
-    expect(unpackEnvelope(Buffer.from(pulled.body.envelope as string, "base64"))).toBeTruthy();
-
-    const pushed = await post(handle, "/v1/push", { client: "mlo-app", baseline: "1", envelope: Buffer.from(delta).toString("base64") });
-    expect(pushed).toEqual({ status: 200, body: { cursor: "2" } });
-    expect(await post(handle, "/v1/pull", { client: "mlo-app", cursor: "1" })).toEqual({ status: 200, body: { cursor: "2" } });
-    expect((await post(handle, "/v1/push", { client: "mlo-app", baseline: "3", envelope: Buffer.from(delta).toString("base64") })).status).toBe(409);
-
-    const before = await handle.state.highWater();
-    expect((await post(handle, "/v1/push", { client: "mlo-app", baseline: "2", envelope: Buffer.from("garbage").toString("base64") })).status).toBe(400);
-    expect(await handle.state.highWater()).toBe(before);
-
-    // The app pulled through cursor 2, so nothing is pending for it. The build
-    // and the contact inventory are what an attaching session reads from here.
     const status = await fetch(`http://${handle.host}:${handle.port}/v1/status`);
     expect(await status.json()).toMatchObject({
-      cursor: "2", entries: { mcp: 1, app: 1 }, pendingForApp: 0, stateRoot: dir, partitions: [],
+      stateRoot: dir, partitions: [],
       version: SERVER_INFO.version, contactUids: [],
     });
+
+    const gone = await fetch(`http://${handle.host}:${handle.port}/v1/pull`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ client: "mlo-app", cursor: "0" }),
+    });
+    expect(gone.status).toBe(404); // the second sync protocol is deleted
   });
 });

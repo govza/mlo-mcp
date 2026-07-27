@@ -7,11 +7,8 @@ import { exportXml, readDataFile } from "./mlo-cli.js";
 import { log } from "./log.js";
 
 export interface Snapshot {
-  xml: string;
   doc: MloDocument;
   tasks: TaskNode[];
-  /** how many tasks got a GUID from the binary */
-  guidCount: number;
   at: number;
 }
 
@@ -52,13 +49,12 @@ export class MloStore {
     const xml = await exportXml(this.config);
     const doc = parseMloXml(xml);
     const tasks = buildTaskTree(doc);
-    let guidCount = 0;
     try {
-      guidCount = annotateGuids(await readDataFile(this.config), tasks);
+      annotateGuids(await readDataFile(this.config), tasks);
     } catch (e) {
       log(`GUID extraction failed (continuing without GUIDs): ${(e as Error).message}`);
     }
-    return { xml, doc, tasks, guidCount, at: Date.now() };
+    return { doc, tasks, at: Date.now() };
   }
 
   invalidate(): void {

@@ -6,11 +6,8 @@ import {
   errorResult,
   toSummary,
   TaskSummarySchema,
-  resolveReadCloudState,
   PATH_ID_CAVEAT,
 } from "./shared.js";
-import { knownCloudProjection } from "../cloud/log-projection.js";
-import { buildUidResolver } from "../cloud/structure-align.js";
 import type { TaskNode } from "../types.js";
 
 export const getTaskTool = defineTool({
@@ -43,14 +40,14 @@ export const getTaskTool = defineTool({
     const snap = await ctx.store.getSnapshot();
     const t = findById(snap.tasks, id);
     if (!t) return errorResult(`no task with id "${id}" — ids shift when the tree changes; re-run list_tasks`);
+    // GUIDs come from the binary annotation on the export snapshot; the
+    // projection-backed fallback died with the delta log (ADR-0005). Identity
+    // gets one owner again in the identity service.
     const all = flatten(snap.tasks);
-    const cloud = await knownCloudProjection(await resolveReadCloudState(ctx));
-    const uidFor = buildUidResolver(snap.tasks, cloud);
-    const resolvedUid = uidFor(t);
+    const resolvedUid = t.Guid?.toUpperCase();
     const byGuid = new Map<string, TaskNode>();
     for (const task of all) {
-      const uid = uidFor(task);
-      if (uid) byGuid.set(uid, task);
+      if (task.Guid) byGuid.set(task.Guid.toUpperCase(), task);
     }
     const dependsOn = t.DependsOn.map((uid) => {
       const dep = byGuid.get(uid.toUpperCase());

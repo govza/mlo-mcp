@@ -1,14 +1,4 @@
 import { XMLParser } from "fast-xml-parser";
-import { cursorToDecimalString, ZERO_CURSOR, type CloudCursor } from "./cursor.js";
-import { parseCursor } from "./cursor.js";
-import { mergeDeltas, NEW_TASK_DEFAULTS } from "./delta.js";
-import { findSection, type SectionedCsv } from "./csv.js";
-import { packEnvelope, unpackEnvelope } from "./envelope.js";
-import { parseLocalStamp } from "./local-stamp.js";
-import { normalizeDataFileUid, type PartitionHandle } from "./partition.js";
-import { validateFullSnapshot } from "./snapshot-validate.js";
-import { CloudState, EndpointMismatchError } from "./state.js";
-import type { CloudGateway } from "./gateway.js";
 
 const SOAP_NAMESPACE = "http://schemas.xmlsoap.org/soap/envelope/";
 const MLO_NAMESPACE = "http://www.mylifeorganized.net/";
@@ -50,14 +40,6 @@ function field(name: string, value: string): string {
   return `<${name}>${escapeXml(value)}</${name}>`;
 }
 
-function successFields(operation: SoapOperation, extra = ""): string {
-  return field(`${operation}Result`, "true") + extra;
-}
-
-function failureFields(operation: SoapOperation, error: string, extra = ""): string {
-  return field(`${operation}Result`, "false") + field("errorMessage", error) + extra;
-}
-
 function parseFields(xml: string, expected: SoapOperation): Record<string, unknown> {
   const document = parser.parse(xml) as Record<string, unknown>;
   const envelopeNode = document.Envelope;
@@ -73,31 +55,6 @@ function parseFields(xml: string, expected: SoapOperation): Record<string, unkno
   return operation as Record<string, unknown>;
 }
 
-function requiredText(fields: Record<string, unknown>, name: string): string {
-  const value = fields[name];
-  if (typeof value !== "string" || value.length === 0) throw new Error(`${name} is required`);
-  return value;
-}
-
-function decodeBase64(value: string): Uint8Array {
-  const compact = value.replace(/\s+/g, "");
-  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(compact)) {
-    throw new Error("data must be valid base64");
-  }
-  return Buffer.from(compact, "base64");
-}
-
-function prepareMcpDeltaForMlo(document: SectionedCsv): SectionedCsv {
-  const tasks = findSection(document, "TodoItems");
-  if (tasks) {
-    for (const [column, value] of Object.entries(NEW_TASK_DEFAULTS)) {
-      const index = tasks.header.indexOf(column);
-      if (index >= 0) for (const row of tasks.rows) if (!row[index]) row[index] = value;
-    }
-  }
-  return document;
-}
-
 /** Parsed operation fields for routing decisions; {} when the body is malformed. */
 export function peekSoapFields(xml: string, operation: SoapOperation): Record<string, unknown> {
   try {
@@ -107,9 +64,9 @@ export function peekSoapFields(xml: string, operation: SoapOperation): Record<st
   }
 }
 
-/** A protocol-level failure envelope, for policy rejections outside the handlers. */
+/** A protocol-level failure envelope, for policy rejections outside the forward path. */
 export function soapOperationFailure(operation: SoapOperation, message: string): Uint8Array {
-  return envelope(operation, failureFields(operation, message));
+  return envelope(operation, field(`${operation}Result`, "false") + field("errorMessage", message));
 }
 
 export function soapOperationFromAction(action: string | string[] | undefined): SoapOperation | undefined {
@@ -118,230 +75,6 @@ export function soapOperationFromAction(action: string | string[] | undefined): 
   const normalized = value.trim().replace(/^"|"$/g, "");
   const name = normalized.slice(normalized.lastIndexOf("/") + 1);
   return OPERATIONS.has(name) ? name as SoapOperation : undefined;
-}
-
-/**
- * Gateway entry point: route the request to the state partition selected by
- * its `dataFileUID`, enforce binding/lifecycle, and run the bootstrap
- * protocol while a window is armed. Routing and policy failures are
- * protocol-level failures, not transport faults.
- */
-export async function handleSoapRequest(
-  gateway: CloudGateway,
-  operation: SoapOperation,
-  xml: string,
-): Promise<Uint8Array> {
-  const fields = parseFields(xml, operation);
-  const rawUid = typeof fields.dataFileUID === "string" && fields.dataFileUID.length ? fields.dataFileUID : undefined;
-
-  const fail = (message: string) => envelope(operation, failureFields(operation, message));
-  if (!rawUid) return fail("dataFileUID is required to route this operation to a state partition");
-  let uid: string;
-  try {
-    uid = normalizeDataFileUid(rawUid);
-  } catch (error) {
-    return fail(error instanceof Error ? error.message : String(error));
-  }
-  await gateway.ensureRoot();
-
-  const binding = await gateway.bindings.forUid(uid);
-  const window = await gateway.bootstrap.current();
-
-  if (binding) {
-    if (binding.mode === "upstream") {
-      // Local termination would fork the vendor's cursor namespace. Upstream
-      // forwarding handles these before this point; reaching here means the
-      // proxy path could not forward.
-      return fail("this dataFileUID is bound to the vendor Cloud (upstream mode); the local endpoint does not terminate its sync operations");
-    }
-    const partition = await gateway.registry.open(uid, binding.mode);
-    if (await partition.lifecycle() === "ready") {
-      return handleParsedSoapOperation(partition.state, operation, fields);
-    }
-    if (window && window.profilePath === binding.profilePath) {
-      return handleBootstrapOperation(gateway, partition, operation, fields);
-    }
-    return fail(
-      "this profile's partition is not bootstrapped; run cloud_bootstrap, then Re-synchronize in MLO — an ordinary sync will not help",
-    );
-  }
-
-  if (window) {
-    const firstContact = !window.dataFileUID;
-    try {
-      await gateway.bootstrap.noteUidSeen(uid);
-    } catch (error) {
-      return fail(error instanceof Error ? error.message : String(error));
-    }
-    const partition = await gateway.registry.open(uid, window.mode);
-    // First contact must find a genuinely empty partition: a bidirectional
-    // re-sync Get would otherwise deliver whatever the partition holds before
-    // MLO uploads its snapshot. Later ops of the same window continue (the
-    // window's own Get/Apply legitimately leave adoption/pull marks).
-    if (firstContact && !(await partition.isEmpty())) {
-      return fail("bootstrap requires an empty partition, but this dataFileUID already has history");
-    }
-    return handleBootstrapOperation(gateway, partition, operation, fields);
-  }
-
-  return fail(
-    "unknown dataFileUID: no profile is bound to it and no bootstrap window is armed; run cloud_bootstrap first",
-  );
-}
-
-/**
- * The armed-window protocol, mirroring the verified Re-synchronize sequence
- * (Get → Apply full snapshot → Get → Release):
- *
- * - Get on the empty partition serves the empty skeleton (adopting the
- *   profile's cursor — the one legitimate adoption) and records the
- *   bidirectional precondition;
- * - Apply must be a validated full snapshot; success materializes it
- *   transactionally, binds the UID, and marks the partition ready;
- * - a failed validation keeps the staged bytes for diagnosis, marks the
- *   partition bootstrap-required, and fails the operation so MLO does not
- *   advance its baseline on an upload the endpoint refused to keep.
- */
-async function handleBootstrapOperation(
-  gateway: CloudGateway,
-  partition: PartitionHandle,
-  operation: SoapOperation,
-  fields: Record<string, unknown>,
-): Promise<Uint8Array> {
-  const bootstrap = gateway.bootstrap;
-  const state = partition.state;
-
-  if (operation === "GetModificationsBytesEx") {
-    const response = await handleParsedSoapOperation(state, operation, fields);
-    await bootstrap.noteEmptyGetServed();
-    return response;
-  }
-
-  if (operation === "ApplyModificationsBytesEx") {
-    const stamp = parseLocalStamp(requiredText(fields, "lastSyncTimestamp"));
-    await state.recordLocalStamp(stamp);
-    const fail = (message: string) => envelope(operation, failureFields(
-      operation,
-      message,
-      field("newServerTimeStamp", cursorToDecimalString(ZERO_CURSOR)),
-    ));
-    const window = await bootstrap.current();
-    if (!window?.sawEmptyGet) {
-      return fail("bootstrap upload arrived before the empty-partition pull — restart the Re-synchronize in MLO");
-    }
-    const encoded = fields.data;
-    if (typeof encoded !== "string" || !encoded.length) {
-      return fail("bootstrap expects a full-snapshot upload, but the request carried no data");
-    }
-    let bytes: Uint8Array;
-    let document: SectionedCsv;
-    try {
-      bytes = decodeBase64(encoded);
-      document = unpackEnvelope(bytes);
-    } catch (error) {
-      return fail(error instanceof Error ? error.message : String(error));
-    }
-    await bootstrap.stageSnapshot(bytes);
-    const validation = validateFullSnapshot(document);
-    if (!validation.ok) {
-      await partition.setLifecycle("bootstrap-required");
-      const preview = validation.errors.slice(0, 5).join("; ");
-      const suffix = validation.errors.length > 5 ? ` (+${validation.errors.length - 5} more)` : "";
-      return fail(`bootstrap snapshot failed validation: ${preview}${suffix}`);
-    }
-    const cursor = await state.append("app", bytes);
-    await partition.snapshots.materialize(document, cursor);
-    await gateway.bindings.bindUid(window.profilePath, partition.uid);
-    await partition.setLifecycle("ready");
-    await bootstrap.complete();
-    return envelope(operation, successFields(operation, field("newServerTimeStamp", cursorToDecimalString(cursor))));
-  }
-
-  await state.finalize();
-  return envelope(operation, successFields(operation));
-}
-
-export async function handleSoapOperation(
-  state: CloudState,
-  operation: SoapOperation,
-  xml: string,
-): Promise<Uint8Array> {
-  return handleParsedSoapOperation(state, operation, parseFields(xml, operation));
-}
-
-async function handleParsedSoapOperation(
-  state: CloudState,
-  operation: SoapOperation,
-  fields: Record<string, unknown>,
-): Promise<Uint8Array> {
-
-  if (operation === "GetModificationsBytesEx") {
-    const baseline = parseCursor(requiredText(fields, "newerThan"));
-    try {
-      // The one legitimate adoption: a genuinely uninitialized state bridging
-      // to the cursor the profile already stores. An initialized state seeing
-      // a newer cursor means the profile synced against a different server
-      // history; splicing the histories is unrecoverable, so fail explicitly.
-      await state.adoptInitialBaseline("app", baseline);
-    } catch (error) {
-      if (!(error instanceof EndpointMismatchError)) throw error;
-      await state.recordEndpointMismatch();
-      const highWater = await state.highWater();
-      return envelope(operation, failureFields(
-        operation,
-        "endpoint mismatch: the profile's stored cloud cursor belongs to a different server history; " +
-        "a full re-synchronization against an empty partition is required",
-        field("maxVersion", cursorToDecimalString(highWater)),
-      ));
-    }
-    const entries = await state.entriesAfter(baseline, "app");
-    const cursor = entries.length ? entries.at(-1)!.cursor : await state.highWater();
-    await state.recordPull("app", cursor);
-    const documents = entries.map((entry) => {
-      const document = unpackEnvelope(entry.bytes);
-      return entry.origin === "mcp" ? prepareMcpDeltaForMlo(document) : document;
-    });
-    const document = entries.length ? mergeDeltas(documents) : mergeDeltas([]);
-    const data = field("data", Buffer.from(packEnvelope(document)).toString("base64"));
-    return envelope(operation, successFields(operation, field("maxVersion", cursorToDecimalString(cursor)) + data));
-  }
-
-  if (operation === "ApplyModificationsBytesEx") {
-    // lastSyncTimestamp is MLO's LOCAL modification baseline — a separate
-    // counter namespace from the remote cloud cursor. It may be negative or
-    // numerically greater than the high-water cursor (captured vendor session:
-    // local 24838 against remote 15515, accepted). It is recorded for
-    // diagnostics and never compared, rejected, or adopted.
-    const stamp = parseLocalStamp(requiredText(fields, "lastSyncTimestamp"));
-    await state.recordLocalStamp(stamp);
-    const highWater = await state.highWater();
-    const encoded = fields.data;
-    if (encoded !== undefined && typeof encoded !== "string") {
-      return envelope(operation, failureFields(
-        operation,
-        "data must be base64 text",
-        field("newServerTimeStamp", cursorToDecimalString(highWater)),
-      ));
-    }
-    let cursor: CloudCursor = highWater;
-    if (encoded) {
-      try {
-        const bytes = decodeBase64(encoded);
-        unpackEnvelope(bytes);
-        cursor = await state.append("app", bytes);
-      } catch (error) {
-        return envelope(operation, failureFields(
-          operation,
-          error instanceof Error ? error.message : String(error),
-          field("newServerTimeStamp", cursorToDecimalString(highWater)),
-        ));
-      }
-    }
-    return envelope(operation, successFields(operation, field("newServerTimeStamp", cursorToDecimalString(cursor))));
-  }
-
-  await state.finalize();
-  return envelope(operation, successFields(operation));
 }
 
 export function soapFault(message: string): Uint8Array {

@@ -50,13 +50,11 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual(
-      ["add_task", "add_tasks", "cloud_bootstrap", "cloud_status", "complete_task", "delete_task", "get_task", "list_contexts", "list_tasks", "search_tasks", "sync", "uncomplete_task", "update_task"]
+      ["cloud_status", "get_task", "list_contexts", "list_tasks", "search_tasks", "sync"]
     );
     const list = tools.find((t) => t.name === "list_tasks")!;
     expect(list.annotations?.readOnlyHint).toBe(true);
     expect(list.outputSchema).toBeDefined();
-    const del = tools.find((t) => t.name === "delete_task")!;
-    expect(del.annotations?.destructiveHint).toBe(true);
     // every tool states its full annotation contract
     for (const t of tools) {
       for (const hint of ["readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"] as const) {
@@ -97,10 +95,8 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
     const status = await client.callTool({ name: "cloud_status", arguments: {} });
     expect(status.isError).toBeFalsy();
     const structured = status.structuredContent as {
-      cursor: string;
       endpoint: { url: string; reachable: boolean; version?: string };
     };
-    expect(structured.cursor).toMatch(/^\d+$/);
     // The session spawned a detached resident endpoint and attached to it —
     // the whole point of the lifecycle, proven in a real install layout.
     expect(structured.endpoint).toMatchObject({

@@ -83,7 +83,7 @@ export class BindingStore {
       if (existing) {
         if (existing.mode !== mode) {
           throw new Error(
-            `profile is already bound in "${existing.mode}" mode; switching modes requires an explicit rebind with a fresh partition (cloud_bootstrap { rebind: true })`,
+            `profile is already bound in "${existing.mode}" mode; switching modes requires an explicit rebind with a fresh partition`,
           );
         }
         return existing;
@@ -105,7 +105,7 @@ export class BindingStore {
       if (!binding) throw new Error(`no binding exists for profile ${profilePath}; create one first`);
       if (binding.dataFileUID && binding.dataFileUID !== uid) {
         throw new Error(
-          `profile is already bound to a different dataFileUID; rebinding requires an explicit fresh bootstrap (cloud_bootstrap { rebind: true })`,
+          `profile is already bound to a different dataFileUID; rebinding requires an explicit fresh bootstrap`,
         );
       }
       const other = bindings.find((entry) => entry !== binding && entry.dataFileUID === uid);

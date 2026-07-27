@@ -29,7 +29,7 @@ async function main(): Promise<void> {
     port: config.cloudPort,
     spawn: residentSpawner(fileURLToPath(import.meta.url)),
   });
-  const ctx = { config, store, cloudState: cloud.defaultState(), cloud, endpoint };
+  const ctx = { config, store, cloud, endpoint };
 
   const server = createMcpServer(ctx);
   await server.connect(new StdioServerTransport());
@@ -42,8 +42,7 @@ async function main(): Promise<void> {
  * The resident endpoint: one long-lived process serving the loopback port that
  * MLO's proxy is permanently pointed at
  * ([ADR-0003](../../docs/adr/0003-resident-endpoint.md)). It outlives every MCP
- * session, holds the vendor contacts scraped from MLO's own proxied traffic,
- * and is the only performer of upstream sync sessions.
+ * session and holds the vendor contacts scraped from MLO's own proxied traffic.
  *
  * It deliberately runs neither watcher below. It follows no profile (partitions
  * are keyed by `dataFileUID`, so a profile switch is not its business), and it

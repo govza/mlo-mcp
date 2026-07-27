@@ -35,7 +35,7 @@ const MAX_SIGHTINGS = 8;
  * The persisted sighting marker, one per state root. Only the process holding
  * the listener ever writes it — attached processes read it — so the write is a
  * temp-file rename with an in-process chain rather than the cross-process lock
- * the bindings and delta logs need.
+ * the bindings need.
  */
 export class SightingStore {
   private writes: Promise<unknown> = Promise.resolve();
