@@ -24,6 +24,24 @@ export interface Problem {
 }
 
 /**
+ * The guarded auto-initialization refusals (spec section 5): a write into an
+ * unbound profile refuses with the guard that stopped the binding, never a
+ * generic "not ready". Declared here, where the wire contract lives, so the
+ * union and the set of kinds the session recognizes cannot drift apart.
+ */
+export const AUTO_INIT_REFUSAL_KINDS = [
+  "no-open-profile",
+  "binding-conflict",
+  "no-bootstrap-candidate",
+  "ambiguous-bootstrap-candidate",
+  "candidate-not-ground-truthed",
+  "auto-init-pull-failed",
+  "auto-init-materialize-failed",
+] as const;
+
+export type AutoInitRefusalKind = (typeof AUTO_INIT_REFUSAL_KINDS)[number];
+
+/**
  * The kinds this build's resident can serialize. The session client treats
  * anything outside this set as `unknown`, which is what lets a newer resident
  * introduce a kind without crashing older sessions.
@@ -32,6 +50,7 @@ export const RESIDENT_PROBLEM_KINDS: ReadonlySet<string> = new Set([
   "invalid-request",
   "partition-not-ready",
   "unknown-write",
+  ...AUTO_INIT_REFUSAL_KINDS,
 ]);
 
 export function problemBody(problem: Problem): string {

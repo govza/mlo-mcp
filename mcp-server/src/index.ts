@@ -65,6 +65,9 @@ async function serveResidentEndpoint(): Promise<void> {
     port: config.cloudPort,
     gateway,
     writeTtlMs: config.writeTtlMs,
+    // What lets the resident bind a cloud file by itself: it asks the running
+    // app which profile is open, and pulls with the contact it captured.
+    mloExePath: config.mloExePath,
   });
   log(`resident cloud endpoint serving on http://${handle.host}:${handle.port} (state root: ${config.cloudStateRoot})`);
   const stop = () => void handle.stop().finally(() => process.exit(0));

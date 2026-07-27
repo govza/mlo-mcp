@@ -248,6 +248,28 @@ SOAP proxy + injection, `POST /v1/write`, `GET /v1/write/:id`,
   MLO-initiated session forwarded through the proxy; endpoint-initiated
   vendor calls = 0. Nothing is periodic.
 
+Two mechanics this spec left open, settled while implementing it:
+
+- **Ground-truthing is task-identity overlap.** The `dataFileUID` appears
+  nowhere in the `.ml` file (checked on the live profile: not as text in any
+  encoding, not as GUID bytes in either order, in any of its ZIP entries), so
+  the candidate cannot be compared to the open profile directly. It is
+  compared through its contents instead: the task GUIDs recorded in the open
+  `.ml`'s own footers against the task UIDs of the pulled history. Neither
+  side is a superset of the other - cloud-written and recurring tasks have no
+  footer, and a full history holds tasks the local file has since deleted - so
+  the check refutes on exactly one observation: two non-empty identity sets
+  with nothing in common, which is what a foreign profile's cloud file looks
+  like. An empty side never refutes, the same per-signal permissiveness
+  [ADR-0004](0004-ground-truth-the-open-profile.md) applies to its own two.
+- **`rebind` and `repull` reach the resident through state, not a route.**
+  Only the resident holds the captured contact and its HTTP surface is closed,
+  so neither verb calls the vendor and neither asks the resident to: `repull`
+  leaves a request on the partition and `rebind` (after backing the `.ml` up)
+  drops the binding, which is exactly the condition auto-initialization waits
+  for. The resident services both on the next proxied sync, so the pull stays
+  a private act of the resident in all three cases.
+
 ## 6. Error contract
 
 ### Carrier

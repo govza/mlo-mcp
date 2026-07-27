@@ -48,6 +48,36 @@ function formatGuid(b: Buffer): string {
   );
 }
 
+/** Offsets of every task-GUID footer in the inflated bytes, in file order. */
+function guidFooterOffsets(raw: Buffer): number[] {
+  const offsets: number[] = [];
+  let at = raw.indexOf(GUID_PREFIX);
+  while (at !== -1) {
+    offsets.push(at + GUID_PREFIX.length);
+    at = raw.indexOf(GUID_PREFIX, at + 1);
+  }
+  return offsets;
+}
+
+/**
+ * Every task GUID recorded in a `.ml` file, read straight off the footers — no
+ * caption alignment, so unlike `annotateGuids` this needs no export of the same
+ * state and never has to leave a node out.
+ *
+ * The set is what the auto-init ground-truth compares a pulled cloud history
+ * against: a cloud file belonging to a different profile shares none of it.
+ * It is deliberately not exhaustive — a task written through the cloud delta
+ * has no footer until MLO re-serializes it, and recurring tasks use a different
+ * layout — so it may only ever be read as evidence of overlap, never of
+ * absence. The file's last footer is the invisible root and is skipped, as it
+ * is nowhere else a task identity.
+ */
+export function taskGuidsInDataFile(mlFile: Buffer): string[] {
+  const raw = inflateDataFile(mlFile);
+  const offsets = guidFooterOffsets(raw).slice(0, -1);
+  return offsets.map((offset) => formatGuid(raw.subarray(offset, offset + 16)));
+}
+
 interface AlignNode {
   task: TaskNode;
   children: AlignNode[];
@@ -106,12 +136,7 @@ export function annotateGuids(mlFile: Buffer, tasks: TaskNode[]): number {
   }
 
   // 3. GUID footer offsets
-  const guidOffs: number[] = [];
-  let g = raw.indexOf(GUID_PREFIX);
-  while (g !== -1) {
-    guidOffs.push(g + GUID_PREFIX.length);
-    g = raw.indexOf(GUID_PREFIX, g + 1);
-  }
+  const guidOffs = guidFooterOffsets(raw);
 
   // 4. post-order constrained assignment
   //

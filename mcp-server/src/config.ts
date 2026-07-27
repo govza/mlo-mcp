@@ -48,6 +48,12 @@ export interface CloudConfig {
   cloudPort: number;
   cloudStateRoot: string;
   writeTtlMs: number;
+  /**
+   * The resident needs this too, and not to run anything: auto-initialization
+   * asks the running app which profile it has open, and the probe finds the app
+   * by this executable's name.
+   */
+  mloExePath: string;
 }
 
 /**
@@ -66,19 +72,21 @@ export function loadCloudConfig(): CloudConfig {
     cloudHost: process.env.MLO_CLOUD_HOST ?? "127.0.0.1",
     cloudPort,
     cloudStateRoot: resolveStateRoot(),
+    // `||`, not `??`: a blank override would yield an empty process name, match
+    // nothing, and make detection report MLO as closed — which accepts the
+    // registry candidate unchecked.
+    mloExePath: process.env.MLO_EXE_PATH || DEFAULT_EXE,
     writeTtlMs: Number.isFinite(ttlMinutes) && ttlMinutes > 0 ? ttlMinutes * 60_000 : DEFAULT_WRITE_TTL_MS,
   };
 }
 
 export function loadConfig(): MloConfig {
-  // Before the data file: detection looks for this exe's process by name, so an
-  // MLO_EXE_PATH override has to reach it. `||`, not `??`: a blank override
-  // would yield an empty process name, match nothing, and make detection report
-  // MLO as closed — which accepts the registry candidate unchecked.
-  const mloExePath = process.env.MLO_EXE_PATH || DEFAULT_EXE;
-  const { dataFile, autoDetected } = resolveDataFile(mloExePath);
+  // Before the data file: detection looks for mlo.exe's process by name, and
+  // that name comes from the cloud config's `mloExePath` (which the resident
+  // needs for the same probe).
+  const cloud = loadCloudConfig();
+  const { dataFile, autoDetected } = resolveDataFile(cloud.mloExePath);
   return {
-    mloExePath,
     dataFile,
     dataFileAutoDetected: autoDetected,
     exportDir: process.env.MLO_EXPORT_DIR ?? path.join(os.tmpdir(), "mlo-mcp"),
@@ -87,6 +95,6 @@ export function loadConfig(): MloConfig {
     // hand-made "Входящие" folder). MLO itself hardcodes the caption "<Inbox>"
     // in every UI language, so most profiles need no override.
     inboxCaption: process.env.MLO_INBOX_CAPTION || undefined,
-    ...loadCloudConfig(),
+    ...cloud,
   };
 }

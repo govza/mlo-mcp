@@ -3,6 +3,7 @@ import type { BindingMismatch, CloudGateway } from "../cloud/gateway.js";
 import type { UnboundSighting } from "../cloud/sightings.js";
 import type { ResidentEndpoint } from "../cloud/endpoint.js";
 import type { MloRepository } from "../repo/mlo-repository.js";
+import { backupDataFile } from "../cloud/profile-backup.js";
 
 export interface CloudPlaneStatus {
   host: string;
@@ -13,22 +14,41 @@ export interface CloudPlaneStatus {
   lifecycle?: string;
   dataFileUID?: string;
   mismatch?: BindingMismatch;
+  /** A repull the resident has not serviced yet — outstanding, not failed. */
+  repullRequestedAt?: string;
   unboundSightings: UnboundSighting[];
   stateRoot: string;
   partitions: { key: string; mode: string; lifecycle: string }[];
 }
 
+export interface RebindOutcome {
+  /** Where the profile's `.ml` was copied before the binding was dropped. */
+  backup: string;
+  /** The UID the profile was bound to, if it was bound at all. */
+  previousDataFileUID?: string;
+}
+
+export interface RepullOutcome {
+  dataFileUID: string;
+  requestedAt: string;
+}
+
 /**
- * The cloud plane's service (spec section 3): today `status()` (gauge-derived
- * as the gauges land) plus the QuickSync surface; `rebind()`/`repull()` and
- * the guarded auto-init arrive with ticket 09.
+ * The cloud plane's service (spec section 3): `status()` (gauge-derived as the
+ * gauges land), `rebind()`, `repull()`, plus the QuickSync surface.
+ *
+ * Neither `rebind` nor `repull` talks to the vendor, and neither asks the
+ * resident to. Only the resident holds the captured contact and its HTTP
+ * surface is closed (spec section 4), so both verbs express themselves in the
+ * shared state the resident already reads on every proxied sync: a repull
+ * leaves a request on the partition, and a rebind drops the binding, which is
+ * exactly the condition guarded auto-initialization waits for. The vendor call
+ * stays a private act of the resident either way.
  *
  * Interim layer deviation, on purpose: it holds `CloudGateway` and
- * `ResidentEndpoint` directly until PartitionStore (ticket 05) and the
- * `ResidentClient` driver inside the repository (ticket 06) give the cloud
- * plane its repository-tier homes. It is the ONLY service allowed to — the
- * spec's "no service ever learns a resident exists" rule lands with those
- * tickets.
+ * `ResidentEndpoint` directly until the cloud plane gets its repository-tier
+ * homes. It is the ONLY service allowed to — the spec's "no service ever learns
+ * a resident exists" rule lands with those tickets.
  */
 export class AdminService {
   constructor(
@@ -37,6 +57,61 @@ export class AdminService {
     private readonly gateway: CloudGateway,
     private readonly endpoint: ResidentEndpoint
   ) {}
+
+  /**
+   * Drop this profile's cloud binding so the endpoint binds it afresh — the
+   * remedy when MLO is syncing a cloud file the profile is not bound to.
+   *
+   * The `.ml` is backed up FIRST and the copy's failure aborts the whole verb:
+   * rebinding is the one endpoint operation whose blast radius reaches the
+   * user's own data (a wrong new binding delivers writes into a history MLO
+   * never reads). The old partition directory is left intact as evidence; only
+   * the pointer moves. Re-binding then happens on the next proxied sync, under
+   * the same three guards as a first-run initialization — a rebind is explicit
+   * about discarding, never about what to adopt next.
+   *
+   * When the discarded cloud file keeps syncing too, the endpoint then sees two
+   * candidates and refuses `ambiguous-bootstrap-candidate` rather than guess.
+   * Its remedy — sync only the target profile and restart the endpoint, which
+   * forgets the contacts it has seen — is what completes such a rebind. That
+   * refusal is the design (ADR-0002: report a mismatch, never repair it), not
+   * a gap in it.
+   */
+  async rebind(): Promise<RebindOutcome> {
+    const existing = await this.gateway.bindings.forProfile(this.config.dataFile);
+    if (!existing?.dataFileUID) {
+      // Refused rather than treated as a no-op: a backup copy of the profile
+      // per call is real clutter, and "nothing was bound" is what the caller
+      // needs to hear anyway.
+      throw new Error("this profile is not bound to a cloud file, so there is nothing to rebind");
+    }
+    const backup = await backupDataFile(this.config.dataFile);
+    await this.gateway.bindings.unbindUid(this.config.dataFile);
+    return { backup, previousDataFileUID: existing.dataFileUID };
+  }
+
+  /**
+   * Ask for the row store to be rebuilt from a fresh full-history pull — the
+   * remedy an `unknown-row` refusal names. The binding is not touched: this
+   * repairs a gap in what the endpoint has captured, it does not reconsider
+   * which cloud file the profile belongs to.
+   *
+   * The pull itself happens in the resident after MLO's next sync, so the
+   * answer here is "requested", not "done"; `cloud_status` reports the result
+   * through the partition's capture journal.
+   */
+  async repull(): Promise<RepullOutcome> {
+    const bound = await this.gateway.boundPartition(this.config.dataFile);
+    if (bound.kind !== "bound") {
+      throw new Error(
+        "this profile has no bound cloud partition, so there is no row store to refresh — sync MLO once through " +
+          "the proxy and let the endpoint bind it first",
+      );
+    }
+    const requestedAt = new Date().toISOString();
+    await bound.partition.requestRepull(requestedAt);
+    return { dataFileUID: bound.partition.uid, requestedAt };
+  }
 
   /** Run the profile's QuickSync — a best-effort accelerator, never load-bearing (spec section 2.5). */
   quickSync(): Promise<void> {
@@ -56,11 +131,13 @@ export class AdminService {
     let mode = "unbound";
     let lifecycle: string | undefined = "uninitialized";
     let dataFileUID: string | undefined;
+    let repullRequestedAt: string | undefined;
     const bound = await this.gateway.boundPartition(this.config.dataFile);
     if (bound.kind === "bound") {
       mode = bound.binding.mode;
       lifecycle = bound.lifecycle;
       dataFileUID = bound.binding.dataFileUID;
+      repullRequestedAt = await bound.partition.repullRequestedAt();
     }
     const partitions = (await this.gateway.registry.list()).map((partition) => ({
       key: partition.key,
@@ -82,6 +159,7 @@ export class AdminService {
       lifecycle,
       dataFileUID,
       mismatch,
+      ...(repullRequestedAt ? { repullRequestedAt } : {}),
       unboundSightings,
       stateRoot: this.gateway.stateRoot,
       partitions,

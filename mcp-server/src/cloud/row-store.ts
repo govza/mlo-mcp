@@ -381,12 +381,22 @@ export class FileRowStore implements RowStore {
 
   replaceAll(document: SectionedCsv, source: RowSource): Promise<{ upserts: number }> {
     return this.writes.run(async () => {
+      // Built beside the live state and swapped in only once it is on disk: a
+      // failing save must leave the store it could not replace, not an emptied
+      // one that reads as a gap until the process restarts.
+      const previous = { headers: this.headers, rows: this.rows, places: this.places, flags: this.flags };
       this.headers = [];
       this.rows = new Map();
       this.places = new Map();
       this.flags = new Map();
-      const { upserts } = this.applyDocument(document, source);
-      await this.save();
+      let upserts: number;
+      try {
+        upserts = this.applyDocument(document, source).upserts;
+        await this.save();
+      } catch (error) {
+        Object.assign(this, previous);
+        throw error;
+      }
       this.loaded = true;
       return { upserts };
     });

@@ -3,11 +3,13 @@ import https from "node:https";
 import net from "node:net";
 import { CloudGateway } from "./gateway.js";
 import { SyncObserver } from "./sync-observer.js";
+import { AutoInitializer, systemAutoInitPorts } from "./auto-init.js";
 import {
   GET_FILE_TS,
   isGetFileTsAction,
   peekSoapFields,
   soapFault,
+  soapFieldText,
   soapOperationFailure,
   soapOperationFromAction,
 } from "./soap.js";
@@ -37,6 +39,15 @@ export interface CloudServerOptions {
   writeTtlMs?: number;
   /** Injectable clock for the write path (tests drive TTL expiry with it). */
   now?: () => Date;
+  /**
+   * The guarded auto-initializer (spec section 5). Built from `mloExePath` when
+   * absent; pass one to substitute its ports. Omitting both leaves the server
+   * unable to bind itself — the shape the suites that only exercise forwarding
+   * want.
+   */
+  autoInit?: AutoInitializer;
+  /** Where mlo.exe lives, for the auto-init profile probe. */
+  mloExePath?: string;
 }
 
 export interface CloudServerHandle {
@@ -89,6 +100,7 @@ async function interceptVendorSoap(
   gateway: CloudGateway,
   observer: SyncObserver,
   writePath: WritePath,
+  autoInit: AutoInitializer | undefined,
 ): Promise<boolean> {
   if (request.method !== "POST") return false;
   let target: URL;
@@ -142,7 +154,14 @@ async function interceptVendorSoap(
       void writePath.observeApply(fields, result).catch((error) =>
         log(`apply observation failed (forward path unaffected): ${error instanceof Error ? error.message : String(error)}`));
     }
-    if (operation === "ReleaseSyncSessionBytes") writePath.observeRelease(fields);
+    if (operation === "ReleaseSyncSessionBytes") {
+      writePath.observeRelease(fields);
+      // The session is over, so this is the moment the endpoint is allowed to
+      // talk to the vendor itself (spec section 5): bind if the guards pass,
+      // and service a human's outstanding repull. Fire-and-forget, like every
+      // other tap — a proxied sync must never wait on the cloud plane.
+      void autoInit?.serviceAfterSession(soapFieldText(fields, "dataFileUID"));
+    }
   } catch (error) {
     const message = `vendor forward failed: ${error instanceof Error ? error.message : String(error)}`;
     exchange.finish(502, {});
@@ -280,15 +299,18 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
   if (!options.gateway && !options.stateRoot) throw new Error("cloud server needs a gateway or a stateRoot");
   const gateway = options.gateway ?? new CloudGateway({ stateRoot: options.stateRoot! });
   const observer = new SyncObserver(gateway.observerDir(), options.observeHost);
+  const autoInit = options.autoInit
+    ?? (options.mloExePath ? new AutoInitializer(gateway, systemAutoInitPorts(gateway, options.mloExePath)) : undefined);
   const writePath = new WritePath(gateway, {
     ...(options.writeTtlMs !== undefined ? { ttlMs: options.writeTtlMs } : {}),
     ...(options.now ? { now: options.now } : {}),
+    ...(autoInit ? { autoInit } : {}),
   });
   let stopped: Promise<void> | undefined;
   const server = http.createServer(async (request, response) => {
     try {
       if (isAbsoluteRequestTarget(request.url ?? "")) {
-        if (await interceptVendorSoap(request, response, gateway, observer, writePath)) return;
+        if (await interceptVendorSoap(request, response, gateway, observer, writePath, autoInit)) return;
         if (await interceptGetFileTs(request, response, observer, writePath)) return;
         forwardRequest(request, response, observer);
         return;

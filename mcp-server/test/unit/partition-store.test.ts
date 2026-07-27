@@ -93,6 +93,19 @@ describe("PartitionStore handle", () => {
     expect((await reader.latest(UID)).kind).toBe("row");
   });
 
+  it("keeps the old rows when a replaceAll cannot be saved", async () => {
+    const dir = await tempDir();
+    const store = new FileRowStore(dir);
+    await store.ingest(addDocument(UID, "captured"), "vendor-get");
+    // A repull that half-lands is worse than one that does not land: the store
+    // would read as gapped and refuse writes it has the rows for.
+    await fs.rm(dir, { recursive: true, force: true });
+
+    await expect(store.replaceAll(addDocument(UID, "pulled"), "history-pull")).rejects.toThrow();
+
+    expect(await store.latest(UID)).toMatchObject({ kind: "row", source: "vendor-get" });
+  });
+
   it("survives a store file that vanished mid-flight: an absent file is an empty store", async () => {
     const dir = await tempDir();
     const store = new FileRowStore(dir);

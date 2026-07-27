@@ -120,6 +120,38 @@ export class BindingStore {
   }
 
   /**
+   * Bind a profile to a UID in ONE write — what auto-initialization uses.
+   * `create` followed by `bindUid` would leave a UID-less binding behind if the
+   * process died between them; harmless, but then "no binding on a partial
+   * failure" would rest on the reader's leniency rather than on the write.
+   */
+  async bind(profilePath: string, mode: PartitionMode, rawUid: string): Promise<ProfileBinding> {
+    return this.serialize(async () => {
+      const uid = normalizeDataFileUid(rawUid);
+      const bindings = await this.load();
+      const canonical = canonicalProfilePath(profilePath);
+      const existing = bindings.find((entry) => canonicalProfilePath(entry.profilePath) === canonical);
+      if (existing?.dataFileUID && existing.dataFileUID !== uid) {
+        throw new Error("profile is already bound to a different dataFileUID; rebinding requires an explicit rebind");
+      }
+      const other = bindings.find((entry) => entry !== existing && entry.dataFileUID === uid);
+      if (other) throw new Error(`dataFileUID is already bound to a different profile (${other.profilePath})`);
+      const now = new Date().toISOString();
+      const binding: ProfileBinding = {
+        profilePath,
+        mode,
+        dataFileUID: uid,
+        boundAt: now,
+        createdAt: existing?.createdAt ?? now,
+      };
+      if (existing) bindings[bindings.indexOf(existing)] = binding;
+      else bindings.push(binding);
+      await this.save(bindings);
+      return binding;
+    });
+  }
+
+  /**
    * Explicit rebind: reset the profile's binding to `mode` with no UID. The
    * old partition directory is left intact as evidence; only the pointer
    * moves. This is the ONLY way a binding's mode changes.

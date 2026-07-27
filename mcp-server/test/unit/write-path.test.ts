@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { CloudGateway } from "../../src/cloud/gateway.js";
+import { AutoInitializer } from "../../src/cloud/auto-init.js";
 import { PartitionRegistry } from "../../src/cloud/partition.js";
 import {
   describeWriteRows,
@@ -206,6 +207,58 @@ describe("durable accept", () => {
       httpStatus: 409,
       problem: { kind: "partition-not-ready", retryable: "after-user-action" },
     });
+  });
+
+  it("refuses an unbound profile with the auto-init guard that stopped the binding", async () => {
+    const root = await tempRoot();
+    const gateway = new CloudGateway({ stateRoot: root });
+    const writePath = new WritePath(gateway, {
+      autoInit: new AutoInitializer(gateway, {
+        openProfile: async () => PROFILE,
+        localTaskGuids: async () => [],
+        pullHistory: async () => { throw new Error("never reached"); },
+      }),
+    });
+
+    const refused = await writePath.accept(PROFILE, addRows());
+
+    // Nothing has synced through the proxy yet, so the guard that stopped it is
+    // the candidate one — and that, not a generic "not ready", is what the
+    // caller is told.
+    expect(refused).toMatchObject({
+      kind: "refused",
+      httpStatus: 409,
+      problem: { kind: "no-bootstrap-candidate", retryable: "after-user-action" },
+    });
+  });
+
+  it("accepts a write that the auto-initializer binds on the spot", async () => {
+    const root = await tempRoot();
+    const gateway = new CloudGateway({ stateRoot: root });
+    gateway.noteVendorContact(UID, {
+      target: new URL("http://sync.example.test/MLOInetSync.asmx"),
+      loginBytes: "login",
+      passwordBytes: "password",
+      seenAt: 0,
+    });
+    const writePath = new WritePath(gateway, {
+      autoInit: new AutoInitializer(gateway, {
+        openProfile: async () => PROFILE,
+        localTaskGuids: async () => [],
+        pullHistory: async () => ({
+          version: "9",
+          envelope: Buffer.from(packEnvelope(buildTaskAddDelta({
+            uid: TASK,
+            caption: "pulled",
+            createdDate: "2026-07-01T09:00:00",
+            lastModified: "2026-07-01T09:00:00",
+          }))),
+        }),
+      }),
+    });
+
+    expect(await writePath.accept(PROFILE, addRows())).toMatchObject({ kind: "accepted", uid: TASK });
+    expect((await gateway.bindings.forProfile(PROFILE))?.dataFileUID).toBe(UID);
   });
 });
 

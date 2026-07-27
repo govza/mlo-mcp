@@ -45,6 +45,14 @@ export interface PartitionMeta {
   mode: PartitionMode;
   lifecycle: PartitionLifecycle;
   createdAt: string;
+  /**
+   * A human asked for a fresh full-history pull (AdminService.repull). The
+   * request is persisted rather than sent: only the resident holds the vendor
+   * contact, and its HTTP surface is closed (spec section 4), so a session asks
+   * by leaving this behind and the resident services it on the next proxied
+   * sync. Cleared when the pull lands; the binding is never touched.
+   */
+  repullRequestedAt?: string;
 }
 
 export interface PartitionSummary extends PartitionMeta {
@@ -99,8 +107,27 @@ export class PartitionStore {
   }
 
   async setLifecycle(next: PartitionLifecycle): Promise<void> {
+    await this.amendMeta({ lifecycle: next });
+  }
+
+  /** Ask the resident for a fresh full-history pull into the row store. */
+  async requestRepull(at = new Date().toISOString()): Promise<void> {
+    await this.amendMeta({ repullRequestedAt: at });
+  }
+
+  /** When a repull is outstanding; undefined when none is. */
+  async repullRequestedAt(): Promise<string | undefined> {
+    return (await this.meta()).repullRequestedAt;
+  }
+
+  async clearRepullRequest(): Promise<void> {
+    // JSON.stringify drops an undefined member, so the key leaves the file.
+    await this.amendMeta({ repullRequestedAt: undefined });
+  }
+
+  private async amendMeta(patch: Partial<PartitionMeta>): Promise<void> {
     const current = await this.meta();
-    await atomicWrite(this.metaPath(), `${JSON.stringify({ ...current, lifecycle: next }, null, 2)}\n`);
+    await atomicWrite(this.metaPath(), `${JSON.stringify({ ...current, ...patch }, null, 2)}\n`);
   }
 }
 

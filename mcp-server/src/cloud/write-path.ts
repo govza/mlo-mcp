@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { AutoInitializer } from "./auto-init.js";
 import type { CloudGateway } from "./gateway.js";
 import type { PartitionStore } from "./partition.js";
 import type { QueuedWrite, WriteVerb } from "./injection-queue.js";
@@ -158,6 +159,13 @@ export interface WritePathOptions {
   ttlMs?: number;
   now?: () => Date;
   inFlightTtlMs?: number;
+  /**
+   * The guarded auto-initializer. A write into an unbound profile is the second
+   * trigger for it (the first is a proxied sync): the server tries to
+   * initialize itself and, failing that, refuses with the guard that stopped
+   * it rather than a generic "not ready".
+   */
+  autoInit?: AutoInitializer;
 }
 
 interface Pin {
@@ -193,11 +201,13 @@ export class WritePath {
   private readonly inFlight = new Map<WriteId, Pin>();
   /** partition key -> MLO's stored remote cursor, as last observed (Get `newerThan`, Apply `newServerTimeStamp`). */
   private readonly stored = new Map<string, bigint>();
+  private readonly autoInit: AutoInitializer | undefined;
 
   constructor(
     private readonly gateway: CloudGateway,
     options: WritePathOptions = {},
   ) {
+    this.autoInit = options.autoInit;
     this.ttlMs = options.ttlMs ?? DEFAULT_WRITE_TTL_MS;
     this.inFlightTtlMs = options.inFlightTtlMs ?? IN_FLIGHT_TTL_MS;
     this.now = options.now ?? (() => new Date());
@@ -303,13 +313,18 @@ export class WritePath {
         retryable: false,
       });
     }
-    const bound = await this.gateway.boundPartition(profilePath);
+    let bound = await this.gateway.boundPartition(profilePath);
+    if (bound.kind !== "bound") {
+      const initialized = await this.autoInit?.attempt();
+      if (initialized && initialized.kind === "refused") return refusal(409, initialized.problem);
+      bound = await this.gateway.boundPartition(profilePath);
+    }
     if (bound.kind !== "bound") {
       return refusal(409, {
         kind: "partition-not-ready",
         title: "this profile has no bound cloud partition — writes have nowhere to land",
         retryable: "after-user-action",
-        remedy: "sync MLO once through the proxy and bootstrap the cloud partition, then retry",
+        remedy: 'sync MLO once through the proxy ("Use secure connection" unchecked) so the endpoint can bind it',
       });
     }
     await this.expireDue(bound.partition);

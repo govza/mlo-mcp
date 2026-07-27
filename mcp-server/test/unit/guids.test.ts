@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { deflateRawSync } from "node:zlib";
-import { annotateGuids } from "../../src/guids.js";
+import { annotateGuids, taskGuidsInDataFile } from "../../src/guids.js";
 import type { TaskNode } from "../../src/types.js";
 
 const GUID_PREFIX = Buffer.from([0x64, 0, 0, 0, 0x01, 0, 0, 0, 0, 0, 0, 0]);
@@ -299,5 +299,25 @@ describe("annotateGuids", () => {
     expect(b.Guid).toBe(guidOf(0xb2)); // did NOT slide onto 0xa1
     expect(p.Guid).toBe(guidOf(0xcc));
     expect(count).toBe(3);
+  });
+});
+
+describe("taskGuidsInDataFile", () => {
+  it("reads every task footer off the bytes, skipping the invisible root", () => {
+    const raw = Buffer.concat([
+      caption("A"),
+      footer(0xa1),
+      caption("B"),
+      footer(0xb2),
+      footer(0xff), // invisible root
+    ]);
+
+    expect(taskGuidsInDataFile(mlFile(raw))).toEqual([guidOf(0xa1), guidOf(0xb2)]);
+  });
+
+  it("needs no captions to align against — a footerless task costs nothing here", () => {
+    const raw = Buffer.concat([footer(0x11), footer(0xff)]);
+
+    expect(taskGuidsInDataFile(mlFile(raw))).toEqual([guidOf(0x11)]);
   });
 });
