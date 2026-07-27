@@ -9,12 +9,11 @@ import {
   type VisibleTask,
 } from "../task-tree.js";
 import {
-  WriteRefusedError,
+  repoFailure,
   type DeltaRow,
   type MloRepository,
   type Snapshot,
   type WriteId,
-  type WriteRefusal,
 } from "../repo/mlo-repository.js";
 import type { IdentityService, SnapshotResolver } from "./identity.js";
 import type { CapturedRow, RowCatalog, RowStore } from "../cloud/row-store.js";
@@ -42,7 +41,9 @@ import {
   type MoveDestination,
   type TaskPatch,
 } from "./outline-authoring.js";
-import { failed, ok, type Failure, type ServiceResult } from "./result.js";
+import { failed, ok, type Failure, type ServiceResult } from "../result.js";
+import { failureFor } from "../error-contract.js";
+import { unresolvable, type OutlineFailure, type ReadFailure } from "./failures.js";
 
 export interface OutlineListing {
   entries: VisibleTask[];
@@ -72,14 +73,6 @@ export interface ContextUsage {
  * the service cannot ingest or replace anything.
  */
 export type AuthoringRows = Pick<RowStore, "latest" | "catalog">;
-
-/** Everything a write refuses with (spec section 6; ticket 10 closes the wider union). */
-export type OutlineFailure =
-  | (Failure & { kind: "target-unresolvable"; id: string })
-  | (Failure & { kind: "unknown-row"; uid: string })
-  | (Failure & { kind: "unsupported-edit" })
-  | (Failure & { kind: "invalid-request" })
-  | (Failure & { kind: "write-refused"; refusal: WriteRefusal });
 
 /** What the caller gets at durable accept — never a delivery promise. */
 export interface WriteReceipt {
@@ -124,16 +117,14 @@ function refusal(
   detail: string,
   remedy: string,
 ): Failure & { kind: "unsupported-edit" | "invalid-request" } {
-  return { kind, retryable: false, remedy, detail };
+  return failureFor(kind, detail, remedy);
 }
 
 /** The refusal a write meets when this session's profile has no bound partition. */
-const UNBOUND: WriteRefusal = {
-  kind: "partition-not-ready",
-  title: "this profile has no bound cloud partition, so there is nowhere to author against",
-  retryable: "after-user-action",
-  remedy: "run one sync in MLO through this proxy so auto-initialization can bind the profile",
-};
+const UNBOUND: OutlineFailure = failureFor(
+  "partition-not-ready",
+  "this profile has no bound cloud partition, so there is nowhere to author against",
+);
 
 /**
  * The outline aggregate's service (spec section 3). Its charter is every
@@ -151,33 +142,38 @@ export class OutlineService {
     private readonly options: { inboxCaption?: string } = {}
   ) {}
 
-  /** Visible outline entries under `parentId` (or the root); undefined when the parent id resolves to nothing. */
+  /** Visible outline entries under `parentId` (or the root). */
   async list(opts: {
     parentId?: string;
     includeCompleted?: boolean;
     maxDepth?: number;
-  }): Promise<OutlineListing | undefined> {
-    const snap = await this.repo.snapshot();
+  }): Promise<ServiceResult<OutlineListing, ReadFailure>> {
+    const read = await this.repo.snapshot();
+    if (read.isErrored) return failed(read.failure);
+    const snap = read.value;
     let tasks = snap.tasks;
     if (opts.parentId) {
       const parent = findById(snap.tasks, opts.parentId);
-      if (!parent) return undefined;
+      if (!parent) return failed(unresolvable(opts.parentId, `no task with id "${opts.parentId}" in this snapshot`));
       tasks = parent.Children;
     }
     const entries = collectVisible(tasks, { includeCompleted: opts.includeCompleted, maxDepth: opts.maxDepth });
-    return { entries, total: entries.length };
+    return ok({ entries, total: entries.length });
   }
 
-  async search(filters: SearchFilters): Promise<TaskNode[]> {
-    const snap = await this.repo.snapshot();
-    return searchTasks(snap.tasks, filters);
+  async search(filters: SearchFilters): Promise<ServiceResult<TaskNode[], ReadFailure>> {
+    const read = await this.repo.snapshot();
+    if (read.isErrored) return failed(read.failure);
+    return ok(searchTasks(read.value.tasks, filters));
   }
 
-  /** Full detail of one task by path id; undefined when the id resolves to nothing. */
-  async get(id: string): Promise<TaskDetail | undefined> {
-    const snap = await this.repo.snapshot();
+  /** Full detail of one task by path id. */
+  async get(id: string): Promise<ServiceResult<TaskDetail, ReadFailure>> {
+    const read = await this.repo.snapshot();
+    if (read.isErrored) return failed(read.failure);
+    const snap = read.value;
     const task = findById(snap.tasks, id);
-    if (!task) return undefined;
+    if (!task) return failed(unresolvable(id, `no task with id "${id}" in this snapshot`));
     const resolver = this.identity.resolverFor(snap);
     const resolution = resolver.uidFor(id);
     const resolvedUid = resolution.kind === "resolved" ? resolution.uid : undefined;
@@ -188,12 +184,14 @@ export class OutlineService {
     const dependedOnBy = resolvedUid
       ? resolver.dependentsOf(resolvedUid).map((x) => ({ id: x.id, Caption: x.Caption }))
       : [];
-    return { task, uid: resolvedUid, dependsOn, dependedOnBy };
+    return ok({ task, uid: resolvedUid, dependsOn, dependedOnBy });
   }
 
   /** The profile's contexts: defined Places plus any referenced by tasks, with usage counts. */
-  async contexts(): Promise<ContextUsage[]> {
-    const snap = await this.repo.snapshot();
+  async contexts(): Promise<ServiceResult<ContextUsage[], ReadFailure>> {
+    const read = await this.repo.snapshot();
+    if (read.isErrored) return failed(read.failure);
+    const snap = read.value;
     const defined = readPlaces(snap.doc).map((p) => p.Caption);
 
     const usage = new Map<string, number>();
@@ -202,9 +200,11 @@ export class OutlineService {
     }
 
     const captions = [...new Set([...defined, ...usage.keys()])];
-    return captions
-      .map((Caption) => ({ Caption, defined: defined.includes(Caption), tasksUsing: usage.get(Caption) ?? 0 }))
-      .sort((a, b) => b.tasksUsing - a.tasksUsing || a.Caption.localeCompare(b.Caption));
+    return ok(
+      captions
+        .map((Caption) => ({ Caption, defined: defined.includes(Caption), tasksUsing: usage.get(Caption) ?? 0 }))
+        .sort((a, b) => b.tasksUsing - a.tasksUsing || a.Caption.localeCompare(b.Caption)),
+    );
   }
 
   // ---------------------------------------------------------------- writes
@@ -468,8 +468,10 @@ export class OutlineService {
    * rows), its resolver, and the row store this profile authors against.
    */
   private async authoring(): Promise<ServiceResult<Authoring, OutlineFailure>> {
-    if (!this.rows) return failed(fromRefusal(UNBOUND));
-    const snapshot = await this.repo.snapshot(true);
+    if (!this.rows) return failed(UNBOUND);
+    const read = await this.repo.snapshot(true);
+    if (read.isErrored) return failed(read.failure);
+    const snapshot = read.value;
     return ok({
       snapshot,
       resolver: this.identity.resolverFor(snapshot),
@@ -604,13 +606,9 @@ export class OutlineService {
 
   /** The one place a service touches the repository seam. */
   private async commit(rows: DeltaRow[], uids: string[]): Promise<OutlineWrite> {
-    try {
-      const pending = await this.repo.write(rows);
-      return ok({ uids, writeId: pending.writeId, expiresAt: pending.expiresAt });
-    } catch (error) {
-      if (error instanceof WriteRefusedError) return failed(fromRefusal(error.refusal));
-      throw error;
-    }
+    const written = await this.repo.write(rows);
+    if (written.isErrored) return failed(written.failure);
+    return ok({ uids, writeId: written.value.writeId, expiresAt: written.value.expiresAt });
   }
 }
 
@@ -656,35 +654,13 @@ function starredOrderFor(row: CapturedRow, catalog: RowCatalog, starred?: boolea
   return row.starredOrderIndex ?? String(catalog.maxStarredOrderIndex + STARRED_ORDER_STEP);
 }
 
-function unresolvable(id: string, detail: string): OutlineFailure {
-  return {
-    kind: "target-unresolvable",
-    id,
-    retryable: false,
-    remedy: "re-run list_tasks — path ids shift when the tree changes — or make this change in the MLO app",
-    detail,
-  };
-}
-
 function recurrenceRefusal(caption: string, what: string): OutlineFailure {
-  return {
-    kind: "unsupported-edit",
-    retryable: false,
-    remedy: "do this in the MLO app, so it generates the next occurrence",
-    detail:
-      `"${caption}" is recurring — ${what} through the sync path would bypass MLO's recurrence generation ` +
+  return failureFor(
+    "unsupported-edit",
+    `"${caption}" is recurring — ${what} through the sync path would bypass MLO's recurrence generation ` +
       "and silently end the series",
-  };
-}
-
-function fromRefusal(refused: WriteRefusal): OutlineFailure {
-  return {
-    kind: "write-refused",
-    refusal: refused,
-    retryable: refused.retryable,
-    remedy: refused.remedy ?? "see the refusal detail",
-    detail: refused.title,
-  };
+    "do this in the MLO app, so it generates the next occurrence",
+  );
 }
 
 /** Batch-shape rules that hold before anything is resolved or authored. */

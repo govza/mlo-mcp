@@ -6,14 +6,18 @@ import { log } from "../log.js";
 import type { MloCli } from "./mlo-cli.js";
 import type { ResidentClient } from "./resident-client.js";
 import {
-  WriteRefusedError,
+  repoFailure,
+  repoFailureFromProblem,
   type DeltaRow,
   type MloRepository,
   type PendingWrite,
+  type RepoResult,
   type Snapshot,
+  type SnapshotFailure,
   type WriteId,
   type WriteStatus,
 } from "./mlo-repository.js";
+import { failed, ok, type ServiceResult } from "../result.js";
 
 /**
  * The session-side MloRepository implementation. Reads go through the
@@ -34,7 +38,24 @@ export class LocalMloRepository implements MloRepository {
     private readonly resident?: ResidentClient,
   ) {}
 
-  async snapshot(fresh = false): Promise<Snapshot> {
+  async snapshot(fresh = false): Promise<ServiceResult<Snapshot, SnapshotFailure>> {
+    try {
+      return ok(await this.exported(fresh));
+    } catch (error) {
+      // Expected, not exceptional: mlo.exe is a single-instance app that
+      // refuses to export while it is busy, and the caller's remedy is to ask
+      // again in a moment rather than to see a stack trace.
+      return failed(
+        repoFailure(
+          "snapshot-unavailable",
+          `could not export the profile: ${error instanceof Error ? error.message : String(error)}`,
+          "try again in a moment — MLO refuses to export while a dialog or another operation holds the profile",
+        ),
+      );
+    }
+  }
+
+  private async exported(fresh: boolean): Promise<Snapshot> {
     if (!fresh && this.snap && Date.now() - this.snap.at < this.config.cacheStaleMs) {
       return this.snap;
     }
@@ -80,26 +101,36 @@ export class LocalMloRepository implements MloRepository {
     return this.resident;
   }
 
-  async write(rows: DeltaRow[]): Promise<PendingWrite> {
+  async write(rows: DeltaRow[]): Promise<RepoResult<PendingWrite>> {
     const result = await this.requireResident().postWrite({ profile: this.config.dataFile, rows });
-    if (!result.ok) throw new WriteRefusedError(result.refusal);
+    if (!result.ok) return failed(repoFailureFromProblem(result.refusal));
     // Best-effort accelerator, never load-bearing (spec section 2 mechanic 5):
     // fire-and-forget so the accept receipt returns now, and a QuickSync that
     // fails or no-ops just leaves delivery to MLO's own cadence.
-    void this.quickSync().catch((error) =>
-      log(`QuickSync nudge after accept failed (delivery rides MLO's own cadence): ${error instanceof Error ? error.message : String(error)}`));
-    return { writeId: result.value.writeId, expiresAt: result.value.expiresAt };
+    void this.quickSync().then((nudge) => {
+      if (nudge.isErrored) {
+        log(`QuickSync nudge after accept failed (delivery rides MLO's own cadence): ${nudge.failure.detail}`);
+      }
+    });
+    return ok({ writeId: result.value.writeId, expiresAt: result.value.expiresAt });
   }
 
-  async status(id: WriteId): Promise<WriteStatus> {
+  async status(id: WriteId): Promise<RepoResult<WriteStatus>> {
     const result = await this.requireResident().writeStatus(id);
-    if (!result.ok) throw new WriteRefusedError(result.refusal);
-    return result.value.status;
+    if (!result.ok) return failed(repoFailureFromProblem(result.refusal));
+    return ok(result.value.status);
   }
 
-  async quickSync(): Promise<void> {
-    await this.cli.quickSync();
+  async quickSync(): Promise<RepoResult<void>> {
+    try {
+      await this.cli.quickSync();
+    } catch (error) {
+      return failed(
+        repoFailure("quick-sync-failed", error instanceof Error ? error.message : String(error)),
+      );
+    }
     // a sync can change the data file, so the stale snapshot dies here, not at the caller
     this.invalidate();
+    return ok(undefined);
   }
 }

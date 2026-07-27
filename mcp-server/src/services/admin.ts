@@ -4,6 +4,15 @@ import type { UnboundSighting } from "../cloud/sightings.js";
 import type { ResidentEndpoint } from "../cloud/endpoint.js";
 import type { MloRepository } from "../repo/mlo-repository.js";
 import { backupDataFile } from "../cloud/profile-backup.js";
+import { failureFor, type AdminFailureKind } from "../error-contract.js";
+import { failed, ok, type Failure, type ServiceResult } from "../result.js";
+
+/** The cloud plane's closed failure union (spec section 6). */
+export type AdminFailure = Failure & { kind: AdminFailureKind };
+
+function adminFailure(kind: AdminFailureKind, detail: string, remedy?: string): AdminFailure {
+  return failureFor(kind, detail, remedy);
+}
 
 export interface CloudPlaneStatus {
   host: string;
@@ -77,17 +86,40 @@ export class AdminService {
    * refusal is the design (ADR-0002: report a mismatch, never repair it), not
    * a gap in it.
    */
-  async rebind(): Promise<RebindOutcome> {
-    const existing = await this.gateway.bindings.forProfile(this.config.dataFile);
-    if (!existing?.dataFileUID) {
-      // Refused rather than treated as a no-op: a backup copy of the profile
-      // per call is real clutter, and "nothing was bound" is what the caller
-      // needs to hear anyway.
-      throw new Error("this profile is not bound to a cloud file, so there is nothing to rebind");
-    }
-    const backup = await backupDataFile(this.config.dataFile);
-    await this.gateway.bindings.unbindUid(this.config.dataFile);
-    return { backup, previousDataFileUID: existing.dataFileUID };
+  rebind(): Promise<ServiceResult<RebindOutcome, AdminFailure>> {
+    return this.overCloudState(async () => {
+      const existing = await this.gateway.bindings.forProfile(this.config.dataFile);
+      if (!existing?.dataFileUID) {
+        // Refused rather than treated as a no-op: a backup copy of the profile
+        // per call is real clutter, and "nothing was bound" is what the caller
+        // needs to hear anyway.
+        return failed(
+          adminFailure(
+            "nothing-bound",
+            "this profile is not bound to a cloud file, so there is nothing to rebind",
+            "run one sync in MLO through this proxy first, so auto-initialization binds the profile",
+          ),
+        );
+      }
+      let backup: string;
+      try {
+        backup = await backupDataFile(this.config.dataFile);
+      } catch (error) {
+        // The copy's failure aborts the whole verb: the binding is what protects
+        // the user's data from a wrong new one, and dropping it uncopied is the
+        // one ordering this verb may never take.
+        return failed(
+          adminFailure(
+            "backup-failed",
+            `the profile could not be copied aside, so the binding was left alone: ` +
+              `${error instanceof Error ? error.message : String(error)}`,
+            `check that ${this.config.dataFile} is readable and its directory writable, then rebind again`,
+          ),
+        );
+      }
+      await this.gateway.bindings.unbindUid(this.config.dataFile);
+      return ok({ backup, previousDataFileUID: existing.dataFileUID });
+    });
   }
 
   /**
@@ -100,25 +132,59 @@ export class AdminService {
    * answer here is "requested", not "done"; `cloud_status` reports the result
    * through the partition's capture journal.
    */
-  async repull(): Promise<RepullOutcome> {
-    const bound = await this.gateway.boundPartition(this.config.dataFile);
-    if (bound.kind !== "bound") {
-      throw new Error(
-        "this profile has no bound cloud partition, so there is no row store to refresh — sync MLO once through " +
-          "the proxy and let the endpoint bind it first",
-      );
-    }
-    const requestedAt = new Date().toISOString();
-    await bound.partition.requestRepull(requestedAt);
-    return { dataFileUID: bound.partition.uid, requestedAt };
+  repull(): Promise<ServiceResult<RepullOutcome, AdminFailure>> {
+    return this.overCloudState(async () => {
+      const bound = await this.gateway.boundPartition(this.config.dataFile);
+      if (bound.kind !== "bound") {
+        return failed(
+          adminFailure(
+            "partition-not-ready",
+            "this profile has no bound cloud partition, so there is no row store to refresh",
+            "sync MLO once through the proxy and let the endpoint bind it first",
+          ),
+        );
+      }
+      const requestedAt = new Date().toISOString();
+      await bound.partition.requestRepull(requestedAt);
+      return ok({ dataFileUID: bound.partition.uid, requestedAt });
+    });
   }
 
   /** Run the profile's QuickSync — a best-effort accelerator, never load-bearing (spec section 2.5). */
-  quickSync(): Promise<void> {
-    return this.repo.quickSync();
+  async quickSync(): Promise<ServiceResult<void, AdminFailure>> {
+    const nudged = await this.repo.quickSync();
+    if (nudged.isErrored) {
+      return failed(adminFailure("quick-sync-failed", nudged.failure.detail, nudged.failure.remedy));
+    }
+    return ok(undefined);
   }
 
-  async status(): Promise<CloudPlaneStatus> {
+  status(): Promise<ServiceResult<CloudPlaneStatus, AdminFailure>> {
+    return this.overCloudState(async () => ok(await this.readStatus()));
+  }
+
+  /**
+   * Every verb here reads or writes the cloud state root, and a state root
+   * that cannot be read is an op refusal like any other: this session keeps
+   * serving reads, and the next call is fresh.
+   */
+  private async overCloudState<T>(
+    run: () => Promise<ServiceResult<T, AdminFailure>>,
+  ): Promise<ServiceResult<T, AdminFailure>> {
+    try {
+      return await run();
+    } catch (error) {
+      return failed(
+        adminFailure(
+          "cloud-state-unreadable",
+          `could not read the cloud state root: ${error instanceof Error ? error.message : String(error)}`,
+          `check that ${this.gateway.stateRoot} is readable`,
+        ),
+      );
+    }
+  }
+
+  private async readStatus(): Promise<CloudPlaneStatus> {
     // Probed rather than remembered: the resident process can exit between two
     // tool calls, and "is it up" is the whole question this field answers.
     const endpointStatus = await this.endpoint.status();

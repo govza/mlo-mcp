@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineTool, textResult } from "./contract.js";
+import { defineTool, textResult, failureResult } from "./contract.js";
 
 export const listContextsTool = defineTool({
   name: "list_contexts",
@@ -19,7 +19,9 @@ export const listContextsTool = defineTool({
   },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   async execute(_args, ctx) {
-    const contexts = await ctx.outline.contexts();
+    const result = await ctx.outline.contexts();
+    if (result.isErrored) return failureResult(result.failure);
+    const contexts = result.value;
     const text = contexts.length
       ? contexts
           .map((c) => `${c.Caption}  (${c.tasksUsing} task${c.tasksUsing === 1 ? "" : "s"}${c.defined ? "" : ", not in places list"})`)

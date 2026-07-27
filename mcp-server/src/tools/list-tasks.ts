@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { renderVisible } from "../task-tree.js";
 import { TaskSummarySchema, toSummary } from "../task-summary.js";
-import { defineTool, textResult, errorResult, DEFAULT_RESULT_LIMIT, PATH_ID_CAVEAT } from "./contract.js";
+import { defineTool, textResult, failureResult, DEFAULT_RESULT_LIMIT, PATH_ID_CAVEAT } from "./contract.js";
 
 export const listTasksTool = defineTool({
   name: "list_tasks",
@@ -29,8 +29,9 @@ export const listTasksTool = defineTool({
   },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   async execute({ format, includeCompleted, parentId, maxDepth, limit }, ctx) {
-    const listing = await ctx.outline.list({ parentId, includeCompleted, maxDepth });
-    if (!listing) return errorResult(`no task with id "${parentId}" — call list_tasks or search_tasks first`);
+    const result = await ctx.outline.list({ parentId, includeCompleted, maxDepth });
+    if (result.isErrored) return failureResult(result.failure);
+    const listing = result.value;
     const shown = listing.entries.slice(0, limit ?? DEFAULT_RESULT_LIMIT);
     let text = renderVisible(shown, format);
     if (shown.length < listing.total) {

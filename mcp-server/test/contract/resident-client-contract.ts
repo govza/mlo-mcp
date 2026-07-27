@@ -26,6 +26,8 @@ export interface ResidentClientHarness {
   boundProfile: string;
   /** A client that cannot reach any resident at all. */
   downClient(): ResidentClient | Promise<ResidentClient>;
+  /** A client whose next call meets this raw non-2xx answer, rehydrated for real. */
+  clientAnswering(status: number, body: string): ResidentClient | Promise<ResidentClient>;
 }
 
 export function describeResidentClientContract(
@@ -81,6 +83,39 @@ export function describeResidentClientContract(
       if (result.ok) return;
       expect(result.refusal.kind).toBe("invalid-request");
       expect(result.refusal.retryable).toBe(false);
+    });
+
+    it("a problem type this build does not know degrades to unknown — never lost, never thrown", async () => {
+      const harness = await makeHarness();
+      const future = await harness.clientAnswering(
+        409,
+        JSON.stringify({
+          type: "urn:mlo-mcp:from-a-newer-resident",
+          title: "something this build has no name for",
+          retryable: "after-user-action",
+          uid: UID,
+        }),
+      );
+      const result = await future.postWrite({ profile: harness.boundProfile, rows: sampleAddRows() });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.refusal.kind).toBe("unknown");
+      // Degraded, not lost: the wire type, the title and the extension members
+      // all survive, so an older session stays diagnosable against a newer one.
+      expect(result.refusal.type).toBe("urn:mlo-mcp:from-a-newer-resident");
+      expect(result.refusal.title).toBe("something this build has no name for");
+      expect(result.refusal.retryable).toBe("after-user-action");
+      expect(result.refusal.extensions.uid).toBe(UID);
+    });
+
+    it("a non-problem body from something in the middle degrades to unknown too", async () => {
+      const harness = await makeHarness();
+      const proxied = await harness.clientAnswering(502, "<html>Bad Gateway</html>");
+      const result = await proxied.postWrite({ profile: harness.boundProfile, rows: sampleAddRows() });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.refusal.kind).toBe("unknown");
+      expect(result.refusal.title).toContain("Bad Gateway");
     });
 
     it("a resident that answers nothing is the typed retryable endpoint-down refusal — never a spool", async () => {

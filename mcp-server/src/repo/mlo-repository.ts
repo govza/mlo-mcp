@@ -1,5 +1,8 @@
 import type { TaskNode } from "../types.js";
 import type { MloDocument } from "../xml.js";
+import type { RehydratedProblem } from "../cloud/problem.js";
+import { failureFor, REPO_FAILURE_KINDS, type RepoFailureKind } from "../error-contract.js";
+import type { Failure, ServiceResult } from "../result.js";
 
 /**
  * A fresh export parsed into the task tree. The pending-write overlay
@@ -38,25 +41,57 @@ export interface PendingWrite {
 export type WriteStatus = "accepted" | "delivered" | "verified" | "expired" | "superseded";
 
 /**
- * A typed write refusal crossing the repository seam. Interim carrier until
- * the error-contract ticket turns every service boundary into
- * `ServiceResult` unions: the refusal is already a plain tagged value
- * (rehydrated problem+json from the resident, or the client-side
- * `endpoint-down`), only the transport up through the repository is still a
- * throw.
+ * The repository's closed failure union (spec section 6): infra kinds only.
+ * Services map these into their own domain kinds; nothing above this seam
+ * learns that a resident, an HTTP hop or mlo.exe was involved.
+ *
+ * Failures are values here, not throws — a refusal that travelled as an
+ * exception would arrive at the tool layer as prose, and prose is exactly what
+ * the contract exists to postpone until the last boundary.
  */
-export interface WriteRefusal {
-  kind: string;
-  title: string;
-  retryable: boolean | "after-user-action";
-  remedy?: string;
+export interface RepoFailure extends Failure {
+  kind: RepoFailureKind;
 }
 
-export class WriteRefusedError extends Error {
-  constructor(readonly refusal: WriteRefusal) {
-    super(refusal.remedy ? `${refusal.title} — ${refusal.remedy}` : refusal.title);
-    this.name = "WriteRefusedError";
-  }
+export type RepoResult<T> = ServiceResult<T, RepoFailure>;
+
+/**
+ * A read can only ever fail one way — the export did not happen — so the
+ * snapshot seam narrows to that single kind rather than making every read
+ * service handle write-path kinds it can never see.
+ */
+export type SnapshotFailure = Failure & { kind: "snapshot-unavailable" };
+
+/** Build a repository failure from the contract table's declaration of the kind. */
+export function repoFailure<K extends RepoFailureKind>(
+  kind: K,
+  detail: string,
+  remedy?: string,
+): Failure & { kind: K } {
+  return failureFor(kind, detail, remedy);
+}
+
+/**
+ * A rehydrated problem+json refusal, mapped onto the repository union. An
+ * unrecognized kind is already `unknown` by the time it gets here (the wire
+ * layer degrades it), so this only has to decide whether the name is one this
+ * union declares.
+ *
+ * The wire `type` and the kind's extension members travel on: degraded is not
+ * the same as lost, and a session facing a newer resident has nothing else to
+ * diagnose with.
+ */
+export function repoFailureFromProblem(problem: RehydratedProblem): RepoFailure {
+  const known = (REPO_FAILURE_KINDS as readonly string[]).includes(problem.kind);
+  const kind = (known ? problem.kind : "unknown") as RepoFailureKind;
+  return {
+    ...failureFor(kind, problem.title, problem.remedy),
+    // The producer's own declaration wins over this build's table: a newer
+    // resident knows better than we do whether its refusal is retryable.
+    retryable: problem.retryable,
+    ...(problem.type ? { wireType: problem.type } : {}),
+    ...(Object.keys(problem.extensions).length ? { fields: problem.extensions } : {}),
+  };
 }
 
 /**
@@ -70,16 +105,16 @@ export interface MloRepository {
    * Fresh export + (eventually) the pending-write overlay. `fresh` bypasses
    * the snapshot cache and never coalesces onto an in-flight refresh.
    */
-  snapshot(fresh?: boolean): Promise<Snapshot>;
+  snapshot(fresh?: boolean): Promise<ServiceResult<Snapshot, SnapshotFailure>>;
   /** Durably accept authored rows; resolves only once the rows are safe. */
-  write(rows: DeltaRow[]): Promise<PendingWrite>;
-  status(id: WriteId): Promise<WriteStatus>;
+  write(rows: DeltaRow[]): Promise<RepoResult<PendingWrite>>;
+  status(id: WriteId): Promise<RepoResult<WriteStatus>>;
   /**
    * Best-effort sync accelerator, never load-bearing (spec section 2.5). On
    * the interface only because the `sync` tool surfaces it; it may fold away
    * once the write path owns delivery.
    */
-  quickSync(): Promise<void>;
+  quickSync(): Promise<RepoResult<void>>;
 }
 
 /**

@@ -4,6 +4,7 @@ import type { MloCli } from "../../src/repo/mlo-cli.js";
 import type { MloConfig } from "../../src/types.js";
 import { FakeMloRepository } from "../fakes/fake-mlo-repository.js";
 import { describeMloRepositoryContract } from "../contract/mlo-repository-contract.js";
+import { expectOk } from "../expect-result.js";
 
 describeMloRepositoryContract("FakeMloRepository", () => ({
   repo: new FakeMloRepository(),
@@ -13,10 +14,10 @@ describeMloRepositoryContract("FakeMloRepository", () => ({
 describe("FakeMloRepository hand-driven transitions", () => {
   it("walks a write through the five states", async () => {
     const repo = new FakeMloRepository();
-    const { writeId } = await repo.write([{ section: "TodoItems", values: [] }]);
+    const { writeId } = expectOk(await repo.write([{ section: "TodoItems", values: [] }]));
     for (const state of ["delivered", "verified", "expired", "superseded"] as const) {
       repo.transition(writeId, state);
-      expect(await repo.status(writeId)).toBe(state);
+      expect(expectOk(await repo.status(writeId))).toBe(state);
     }
   });
 });
@@ -69,8 +70,8 @@ describe("LocalMloRepository snapshot coalescing", () => {
     const repo = new LocalMloRepository(config, cli);
     const [a, b] = [repo.snapshot(), repo.snapshot()];
     first.resolve(xmlWithTask("only"));
-    expect((await a).tasks[0]?.Caption).toBe("only");
-    expect(await b).toBe(await a);
+    expect(expectOk(await a).tasks[0]?.Caption).toBe("only");
+    expect(expectOk(await b)).toBe(expectOk(await a));
     expect(cli.exportCalls).toBe(1);
   });
 
@@ -87,12 +88,12 @@ describe("LocalMloRepository snapshot coalescing", () => {
     const verification = repo.snapshot(true);
 
     postMutation.resolve(xmlWithTask("after write"));
-    expect((await verification).tasks[0]?.Caption).toBe("after write");
+    expect(expectOk(await verification).tasks[0]?.Caption).toBe("after write");
 
     // the superseded refresh resolves late and must not clobber the newer snapshot
     preMutation.resolve(xmlWithTask("before write"));
-    expect((await staleRead).tasks[0]?.Caption).toBe("before write");
-    expect((await repo.snapshot()).tasks[0]?.Caption).toBe("after write");
+    expect(expectOk(await staleRead).tasks[0]?.Caption).toBe("before write");
+    expect(expectOk(await repo.snapshot()).tasks[0]?.Caption).toBe("after write");
     expect(cli.exportCalls).toBe(2);
   });
 
@@ -101,10 +102,10 @@ describe("LocalMloRepository snapshot coalescing", () => {
     cli.queueExport(Promise.resolve(xmlWithTask("before")));
     cli.queueExport(Promise.resolve(xmlWithTask("after")));
     const repo = new LocalMloRepository(config, cli);
-    expect((await repo.snapshot()).tasks[0]?.Caption).toBe("before");
+    expect(expectOk(await repo.snapshot()).tasks[0]?.Caption).toBe("before");
     await repo.quickSync();
     expect(cli.quickSyncs).toBe(1);
-    expect((await repo.snapshot()).tasks[0]?.Caption).toBe("after");
+    expect(expectOk(await repo.snapshot()).tasks[0]?.Caption).toBe("after");
   });
 });
 

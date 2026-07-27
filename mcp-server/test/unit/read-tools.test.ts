@@ -127,3 +127,40 @@ describe("search_tasks", () => {
     expect((res.content[0] as { text: string }).text).toContain("showing 1 of 3 matches");
   });
 });
+
+/**
+ * The tool layer is the only place a failure becomes prose (spec section 6):
+ * everything below carries the refusal as a value, and it is said once here,
+ * with the remedy attached and the kind named for a caller that wants to
+ * branch rather than read.
+ */
+describe("failures become prose exactly once, at the tool boundary", () => {
+  function ctxWithFailingExport(): ToolContext {
+    const repo = new FakeMloRepository();
+    repo.exportFails = "mlo.exe is busy";
+    const outline = new OutlineService(repo, new IdentityService(EMPTY_ROW_STORE_VIEW));
+    return { config: {}, outline } as unknown as ToolContext;
+  }
+
+  it("carries a read refusal out as an isError result naming the kind and the remedy", async () => {
+    const res = await listTasksTool.execute({}, ctxWithFailingExport());
+    expect(res.isError).toBe(true);
+    const text = (res.content[0] as { text: string }).text;
+    expect(text).toContain("mlo.exe is busy");
+    expect(text).toContain("[snapshot-unavailable]");
+    // detail — remedy, in that order: the refusal, then what ends it.
+    expect(text).toMatch(/mlo\.exe is busy — .+ \[snapshot-unavailable\]$/);
+  });
+
+  it("an id that resolves to nothing refuses target-unresolvable rather than answering empty", async () => {
+    const res = await listTasksTool.execute({ parentId: "9.9" }, fakeCtx(fixture()));
+    expect(res.isError).toBe(true);
+    expect((res.content[0] as { text: string }).text).toContain("[target-unresolvable]");
+  });
+
+  it("search refuses with the same kind rather than an empty match list", async () => {
+    const res = await searchTasksTool.execute({}, ctxWithFailingExport());
+    expect(res.isError).toBe(true);
+    expect((res.content[0] as { text: string }).text).toContain("[snapshot-unavailable]");
+  });
+});

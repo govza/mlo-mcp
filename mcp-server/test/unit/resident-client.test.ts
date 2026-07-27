@@ -1,14 +1,15 @@
 import { promises as fs } from "node:fs";
+import http from "node:http";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { startCloudServer, type CloudServerHandle } from "../../src/cloud/server.js";
 import { CloudGateway } from "../../src/cloud/gateway.js";
-import { parseProblem, problemBody } from "../../src/cloud/problem.js";
+import { parseProblem, problemBody, PROBLEM_CONTENT_TYPE } from "../../src/cloud/problem.js";
 import { HttpResidentClient } from "../../src/repo/resident-client.js";
 import { LocalMloRepository } from "../../src/repo/local-mlo-repository.js";
-import { WriteRefusedError } from "../../src/repo/mlo-repository.js";
+import { expectFailed, expectOk } from "../expect-result.js";
 import type { MloConfig } from "../../src/types.js";
 import type { MloCli } from "../../src/repo/mlo-cli.js";
 import { FakeResidentClient } from "../fakes/fake-resident-client.js";
@@ -18,9 +19,11 @@ const UID = "{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}";
 const PROFILE = "C:/profiles/resident-client.ml";
 
 const handles: CloudServerHandle[] = [];
+const stubs: http.Server[] = [];
 const dirs: string[] = [];
 afterEach(async () => {
   await Promise.all(handles.splice(0).map((handle) => handle.stop()));
+  await Promise.all(stubs.splice(0).map((stub) => new Promise<void>((resolve) => stub.close(() => resolve()))));
   await Promise.all(dirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
 });
 
@@ -57,6 +60,17 @@ describeResidentClientContract("HTTP driver against a real resident", async () =
     client: new HttpResidentClient({ host: handle.host, port: handle.port }),
     boundProfile: PROFILE,
     downClient: async () => new HttpResidentClient({ host: "127.0.0.1", port: await freePort() }),
+    // A real HTTP hop, so the driver's own rehydration is what is under test —
+    // the resident cannot be made to emit a kind this build has never heard of.
+    clientAnswering: async (status: number, body: string) => {
+      const stub = http.createServer((_request, response) => {
+        response.writeHead(status, { "content-type": PROBLEM_CONTENT_TYPE });
+        response.end(body);
+      });
+      await new Promise<void>((resolve) => stub.listen(0, "127.0.0.1", resolve));
+      stubs.push(stub);
+      return new HttpResidentClient({ host: "127.0.0.1", port: (stub.address() as net.AddressInfo).port });
+    },
   };
 });
 
@@ -67,6 +81,11 @@ describeResidentClientContract("fake", () => {
     client: new FakeResidentClient(),
     boundProfile: PROFILE,
     downClient: () => down,
+    clientAnswering: (status: number, body: string) => {
+      const scripted = new FakeResidentClient();
+      scripted.refuseNextWithRaw(status, body);
+      return scripted;
+    },
   };
 });
 
@@ -162,22 +181,40 @@ describe("LocalMloRepository write path", () => {
   it("write posts the profile's rows through the driver and returns the receipt", async () => {
     const resident = new FakeResidentClient();
     const repo = new LocalMloRepository(config(), unusedCli, resident);
-    const pending = await repo.write(sampleAddRows());
+    const pending = expectOk(await repo.write(sampleAddRows()));
     expect(pending.writeId).toBeTruthy();
     expect(resident.accepted[0]?.profile).toBe(PROFILE);
-    expect(await repo.status(pending.writeId)).toBe("accepted");
+    expect(expectOk(await repo.status(pending.writeId))).toBe("accepted");
     resident.transition(pending.writeId, "delivered");
-    expect(await repo.status(pending.writeId)).toBe("delivered");
+    expect(expectOk(await repo.status(pending.writeId))).toBe("delivered");
   });
 
-  it("a driver refusal surfaces as the typed WriteRefusedError, never a spool", async () => {
+  it("an unknown kind keeps its wire type and typed fields across the repository seam", async () => {
+    const resident = new FakeResidentClient();
+    resident.refuseNextWithRaw(
+      409,
+      JSON.stringify({ type: "urn:mlo-mcp:from-the-future", title: "not in this build", retryable: true, uid: UID }),
+    );
+    const repo = new LocalMloRepository(config(), unusedCli, resident);
+    const failure = expectFailed(await repo.write(sampleAddRows()));
+    // Degraded, never lost: `unknown` with the wire type and the extension
+    // members intact is all a session facing a newer resident has to go on.
+    expect(failure.kind).toBe("unknown");
+    expect(failure.wireType).toBe("urn:mlo-mcp:from-the-future");
+    expect(failure.fields?.uid).toBe(UID);
+    expect(failure.detail).toBe("not in this build");
+    // The producer's own declaration, not this build's table row for `unknown`.
+    expect(failure.retryable).toBe(true);
+  });
+
+  it("a driver refusal crosses the seam as a typed value, never a throw or a spool", async () => {
     const resident = new FakeResidentClient();
     resident.setDown(true);
     const repo = new LocalMloRepository(config(), unusedCli, resident);
-    const error = await repo.write(sampleAddRows()).catch((caught: unknown) => caught);
-    expect(error).toBeInstanceOf(WriteRefusedError);
-    expect((error as WriteRefusedError).refusal.kind).toBe("endpoint-down");
-    expect((error as WriteRefusedError).refusal.retryable).toBe(true);
+    const failure = expectFailed(await repo.write(sampleAddRows()));
+    expect(failure.kind).toBe("endpoint-down");
+    expect(failure.retryable).toBe(true);
+    expect(failure.remedy).toBeTruthy();
     expect(resident.accepted).toHaveLength(0);
   });
 });

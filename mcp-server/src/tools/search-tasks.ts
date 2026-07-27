@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { renderLine } from "../task-tree.js";
 import { TaskSummarySchema, toSummary } from "../task-summary.js";
-import { defineTool, textResult, DEFAULT_RESULT_LIMIT } from "./contract.js";
+import { defineTool, textResult, failureResult, DEFAULT_RESULT_LIMIT } from "./contract.js";
 
 export const searchTasksTool = defineTool({
   name: "search_tasks",
@@ -31,7 +31,9 @@ export const searchTasksTool = defineTool({
   },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   async execute({ limit, ...filters }, ctx) {
-    const matches = await ctx.outline.search(filters);
+    const result = await ctx.outline.search(filters);
+    if (result.isErrored) return failureResult(result.failure);
+    const matches = result.value;
     const shown = matches.slice(0, limit ?? DEFAULT_RESULT_LIMIT);
     let text = shown.length
       ? shown.map((t) => `${renderLine(t)}  (${t.Path.slice(0, -1).join(" > ") || "top level"})`).join("\n")

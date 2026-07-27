@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ENDPOINT_RECOVERY } from "../cloud/endpoint.js";
-import { defineTool, textResult } from "./contract.js";
+import { defineTool, textResult, failureResult } from "./contract.js";
 
 export const cloudStatusTool = defineTool({
   name: "cloud_status",
@@ -44,7 +44,9 @@ export const cloudStatusTool = defineTool({
   },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   async execute(_args, ctx) {
-    const status = await ctx.admin.status();
+    const answered = await ctx.admin.status();
+    if (answered.isErrored) return failureResult(answered.failure);
+    const status = answered.value;
     const result = {
       host: status.host,
       port: status.port,

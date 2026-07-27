@@ -1,6 +1,8 @@
 import type { TaskNode } from "../types.js";
 import type { ReadRepository } from "../repo/mlo-repository.js";
 import { AvailabilityEngine, type Block } from "./availability.js";
+import { failed, ok, type ServiceResult } from "../result.js";
+import type { ReadFailure } from "./failures.js";
 
 export interface NextAction {
   task: TaskNode;
@@ -55,9 +57,10 @@ export class NextActionsService {
   ) {}
 
   /** Ranked next actions, highest computed score first. */
-  async nextActions(query: NextActionsQuery = {}): Promise<NextAction[]> {
-    const snapshot = await this.repo.snapshot();
-    const engine = new AvailabilityEngine(snapshot, { now: this.options.now?.() });
+  async nextActions(query: NextActionsQuery = {}): Promise<ServiceResult<NextAction[], ReadFailure>> {
+    const read = await this.repo.snapshot();
+    if (read.isErrored) return failed(read.failure);
+    const engine = new AvailabilityEngine(read.value, { now: this.options.now?.() });
     const availableOnly = query.availableOnly ?? true;
 
     const matches = engine.actions().filter((entry) => {
@@ -71,8 +74,10 @@ export class NextActionsService {
       return true;
     });
 
-    return matches
-      .slice(0, query.limit ?? matches.length)
-      .map(({ task, score, available, blocks }) => ({ task, score, available, blocks }));
+    return ok(
+      matches
+        .slice(0, query.limit ?? matches.length)
+        .map(({ task, score, available, blocks }) => ({ task, score, available, blocks })),
+    );
   }
 }

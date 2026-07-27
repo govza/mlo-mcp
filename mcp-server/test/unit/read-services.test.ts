@@ -4,6 +4,7 @@ import { ReviewService } from "../../src/services/review.js";
 import { FakeMloRepository } from "../fakes/fake-mlo-repository.js";
 import type { MloDocument } from "../../src/xml.js";
 import type { TaskNode } from "../../src/types.js";
+import { expectOk } from "../expect-result.js";
 
 function task(id: string, caption: string, extra: Partial<TaskNode> = {}): TaskNode {
   return {
@@ -41,7 +42,7 @@ describe("NextActionsService.nextActions", () => {
     const branch = task("1", "branch", { Children: [overdue, undated] });
     const service = new NextActionsService(repoWith([branch]), { now });
 
-    const actions = await service.nextActions();
+    const actions = expectOk(await service.nextActions());
     expect(actions.map((a) => a.task.id)).toEqual(["1.1", "1.2"]);
     expect(actions.every((a) => a.available)).toBe(true);
   });
@@ -51,9 +52,9 @@ describe("NextActionsService.nextActions", () => {
     const blocked = task("2", "blocked", { DependsOn: ["{AAA}"] });
     const service = new NextActionsService(repoWith([blocker, blocked]), { now });
 
-    expect((await service.nextActions()).map((a) => a.task.id)).toEqual(["1"]);
+    expect(expectOk(await service.nextActions()).map((a) => a.task.id)).toEqual(["1"]);
 
-    const all = await service.nextActions({ availableOnly: false });
+    const all = expectOk(await service.nextActions({ availableOnly: false }));
     expect(all.map((a) => a.task.id)).toEqual(["1", "2"]);
     expect(all[1].blocks.map((b) => b.kind)).toEqual(["blocked-by-dependency"]);
   });
@@ -64,8 +65,8 @@ describe("NextActionsService.nextActions", () => {
     const places = [{ "@_Caption": "@Home", Includes: { "@_Place": "Phone" } }, { "@_Caption": "Phone" }];
     const service = new NextActionsService(repoWith([call, errand], places), { now });
 
-    expect((await service.nextActions({ context: "@Home" })).map((a) => a.task.id)).toEqual(["1"]);
-    expect((await service.nextActions({ context: "Town" })).map((a) => a.task.id)).toEqual(["2"]);
+    expect(expectOk(await service.nextActions({ context: "@Home" })).map((a) => a.task.id)).toEqual(["1"]);
+    expect(expectOk(await service.nextActions({ context: "Town" })).map((a) => a.task.id)).toEqual(["2"]);
   });
 
   it("fits actions into a clock-time budget, keeping the ones with no estimate", async () => {
@@ -74,15 +75,15 @@ describe("NextActionsService.nextActions", () => {
     const unknown = task("3", "unestimated");
     const service = new NextActionsService(repoWith([quick, long, unknown]), { now });
 
-    expect((await service.nextActions({ maxTimeMin: 15 })).map((a) => a.task.id)).toEqual(["1", "3"]);
+    expect(expectOk(await service.nextActions({ maxTimeMin: 15 })).map((a) => a.task.id)).toEqual(["1", "3"]);
   });
 
   it("judges the budget on the pessimistic estimate when the profile has one", async () => {
     const maybeLong = task("1", "10 to 120 minutes", { EstimateMin: 10 / 1440, EstimateMax: 120 / 1440 });
     const service = new NextActionsService(repoWith([maybeLong]), { now });
 
-    expect(await service.nextActions({ maxTimeMin: 15 })).toEqual([]);
-    expect((await service.nextActions({ maxTimeMin: 180 })).map((a) => a.task.id)).toEqual(["1"]);
+    expect(expectOk(await service.nextActions({ maxTimeMin: 15 }))).toEqual([]);
+    expect(expectOk(await service.nextActions({ maxTimeMin: 180 })).map((a) => a.task.id)).toEqual(["1"]);
   });
 
   it("caps effort on MLO's 0–200 scale, counting an unset Effort as normal", async () => {
@@ -91,7 +92,7 @@ describe("NextActionsService.nextActions", () => {
     const hard = task("3", "hard", { Effort: 175 });
     const service = new NextActionsService(repoWith([easy, normal, hard]), { now });
 
-    expect((await service.nextActions({ maxEffort: 100 })).map((a) => a.task.id)).toEqual(["1", "2"]);
+    expect(expectOk(await service.nextActions({ maxEffort: 100 })).map((a) => a.task.id)).toEqual(["1", "2"]);
   });
 
   it("truncates to the limit after ranking", async () => {
@@ -99,7 +100,7 @@ describe("NextActionsService.nextActions", () => {
       repoWith([task("1", "normal"), task("2", "critical", { Importance: 175 })]),
       { now }
     );
-    expect((await service.nextActions({ limit: 1 })).map((a) => a.task.id)).toEqual(["2"]);
+    expect(expectOk(await service.nextActions({ limit: 1 })).map((a) => a.task.id)).toEqual(["2"]);
   });
 });
 
@@ -110,14 +111,14 @@ describe("ReviewService.inbox", () => {
     const inbox = task("1", "<Inbox>", { Children: [open, done] });
     const service = new ReviewService(repoWith([inbox, task("2", "elsewhere")]));
 
-    expect((await service.inbox()).map((t) => t.id)).toEqual(["1.1"]);
+    expect(expectOk(await service.inbox()).map((t) => t.id)).toEqual(["1.1"]);
   });
 
   it("honours the configured inbox caption and answers empty when there is no inbox", async () => {
     const captures = task("1", "Capture", { Children: [task("1.1", "an idea")] });
-    expect(await new ReviewService(repoWith([captures])).inbox()).toEqual([]);
+    expect(expectOk(await new ReviewService(repoWith([captures])).inbox())).toEqual([]);
     expect(
-      (await new ReviewService(repoWith([captures]), { inboxCaption: "Capture" }).inbox()).map((t) => t.id)
+      expectOk(await new ReviewService(repoWith([captures]), { inboxCaption: "Capture" }).inbox()).map((t) => t.id)
     ).toEqual(["1.1"]);
   });
 });
@@ -139,7 +140,7 @@ describe("ReviewService.projects", () => {
   }
 
   it("returns each project and folder with the open tasks nested under it", async () => {
-    const branches = await new ReviewService(repoWith(outline()), { now }).projects();
+    const branches = expectOk(await new ReviewService(repoWith(outline()), { now }).projects());
 
     expect(branches.map((b) => [b.task.id, b.kind])).toEqual([
       ["1", "folder"],
@@ -153,21 +154,21 @@ describe("ReviewService.projects", () => {
   });
 
   it("counts the actions each branch can actually offer, so a stalled one reads zero", async () => {
-    const branches = await new ReviewService(repoWith(outline()), { now }).projects();
+    const branches = expectOk(await new ReviewService(repoWith(outline()), { now }).projects());
     expect(branches.find((b) => b.task.id === "1.1")?.availableActions).toBe(1);
     expect(branches.find((b) => b.task.id === "2")?.availableActions).toBe(0);
   });
 
   it("filters by kind and by MLO's manual project status", async () => {
     const service = new ReviewService(repoWith(outline()), { now });
-    expect((await service.projects({ kind: "folder" })).map((b) => b.task.id)).toEqual(["1"]);
-    expect((await service.projects({ status: 2 })).map((b) => b.task.id)).toEqual(["2"]);
+    expect(expectOk(await service.projects({ kind: "folder" })).map((b) => b.task.id)).toEqual(["1"]);
+    expect(expectOk(await service.projects({ status: 2 })).map((b) => b.task.id)).toEqual(["2"]);
   });
 
   it("skips completed branches unless asked for them", async () => {
     const done = task("1", "shipped", { IsProject: true, CompletionDateTime: "2026-07-01T09:00:00" });
     const service = new ReviewService(repoWith([done]), { now });
-    expect(await service.projects()).toEqual([]);
-    expect((await service.projects({ includeCompleted: true })).map((b) => b.task.id)).toEqual(["1"]);
+    expect(expectOk(await service.projects())).toEqual([]);
+    expect(expectOk(await service.projects({ includeCompleted: true })).map((b) => b.task.id)).toEqual(["1"]);
   });
 });

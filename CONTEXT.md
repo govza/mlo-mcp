@@ -42,6 +42,15 @@ Ubiquitous language for this repo. Terms are defined here in one or two lines; t
 - **Tombstone** — a deletion record in a delta; `delete_task` tombstones a task and its whole subtree.
 - **Dead letter** — the raw text of a write the server refused, appended to a file in the state root so the words survive a failure that queued nothing. Never replayed automatically.
 
+## Failures
+
+- **Failure kind** — the tagged name a refusal travels under (`unknown-row`, `binding-conflict`, …). Every kind this build can produce is declared once in `mcp-server/src/error-contract.ts` with its tier, its `retryable`, and what ends it ([ADR-0005](docs/adr/0005-target-architecture-spec.md) §6).
+- **Failures as values** — a refusal crosses every boundary as a `ServiceResult` (`{ isErrored, value | failure }`), never as a throw. Exceptions are reserved for genuine invariant violations, such as a repository wired without a write driver.
+- **Blast radius** — how far one failure reaches. Exactly four tiers: **event** (journaled, blocks nothing), **op refusal** (this call refuses, the next is fresh), **write-gate refusal** (every write refuses the same way until a state changes; reads untouched), **startup verdict** (refuse to start, exit 1 — allowed before serving only). Post-startup, nothing stops the server.
+- **Remedy** — the concrete thing that ends a refusal, declared by the producer and carried with the kind. Caller metadata: nothing in this server ever retries automatically.
+- **Advisory** — an event-tier observation riding along with a result that still succeeded; never a refusal.
+- **Degraded to `unknown`** — a problem+json `type` an older session does not recognize, rehydrated with its wire type, title and extension members intact. Degraded, never lost, and never thrown.
+
 ## Where the deep docs are
 
 [docs/README.md](docs/README.md) is the index: server internals in [docs/server-architecture.md](docs/server-architecture.md), tool semantics in [docs/tools.md](docs/tools.md), the sync endpoint in [docs/mcp-cloud.md](docs/mcp-cloud.md), and the reverse-engineered MLO formats/protocol under [docs/mlo/](docs/mlo/). Established design decisions are currently recorded in prose in those docs; new decisions get ADRs under `docs/adr/` (see [docs/agents/domain.md](docs/agents/domain.md)).

@@ -49,7 +49,27 @@ export class StateRootLock {
     try {
       return await operation();
     } finally {
-      await fs.rm(lockDir, { recursive: true, force: true });
+      await this.release(lockDir);
+    }
+  }
+
+  /**
+   * Drop the lock directory. On Windows a directory whose handle the OS has
+   * not finished closing answers `EBUSY` to `rmdir`, and `force` does not
+   * cover that one — a release is not a failure, so it may never surface as
+   * the operation's own error. A few short attempts clear it in practice, and
+   * the stale timeout above is the backstop if they do not. Any other error is
+   * left to the same backstop rather than replacing the caller's result.
+   */
+  private async release(lockDir: string): Promise<void> {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      try {
+        await fs.rm(lockDir, { recursive: true, force: true });
+        return;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EBUSY") return;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
     }
   }
 

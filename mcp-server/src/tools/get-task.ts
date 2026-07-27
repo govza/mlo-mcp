@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TaskSummarySchema, toSummary } from "../task-summary.js";
-import { defineTool, textResult, errorResult, PATH_ID_CAVEAT } from "./contract.js";
+import { defineTool, textResult, failureResult, PATH_ID_CAVEAT } from "./contract.js";
 
 export const getTaskTool = defineTool({
   name: "get_task",
@@ -29,9 +29,9 @@ export const getTaskTool = defineTool({
   },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   async execute({ id }, ctx) {
-    const detail = await ctx.outline.get(id);
-    if (!detail) return errorResult(`no task with id "${id}" — ids shift when the tree changes; re-run list_tasks`);
-    const { task: t, uid: resolvedUid, dependsOn, dependedOnBy } = detail;
+    const result = await ctx.outline.get(id);
+    if (result.isErrored) return failureResult(result.failure);
+    const { task: t, uid: resolvedUid, dependsOn, dependedOnBy } = result.value;
     const task = {
       ...toSummary(t),
       Guid: resolvedUid,

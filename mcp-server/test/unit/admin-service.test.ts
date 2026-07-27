@@ -7,6 +7,7 @@ import { CloudGateway } from "../../src/cloud/gateway.js";
 import { ResidentEndpoint } from "../../src/cloud/endpoint.js";
 import { FakeMloRepository } from "../fakes/fake-mlo-repository.js";
 import type { MloConfig } from "../../src/types.js";
+import { expectFailed, expectOk } from "../expect-result.js";
 
 const UID = "{ABCDEF01-2345-6789-ABCD-EF0123456789}";
 
@@ -52,7 +53,7 @@ describe("AdminService.rebind", () => {
     const { admin, gateway, dataFile } = await rig();
     await bind(gateway, dataFile);
 
-    const outcome = await admin.rebind();
+    const outcome = expectOk(await admin.rebind());
 
     expect(outcome.previousDataFileUID).toBe(UID);
     expect(await fs.readFile(outcome.backup, "utf8")).toBe("the user's own data");
@@ -64,7 +65,8 @@ describe("AdminService.rebind", () => {
     await bind(gateway, dataFile);
     await fs.rm(dataFile);
 
-    await expect(admin.rebind()).rejects.toThrow();
+    const failure = expectFailed(await admin.rebind());
+    expect(failure.kind).toBe("backup-failed");
 
     expect((await gateway.bindings.forProfile(dataFile))?.dataFileUID).toBe(UID);
   });
@@ -84,7 +86,7 @@ describe("AdminService.repull", () => {
     const { admin, gateway, dataFile } = await rig();
     await bind(gateway, dataFile);
 
-    const outcome = await admin.repull();
+    const outcome = expectOk(await admin.repull());
 
     expect(outcome.dataFileUID).toBe(UID);
     const partition = await gateway.registry.open(UID);
@@ -95,14 +97,16 @@ describe("AdminService.repull", () => {
   it("surfaces the outstanding request in status", async () => {
     const { admin, gateway, dataFile } = await rig();
     await bind(gateway, dataFile);
-    const { requestedAt } = await admin.repull();
+    const { requestedAt } = expectOk(await admin.repull());
 
-    expect((await admin.status()).repullRequestedAt).toBe(requestedAt);
+    expect(expectOk(await admin.status()).repullRequestedAt).toBe(requestedAt);
   });
 
   it("refuses when nothing is bound — there is no row store to refresh", async () => {
     const { admin } = await rig();
 
-    await expect(admin.repull()).rejects.toThrow(/no bound cloud partition/);
+    const failure = expectFailed(await admin.repull());
+    expect(failure.kind).toBe("partition-not-ready");
+    expect(failure.detail).toMatch(/no bound cloud partition/);
   });
 });

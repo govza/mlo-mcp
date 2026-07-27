@@ -10,7 +10,8 @@ import {
 } from "../../src/services/outline-authoring.js";
 import { documentFromDeltaRows, normalizeGuid, TODO_ITEMS_HEADER } from "../../src/cloud/delta.js";
 import { findSection, type SectionedCsv } from "../../src/cloud/csv.js";
-import { WriteRefusedError, type DeltaRow } from "../../src/repo/mlo-repository.js";
+import { repoFailure, type DeltaRow } from "../../src/repo/mlo-repository.js";
+import { failed } from "../../src/result.js";
 import type { CapturedRow } from "../../src/cloud/row-store.js";
 import type { TaskNode } from "../../src/types.js";
 import type { MloDocument } from "../../src/xml.js";
@@ -403,25 +404,20 @@ describe("OutlineService refusals from below", () => {
     const repo = new FakeMloRepository();
     const outline = new OutlineService(repo, new IdentityService(new FakeRowStore().view()));
     const refused = failure(await outline.add({ caption: "nowhere to go" }));
-    expect(refused.kind).toBe("write-refused");
-    if (refused.kind !== "write-refused") return;
-    expect(refused.refusal.kind).toBe("partition-not-ready");
+    expect(refused.kind).toBe("partition-not-ready");
+    expect(refused.retryable).toBe("after-user-action");
+    expect(refused.remedy).toMatch(/sync/);
   });
 
   it("carries a repository write refusal through as a value", async () => {
     const h = harness();
-    h.repo.write = async () => {
-      throw new WriteRefusedError({
-        kind: "endpoint-down",
-        title: "the resident endpoint is not answering",
-        retryable: true,
-        remedy: "retry — the next call attaches and spawns it",
-      });
-    };
+    h.repo.write = async () =>
+      failed(repoFailure("endpoint-down", "the resident endpoint is not answering"));
+    // Forwarded under its own name, not re-wrapped: the caller reads the kind
+    // the contract table declares, and its remedy with it.
     const refused = failure(await h.outline.add({ caption: "will not land" }));
-    expect(refused.kind).toBe("write-refused");
-    if (refused.kind !== "write-refused") return;
-    expect(refused.refusal.kind).toBe("endpoint-down");
+    expect(refused.kind).toBe("endpoint-down");
     expect(refused.retryable).toBe(true);
+    expect(refused.remedy).toBeTruthy();
   });
 });

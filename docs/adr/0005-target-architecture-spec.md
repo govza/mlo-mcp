@@ -310,6 +310,48 @@ status stays meaningful but decorative; the `kind` is the contract.
 Post-startup, no failure stops the server. The mid-session profile-switch
 watcher's exit-while-idle is a designed lifecycle restart, not a failure.
 
+**The table above is implemented as data**, in `mcp-server/src/error-contract.ts`:
+one row per kind (tier, `retryable`, meaning, and - for the two tiers that
+outlive a call - the observation that ends it), plus the boundary unions
+derived from it, so a union and the table cannot drift. The review gates run
+as tests (`test/unit/error-contract.test.ts`). Settled while implementing it:
+
+- Kinds the tier table did not name, added under the tiers it defines:
+  `snapshot-unavailable`, `quick-sync-failed`, `cloud-state-unreadable`,
+  `backup-failed`, `nothing-bound`, `unknown-write` and `unknown` are op
+  refusals; `no-open-profile` and `candidate-not-ground-truthed` join the
+  write gate (they persist until the app's own state changes), while
+  `auto-init-pull-failed` / `auto-init-materialize-failed` are the
+  "bootstrap-attempt failures" the op-refusal row already anticipated.
+- **Infra kinds forward under their own names.** OutlineService does not
+  re-wrap a repository refusal into one opaque `write-refused`: a caller
+  reading `binding-conflict` gets the remedy that ends it, where a wrapper
+  would have buried it a level down. The service union is therefore its own
+  domain kinds plus the repository's.
+- `snapshot()` narrows to a single kind rather than the whole repository
+  union, so a read service cannot be handed write-path kinds it can never see.
+- The tool layer's prose form is `detail — remedy [kind]`: said once, with the
+  kind left machine-readable for a caller that would rather branch than parse.
+- **Every kind declares an ending**: an `endedBy` observation for the tiers
+  that outlive a call, or a standing `remedy` for the ones the caller ends
+  itself. A gate enforces it, because the alternative a fallback chain reaches
+  for is restating the kind's meaning as advice.
+- The wire `type` and the problem's extension members survive the repository
+  seam onto the failure (`wireType`, `fields`), not just the HTTP client:
+  "degraded, never lost" is only true if the degraded form reaches the caller.
+- `lock-timeout` has no kind of its own. A state-root lock that times out is
+  reported as whichever boundary kind the caller can act on
+  (`cloud-state-unreadable`, `snapshot-unavailable`); a separate kind would
+  name a distinction no caller can do anything different about.
+- `binding-mismatch` is declared in the write-gate tier but not yet produced:
+  today the mismatch is reported by `cloud_status` and no write is gated on
+  it. The gate lands with the mismatch work, and the row is what it will
+  refuse with.
+- The Event-tier kinds (`injection-skipped`, `queue-redelivery`,
+  `version-skew-attach`, capture outcomes, write outcomes) are journal and log
+  observations, not returned values — declared here so the tier is complete
+  and each one's ending is stated, not so a boundary can return them.
+
 `write-superseded` (from the live conflict rounds): the user answered MLO's
 conflict dialog local-wins, so their row overwrote the injected write for the
 same UID. Advisory tier, no retry - re-injecting would just re-raise the

@@ -7,6 +7,7 @@ import type { OutlineService } from "../services/outline.js";
 import type { NextActionsService } from "../services/next-actions.js";
 import type { ReviewService } from "../services/review.js";
 import type { AdminService } from "../services/admin.js";
+import { failureText, type Failure } from "../result.js";
 
 /**
  * Required services only ([spec section 1](../../../docs/adr/0005-target-architecture-spec.md)):
@@ -105,6 +106,16 @@ export function textResult(text: string, structuredContent?: Record<string, unkn
 
 export function errorResult(message: string): CallToolResult {
   return { isError: true, content: [{ type: "text", text: message }] };
+}
+
+/**
+ * The one place a typed failure becomes prose (spec section 6). Every layer
+ * below carries the refusal as a value; here it is said once, with the remedy
+ * attached and the kind named so a caller can branch on it without parsing
+ * the sentence.
+ */
+export function failureResult(failure: Failure): CallToolResult {
+  return errorResult(`${failureText(failure)} [${failure.kind}]`);
 }
 
 /** Wrap a tool handler so failures become isError results with actionable text. */
