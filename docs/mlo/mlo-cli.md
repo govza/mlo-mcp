@@ -6,8 +6,17 @@
 
 ```
 mlo.exe [<FileToOpen>] [-QuickSync] [-task={GUID}] [-AddSubtask="<Caption>"]
-        [-Parse] [-saveXML="<File>"] [-saveML="<File>"] [-console] [-?]
+        [-Parse] [-saveXML="<File>"] [-saveML="<File>"] [-saveOPML="<File>"]
+        [-zoom] [-url=<mlo-url>] [-nocloud] [-console] [-?]
 ```
+
+**The verb list is closed.** The vendor's shipped help (`mlo.chm`) and the
+binary's own IPC dispatcher (`ProcessMSG*`) enumerate every verb; there is no
+update, complete, or delete verb - `-AddSubtask` is the only mutating one.
+The extras beyond the original syntax line: `-zoom` (zoom the GUI to the
+`-task` target), `-saveOPML` (OPML export, same never-overwrite rule as
+`-saveXML`/`-saveML`), `-url` (open an `mlo:`-scheme link), `-nocloud`
+(suppress cloud features for the launch); none of them mutate task data.
 
 ### Exit codes (ERRORLEVEL)
 
@@ -27,6 +36,8 @@ mlo.exe [<FileToOpen>] [-QuickSync] [-task={GUID}] [-AddSubtask="<Caption>"]
    - `-AddSubtask` without `-task` is applied to **whatever row the user has selected** ("Add subtask to the selected task") — placement is nondeterministic while the GUI is open.
    - `-task={GUID}` **zooms the user's GUI** to that task, and the zoom persists — later exports return only the zoomed subtree.
    - An invalid `-task` GUID (e.g. the root's GUID) pops a modal Warning dialog in the GUI and the CLI process never exits.
+   - **Always pass the explicit `<FileToOpen>`.** A pathless `mlo.exe -AddSubtask="..." -console` against an open GUI can **silently no-op with exit 0** (reproduced twice after an app restart; consistent with the forward routing against the registry's `LastDBFile`, which is stale after an in-app profile switch — see ADR-0004). The explicit path fixed it both times.
+   - **Any file argument that isn't the open file bypasses forwarding.** A malformed invocation whose caption parses as `<FileToOpen>` (e.g. a missing `=`) launches a **second MLO instance** on the nonexistent file ("File not found") instead of forwarding to the running one.
 4. **Concurrent invocations race the `.ml` file** ("file is locked by another process" dialog + hang). Serialize all invocations — across processes, not just within one.
 5. Headless (no GUI running) everything is clean: `-AddSubtask` targets the top level, `-task={GUID}` works without side effects, no zoom persistence.
 
@@ -35,7 +46,7 @@ mlo.exe [<FileToOpen>] [-QuickSync] [-task={GUID}] [-AddSubtask="<Caption>"]
 - **Export**: `mlo.exe <file.ml> -saveXML="out.xml" -console` → full task tree + app state (see [xml-format.md](xml-format.md)). With `-task={GUID}`: exports only that subtree.
 - **Import/convert**: `mlo.exe <file.xml> -saveML="out.ml" -console` → builds a `.ml` from an XML document. The XML→ML→XML round-trip is **lossless** for task data (verified byte-for-byte modulo a profile timestamp) — this is what makes file-replacement writes viable.
 - **Add**: `mlo.exe <file.ml> [-task={parentGUID}] -AddSubtask="<caption>" [-Parse] -console`.
-- **Sync**: `mlo.exe <file.ml> -QuickSync -console` — runs the profile's configured cloud/Wi-Fi sync.
+- **Sync**: `mlo.exe <file.ml> -QuickSync -console` — runs the profile's configured cloud/Wi-Fi sync. **Asynchronous**: the invocation returns immediately (exit 0) and MLO runs the session on its own cadence — observed 40–80 s later, sometimes longer. Sharper still: **it opens no sync session at all when MLO believes nothing changed** (no local modifications and the background `GetFileTS` poll returning the stored stamp); a manual GUI sync always opens a full session. Do not treat `-QuickSync` returning as evidence a session ran.
 
 ## The `-Parse` rapid-entry parser
 

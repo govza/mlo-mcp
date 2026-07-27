@@ -86,29 +86,41 @@ must not collapse them into one counter.
 | Task/context/flag UID | Object, created by a client | Braced GUID | Stable identity and foreign keys |
 | `dataFileUID` | Cloud file | GUID-shaped text | Selects the remote logical database |
 | `sessionID` | One sync attempt | GUID-shaped text | Groups Get/Apply/Release calls and retries |
-| Local modification stamp | One local `.ml` profile, assigned by MLO | Signed integer text when sent as `lastSyncTimestamp` | Selects local objects changed since the last local baseline |
+| Local modification stamp | One local `.ml` profile, assigned by MLO | Not sent on the wire (appears only in MLO's own sync log) | Selects local objects changed since the last local baseline |
 | Remote Cloud version | One Cloud file, assigned by the server | Signed integer text in `newerThan`, `maxVersion`, and `newServerTimeStamp` | Selects and orders remote changes |
 | User-facing dates | Task properties | Local ISO text or field-specific numeric values | Scheduling, review, recurrence, reminders |
 
 ### Local and remote stamps are separate namespaces
 
-This is the most important correction to the earlier notes.
+Local modification stamps and remote Cloud versions are independent counters.
+In one logged session the profile held a local modification stamp of `24838`
+and a remote Cloud version of `15515`; the two advance independently and are
+never interchangeable.
 
-In one logged session the profile started with a local modification stamp of
-`24838` and a remote Cloud version of `15515`. MLO exported local modifications
-newer than `24838`, sent that value with the upload, and the server returned the
-new remote version `15516`. The server therefore accepts a
-`lastSyncTimestamp` that can be numerically greater than its remote version.
+**Correction (captured, 2026-07-27): the local stamp never appears on the
+wire.** An earlier revision of this document inferred from the log line
+"Sending modifications ... newer than (24838)" that MLO sends the local
+baseline as `ApplyModificationsBytesEx.lastSyncTimestamp`. Paired log/wire
+captures across three consecutive live sessions disprove that: MLO's log said
+"Sending modifications to MLO Cloud newer than (273)" while the wire's Apply
+carried `lastSyncTimestamp=143` - the profile's **stored remote Cloud
+version**. A field census rules out a misreading: the Apply request's fields
+are exactly `loginBytes, passwordBytes, additionalParams, sessionID,
+encoding, dataFileUID, lastSyncTimestamp, data`, and `lastSyncTimestamp` is
+its only numeric field.
 
 Consequences:
 
 - `GetModificationsBytesEx.newerThan` is a **remote Cloud version**.
 - `GetModificationsBytesEx.maxVersion` is a **remote Cloud version**.
-- `ApplyModificationsBytesEx.lastSyncTimestamp` is a **local MLO modification
-  baseline**, not an optimistic-concurrency server cursor.
+- `ApplyModificationsBytesEx.lastSyncTimestamp` carries the **remote Cloud
+  version** the profile has accepted (the same cursor family as `newerThan`),
+  not the local selection baseline. The local baseline exists only inside
+  MLO and its log.
 - `ApplyModificationsBytesEx.newServerTimeStamp` is a **remote Cloud version**.
-- A server must not reject an upload merely because `lastSyncTimestamp` is
-  greater than its current remote high-water version.
+- A replacement server must not interpret `lastSyncTimestamp` as a local
+  stamp, and must not use it as an optimistic-concurrency gate it was never
+  observed to be; its vendor-side use beyond bookkeeping remains uncaptured.
 - Neither counter is a wall-clock timestamp, Delphi `TDateTime`, filesystem
   time, or JavaScript millisecond time.
 
@@ -234,10 +246,26 @@ Semantics:
 - With no newer changes, the logged client expects the returned remote version
   not to advance. Captured response shapes still included `data`; it may be an
   empty section skeleton.
-- A higher `maxVersion` makes MLO process the returned payload as remote
-  modifications.
+- **The returned stamp is a hard gate (logged, 210/210 sessions, zero
+  counterexamples).** MLO's remote-side decision is two-stage: "Data received
+  ... Remote modif. stamp: N" is followed by "Modifications found on MLO
+  Cloud." iff N exceeds the profile's stored remote stamp, otherwise "No
+  modifications on MLO Cloud." - and **the payload is never parsed unless the
+  stamp advanced**. Appending rows to a response whose `maxVersion` does not
+  advance cannot deliver anything. (This also settles the echo question: MLO
+  does not suppress its own echoed uploads by origin - only by the stamp
+  gate. When a payload does clear the gate, imported records receive fresh
+  local modification stamps and are re-exported by the next upload; one
+  logged session re-uploaded the 165 rows it had just imported.)
+- **A merged extra row is applied (captured, live).** A complete row injected
+  into a forwarded Get alongside an advanced `maxVersion` is applied into the
+  profile as ordinary remote data, appears in the GUI immediately, is stamped
+  as a fresh local edit, and rides out in MLO's own next Apply. Verified for
+  add, update, complete, and tombstone rows.
 - Remote versions need only be monotonic. One controlled deletion advanced the
-  observed server version by two, so clients must not require contiguity.
+  observed server version by two, so clients must not require contiguity. A
+  second live instance: one tombstone Apply consumed two remote versions
+  (145 -> 146).
 
 ### `ApplyModificationsBytesEx`
 
@@ -270,14 +298,15 @@ Captured success response fields:
 
 Semantics:
 
-- `lastSyncTimestamp` is the local selection baseline reported in the MLO log
-  as “Sending modifications ... newer than (...)”. It is not the remote cursor
-  returned by the previous Get.
+- `lastSyncTimestamp` carries the profile's stored **remote Cloud version**,
+  not the local selection baseline the log reports as "Sending modifications
+  ... newer than (...)" - see the paired log/wire evidence under
+  [Local and remote stamps are separate namespaces](#local-and-remote-stamps-are-separate-namespaces).
 - `data` is a ZIP envelope containing complete changed records and tombstones.
 - On success the service assigns and returns a new remote Cloud version.
 - The captured server can assign a version that is not `previous + 1`.
 - The exact vendor use of `lastSyncTimestamp` beyond diagnostics/session
-  bookkeeping is not yet established. It must be accepted as an opaque local
+  bookkeeping is not yet established. It must be accepted as an opaque
   64-bit value by a replacement server.
 
 The client uses boolean `...Result` fields and `errorMessage` names.
@@ -314,6 +343,31 @@ shows a three-second retry and reuse of an unfinished session ID. A replacement
 server should therefore make Release idempotent and should design Apply replay
 handling deliberately; vendor replay/idempotency keys have not yet been
 isolated.
+
+Two captured failure behaviors around session persistence:
+
+- **A transport-failed Apply does not persist advanced stamps.** Killing the
+  Apply's socket mid-session made MLO log `ABORTED` + `Error receiving data:
+  (12152)` + `Retrying in 3 sec...`; the retry re-read the **unchanged**
+  stamps, re-exported the same modifications, and the vendor accepted them
+  once - no duplicate, no stranded data.
+- **A session that applied remote data and then aborted still persisted BOTH
+  advanced stamps** (logged: Remote 15518 -> 15521 and Local 24879 -> 24884
+  across the abort, with the next session starting from those values). So
+  stamp persistence depends on how far the session got, not on whether it
+  completed.
+
+### `GetFileTS`
+
+A fourth SOAP operation, absent from earlier revisions of this document:
+`GetFileTS` returns the Cloud file's current remote version. Captured live,
+it is a **background poll, not a session gate** - the desktop calls it on a
+~90-second cadence outside Get/Apply/Release sessions, and an answer that
+does not advance does not prevent MLO from opening a full session later (one
+capture had `GetFileTS` return the stored stamp and a full session open 11
+seconds afterwards). A replacement or proxying server must decide to answer
+it consistently with what it presents on `GetModificationsBytesEx`, since it
+is a second surface that reveals the remote version.
 
 ## Synchronization state machine
 
@@ -358,10 +412,13 @@ The detailed log confirms these phases:
 8. release the session.
 
 After an upload, the client performs another Get and processes the newly
-assigned remote version. The evidence does not establish that the vendor
-service filters out changes originating from the same client. A replacement
-server must not assume “never echo a client's own upload” is part of the vendor
-protocol merely because that policy is convenient for an internal log.
+assigned remote version. The client itself has **no origin/echo
+suppression**: whether a received payload is imported is decided purely by
+the stamp gate, imported records receive fresh local modification stamps,
+and one logged session re-uploaded the very rows it had just imported. A
+replacement server must not assume "never echo a client's own upload" is
+part of the vendor protocol - an echoed payload that advances the stamp will
+be re-imported and re-exported.
 
 ### Sync directions and exclusions
 
@@ -403,6 +460,18 @@ This supports the following model:
 - the client tracks local per-object modification stamps in `.ml`;
 - complete records give the client both versions to compare;
 - resolution produces another local logical update, which is uploaded normally.
+
+**Captured (live conflict rounds, 2026-07-27):** the "Resolve Sync Conflict"
+window opens **mid-session, between the Get and the Apply**, and holds the
+sync session open until a human answers - the vendor session tolerated at
+least 47 seconds of that and completed cleanly after OK. The dialog is not
+app-modal (the main window stays usable behind it), but nothing queued behind
+the session delivers until it is answered. Each conflicted item has an Action
+column defaulting to `<- Replace` (remote wins); toggled to keep Local, MLO
+uploads its **own local row for the same UID** - so a remote-side writer
+watching the Apply sees the conflicted UID go out and cannot distinguish
+"my change survived" from "the user's version replaced it" without comparing
+row content.
 
 The exact automatic winner rules and server behavior for two simultaneous
 sessions remain unverified.
@@ -955,7 +1024,9 @@ A server intended to replace MLO Cloud should satisfy these invariants:
 1. Partition state by `dataFileUID`; never mix profiles.
 2. Treat `sessionID` as opaque and tolerate Release/retry patterns.
 3. Maintain a monotonic signed 64-bit **remote** version per Cloud file.
-4. Do not treat Apply's `lastSyncTimestamp` as that remote version.
+4. Treat Apply's `lastSyncTimestamp` as the client's stored remote cursor
+   echoed back; never use it to assign the new version, and never gate an
+   upload on it.
 5. Retain complete latest records by stable UID plus tombstone history or an
    equivalent versioned change log.
 6. Return all logical changes after `newerThan`, with a `maxVersion` that
@@ -999,10 +1070,7 @@ The following questions should remain explicit until captured:
 - exact SOAP/WSDL scalar types and live values for `encoding` and
   `additionalParams`;
 - vendor failure bodies versus SOAP Fault/HTTP status behavior;
-- whether uploads are echoed byte-for-byte to the same client on its next Get;
 - replay/idempotency behavior for a repeated Apply in one `sessionID`;
-- whether the vendor accepts an extra complete row merged into a client's
-  outbound Apply, and whether the follow-up Get makes MLO apply it locally;
 - concurrent two-client conflict cases and server transaction boundaries;
 - Config update/merge behavior after initial sync;
 - parent deletion cascade behavior;
@@ -1014,10 +1082,11 @@ The following questions should remain explicit until captured:
 - maximum payload size, chunking, and any multi-entry envelope variants;
 - why some server operations consume more than one remote version.
 
-The echo, replay, and merged-row experiments are the gate for the MCP
-endpoint's upstream write-through stage ([mcp-cloud](../mcp-cloud.md)): until
-they are captured on a disposable vendor profile, MCP mutations stay disabled
-for upstream-bound profiles.
+The echo and merged-row experiments were captured live in 2026-07 (see the
+stamp-gate and merged-row bullets under `GetModificationsBytesEx`); together
+with [ADR-0005](../adr/0005-layered-rearchitecture-local-landing-writes.md)
+they retire the upstream write-through stage entirely - MCP writes land
+locally through injection and MLO remains the sole vendor writer.
 
-Until those are resolved, preserve opaque data and prefer a rejected operation
-over a lossy partial-record rewrite.
+Until the remaining questions are resolved, preserve opaque data and prefer a
+rejected operation over a lossy partial-record rewrite.
