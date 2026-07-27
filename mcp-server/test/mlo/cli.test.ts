@@ -2,22 +2,24 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { mloInstalled, assertGuiClosed, makeTestEnv, type TestEnv } from "./helpers.js";
-import { exportXml, readDataFile } from "../../src/mlo-cli.js";
+import { SystemMloCli } from "../../src/repo/mlo-cli.js";
 import { parseMloXml } from "../../src/xml.js";
 import { buildTaskTree, flatten } from "../../src/task-tree.js";
 import { annotateGuids } from "../../src/guids.js";
 
 describe.skipIf(!mloInstalled)("mlo.exe integration", () => {
   let env: TestEnv;
+  let cli: SystemMloCli;
 
   beforeAll(() => {
     assertGuiClosed();
     env = makeTestEnv();
+    cli = new SystemMloCli(env.config);
   });
   afterAll(() => env?.cleanup());
 
   it("exports a parseable tree with the demo tasks", async () => {
-    const xml = await exportXml(env.config);
+    const xml = await cli.exportXml();
     const tasks = flatten(buildTaskTree(parseMloXml(xml)));
     expect(tasks.length).toBeGreaterThan(50);
     expect(tasks.some((t) => t.Caption === "Business and Career")).toBe(true);
@@ -40,9 +42,9 @@ describe.skipIf(!mloInstalled)("mlo.exe integration", () => {
   });
 
   it("recovers GUIDs for most tasks, and never the same one twice (E4)", async () => {
-    const xml = await exportXml(env.config);
+    const xml = await cli.exportXml();
     const tasks = buildTaskTree(parseMloXml(xml));
-    const count = annotateGuids(await readDataFile(env.config), tasks);
+    const count = annotateGuids(await cli.readDataFile(), tasks);
     const all = flatten(tasks);
 
     // Coverage is state-dependent and deliberately not maximised: a task

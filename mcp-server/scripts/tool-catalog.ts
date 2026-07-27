@@ -5,7 +5,7 @@
  */
 import { z } from "zod";
 import { allTools } from "../src/tools/registry.js";
-import type { MloTool } from "../src/tools/shared.js";
+import type { MloTool } from "../src/tools/contract.js";
 
 export type ToolKind = "read" | "write" | "destructive";
 

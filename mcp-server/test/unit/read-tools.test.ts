@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import { collectVisible, searchTasks } from "../../src/task-tree.js";
 import { listTasksTool } from "../../src/tools/list-tasks.js";
 import { searchTasksTool } from "../../src/tools/search-tasks.js";
-import type { ToolContext } from "../../src/tools/shared.js";
+import type { ToolContext } from "../../src/tools/contract.js";
+import { OutlineService } from "../../src/services/outline.js";
+import { FakeMloRepository } from "../fakes/fake-mlo-repository.js";
 import type { TaskNode } from "../../src/types.js";
 
 function task(id: string, caption: string, extra: Partial<TaskNode> = {}): TaskNode {
@@ -30,7 +32,9 @@ function fixture(): TaskNode[] {
 }
 
 function fakeCtx(tasks: TaskNode[]): ToolContext {
-  return { config: {}, store: { getSnapshot: async () => ({ tasks }) } } as unknown as ToolContext;
+  const repo = new FakeMloRepository();
+  repo.tasks = tasks;
+  return { config: {}, outline: new OutlineService(repo) } as unknown as ToolContext;
 }
 
 describe("collectVisible", () => {

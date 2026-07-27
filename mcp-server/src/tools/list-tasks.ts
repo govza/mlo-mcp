@@ -1,14 +1,7 @@
 import { z } from "zod";
-import { findById, collectVisible, renderVisible } from "../task-tree.js";
-import {
-  defineTool,
-  textResult,
-  errorResult,
-  toSummary,
-  TaskSummarySchema,
-  DEFAULT_RESULT_LIMIT,
-  PATH_ID_CAVEAT,
-} from "./shared.js";
+import { renderVisible } from "../task-tree.js";
+import { TaskSummarySchema, toSummary } from "../task-summary.js";
+import { defineTool, textResult, errorResult, DEFAULT_RESULT_LIMIT, PATH_ID_CAVEAT } from "./contract.js";
 
 export const listTasksTool = defineTool({
   name: "list_tasks",
@@ -36,19 +29,13 @@ export const listTasksTool = defineTool({
   },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   async execute({ format, includeCompleted, parentId, maxDepth, limit }, ctx) {
-    const snap = await ctx.store.getSnapshot();
-    let tasks = snap.tasks;
-    if (parentId) {
-      const parent = findById(snap.tasks, parentId);
-      if (!parent) return errorResult(`no task with id "${parentId}" — call list_tasks or search_tasks first`);
-      tasks = parent.Children;
-    }
-    const entries = collectVisible(tasks, { includeCompleted, maxDepth });
-    const shown = entries.slice(0, limit ?? DEFAULT_RESULT_LIMIT);
+    const listing = await ctx.outline.list({ parentId, includeCompleted, maxDepth });
+    if (!listing) return errorResult(`no task with id "${parentId}" — call list_tasks or search_tasks first`);
+    const shown = listing.entries.slice(0, limit ?? DEFAULT_RESULT_LIMIT);
     let text = renderVisible(shown, format);
-    if (shown.length < entries.length) {
-      text += `\n… showing ${shown.length} of ${entries.length} tasks — narrow with parentId/maxDepth or raise limit`;
+    if (shown.length < listing.total) {
+      text += `\n… showing ${shown.length} of ${listing.total} tasks — narrow with parentId/maxDepth or raise limit`;
     }
-    return textResult(text, { tasks: shown.map((e) => toSummary(e.task)), total: entries.length });
+    return textResult(text, { tasks: shown.map((e) => toSummary(e.task)), total: listing.total });
   },
 });

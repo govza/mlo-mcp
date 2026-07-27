@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { allTools } from "./tools/registry.js";
-import { NOTE_DESCRIPTION, registerTool, type ToolContext } from "./tools/shared.js";
+import { NOTE_DESCRIPTION, registerTool, type ToolContext } from "./tools/contract.js";
 import { SERVER_INFO } from "./version.js";
 
 /** Connection-time usage guide shown to the LLM (MCP `instructions`). */

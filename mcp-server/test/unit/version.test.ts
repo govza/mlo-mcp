@@ -4,7 +4,7 @@ import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createMcpServer } from "../../src/server.js";
-import type { ToolContext } from "../../src/tools/shared.js";
+import type { ToolContext } from "../../src/tools/contract.js";
 
 /** Compare the sources against each other — never against a restated literal. */
 function manifestVersion(...segments: string[]): string {

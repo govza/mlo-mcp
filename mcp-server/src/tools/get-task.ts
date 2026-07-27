@@ -1,14 +1,6 @@
 import { z } from "zod";
-import { findById, flatten } from "../task-tree.js";
-import {
-  defineTool,
-  textResult,
-  errorResult,
-  toSummary,
-  TaskSummarySchema,
-  PATH_ID_CAVEAT,
-} from "./shared.js";
-import type { TaskNode } from "../types.js";
+import { TaskSummarySchema, toSummary } from "../task-summary.js";
+import { defineTool, textResult, errorResult, PATH_ID_CAVEAT } from "./contract.js";
 
 export const getTaskTool = defineTool({
   name: "get_task",
@@ -37,25 +29,9 @@ export const getTaskTool = defineTool({
   },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   async execute({ id }, ctx) {
-    const snap = await ctx.store.getSnapshot();
-    const t = findById(snap.tasks, id);
-    if (!t) return errorResult(`no task with id "${id}" — ids shift when the tree changes; re-run list_tasks`);
-    // GUIDs come from the binary annotation on the export snapshot; the
-    // projection-backed fallback died with the delta log (ADR-0005). Identity
-    // gets one owner again in the identity service.
-    const all = flatten(snap.tasks);
-    const resolvedUid = t.Guid?.toUpperCase();
-    const byGuid = new Map<string, TaskNode>();
-    for (const task of all) {
-      if (task.Guid) byGuid.set(task.Guid.toUpperCase(), task);
-    }
-    const dependsOn = t.DependsOn.map((uid) => {
-      const dep = byGuid.get(uid.toUpperCase());
-      return { id: dep?.id, Caption: dep?.Caption, uid };
-    });
-    const dependedOnBy = all
-      .filter((x) => resolvedUid && x.DependsOn.map((uid) => uid.toUpperCase()).includes(resolvedUid))
-      .map((x) => ({ id: x.id, Caption: x.Caption }));
+    const detail = await ctx.outline.get(id);
+    if (!detail) return errorResult(`no task with id "${id}" — ids shift when the tree changes; re-run list_tasks`);
+    const { task: t, uid: resolvedUid, dependsOn, dependedOnBy } = detail;
     const task = {
       ...toSummary(t),
       Guid: resolvedUid,

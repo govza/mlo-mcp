@@ -1,23 +1,26 @@
 import { z } from "zod";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { MloConfig, TaskNode } from "../types.js";
-import type { MloStore } from "../store.js";
+import type { MloConfig } from "../types.js";
 import { log } from "../log.js";
-import type { CloudGateway } from "../cloud/gateway.js";
-import type { ResidentEndpoint } from "../cloud/endpoint.js";
+import type { OutlineService } from "../services/outline.js";
+import type { NextActionsService } from "../services/next-actions.js";
+import type { ReviewService } from "../services/review.js";
+import type { AdminService } from "../services/admin.js";
 
+/**
+ * Required services only ([spec section 1](../../../docs/adr/0005-target-architecture-spec.md)):
+ * no repositories, no optional fields — the historic `ctx.cloud`-absent silent
+ * downgrade is unrepresentable. Repositories are wired into services once, at
+ * the composition root.
+ */
 export interface ToolContext {
+  outline: OutlineService;
+  nextActions: NextActionsService;
+  review: ReviewService;
+  admin: AdminService;
   config: MloConfig;
-  store: MloStore;
-  /** Cloud-plane state (bindings, sightings); absent only in old test fixtures. */
-  cloud?: CloudGateway;
-  /**
-   * The resident endpoint this session is attached to. Every session attaches
-   * and none ever listens ([ADR-0003](../../../docs/adr/0003-resident-endpoint.md)).
-   * Absent only in old test fixtures.
-   */
-  endpoint?: ResidentEndpoint;
+  log: (message: string) => void;
 }
 
 /** All four hints are mandatory so every tool states its contract explicitly. */
@@ -96,42 +99,6 @@ export const PATH_ID_CAVEAT = "ids shift when the tree changes";
 export const NOTE_DESCRIPTION =
   "Free-form text on the task — context that does not fit in the caption, such as where a captured idea came from";
 
-/** Machine-readable task summary used in structuredContent across tools. */
-export const TaskSummaryShape = {
-  id: z.string().describe('Path-based id ("1.2.3"); stable only until the tree changes'),
-  Guid: z.string().optional().describe("Internal MLO GUID (stable), when recoverable"),
-  Caption: z.string(),
-  completed: z.boolean(),
-  IsProject: z.boolean().optional(),
-  Starred: z.boolean().optional(),
-  DueDateTime: z.string().optional(),
-  StartDateTime: z.string().optional(),
-  Importance: z.number().optional().describe("0–200; 100 = normal (omitted in MLO's XML); -iN entry maps to (N-1)*50"),
-  Flag: z.string().optional(),
-  Places: z.array(z.string()).describe("Contexts, e.g. @Office"),
-  parentPath: z.string().describe("Captions of ancestors joined with ' > '"),
-};
-
-export const TaskSummarySchema = z.object(TaskSummaryShape);
-export type TaskSummary = z.infer<typeof TaskSummarySchema>;
-
-export function toSummary(t: TaskNode): TaskSummary {
-  return {
-    id: t.id,
-    Guid: t.Guid,
-    Caption: t.Caption,
-    completed: Boolean(t.CompletionDateTime),
-    IsProject: t.IsProject || undefined,
-    Starred: t.Starred || undefined,
-    DueDateTime: t.DueDateTime,
-    StartDateTime: t.StartDateTime,
-    Importance: t.Importance,
-    Flag: t.Flag,
-    Places: t.Places,
-    parentPath: t.Path.slice(0, -1).join(" > "),
-  };
-}
-
 export function textResult(text: string, structuredContent?: Record<string, unknown>): CallToolResult {
   return { content: [{ type: "text", text }], ...(structuredContent ? { structuredContent } : {}) };
 }
@@ -154,11 +121,4 @@ export function guard<A extends unknown[]>(
       return errorResult(`${name} failed: ${message}`);
     }
   };
-}
-
-/** Local time as MLO's ISO format (no timezone suffix): 2026-07-17T15:00:00 */
-export function nowIso(): string {
-  const d = new Date();
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }

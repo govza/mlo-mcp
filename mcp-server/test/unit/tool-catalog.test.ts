@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { catalog, renderDetail, renderList, toolInfo, type FieldInfo } from "../../scripts/tool-catalog.js";
 import { allTools } from "../../src/tools/registry.js";
-import { PATH_ID_CAVEAT } from "../../src/tools/shared.js";
+import { PATH_ID_CAVEAT } from "../../src/tools/contract.js";
 import { getTaskTool } from "../../src/tools/get-task.js";
 import { syncTool } from "../../src/tools/sync.js";
 

@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { quickSync } from "../mlo-cli.js";
-import { defineTool, textResult } from "./shared.js";
+import { defineTool, textResult } from "./contract.js";
 
 export const syncTool = defineTool({
   name: "sync",
@@ -11,8 +10,7 @@ export const syncTool = defineTool({
   // openWorldHint: QuickSync talks to the MLO cloud / Wi-Fi sync endpoint.
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   async execute(_args, ctx) {
-    await quickSync(ctx.config);
-    ctx.store.invalidate();
+    await ctx.admin.quickSync();
     return textResult("QuickSync finished", { ok: true });
   },
 });

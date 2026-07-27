@@ -1,7 +1,7 @@
-import { execFile, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { MloConfig } from "./types.js";
+import type { MloConfig } from "../types.js";
 
 /** ERRORLEVEL values documented by mlo.exe -? */
 const EXIT_MESSAGES: Record<number, string> = {
@@ -20,6 +20,27 @@ export class MloError extends Error {
     this.name = "MloError";
   }
 }
+
+/**
+ * The named driver seam over mlo.exe ([spec section 4](../../../docs/adr/0005-target-architecture-spec.md)):
+ * constructor-injected into the MloRepository implementation and invisible to
+ * every layer above it.
+ */
+export interface MloCli {
+  /** Export the full task tree to XML and return the XML text. */
+  exportXml(): Promise<string>;
+  /** Trigger MLO's QuickSync (cloud/Wi-Fi sync as configured in the profile). */
+  quickSync(): Promise<void>;
+  /** Read the raw .ml data file (for GUID extraction). */
+  readDataFile(): Promise<Buffer>;
+}
+
+/**
+ * The process seam inside the driver: spawn mlo.exe with an already-composed
+ * argument line and resolve on exit 0. `FakeMloCli` (test/fakes) simulates the
+ * app behind this signature, including both live CLI traps.
+ */
+export type MloExec = (exePath: string, args: string[], timeoutMs: number) => Promise<void>;
 
 /**
  * All mlo.exe invocations are serialized through a single promise-chain
@@ -91,6 +112,31 @@ export function withMloFileLock<T>(config: MloConfig, fn: () => Promise<T>): Pro
 }
 
 /**
+ * Compose an mlo.exe command line, enforcing the two live CLI traps
+ * (docs/mlo/mlo-cli.md):
+ *
+ * 1. **Always pass the explicit data-file path.** A pathless invocation
+ *    against an open GUI forwards against the registry's LastDBFile — stale
+ *    after an in-app profile switch — and can silently no-op with exit 0.
+ * 2. **Only the data file may be positional.** Any other bare argument parses
+ *    as `<FileToOpen>` (e.g. a caption after a missing `=`), bypassing
+ *    single-instance forwarding and launching a second MLO instance.
+ */
+export function mloArgs(dataFile: string, flags: string[]): string[] {
+  if (!dataFile) {
+    throw new MloError("refusing a pathless mlo.exe invocation: it can silently no-op against a stale registry profile");
+  }
+  for (const flag of flags) {
+    if (!flag.startsWith("-")) {
+      throw new MloError(
+        `refusing mlo.exe argument "${flag}": a bare argument parses as <FileToOpen> and spawns a second MLO instance`
+      );
+    }
+  }
+  return [dataFile, ...flags, "-console"];
+}
+
+/**
  * mlo.exe is a Delphi app: a literal quote inside a quoted argument must be
  * DOUBLED (""), not backslash-escaped (\") as Node's default Windows escaping
  * does — \" makes MLO misparse the command (it pops a "task not found" dialog
@@ -101,21 +147,21 @@ function delphiQuote(arg: string): string {
   return `"${arg.replaceAll('"', '""')}"`;
 }
 
-function execMlo(config: MloConfig, args: string[], timeoutMs: number): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(config.mloExePath, [...args, "-console"].map(delphiQuote), {
+const execMlo: MloExec = (exePath, args, timeoutMs) =>
+  new Promise((resolve, reject) => {
+    const child = spawn(exePath, args.map(delphiQuote), {
       timeout: timeoutMs,
       windowsHide: true,
       killSignal: "SIGKILL",
       windowsVerbatimArguments: true,
       // with verbatim arguments the exe path itself must be quoted in the
       // command line, or its spaces shift every parameter the child sees
-      argv0: delphiQuote(config.mloExePath),
+      argv0: delphiQuote(exePath),
       stdio: "ignore",
     });
     child.on("error", (err: NodeJS.ErrnoException) => {
       if (err.code === "ENOENT") {
-        reject(new MloError(`mlo.exe not found at "${config.mloExePath}". Set MLO_EXE_PATH to the correct location.`));
+        reject(new MloError(`mlo.exe not found at "${exePath}". Set MLO_EXE_PATH to the correct location.`));
       } else {
         reject(new MloError(`failed to run mlo.exe: ${err.message}`));
       }
@@ -136,52 +182,49 @@ function execMlo(config: MloConfig, args: string[], timeoutMs: number): Promise<
       }
     });
   });
-}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function ensureDataFile(config: MloConfig): Promise<void> {
-  try {
-    await fs.access(config.dataFile);
-  } catch {
-    throw new MloError(`MLO data file not found at "${config.dataFile}"`);
-  }
-}
-
 let exportCounter = 0;
 
-/**
- * Export the task tree to XML and return the XML text.
- * When `taskGuid` is given, only that subtree is exported (mlo.exe -task=… -saveXML=…).
- * WARNING: never pass `taskGuid` while the MLO GUI is running — it zooms the user's view.
- */
-export function exportXml(config: MloConfig, taskGuid?: string): Promise<string> {
-  return withMloFileLock(config, async () => {
-    await ensureDataFile(config);
-    await fs.mkdir(config.exportDir, { recursive: true });
-    const target = path.join(config.exportDir, `export-${process.pid}-${++exportCounter}.xml`);
-    await fs.rm(target, { force: true });
-    const args = [config.dataFile];
-    if (taskGuid) args.push(`-task=${taskGuid}`);
-    args.push(`-saveXML=${target}`);
+/** The real driver: spawns mlo.exe. The locks and the export counter stay module-level — process-wide serialization is the point. */
+export class SystemMloCli implements MloCli {
+  constructor(
+    private readonly config: MloConfig,
+    private readonly exec: MloExec = execMlo
+  ) {}
+
+  private async ensureDataFile(): Promise<void> {
     try {
-      await execMlo(config, args, 30_000);
-      return await fs.readFile(target, "utf8");
-    } finally {
-      await fs.rm(target, { force: true });
+      await fs.access(this.config.dataFile);
+    } catch {
+      throw new MloError(`MLO data file not found at "${this.config.dataFile}"`);
     }
-  });
-}
+  }
 
-/** Trigger MLO's QuickSync (cloud/Wi-Fi sync as configured in the profile). */
-export function quickSync(config: MloConfig): Promise<void> {
-  return withMloFileLock(config, async () => {
-    await ensureDataFile(config);
-    await execMlo(config, [config.dataFile, "-QuickSync"], 120_000);
-  });
-}
+  exportXml(): Promise<string> {
+    return withMloFileLock(this.config, async () => {
+      await this.ensureDataFile();
+      await fs.mkdir(this.config.exportDir, { recursive: true });
+      const target = path.join(this.config.exportDir, `export-${process.pid}-${++exportCounter}.xml`);
+      await fs.rm(target, { force: true });
+      try {
+        await this.exec(this.config.mloExePath, mloArgs(this.config.dataFile, [`-saveXML=${target}`]), 30_000);
+        return await fs.readFile(target, "utf8");
+      } finally {
+        await fs.rm(target, { force: true });
+      }
+    });
+  }
 
-/** Read the raw .ml data file (for GUID extraction). */
-export function readDataFile(config: MloConfig): Promise<Buffer> {
-  return fs.readFile(config.dataFile);
+  quickSync(): Promise<void> {
+    return withMloFileLock(this.config, async () => {
+      await this.ensureDataFile();
+      await this.exec(this.config.mloExePath, mloArgs(this.config.dataFile, ["-QuickSync"]), 120_000);
+    });
+  }
+
+  readDataFile(): Promise<Buffer> {
+    return fs.readFile(this.config.dataFile);
+  }
 }

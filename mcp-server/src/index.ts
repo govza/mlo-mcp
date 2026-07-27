@@ -4,8 +4,9 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { loadCloudConfig, loadConfig } from "./config.js";
 import { detectProfile } from "./profile-detect.js";
 import type { MloConfig } from "./types.js";
-import { isMloBusy } from "./mlo-cli.js";
-import { MloStore } from "./store.js";
+import { isMloBusy, SystemMloCli } from "./repo/mlo-cli.js";
+import { LocalMloRepository } from "./repo/local-mlo-repository.js";
+import { createToolContext } from "./context.js";
 import { log } from "./log.js";
 import { createMcpServer } from "./server.js";
 import { CloudGateway } from "./cloud/gateway.js";
@@ -19,7 +20,8 @@ async function main(): Promise<void> {
   if (process.argv.includes(RESIDENT_FLAG)) return serveResidentEndpoint();
 
   const config = loadConfig();
-  const store = new MloStore(config);
+  // The MloCli driver is wired here and nowhere else — above the repository it does not exist.
+  const repo = new LocalMloRepository(config, new SystemMloCli(config));
   const cloud = new CloudGateway({ stateRoot: config.cloudStateRoot });
   // Never a listener of its own: MLO's proxy points at this port permanently,
   // so a session that owned it would take the app's sync down when it closed.
@@ -29,7 +31,7 @@ async function main(): Promise<void> {
     port: config.cloudPort,
     spawn: residentSpawner(fileURLToPath(import.meta.url)),
   });
-  const ctx = { config, store, cloud, endpoint };
+  const ctx = createToolContext(config, repo, cloud, endpoint);
 
   const server = createMcpServer(ctx);
   await server.connect(new StdioServerTransport());

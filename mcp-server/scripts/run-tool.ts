@@ -9,7 +9,9 @@
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { loadConfig } from "../src/config.js";
-import { MloStore } from "../src/store.js";
+import { SystemMloCli } from "../src/repo/mlo-cli.js";
+import { LocalMloRepository } from "../src/repo/local-mlo-repository.js";
+import { createToolContext } from "../src/context.js";
 import { allTools } from "../src/tools/registry.js";
 import { CloudGateway } from "../src/cloud/gateway.js";
 import { ensureEndpoint, residentSpawner } from "../src/cloud/endpoint.js";
@@ -38,7 +40,7 @@ const endpoint = await ensureEndpoint({
   port: config.cloudPort,
   spawn: residentSpawner(fileURLToPath(new URL("../src/index.ts", import.meta.url))),
 });
-const ctx = { config, store: new MloStore(config), cloud, endpoint };
+const ctx = createToolContext(config, new LocalMloRepository(config, new SystemMloCli(config)), cloud, endpoint);
 const args = z.object(tool.inputSchema).parse(JSON.parse(json ?? "{}"));
 
 const result = await tool.execute(args, ctx);

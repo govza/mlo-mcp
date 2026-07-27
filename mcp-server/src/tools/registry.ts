@@ -1,4 +1,4 @@
-import type { MloTool } from "./shared.js";
+import type { MloTool } from "./contract.js";
 import { listTasksTool } from "./list-tasks.js";
 import { searchTasksTool } from "./search-tasks.js";
 import { getTaskTool } from "./get-task.js";
