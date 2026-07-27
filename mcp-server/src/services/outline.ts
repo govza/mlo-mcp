@@ -14,6 +14,7 @@ import {
   type MloRepository,
   type Snapshot,
   type WriteId,
+  type WriteStatus,
 } from "../repo/mlo-repository.js";
 import type { IdentityService, SnapshotResolver } from "./identity.js";
 import type { CapturedRow, RowCatalog, RowStore } from "../cloud/row-store.js";
@@ -83,6 +84,46 @@ export interface WriteReceipt {
 }
 
 export type OutlineWrite = ServiceResult<WriteReceipt, OutlineFailure>;
+
+/**
+ * Where one accept receipt stands (spec section 2). Five states, and for each
+ * one a sentence saying what it means for the caller plus, where anything can
+ * be done about it, the thing to do. The states themselves come from the write
+ * path; the words are this service's, because "what does superseded mean for
+ * me" is a domain question, not an infra one.
+ */
+export interface WriteProgress {
+  writeId: WriteId;
+  status: WriteStatus;
+  /** The task the write addressed, when the write path recorded one. */
+  uid?: string;
+  /** Present while still queued: when an undelivered write gives up. */
+  expiresAt?: string;
+  /** When the write resolved, for every state past `accepted`. */
+  at?: string;
+  detail: string;
+  remedy?: string;
+}
+
+/** One sentence per state, plus what ends it where anything can. */
+const PROGRESS_WORDS: Record<WriteStatus, { detail: string; remedy?: string }> = {
+  accepted: {
+    detail: "durably queued — it lands the next time MLO syncs through the endpoint",
+    remedy: "nothing to do; MLO syncs on its own within about 90 seconds, or run `sync` to hurry it",
+  },
+  delivered: { detail: "MLO applied this write to the profile" },
+  verified: { detail: "MLO applied this write and a fresh export confirmed it" },
+  expired: {
+    detail: "MLO did not sync before the write's TTL ran out, so it was never applied — the rows are in the dead-letter file",
+    remedy: "check MLO is running and syncing through the endpoint (`cloud_status`), then make the change again",
+  },
+  superseded: {
+    detail:
+      "MLO applied a different version of this task instead — a conflict the app resolved in favour of its own copy, " +
+      "so this write's content is gone",
+    remedy: "read the task again and re-apply the change on top of what MLO kept",
+  },
+};
 
 /**
  * One task to create; `key` links it to others in the same batch.
@@ -436,6 +477,28 @@ export class OutlineService {
       uids.push(normalizeGuid(node.Guid));
     }
     return this.commit(deltaRowsFromDocument(buildTaskDeleteDelta(uids)), uids);
+  }
+
+  /**
+   * Where an accept receipt stands. The one read on this service that is about
+   * a write rather than the outline: a receipt outlives the call that returned
+   * it, and the caller that holds one has nowhere else to ask.
+   */
+  async writeStatus(writeId: WriteId): Promise<ServiceResult<WriteProgress, OutlineFailure>> {
+    const state = await this.repo.status(writeId);
+    if (state.isErrored) return failed(state.failure);
+    const { detail, remedy } = PROGRESS_WORDS[state.value.status];
+    return ok({
+      writeId: state.value.writeId,
+      status: state.value.status,
+      ...(state.value.uid ? { uid: state.value.uid } : {}),
+      ...(state.value.expiresAt ? { expiresAt: state.value.expiresAt } : {}),
+      ...(state.value.at ? { at: state.value.at } : {}),
+      // The write path's own words come first when it has any: they name the
+      // task and the session, which no generic sentence can.
+      detail: state.value.detail ? `${state.value.detail} — ${detail}` : detail,
+      ...(remedy ? { remedy } : {}),
+    });
   }
 
   // -------------------------------------------------------- Organize verbs

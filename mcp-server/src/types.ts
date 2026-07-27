@@ -28,6 +28,14 @@ export interface TaskNode {
   Children: TaskNode[];
   Path: string[];
   Depth: number;
+  /**
+   * Set by the read-your-own-writes overlay (spec section 2): this node
+   * reflects a durably accepted write MLO has not applied yet, composed onto
+   * the export at read time. Never persisted, never present on export truth.
+   */
+  pending?: true;
+  /** The accept receipt behind `pending` — what `write_status` answers about. */
+  writeId?: string;
 }
 
 export interface MloConfig {

@@ -9,8 +9,10 @@ import {
   type Snapshot,
   type SnapshotFailure,
   type WriteId,
+  type WriteState,
   type WriteStatus,
 } from "../../src/repo/mlo-repository.js";
+import { overlayPendingWrites } from "../../src/repo/pending-overlay.js";
 import type { RepoFailureKind } from "../../src/error-contract.js";
 import { failed, ok, type ServiceResult } from "../../src/result.js";
 
@@ -29,7 +31,7 @@ export class FakeMloRepository implements MloRepository {
   writeTtlMs = 15 * 60_000;
   quickSyncs = 0;
 
-  private readonly writes = new Map<WriteId, { rows: DeltaRow[]; status: WriteStatus }>();
+  private readonly writes = new Map<WriteId, { rows: DeltaRow[]; status: WriteStatus; expiresAt: string }>();
   private nextWriteId = 1;
 
   /** Set to refuse the next and every following read with `snapshot-unavailable`. */
@@ -39,20 +41,31 @@ export class FakeMloRepository implements MloRepository {
 
   async snapshot(): Promise<ServiceResult<Snapshot, SnapshotFailure>> {
     if (this.exportFails) return failed(repoFailure("snapshot-unavailable", this.exportFails));
-    return ok({ doc: this.doc, tasks: this.tasks, at: Date.now() });
+    // The real overlay over the still-queued writes, so a test of
+    // read-your-own-writes exercises the composition rather than a stand-in.
+    // A write that transitioned out of `accepted` has left the queue.
+    const pending = [...this.writes]
+      .filter(([, write]) => write.status === "accepted")
+      .map(([writeId, write]) => ({ writeId, expiresAt: write.expiresAt, rows: write.rows }));
+    return ok({ doc: this.doc, tasks: overlayPendingWrites(this.tasks, pending), at: Date.now() });
   }
 
   async write(rows: DeltaRow[]): Promise<RepoResult<PendingWrite>> {
     if (this.writeRefuses) return failed(repoFailure(this.writeRefuses, `fake repository refuses ${this.writeRefuses}`));
     const writeId: WriteId = `w${this.nextWriteId++}`;
-    this.writes.set(writeId, { rows, status: "accepted" });
-    return ok({ writeId, expiresAt: new Date(Date.now() + this.writeTtlMs).toISOString() });
+    const expiresAt = new Date(Date.now() + this.writeTtlMs).toISOString();
+    this.writes.set(writeId, { rows, status: "accepted", expiresAt });
+    return ok({ writeId, expiresAt });
   }
 
-  async status(id: WriteId): Promise<RepoResult<WriteStatus>> {
+  async status(id: WriteId): Promise<RepoResult<WriteState>> {
     const entry = this.writes.get(id);
     if (!entry) return failed(repoFailure("unknown-write", `unknown writeId "${id}"`));
-    return ok(entry.status);
+    return ok({
+      writeId: id,
+      status: entry.status,
+      ...(entry.status === "accepted" ? { expiresAt: entry.expiresAt } : { at: new Date().toISOString() }),
+    });
   }
 
   async quickSync(): Promise<RepoResult<void>> {

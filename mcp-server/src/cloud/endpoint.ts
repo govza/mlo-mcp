@@ -42,6 +42,13 @@ export interface EndpointStatus {
   /** dataFileUIDs whose sync traffic the resident has seen since IT started. */
   contactUids: string[];
   stateRoot?: string;
+  /**
+   * Injected writes an MLO sync session has held unresolved long enough to read
+   * as stalled — most likely a conflict dialog waiting on the user (spec
+   * section 6). Absent — not empty — from an endpoint too old to report it, so
+   * `cloud_status` can stay silent instead of claiming nothing is stalled.
+   */
+  writesHeldOpen?: string[];
 }
 
 /** Injected so the unit suite never launches a real detached process. */
@@ -127,6 +134,9 @@ async function askStatus(host: string, port: number): Promise<Answer> {
       ...(typeof body.version === "string" ? { version: body.version } : {}),
       contactUids: Array.isArray(body.contactUids) ? body.contactUids.filter((uid): uid is string => typeof uid === "string") : [],
       ...(typeof body.stateRoot === "string" ? { stateRoot: body.stateRoot } : {}),
+      ...(Array.isArray(body.writesHeldOpen)
+        ? { writesHeldOpen: body.writesHeldOpen.filter((id): id is string => typeof id === "string") }
+        : {}),
     },
   };
 }

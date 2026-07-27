@@ -42,16 +42,18 @@ const endpoint = await ensureEndpoint({
   port: config.cloudPort,
   spawn,
 });
+const { rows, queue } = await cloud.boundStores(config.dataFile);
 const ctx = createToolContext(
   config,
   new LocalMloRepository(
     config,
     new SystemMloCli(config),
     new HttpResidentClient({ host: config.cloudHost, port: config.cloudPort, spawn }),
+    queue,
   ),
   cloud,
   endpoint,
-  await cloud.boundRowStore(config.dataFile),
+  rows,
 );
 const args = z.object(tool.inputSchema).parse(JSON.parse(json ?? "{}"));
 

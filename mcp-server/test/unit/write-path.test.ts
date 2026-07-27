@@ -301,6 +301,22 @@ describe("Get injection", () => {
     expect(await partition.queue.pending()).toHaveLength(1);
   });
 
+  it("reports a session held open over an injected write — the stall gauge, not every exchange", async () => {
+    const rig = await boundRig();
+    const accepted = await rig.writePath.accept(PROFILE, addRows());
+    if (accepted.kind !== "accepted") throw new Error("accept failed");
+    // Queued is not held open: nothing rides a session until a Get carries it.
+    expect(rig.writePath.writesHeldOpen()).toEqual([]);
+    await rig.writePath.enrichGetResponse(getFields("s1", "100"), vendorGetResult("100"));
+    // Nor is a healthy exchange still in flight — MLO applies within a second.
+    expect(rig.writePath.writesHeldOpen()).toEqual([]);
+
+    rig.clock.now = new Date(rig.clock.now.getTime() + 31_000);
+    expect(rig.writePath.writesHeldOpen()).toEqual([accepted.writeId]);
+    rig.writePath.observeRelease({ dataFileUID: UID, sessionID: "s1" });
+    expect(rig.writePath.writesHeldOpen()).toEqual([]);
+  });
+
   it("does not re-inject while the write rides an in-flight session; a Release frees it", async () => {
     const rig = await boundRig();
     await rig.writePath.accept(PROFILE, addRows());

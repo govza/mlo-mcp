@@ -37,8 +37,10 @@ Ubiquitous language for this repo. Terms are defined here in one or two lines; t
 - **Mirror** — the passive per-`dataFileUID` capture of validated vendor envelopes, ordered by vendor-assigned versions.
 - **Partition** — the per-`dataFileUID` state directory under the private state root; lifecycle `uninitialized → bootstrap-required → ready`.
 - **Bootstrap** — the one-time pull of the vendor cloud's complete history that binds a profile and enables writes (`cloud_bootstrap`).
-- **QuickSync** — `mlo.exe -QuickSync`; how queued deltas reach the running app. Every write follows **queue → QuickSync → verify**.
-- **Verified flag** — advisory: `verified: true` means a fresh post-QuickSync export confirmed the change; `false` means durably queued, not failed.
+- **QuickSync** — `mlo.exe -QuickSync`; a best-effort accelerator fired after every accept, never load-bearing. MLO's own ~90 s sync cadence is what delivers a write ([ADR-0005](docs/adr/0005-target-architecture-spec.md) §2).
+- **Accept receipt / `writeId`** — what a write tool answers with, at durable accept: the queue holds the rows, MLO has not applied them. Keyed by `writeId`, not uid, because two queued writes can share one uid.
+- **Write status** — the five states an accept receipt passes through, read back through `write_status`: `accepted | delivered | verified | expired | superseded`. `verified` is an advisory export re-align on top of `delivered`; it is no longer a boolean on a write's own answer.
+- **Read-your-own-writes overlay** — the pending queue composed onto a fresh export at read time, so a caller sees its own accepted writes immediately (`pending: true` + the `writeId`). Derived, never stored: when a write leaves the queue (or its TTL passes) the entry drops silently and reads revert to export truth — loudness lives in `write_status` / `cloud_status`.
 - **Tombstone** — a deletion record in a delta; `delete_task` tombstones a task and its whole subtree.
 - **Dead letter** — the raw text of a write the server refused, appended to a file in the state root so the words survive a failure that queued nothing. Never replayed automatically.
 

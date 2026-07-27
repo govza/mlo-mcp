@@ -20,6 +20,10 @@ function referenceFields(
   const found: Array<{ path: string; kind: ReferenceKind; description?: string }> = [];
   for (const field of fields) {
     const path = prefix ? `${prefix}.${field.name}` : field.name;
+    // `writeId` is an accept receipt, not a reference to a task: it addresses
+    // one write of the server's own, is opaque to the caller, and shifts with
+    // nothing.
+    if (field.name === "writeId") continue;
     const kind: ReferenceKind | undefined = /uids?$/i.test(field.name)
       ? "guid"
       : /ids?$/i.test(field.name)

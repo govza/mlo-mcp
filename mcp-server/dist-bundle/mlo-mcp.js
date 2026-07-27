@@ -50,8 +50,8 @@ var require_util = __commonJS({
         const allmatches = [];
         allmatches.startIndex = regex.lastIndex - match[0].length;
         const len = match.length;
-        for (let index = 0; index < len; index++) {
-          allmatches.push(match[index]);
+        for (let index2 = 0; index2 < len; index2++) {
+          allmatches.push(match[index2]);
         }
         matches.push(allmatches);
         match = regex.exec(string3);
@@ -72,11 +72,11 @@ var require_util = __commonJS({
       if (a) {
         const keys = Object.keys(a);
         const len = keys.length;
-        for (let i = 0; i < len; i++) {
+        for (let i2 = 0; i2 < len; i2++) {
           if (arrayMode === "strict") {
-            target[keys[i]] = [a[keys[i]]];
+            target[keys[i2]] = [a[keys[i2]]];
           } else {
-            target[keys[i]] = a[keys[i]];
+            target[keys[i2]] = a[keys[i2]];
           }
         }
       }
@@ -127,31 +127,31 @@ var require_validator = __commonJS({
       if (xmlData[0] === "\uFEFF") {
         xmlData = xmlData.substr(1);
       }
-      for (let i = 0; i < xmlData.length; i++) {
-        if (xmlData[i] === "<" && xmlData[i + 1] === "?") {
-          i += 2;
-          i = readPI(xmlData, i);
-          if (i.err) return i;
-        } else if (xmlData[i] === "<") {
-          let tagStartPos = i;
-          i++;
-          if (xmlData[i] === "!") {
-            i = readCommentAndCDATA(xmlData, i);
+      for (let i2 = 0; i2 < xmlData.length; i2++) {
+        if (xmlData[i2] === "<" && xmlData[i2 + 1] === "?") {
+          i2 += 2;
+          i2 = readPI(xmlData, i2);
+          if (i2.err) return i2;
+        } else if (xmlData[i2] === "<") {
+          let tagStartPos = i2;
+          i2++;
+          if (xmlData[i2] === "!") {
+            i2 = readCommentAndCDATA(xmlData, i2);
             continue;
           } else {
             let closingTag = false;
-            if (xmlData[i] === "/") {
+            if (xmlData[i2] === "/") {
               closingTag = true;
-              i++;
+              i2++;
             }
             let tagName = "";
-            for (; i < xmlData.length && xmlData[i] !== ">" && xmlData[i] !== " " && xmlData[i] !== "	" && xmlData[i] !== "\n" && xmlData[i] !== "\r"; i++) {
-              tagName += xmlData[i];
+            for (; i2 < xmlData.length && xmlData[i2] !== ">" && xmlData[i2] !== " " && xmlData[i2] !== "	" && xmlData[i2] !== "\n" && xmlData[i2] !== "\r"; i2++) {
+              tagName += xmlData[i2];
             }
             tagName = tagName.trim();
             if (tagName[tagName.length - 1] === "/") {
               tagName = tagName.substring(0, tagName.length - 1);
-              i--;
+              i2--;
             }
             if (!validateTagName(tagName)) {
               let msg;
@@ -160,16 +160,16 @@ var require_validator = __commonJS({
               } else {
                 msg = "Tag '" + tagName + "' is an invalid name.";
               }
-              return getErrorObject("InvalidTag", msg, getLineNumberForPosition(xmlData, i));
+              return getErrorObject("InvalidTag", msg, getLineNumberForPosition(xmlData, i2));
             }
-            const result = readAttributeStr(xmlData, i);
+            const result = readAttributeStr(xmlData, i2);
             if (result === false) {
-              return getErrorObject("InvalidAttr", "Attributes for '" + tagName + "' have open quote.", getLineNumberForPosition(xmlData, i));
+              return getErrorObject("InvalidAttr", "Attributes for '" + tagName + "' have open quote.", getLineNumberForPosition(xmlData, i2));
             }
             let attrStr = result.value;
-            i = result.index;
+            i2 = result.index;
             if (attrStr[attrStr.length - 1] === "/") {
-              const attrStrStart = i - attrStr.length;
+              const attrStrStart = i2 - attrStr.length;
               attrStr = attrStr.substring(0, attrStr.length - 1);
               const isValid2 = validateAttributeString(attrStr, options);
               if (isValid2 === true) {
@@ -179,7 +179,7 @@ var require_validator = __commonJS({
               }
             } else if (closingTag) {
               if (!result.tagClosed) {
-                return getErrorObject("InvalidTag", "Closing tag '" + tagName + "' doesn't have proper closing.", getLineNumberForPosition(xmlData, i));
+                return getErrorObject("InvalidTag", "Closing tag '" + tagName + "' doesn't have proper closing.", getLineNumberForPosition(xmlData, i2));
               } else if (attrStr.trim().length > 0) {
                 return getErrorObject("InvalidTag", "Closing tag '" + tagName + "' can't have attributes or invalid starting.", getLineNumberForPosition(xmlData, tagStartPos));
               } else if (tags.length === 0) {
@@ -201,48 +201,48 @@ var require_validator = __commonJS({
             } else {
               const isValid2 = validateAttributeString(attrStr, options);
               if (isValid2 !== true) {
-                return getErrorObject(isValid2.err.code, isValid2.err.msg, getLineNumberForPosition(xmlData, i - attrStr.length + isValid2.err.line));
+                return getErrorObject(isValid2.err.code, isValid2.err.msg, getLineNumberForPosition(xmlData, i2 - attrStr.length + isValid2.err.line));
               }
               if (reachedRoot === true) {
-                return getErrorObject("InvalidXml", "Multiple possible root nodes found.", getLineNumberForPosition(xmlData, i));
+                return getErrorObject("InvalidXml", "Multiple possible root nodes found.", getLineNumberForPosition(xmlData, i2));
               } else if (options.unpairedTags.indexOf(tagName) !== -1) {
               } else {
                 tags.push({ tagName, tagStartPos });
               }
               tagFound = true;
             }
-            for (i++; i < xmlData.length; i++) {
-              if (xmlData[i] === "<") {
-                if (xmlData[i + 1] === "!") {
-                  i++;
-                  i = readCommentAndCDATA(xmlData, i);
+            for (i2++; i2 < xmlData.length; i2++) {
+              if (xmlData[i2] === "<") {
+                if (xmlData[i2 + 1] === "!") {
+                  i2++;
+                  i2 = readCommentAndCDATA(xmlData, i2);
                   continue;
-                } else if (xmlData[i + 1] === "?") {
-                  i = readPI(xmlData, ++i);
-                  if (i.err) return i;
+                } else if (xmlData[i2 + 1] === "?") {
+                  i2 = readPI(xmlData, ++i2);
+                  if (i2.err) return i2;
                 } else {
                   break;
                 }
-              } else if (xmlData[i] === "&") {
-                const afterAmp = validateAmpersand(xmlData, i);
+              } else if (xmlData[i2] === "&") {
+                const afterAmp = validateAmpersand(xmlData, i2);
                 if (afterAmp == -1)
-                  return getErrorObject("InvalidChar", "char '&' is not expected.", getLineNumberForPosition(xmlData, i));
-                i = afterAmp;
+                  return getErrorObject("InvalidChar", "char '&' is not expected.", getLineNumberForPosition(xmlData, i2));
+                i2 = afterAmp;
               } else {
-                if (reachedRoot === true && !isWhiteSpace(xmlData[i])) {
-                  return getErrorObject("InvalidXml", "Extra text at the end", getLineNumberForPosition(xmlData, i));
+                if (reachedRoot === true && !isWhiteSpace(xmlData[i2])) {
+                  return getErrorObject("InvalidXml", "Extra text at the end", getLineNumberForPosition(xmlData, i2));
                 }
               }
             }
-            if (xmlData[i] === "<") {
-              i--;
+            if (xmlData[i2] === "<") {
+              i2--;
             }
           }
         } else {
-          if (isWhiteSpace(xmlData[i])) {
+          if (isWhiteSpace(xmlData[i2])) {
             continue;
           }
-          return getErrorObject("InvalidChar", "char '" + xmlData[i] + "' is not expected.", getLineNumberForPosition(xmlData, i));
+          return getErrorObject("InvalidChar", "char '" + xmlData[i2] + "' is not expected.", getLineNumberForPosition(xmlData, i2));
         }
       }
       if (!tagFound) {
@@ -257,81 +257,81 @@ var require_validator = __commonJS({
     function isWhiteSpace(char) {
       return char === " " || char === "	" || char === "\n" || char === "\r";
     }
-    function readPI(xmlData, i) {
-      const start = i;
-      for (; i < xmlData.length; i++) {
-        if (xmlData[i] == "?" || xmlData[i] == " ") {
-          const tagname = xmlData.substr(start, i - start);
-          if (i > 5 && tagname === "xml") {
-            return getErrorObject("InvalidXml", "XML declaration allowed only at the start of the document.", getLineNumberForPosition(xmlData, i));
-          } else if (xmlData[i] == "?" && xmlData[i + 1] == ">") {
-            i++;
+    function readPI(xmlData, i2) {
+      const start = i2;
+      for (; i2 < xmlData.length; i2++) {
+        if (xmlData[i2] == "?" || xmlData[i2] == " ") {
+          const tagname = xmlData.substr(start, i2 - start);
+          if (i2 > 5 && tagname === "xml") {
+            return getErrorObject("InvalidXml", "XML declaration allowed only at the start of the document.", getLineNumberForPosition(xmlData, i2));
+          } else if (xmlData[i2] == "?" && xmlData[i2 + 1] == ">") {
+            i2++;
             break;
           } else {
             continue;
           }
         }
       }
-      return i;
+      return i2;
     }
-    function readCommentAndCDATA(xmlData, i) {
-      if (xmlData.length > i + 5 && xmlData[i + 1] === "-" && xmlData[i + 2] === "-") {
-        for (i += 3; i < xmlData.length; i++) {
-          if (xmlData[i] === "-" && xmlData[i + 1] === "-" && xmlData[i + 2] === ">") {
-            i += 2;
+    function readCommentAndCDATA(xmlData, i2) {
+      if (xmlData.length > i2 + 5 && xmlData[i2 + 1] === "-" && xmlData[i2 + 2] === "-") {
+        for (i2 += 3; i2 < xmlData.length; i2++) {
+          if (xmlData[i2] === "-" && xmlData[i2 + 1] === "-" && xmlData[i2 + 2] === ">") {
+            i2 += 2;
             break;
           }
         }
-      } else if (xmlData.length > i + 8 && xmlData[i + 1] === "D" && xmlData[i + 2] === "O" && xmlData[i + 3] === "C" && xmlData[i + 4] === "T" && xmlData[i + 5] === "Y" && xmlData[i + 6] === "P" && xmlData[i + 7] === "E") {
+      } else if (xmlData.length > i2 + 8 && xmlData[i2 + 1] === "D" && xmlData[i2 + 2] === "O" && xmlData[i2 + 3] === "C" && xmlData[i2 + 4] === "T" && xmlData[i2 + 5] === "Y" && xmlData[i2 + 6] === "P" && xmlData[i2 + 7] === "E") {
         let angleBracketsCount = 1;
-        for (i += 8; i < xmlData.length; i++) {
-          if (xmlData[i] === "<") {
+        for (i2 += 8; i2 < xmlData.length; i2++) {
+          if (xmlData[i2] === "<") {
             angleBracketsCount++;
-          } else if (xmlData[i] === ">") {
+          } else if (xmlData[i2] === ">") {
             angleBracketsCount--;
             if (angleBracketsCount === 0) {
               break;
             }
           }
         }
-      } else if (xmlData.length > i + 9 && xmlData[i + 1] === "[" && xmlData[i + 2] === "C" && xmlData[i + 3] === "D" && xmlData[i + 4] === "A" && xmlData[i + 5] === "T" && xmlData[i + 6] === "A" && xmlData[i + 7] === "[") {
-        for (i += 8; i < xmlData.length; i++) {
-          if (xmlData[i] === "]" && xmlData[i + 1] === "]" && xmlData[i + 2] === ">") {
-            i += 2;
+      } else if (xmlData.length > i2 + 9 && xmlData[i2 + 1] === "[" && xmlData[i2 + 2] === "C" && xmlData[i2 + 3] === "D" && xmlData[i2 + 4] === "A" && xmlData[i2 + 5] === "T" && xmlData[i2 + 6] === "A" && xmlData[i2 + 7] === "[") {
+        for (i2 += 8; i2 < xmlData.length; i2++) {
+          if (xmlData[i2] === "]" && xmlData[i2 + 1] === "]" && xmlData[i2 + 2] === ">") {
+            i2 += 2;
             break;
           }
         }
       }
-      return i;
+      return i2;
     }
     var doubleQuote = '"';
     var singleQuote = "'";
-    function readAttributeStr(xmlData, i) {
+    function readAttributeStr(xmlData, i2) {
       let attrStr = "";
       let startChar = "";
       let tagClosed = false;
-      for (; i < xmlData.length; i++) {
-        if (xmlData[i] === doubleQuote || xmlData[i] === singleQuote) {
+      for (; i2 < xmlData.length; i2++) {
+        if (xmlData[i2] === doubleQuote || xmlData[i2] === singleQuote) {
           if (startChar === "") {
-            startChar = xmlData[i];
-          } else if (startChar !== xmlData[i]) {
+            startChar = xmlData[i2];
+          } else if (startChar !== xmlData[i2]) {
           } else {
             startChar = "";
           }
-        } else if (xmlData[i] === ">") {
+        } else if (xmlData[i2] === ">") {
           if (startChar === "") {
             tagClosed = true;
             break;
           }
         }
-        attrStr += xmlData[i];
+        attrStr += xmlData[i2];
       }
       if (startChar !== "") {
         return false;
       }
       return {
         value: attrStr,
-        index: i,
+        index: i2,
         tagClosed
       };
     }
@@ -339,57 +339,57 @@ var require_validator = __commonJS({
     function validateAttributeString(attrStr, options) {
       const matches = util2.getAllMatches(attrStr, validAttrStrRegxp);
       const attrNames = {};
-      for (let i = 0; i < matches.length; i++) {
-        if (matches[i][1].length === 0) {
-          return getErrorObject("InvalidAttr", "Attribute '" + matches[i][2] + "' has no space in starting.", getPositionFromMatch(matches[i]));
-        } else if (matches[i][3] !== void 0 && matches[i][4] === void 0) {
-          return getErrorObject("InvalidAttr", "Attribute '" + matches[i][2] + "' is without value.", getPositionFromMatch(matches[i]));
-        } else if (matches[i][3] === void 0 && !options.allowBooleanAttributes) {
-          return getErrorObject("InvalidAttr", "boolean attribute '" + matches[i][2] + "' is not allowed.", getPositionFromMatch(matches[i]));
+      for (let i2 = 0; i2 < matches.length; i2++) {
+        if (matches[i2][1].length === 0) {
+          return getErrorObject("InvalidAttr", "Attribute '" + matches[i2][2] + "' has no space in starting.", getPositionFromMatch(matches[i2]));
+        } else if (matches[i2][3] !== void 0 && matches[i2][4] === void 0) {
+          return getErrorObject("InvalidAttr", "Attribute '" + matches[i2][2] + "' is without value.", getPositionFromMatch(matches[i2]));
+        } else if (matches[i2][3] === void 0 && !options.allowBooleanAttributes) {
+          return getErrorObject("InvalidAttr", "boolean attribute '" + matches[i2][2] + "' is not allowed.", getPositionFromMatch(matches[i2]));
         }
-        const attrName = matches[i][2];
+        const attrName = matches[i2][2];
         if (!validateAttrName(attrName)) {
-          return getErrorObject("InvalidAttr", "Attribute '" + attrName + "' is an invalid name.", getPositionFromMatch(matches[i]));
+          return getErrorObject("InvalidAttr", "Attribute '" + attrName + "' is an invalid name.", getPositionFromMatch(matches[i2]));
         }
         if (!attrNames.hasOwnProperty(attrName)) {
           attrNames[attrName] = 1;
         } else {
-          return getErrorObject("InvalidAttr", "Attribute '" + attrName + "' is repeated.", getPositionFromMatch(matches[i]));
+          return getErrorObject("InvalidAttr", "Attribute '" + attrName + "' is repeated.", getPositionFromMatch(matches[i2]));
         }
       }
       return true;
     }
-    function validateNumberAmpersand(xmlData, i) {
+    function validateNumberAmpersand(xmlData, i2) {
       let re = /\d/;
-      if (xmlData[i] === "x") {
-        i++;
+      if (xmlData[i2] === "x") {
+        i2++;
         re = /[\da-fA-F]/;
       }
-      for (; i < xmlData.length; i++) {
-        if (xmlData[i] === ";")
-          return i;
-        if (!xmlData[i].match(re))
+      for (; i2 < xmlData.length; i2++) {
+        if (xmlData[i2] === ";")
+          return i2;
+        if (!xmlData[i2].match(re))
           break;
       }
       return -1;
     }
-    function validateAmpersand(xmlData, i) {
-      i++;
-      if (xmlData[i] === ";")
+    function validateAmpersand(xmlData, i2) {
+      i2++;
+      if (xmlData[i2] === ";")
         return -1;
-      if (xmlData[i] === "#") {
-        i++;
-        return validateNumberAmpersand(xmlData, i);
+      if (xmlData[i2] === "#") {
+        i2++;
+        return validateNumberAmpersand(xmlData, i2);
       }
       let count = 0;
-      for (; i < xmlData.length; i++, count++) {
-        if (xmlData[i].match(/\w/) && count < 20)
+      for (; i2 < xmlData.length; i2++, count++) {
+        if (xmlData[i2].match(/\w/) && count < 20)
           continue;
-        if (xmlData[i] === ";")
+        if (xmlData[i2] === ";")
           break;
         return -1;
       }
-      return i;
+      return i2;
     }
     function getErrorObject(code, message, lineNumber) {
       return {
@@ -407,8 +407,8 @@ var require_validator = __commonJS({
     function validateTagName(tagname) {
       return util2.isName(tagname);
     }
-    function getLineNumberForPosition(xmlData, index) {
-      const lines = xmlData.substring(0, index).split(/\r?\n/);
+    function getLineNumberForPosition(xmlData, index2) {
+      const lines = xmlData.substring(0, index2).split(/\r?\n/);
       return {
         line: lines.length,
         // column number is last line's length + 1, because column numbering starts at 1:
@@ -583,20 +583,20 @@ var require_DocTypeReader = __commonJS({
         this.suppressValidationErr = !options;
         this.options = options || {};
       }
-      readDocType(xmlData, i) {
+      readDocType(xmlData, i2) {
         const entities = /* @__PURE__ */ Object.create(null);
         let entityCount = 0;
-        if (xmlData[i + 3] === "O" && xmlData[i + 4] === "C" && xmlData[i + 5] === "T" && xmlData[i + 6] === "Y" && xmlData[i + 7] === "P" && xmlData[i + 8] === "E") {
-          i = i + 9;
+        if (xmlData[i2 + 3] === "O" && xmlData[i2 + 4] === "C" && xmlData[i2 + 5] === "T" && xmlData[i2 + 6] === "Y" && xmlData[i2 + 7] === "P" && xmlData[i2 + 8] === "E") {
+          i2 = i2 + 9;
           let angleBracketsCount = 1;
           let hasBody = false, comment = false;
           let exp = "";
-          for (; i < xmlData.length; i++) {
-            if (xmlData[i] === "<" && !comment) {
-              if (hasBody && hasSeq(xmlData, "!ENTITY", i)) {
-                i += 7;
+          for (; i2 < xmlData.length; i2++) {
+            if (xmlData[i2] === "<" && !comment) {
+              if (hasBody && hasSeq(xmlData, "!ENTITY", i2)) {
+                i2 += 7;
                 let entityName, val;
-                [entityName, val, i] = this.readEntityExp(xmlData, i + 1, this.suppressValidationErr);
+                [entityName, val, i2] = this.readEntityExp(xmlData, i2 + 1, this.suppressValidationErr);
                 if (val.indexOf("&") === -1) {
                   if (this.options.enabled !== false && this.options.maxEntityCount != null && entityCount >= this.options.maxEntityCount) {
                     throw new Error(
@@ -610,26 +610,26 @@ var require_DocTypeReader = __commonJS({
                   };
                   entityCount++;
                 }
-              } else if (hasBody && hasSeq(xmlData, "!ELEMENT", i)) {
-                i += 8;
-                const { index } = this.readElementExp(xmlData, i + 1);
-                i = index;
-              } else if (hasBody && hasSeq(xmlData, "!ATTLIST", i)) {
-                i += 8;
-              } else if (hasBody && hasSeq(xmlData, "!NOTATION", i)) {
-                i += 9;
-                const { index } = this.readNotationExp(xmlData, i + 1, this.suppressValidationErr);
-                i = index;
-              } else if (hasSeq(xmlData, "!--", i)) {
+              } else if (hasBody && hasSeq(xmlData, "!ELEMENT", i2)) {
+                i2 += 8;
+                const { index: index2 } = this.readElementExp(xmlData, i2 + 1);
+                i2 = index2;
+              } else if (hasBody && hasSeq(xmlData, "!ATTLIST", i2)) {
+                i2 += 8;
+              } else if (hasBody && hasSeq(xmlData, "!NOTATION", i2)) {
+                i2 += 9;
+                const { index: index2 } = this.readNotationExp(xmlData, i2 + 1, this.suppressValidationErr);
+                i2 = index2;
+              } else if (hasSeq(xmlData, "!--", i2)) {
                 comment = true;
               } else {
                 throw new Error(`Invalid DOCTYPE`);
               }
               angleBracketsCount++;
               exp = "";
-            } else if (xmlData[i] === ">") {
+            } else if (xmlData[i2] === ">") {
               if (comment) {
-                if (xmlData[i - 1] === "-" && xmlData[i - 2] === "-") {
+                if (xmlData[i2 - 1] === "-" && xmlData[i2 - 2] === "-") {
                   comment = false;
                   angleBracketsCount--;
                 }
@@ -639,10 +639,10 @@ var require_DocTypeReader = __commonJS({
               if (angleBracketsCount === 0) {
                 break;
               }
-            } else if (xmlData[i] === "[") {
+            } else if (xmlData[i2] === "[") {
               hasBody = true;
             } else {
-              exp += xmlData[i];
+              exp += xmlData[i2];
             }
           }
           if (angleBracketsCount !== 0) {
@@ -651,204 +651,204 @@ var require_DocTypeReader = __commonJS({
         } else {
           throw new Error(`Invalid Tag instead of DOCTYPE`);
         }
-        return { entities, i };
+        return { entities, i: i2 };
       }
-      readEntityExp(xmlData, i) {
-        i = skipWhitespace(xmlData, i);
+      readEntityExp(xmlData, i2) {
+        i2 = skipWhitespace(xmlData, i2);
         let entityName = "";
-        while (i < xmlData.length && !/\s/.test(xmlData[i]) && xmlData[i] !== '"' && xmlData[i] !== "'") {
-          entityName += xmlData[i];
-          i++;
+        while (i2 < xmlData.length && !/\s/.test(xmlData[i2]) && xmlData[i2] !== '"' && xmlData[i2] !== "'") {
+          entityName += xmlData[i2];
+          i2++;
         }
         validateEntityName(entityName);
-        i = skipWhitespace(xmlData, i);
+        i2 = skipWhitespace(xmlData, i2);
         if (!this.suppressValidationErr) {
-          if (xmlData.substring(i, i + 6).toUpperCase() === "SYSTEM") {
+          if (xmlData.substring(i2, i2 + 6).toUpperCase() === "SYSTEM") {
             throw new Error("External entities are not supported");
-          } else if (xmlData[i] === "%") {
+          } else if (xmlData[i2] === "%") {
             throw new Error("Parameter entities are not supported");
           }
         }
         let entityValue = "";
-        [i, entityValue] = this.readIdentifierVal(xmlData, i, "entity");
+        [i2, entityValue] = this.readIdentifierVal(xmlData, i2, "entity");
         if (this.options.enabled !== false && this.options.maxEntitySize != null && entityValue.length > this.options.maxEntitySize) {
           throw new Error(
             `Entity "${entityName}" size (${entityValue.length}) exceeds maximum allowed size (${this.options.maxEntitySize})`
           );
         }
-        i--;
-        return [entityName, entityValue, i];
+        i2--;
+        return [entityName, entityValue, i2];
       }
-      readNotationExp(xmlData, i) {
-        i = skipWhitespace(xmlData, i);
+      readNotationExp(xmlData, i2) {
+        i2 = skipWhitespace(xmlData, i2);
         let notationName = "";
-        while (i < xmlData.length && !/\s/.test(xmlData[i])) {
-          notationName += xmlData[i];
-          i++;
+        while (i2 < xmlData.length && !/\s/.test(xmlData[i2])) {
+          notationName += xmlData[i2];
+          i2++;
         }
         !this.suppressValidationErr && validateEntityName(notationName);
-        i = skipWhitespace(xmlData, i);
-        const identifierType = xmlData.substring(i, i + 6).toUpperCase();
+        i2 = skipWhitespace(xmlData, i2);
+        const identifierType = xmlData.substring(i2, i2 + 6).toUpperCase();
         if (!this.suppressValidationErr && identifierType !== "SYSTEM" && identifierType !== "PUBLIC") {
           throw new Error(`Expected SYSTEM or PUBLIC, found "${identifierType}"`);
         }
-        i += identifierType.length;
-        i = skipWhitespace(xmlData, i);
+        i2 += identifierType.length;
+        i2 = skipWhitespace(xmlData, i2);
         let publicIdentifier = null;
         let systemIdentifier = null;
         if (identifierType === "PUBLIC") {
-          [i, publicIdentifier] = this.readIdentifierVal(xmlData, i, "publicIdentifier");
-          i = skipWhitespace(xmlData, i);
-          if (xmlData[i] === '"' || xmlData[i] === "'") {
-            [i, systemIdentifier] = this.readIdentifierVal(xmlData, i, "systemIdentifier");
+          [i2, publicIdentifier] = this.readIdentifierVal(xmlData, i2, "publicIdentifier");
+          i2 = skipWhitespace(xmlData, i2);
+          if (xmlData[i2] === '"' || xmlData[i2] === "'") {
+            [i2, systemIdentifier] = this.readIdentifierVal(xmlData, i2, "systemIdentifier");
           }
         } else if (identifierType === "SYSTEM") {
-          [i, systemIdentifier] = this.readIdentifierVal(xmlData, i, "systemIdentifier");
+          [i2, systemIdentifier] = this.readIdentifierVal(xmlData, i2, "systemIdentifier");
           if (!this.suppressValidationErr && !systemIdentifier) {
             throw new Error("Missing mandatory system identifier for SYSTEM notation");
           }
         }
-        return { notationName, publicIdentifier, systemIdentifier, index: --i };
+        return { notationName, publicIdentifier, systemIdentifier, index: --i2 };
       }
-      readIdentifierVal(xmlData, i, type) {
+      readIdentifierVal(xmlData, i2, type) {
         let identifierVal = "";
-        const startChar = xmlData[i];
+        const startChar = xmlData[i2];
         if (startChar !== '"' && startChar !== "'") {
           throw new Error(`Expected quoted string, found "${startChar}"`);
         }
-        i++;
-        while (i < xmlData.length && xmlData[i] !== startChar) {
-          identifierVal += xmlData[i];
-          i++;
+        i2++;
+        while (i2 < xmlData.length && xmlData[i2] !== startChar) {
+          identifierVal += xmlData[i2];
+          i2++;
         }
-        if (xmlData[i] !== startChar) {
+        if (xmlData[i2] !== startChar) {
           throw new Error(`Unterminated ${type} value`);
         }
-        i++;
-        return [i, identifierVal];
+        i2++;
+        return [i2, identifierVal];
       }
-      readElementExp(xmlData, i) {
-        i = skipWhitespace(xmlData, i);
+      readElementExp(xmlData, i2) {
+        i2 = skipWhitespace(xmlData, i2);
         let elementName = "";
-        while (i < xmlData.length && !/\s/.test(xmlData[i])) {
-          elementName += xmlData[i];
-          i++;
+        while (i2 < xmlData.length && !/\s/.test(xmlData[i2])) {
+          elementName += xmlData[i2];
+          i2++;
         }
         if (!this.suppressValidationErr && !util2.isName(elementName)) {
           throw new Error(`Invalid element name: "${elementName}"`);
         }
-        i = skipWhitespace(xmlData, i);
+        i2 = skipWhitespace(xmlData, i2);
         let contentModel = "";
-        if (xmlData[i] === "E" && hasSeq(xmlData, "MPTY", i)) {
-          i += 4;
-        } else if (xmlData[i] === "A" && hasSeq(xmlData, "NY", i)) {
-          i += 2;
-        } else if (xmlData[i] === "(") {
-          i++;
-          while (i < xmlData.length && xmlData[i] !== ")") {
-            contentModel += xmlData[i];
-            i++;
+        if (xmlData[i2] === "E" && hasSeq(xmlData, "MPTY", i2)) {
+          i2 += 4;
+        } else if (xmlData[i2] === "A" && hasSeq(xmlData, "NY", i2)) {
+          i2 += 2;
+        } else if (xmlData[i2] === "(") {
+          i2++;
+          while (i2 < xmlData.length && xmlData[i2] !== ")") {
+            contentModel += xmlData[i2];
+            i2++;
           }
-          if (xmlData[i] !== ")") {
+          if (xmlData[i2] !== ")") {
             throw new Error("Unterminated content model");
           }
         } else if (!this.suppressValidationErr) {
-          throw new Error(`Invalid Element Expression, found "${xmlData[i]}"`);
+          throw new Error(`Invalid Element Expression, found "${xmlData[i2]}"`);
         }
         return {
           elementName,
           contentModel: contentModel.trim(),
-          index: i
+          index: i2
         };
       }
-      readAttlistExp(xmlData, i) {
-        i = skipWhitespace(xmlData, i);
+      readAttlistExp(xmlData, i2) {
+        i2 = skipWhitespace(xmlData, i2);
         let elementName = "";
-        while (i < xmlData.length && !/\s/.test(xmlData[i])) {
-          elementName += xmlData[i];
-          i++;
+        while (i2 < xmlData.length && !/\s/.test(xmlData[i2])) {
+          elementName += xmlData[i2];
+          i2++;
         }
         validateEntityName(elementName);
-        i = skipWhitespace(xmlData, i);
+        i2 = skipWhitespace(xmlData, i2);
         let attributeName = "";
-        while (i < xmlData.length && !/\s/.test(xmlData[i])) {
-          attributeName += xmlData[i];
-          i++;
+        while (i2 < xmlData.length && !/\s/.test(xmlData[i2])) {
+          attributeName += xmlData[i2];
+          i2++;
         }
         if (!validateEntityName(attributeName)) {
           throw new Error(`Invalid attribute name: "${attributeName}"`);
         }
-        i = skipWhitespace(xmlData, i);
+        i2 = skipWhitespace(xmlData, i2);
         let attributeType = "";
-        if (xmlData.substring(i, i + 8).toUpperCase() === "NOTATION") {
+        if (xmlData.substring(i2, i2 + 8).toUpperCase() === "NOTATION") {
           attributeType = "NOTATION";
-          i += 8;
-          i = skipWhitespace(xmlData, i);
-          if (xmlData[i] !== "(") {
-            throw new Error(`Expected '(', found "${xmlData[i]}"`);
+          i2 += 8;
+          i2 = skipWhitespace(xmlData, i2);
+          if (xmlData[i2] !== "(") {
+            throw new Error(`Expected '(', found "${xmlData[i2]}"`);
           }
-          i++;
+          i2++;
           let allowedNotations = [];
-          while (i < xmlData.length && xmlData[i] !== ")") {
+          while (i2 < xmlData.length && xmlData[i2] !== ")") {
             let notation = "";
-            while (i < xmlData.length && xmlData[i] !== "|" && xmlData[i] !== ")") {
-              notation += xmlData[i];
-              i++;
+            while (i2 < xmlData.length && xmlData[i2] !== "|" && xmlData[i2] !== ")") {
+              notation += xmlData[i2];
+              i2++;
             }
             notation = notation.trim();
             if (!validateEntityName(notation)) {
               throw new Error(`Invalid notation name: "${notation}"`);
             }
             allowedNotations.push(notation);
-            if (xmlData[i] === "|") {
-              i++;
-              i = skipWhitespace(xmlData, i);
+            if (xmlData[i2] === "|") {
+              i2++;
+              i2 = skipWhitespace(xmlData, i2);
             }
           }
-          if (xmlData[i] !== ")") {
+          if (xmlData[i2] !== ")") {
             throw new Error("Unterminated list of notations");
           }
-          i++;
+          i2++;
           attributeType += " (" + allowedNotations.join("|") + ")";
         } else {
-          while (i < xmlData.length && !/\s/.test(xmlData[i])) {
-            attributeType += xmlData[i];
-            i++;
+          while (i2 < xmlData.length && !/\s/.test(xmlData[i2])) {
+            attributeType += xmlData[i2];
+            i2++;
           }
           const validTypes = ["CDATA", "ID", "IDREF", "IDREFS", "ENTITY", "ENTITIES", "NMTOKEN", "NMTOKENS"];
           if (!this.suppressValidationErr && !validTypes.includes(attributeType.toUpperCase())) {
             throw new Error(`Invalid attribute type: "${attributeType}"`);
           }
         }
-        i = skipWhitespace(xmlData, i);
+        i2 = skipWhitespace(xmlData, i2);
         let defaultValue = "";
-        if (xmlData.substring(i, i + 8).toUpperCase() === "#REQUIRED") {
+        if (xmlData.substring(i2, i2 + 8).toUpperCase() === "#REQUIRED") {
           defaultValue = "#REQUIRED";
-          i += 8;
-        } else if (xmlData.substring(i, i + 7).toUpperCase() === "#IMPLIED") {
+          i2 += 8;
+        } else if (xmlData.substring(i2, i2 + 7).toUpperCase() === "#IMPLIED") {
           defaultValue = "#IMPLIED";
-          i += 7;
+          i2 += 7;
         } else {
-          [i, defaultValue] = this.readIdentifierVal(xmlData, i, "ATTLIST");
+          [i2, defaultValue] = this.readIdentifierVal(xmlData, i2, "ATTLIST");
         }
         return {
           elementName,
           attributeName,
           attributeType,
           defaultValue,
-          index: i
+          index: i2
         };
       }
     };
-    var skipWhitespace = (data, index) => {
-      while (index < data.length && /\s/.test(data[index])) {
-        index++;
+    var skipWhitespace = (data, index2) => {
+      while (index2 < data.length && /\s/.test(data[index2])) {
+        index2++;
       }
-      return index;
+      return index2;
     };
-    function hasSeq(data, seq, i) {
+    function hasSeq(data, seq, i2) {
       for (let j = 0; j < seq.length; j++) {
-        if (seq[j] !== data[i + j + 1]) return false;
+        if (seq[j] !== data[i2 + j + 1]) return false;
       }
       return true;
     }
@@ -1030,8 +1030,8 @@ var require_OrderedObjParser = __commonJS({
         if (this.options.stopNodes && this.options.stopNodes.length > 0) {
           this.stopNodesExact = /* @__PURE__ */ new Set();
           this.stopNodesWildcard = /* @__PURE__ */ new Set();
-          for (let i = 0; i < this.options.stopNodes.length; i++) {
-            const stopNodeExp = this.options.stopNodes[i];
+          for (let i2 = 0; i2 < this.options.stopNodes.length; i2++) {
+            const stopNodeExp = this.options.stopNodes[i2];
             if (typeof stopNodeExp !== "string") continue;
             if (stopNodeExp.startsWith("*.")) {
               this.stopNodesWildcard.add(stopNodeExp.substring(2));
@@ -1044,8 +1044,8 @@ var require_OrderedObjParser = __commonJS({
     };
     function addExternalEntities(externalEntities) {
       const entKeys = Object.keys(externalEntities);
-      for (let i = 0; i < entKeys.length; i++) {
-        const ent = entKeys[i];
+      for (let i2 = 0; i2 < entKeys.length; i2++) {
+        const ent = entKeys[i2];
         const escaped = ent.replace(/[.\-+*:]/g, "\\.");
         this.lastEntities[ent] = {
           regex: new RegExp("&" + escaped + ";", "g"),
@@ -1097,12 +1097,12 @@ var require_OrderedObjParser = __commonJS({
         const matches = util2.getAllMatches(attrStr, attrsRegx);
         const len = matches.length;
         const attrs = {};
-        for (let i = 0; i < len; i++) {
-          const attrName = this.resolveNameSpace(matches[i][1]);
+        for (let i2 = 0; i2 < len; i2++) {
+          const attrName = this.resolveNameSpace(matches[i2][1]);
           if (this.ignoreAttributesFn(attrName, jPath)) {
             continue;
           }
-          let oldVal = matches[i][4];
+          let oldVal = matches[i2][4];
           let aName = this.options.attributeNamePrefix + attrName;
           if (attrName.length) {
             if (this.options.transformAttributeName) {
@@ -1151,12 +1151,12 @@ var require_OrderedObjParser = __commonJS({
       this.entityExpansionCount = 0;
       this.currentExpandedLength = 0;
       const docTypeReader = new DocTypeReader(this.options.processEntities);
-      for (let i = 0; i < xmlData.length; i++) {
-        const ch = xmlData[i];
+      for (let i2 = 0; i2 < xmlData.length; i2++) {
+        const ch = xmlData[i2];
         if (ch === "<") {
-          if (xmlData[i + 1] === "/") {
-            const closeIndex = findClosingIndex(xmlData, ">", i, "Closing Tag is not closed.");
-            let tagName = xmlData.substring(i + 2, closeIndex).trim();
+          if (xmlData[i2 + 1] === "/") {
+            const closeIndex = findClosingIndex(xmlData, ">", i2, "Closing Tag is not closed.");
+            let tagName = xmlData.substring(i2 + 2, closeIndex).trim();
             if (this.options.removeNSPrefix) {
               const colonIndex = tagName.indexOf(":");
               if (colonIndex !== -1) {
@@ -1183,9 +1183,9 @@ var require_OrderedObjParser = __commonJS({
             jPath = jPath.substring(0, propIndex);
             currentNode = this.tagsNodeStack.pop();
             textData = "";
-            i = closeIndex;
-          } else if (xmlData[i + 1] === "?") {
-            let tagData = readTagExp(xmlData, i, false, "?>");
+            i2 = closeIndex;
+          } else if (xmlData[i2 + 1] === "?") {
+            let tagData = readTagExp(xmlData, i2, false, "?>");
             if (!tagData) throw new Error("Pi Tag is not closed.");
             textData = this.saveTextToParentTag(textData, currentNode, jPath);
             if (this.options.ignoreDeclaration && tagData.tagName === "?xml" || this.options.ignorePiTags) {
@@ -1195,24 +1195,24 @@ var require_OrderedObjParser = __commonJS({
               if (tagData.tagName !== tagData.tagExp && tagData.attrExpPresent) {
                 childNode[":@"] = this.buildAttributesMap(tagData.tagExp, jPath, tagData.tagName);
               }
-              this.addChild(currentNode, childNode, jPath, i);
+              this.addChild(currentNode, childNode, jPath, i2);
             }
-            i = tagData.closeIndex + 1;
-          } else if (xmlData.substr(i + 1, 3) === "!--") {
-            const endIndex = findClosingIndex(xmlData, "-->", i + 4, "Comment is not closed.");
+            i2 = tagData.closeIndex + 1;
+          } else if (xmlData.substr(i2 + 1, 3) === "!--") {
+            const endIndex = findClosingIndex(xmlData, "-->", i2 + 4, "Comment is not closed.");
             if (this.options.commentPropName) {
-              const comment = xmlData.substring(i + 4, endIndex - 2);
+              const comment = xmlData.substring(i2 + 4, endIndex - 2);
               textData = this.saveTextToParentTag(textData, currentNode, jPath);
               currentNode.add(this.options.commentPropName, [{ [this.options.textNodeName]: comment }]);
             }
-            i = endIndex;
-          } else if (xmlData.substr(i + 1, 2) === "!D") {
-            const result = docTypeReader.readDocType(xmlData, i);
+            i2 = endIndex;
+          } else if (xmlData.substr(i2 + 1, 2) === "!D") {
+            const result = docTypeReader.readDocType(xmlData, i2);
             this.docTypeEntities = result.entities;
-            i = result.i;
-          } else if (xmlData.substr(i + 1, 2) === "![") {
-            const closeIndex = findClosingIndex(xmlData, "]]>", i, "CDATA is not closed.") - 2;
-            const tagExp = xmlData.substring(i + 9, closeIndex);
+            i2 = result.i;
+          } else if (xmlData.substr(i2 + 1, 2) === "![") {
+            const closeIndex = findClosingIndex(xmlData, "]]>", i2, "CDATA is not closed.") - 2;
+            const tagExp = xmlData.substring(i2 + 9, closeIndex);
             textData = this.saveTextToParentTag(textData, currentNode, jPath);
             let val = this.parseTextData(tagExp, currentNode.tagname, jPath, true, false, true, true);
             if (val == void 0) val = "";
@@ -1221,9 +1221,9 @@ var require_OrderedObjParser = __commonJS({
             } else {
               currentNode.add(this.options.textNodeName, val);
             }
-            i = closeIndex + 2;
+            i2 = closeIndex + 2;
           } else {
-            let result = readTagExp(xmlData, i, this.options.removeNSPrefix);
+            let result = readTagExp(xmlData, i2, this.options.removeNSPrefix);
             let tagName = result.tagName;
             const rawTagName = result.rawTagName;
             let tagExp = result.tagExp;
@@ -1252,7 +1252,7 @@ var require_OrderedObjParser = __commonJS({
             if (tagName !== xmlObj.tagname) {
               jPath += jPath ? "." + tagName : tagName;
             }
-            const startIndex = i;
+            const startIndex = i2;
             if (this.isItStopNode(this.stopNodesExact, this.stopNodesWildcard, jPath, tagName)) {
               let tagContent = "";
               if (tagExp.length > 0 && tagExp.lastIndexOf("/") === tagExp.length - 1) {
@@ -1263,13 +1263,13 @@ var require_OrderedObjParser = __commonJS({
                 } else {
                   tagExp = tagExp.substr(0, tagExp.length - 1);
                 }
-                i = result.closeIndex;
+                i2 = result.closeIndex;
               } else if (this.options.unpairedTags.indexOf(tagName) !== -1) {
-                i = result.closeIndex;
+                i2 = result.closeIndex;
               } else {
                 const result2 = this.readStopNodeData(xmlData, rawTagName, closeIndex + 1);
                 if (!result2) throw new Error(`Unexpected end of ${rawTagName}`);
-                i = result2.i;
+                i2 = result2.i;
                 tagContent = result2.tagContent;
               }
               const childNode = new xmlNode(tagName);
@@ -1311,7 +1311,7 @@ var require_OrderedObjParser = __commonJS({
                 }
                 this.addChild(currentNode, childNode, jPath, startIndex);
                 jPath = jPath.substr(0, jPath.lastIndexOf("."));
-                i = result.closeIndex;
+                i2 = result.closeIndex;
                 continue;
               } else {
                 const childNode = new xmlNode(tagName);
@@ -1326,11 +1326,11 @@ var require_OrderedObjParser = __commonJS({
                 currentNode = childNode;
               }
               textData = "";
-              i = closeIndex;
+              i2 = closeIndex;
             }
           }
         } else {
-          textData += xmlData[i];
+          textData += xmlData[i2];
         }
       }
       return xmlObj.child;
@@ -1441,27 +1441,27 @@ var require_OrderedObjParser = __commonJS({
       if (stopNodesExact && stopNodesExact.has(jPath)) return true;
       return false;
     }
-    function tagExpWithClosingIndex(xmlData, i, closingChar = ">") {
+    function tagExpWithClosingIndex(xmlData, i2, closingChar = ">") {
       let attrBoundary;
       let tagExp = "";
-      for (let index = i; index < xmlData.length; index++) {
-        let ch = xmlData[index];
+      for (let index2 = i2; index2 < xmlData.length; index2++) {
+        let ch = xmlData[index2];
         if (attrBoundary) {
           if (ch === attrBoundary) attrBoundary = "";
         } else if (ch === '"' || ch === "'") {
           attrBoundary = ch;
         } else if (ch === closingChar[0]) {
           if (closingChar[1]) {
-            if (xmlData[index + 1] === closingChar[1]) {
+            if (xmlData[index2 + 1] === closingChar[1]) {
               return {
                 data: tagExp,
-                index
+                index: index2
               };
             }
           } else {
             return {
               data: tagExp,
-              index
+              index: index2
             };
           }
         } else if (ch === "	") {
@@ -1470,16 +1470,16 @@ var require_OrderedObjParser = __commonJS({
         tagExp += ch;
       }
     }
-    function findClosingIndex(xmlData, str, i, errMsg) {
-      const closingIndex = xmlData.indexOf(str, i);
+    function findClosingIndex(xmlData, str, i2, errMsg) {
+      const closingIndex = xmlData.indexOf(str, i2);
       if (closingIndex === -1) {
         throw new Error(errMsg);
       } else {
         return closingIndex + str.length - 1;
       }
     }
-    function readTagExp(xmlData, i, removeNSPrefix, closingChar = ">") {
-      const result = tagExpWithClosingIndex(xmlData, i + 1, closingChar);
+    function readTagExp(xmlData, i2, removeNSPrefix, closingChar = ">") {
+      const result = tagExpWithClosingIndex(xmlData, i2 + 1, closingChar);
       if (!result) return;
       let tagExp = result.data;
       const closeIndex = result.index;
@@ -1506,41 +1506,41 @@ var require_OrderedObjParser = __commonJS({
         rawTagName
       };
     }
-    function readStopNodeData(xmlData, tagName, i) {
-      const startIndex = i;
+    function readStopNodeData(xmlData, tagName, i2) {
+      const startIndex = i2;
       let openTagCount = 1;
-      for (; i < xmlData.length; i++) {
-        if (xmlData[i] === "<") {
-          if (xmlData[i + 1] === "/") {
-            const closeIndex = findClosingIndex(xmlData, ">", i, `${tagName} is not closed`);
-            let closeTagName = xmlData.substring(i + 2, closeIndex).trim();
+      for (; i2 < xmlData.length; i2++) {
+        if (xmlData[i2] === "<") {
+          if (xmlData[i2 + 1] === "/") {
+            const closeIndex = findClosingIndex(xmlData, ">", i2, `${tagName} is not closed`);
+            let closeTagName = xmlData.substring(i2 + 2, closeIndex).trim();
             if (closeTagName === tagName) {
               openTagCount--;
               if (openTagCount === 0) {
                 return {
-                  tagContent: xmlData.substring(startIndex, i),
+                  tagContent: xmlData.substring(startIndex, i2),
                   i: closeIndex
                 };
               }
             }
-            i = closeIndex;
-          } else if (xmlData[i + 1] === "?") {
-            const closeIndex = findClosingIndex(xmlData, "?>", i + 1, "StopNode is not closed.");
-            i = closeIndex;
-          } else if (xmlData.substr(i + 1, 3) === "!--") {
-            const closeIndex = findClosingIndex(xmlData, "-->", i + 3, "StopNode is not closed.");
-            i = closeIndex;
-          } else if (xmlData.substr(i + 1, 2) === "![") {
-            const closeIndex = findClosingIndex(xmlData, "]]>", i, "StopNode is not closed.") - 2;
-            i = closeIndex;
+            i2 = closeIndex;
+          } else if (xmlData[i2 + 1] === "?") {
+            const closeIndex = findClosingIndex(xmlData, "?>", i2 + 1, "StopNode is not closed.");
+            i2 = closeIndex;
+          } else if (xmlData.substr(i2 + 1, 3) === "!--") {
+            const closeIndex = findClosingIndex(xmlData, "-->", i2 + 3, "StopNode is not closed.");
+            i2 = closeIndex;
+          } else if (xmlData.substr(i2 + 1, 2) === "![") {
+            const closeIndex = findClosingIndex(xmlData, "]]>", i2, "StopNode is not closed.") - 2;
+            i2 = closeIndex;
           } else {
-            const tagData = readTagExp(xmlData, i, ">");
+            const tagData = readTagExp(xmlData, i2, ">");
             if (tagData) {
               const openTagName = tagData && tagData.tagName;
               if (openTagName === tagName && tagData.tagExp[tagData.tagExp.length - 1] !== "/") {
                 openTagCount++;
               }
-              i = tagData.closeIndex;
+              i2 = tagData.closeIndex;
             }
           }
         }
@@ -1588,17 +1588,17 @@ var require_node2json = __commonJS({
       return compress(node, options);
     }
     function compress(arr, options, jPath) {
-      let text;
+      let text2;
       const compressedObj = {};
-      for (let i = 0; i < arr.length; i++) {
-        const tagObj = arr[i];
+      for (let i2 = 0; i2 < arr.length; i2++) {
+        const tagObj = arr[i2];
         const property = propName(tagObj);
         let newJpath = "";
         if (jPath === void 0) newJpath = property;
         else newJpath = jPath + "." + property;
         if (property === options.textNodeName) {
-          if (text === void 0) text = tagObj[property];
-          else text += "" + tagObj[property];
+          if (text2 === void 0) text2 = tagObj[property];
+          else text2 += "" + tagObj[property];
         } else if (property === void 0) {
           continue;
         } else if (tagObj[property]) {
@@ -1626,15 +1626,15 @@ var require_node2json = __commonJS({
           }
         }
       }
-      if (typeof text === "string") {
-        if (text.length > 0) compressedObj[options.textNodeName] = text;
-      } else if (text !== void 0) compressedObj[options.textNodeName] = text;
+      if (typeof text2 === "string") {
+        if (text2.length > 0) compressedObj[options.textNodeName] = text2;
+      } else if (text2 !== void 0) compressedObj[options.textNodeName] = text2;
       return compressedObj;
     }
     function propName(obj) {
       const keys = Object.keys(obj);
-      for (let i = 0; i < keys.length; i++) {
-        const key = keys[i];
+      for (let i2 = 0; i2 < keys.length; i2++) {
+        const key = keys[i2];
         if (key !== ":@") return key;
       }
     }
@@ -1642,8 +1642,8 @@ var require_node2json = __commonJS({
       if (attrMap) {
         const keys = Object.keys(attrMap);
         const len = keys.length;
-        for (let i = 0; i < len; i++) {
-          const atrrName = keys[i];
+        for (let i2 = 0; i2 < len; i2++) {
+          const atrrName = keys[i2];
           if (options.isArray(atrrName, jpath + "." + atrrName, true, true)) {
             obj[atrrName] = [attrMap[atrrName]];
           } else {
@@ -1741,14 +1741,14 @@ var require_orderedJs2Xml = __commonJS({
       let isPreviousElementTag = false;
       if (!Array.isArray(arr)) {
         if (arr !== void 0 && arr !== null) {
-          let text = arr.toString();
-          text = replaceEntitiesValue(text, options);
-          return text;
+          let text2 = arr.toString();
+          text2 = replaceEntitiesValue(text2, options);
+          return text2;
         }
         return "";
       }
-      for (let i = 0; i < arr.length; i++) {
-        const tagObj = arr[i];
+      for (let i2 = 0; i2 < arr.length; i2++) {
+        const tagObj = arr[i2];
         const tagName = propName(tagObj);
         if (tagName === void 0) continue;
         let newJPath = "";
@@ -1817,8 +1817,8 @@ var require_orderedJs2Xml = __commonJS({
     }
     function propName(obj) {
       const keys = Object.keys(obj);
-      for (let i = 0; i < keys.length; i++) {
-        const key = keys[i];
+      for (let i2 = 0; i2 < keys.length; i2++) {
+        const key = keys[i2];
         if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
         if (key !== ":@") return key;
       }
@@ -1842,15 +1842,15 @@ var require_orderedJs2Xml = __commonJS({
     function isStopNode(jPath, options) {
       jPath = jPath.substr(0, jPath.length - options.textNodeName.length - 1);
       let tagName = jPath.substr(jPath.lastIndexOf(".") + 1);
-      for (let index in options.stopNodes) {
-        if (options.stopNodes[index] === jPath || options.stopNodes[index] === "*." + tagName) return true;
+      for (let index2 in options.stopNodes) {
+        if (options.stopNodes[index2] === jPath || options.stopNodes[index2] === "*." + tagName) return true;
       }
       return false;
     }
     function replaceEntitiesValue(textValue, options) {
       if (textValue && textValue.length > 0 && options.processEntities) {
-        for (let i = 0; i < options.entities.length; i++) {
-          const entity = options.entities[i];
+        for (let i2 = 0; i2 < options.entities.length; i2++) {
+          const entity = options.entities[i2];
           textValue = textValue.replace(entity.regex, entity.val);
         }
       }
@@ -2088,8 +2088,8 @@ var require_json2xml = __commonJS({
     };
     Builder.prototype.replaceEntitiesValue = function(textValue) {
       if (textValue && textValue.length > 0 && this.options.processEntities) {
-        for (let i = 0; i < this.options.entities.length; i++) {
-          const entity = this.options.entities[i];
+        for (let i2 = 0; i2 < this.options.entities.length; i2++) {
+          const entity = this.options.entities[i2];
           textValue = textValue.replace(entity.regex, entity.val);
         }
       }
@@ -2167,12 +2167,12 @@ var require_code = __commonJS({
         return item === "" || item === '""';
       }
       get str() {
-        var _a;
-        return (_a = this._str) !== null && _a !== void 0 ? _a : this._str = this._items.reduce((s, c) => `${s}${c}`, "");
+        var _a2;
+        return (_a2 = this._str) !== null && _a2 !== void 0 ? _a2 : this._str = this._items.reduce((s, c) => `${s}${c}`, "");
       }
       get names() {
-        var _a;
-        return (_a = this._names) !== null && _a !== void 0 ? _a : this._names = this._items.reduce((names, c) => {
+        var _a2;
+        return (_a2 = this._names) !== null && _a2 !== void 0 ? _a2 : this._names = this._items.reduce((names, c) => {
           if (c instanceof Name)
             names[c.str] = (names[c.str] || 0) + 1;
           return names;
@@ -2183,10 +2183,10 @@ var require_code = __commonJS({
     exports.nil = new _Code("");
     function _(strs, ...args) {
       const code = [strs[0]];
-      let i = 0;
-      while (i < args.length) {
-        addCodeArg(code, args[i]);
-        code.push(strs[++i]);
+      let i2 = 0;
+      while (i2 < args.length) {
+        addCodeArg(code, args[i2]);
+        code.push(strs[++i2]);
       }
       return new _Code(code);
     }
@@ -2194,11 +2194,11 @@ var require_code = __commonJS({
     var plus = new _Code("+");
     function str(strs, ...args) {
       const expr = [safeStringify(strs[0])];
-      let i = 0;
-      while (i < args.length) {
+      let i2 = 0;
+      while (i2 < args.length) {
         expr.push(plus);
-        addCodeArg(expr, args[i]);
-        expr.push(plus, safeStringify(strs[++i]));
+        addCodeArg(expr, args[i2]);
+        expr.push(plus, safeStringify(strs[++i2]));
       }
       optimize(expr);
       return new _Code(expr);
@@ -2214,17 +2214,17 @@ var require_code = __commonJS({
     }
     exports.addCodeArg = addCodeArg;
     function optimize(expr) {
-      let i = 1;
-      while (i < expr.length - 1) {
-        if (expr[i] === plus) {
-          const res = mergeExprItems(expr[i - 1], expr[i + 1]);
+      let i2 = 1;
+      while (i2 < expr.length - 1) {
+        if (expr[i2] === plus) {
+          const res = mergeExprItems(expr[i2 - 1], expr[i2 + 1]);
           if (res !== void 0) {
-            expr.splice(i - 1, 3, res);
+            expr.splice(i2 - 1, 3, res);
             continue;
           }
-          expr[i++] = "+";
+          expr[i2++] = "+";
         }
-        i++;
+        i2++;
       }
     }
     function mergeExprItems(a, b) {
@@ -2249,15 +2249,15 @@ var require_code = __commonJS({
       return c2.emptyStr() ? c1 : c1.emptyStr() ? c2 : str`${c1}${c2}`;
     }
     exports.strConcat = strConcat;
-    function interpolate(x) {
-      return typeof x == "number" || typeof x == "boolean" || x === null ? x : safeStringify(Array.isArray(x) ? x.join(",") : x);
+    function interpolate(x2) {
+      return typeof x2 == "number" || typeof x2 == "boolean" || x2 === null ? x2 : safeStringify(Array.isArray(x2) ? x2.join(",") : x2);
     }
-    function stringify(x) {
-      return new _Code(safeStringify(x));
+    function stringify(x2) {
+      return new _Code(safeStringify(x2));
     }
     exports.stringify = stringify;
-    function safeStringify(x) {
-      return JSON.stringify(x).replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+    function safeStringify(x2) {
+      return JSON.stringify(x2).replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
     }
     exports.safeStringify = safeStringify;
     function getProperty(key) {
@@ -2318,8 +2318,8 @@ var require_scope = __commonJS({
         return `${prefix}${ng.index++}`;
       }
       _nameGroup(prefix) {
-        var _a, _b;
-        if (((_b = (_a = this._parent) === null || _a === void 0 ? void 0 : _a._prefixes) === null || _b === void 0 ? void 0 : _b.has(prefix)) || this._prefixes && !this._prefixes.has(prefix)) {
+        var _a2, _b2;
+        if (((_b2 = (_a2 = this._parent) === null || _a2 === void 0 ? void 0 : _a2._prefixes) === null || _b2 === void 0 ? void 0 : _b2.has(prefix)) || this._prefixes && !this._prefixes.has(prefix)) {
           throw new Error(`CodeGen: prefix "${prefix}" is not allowed in this scope`);
         }
         return this._names[prefix] = { prefix, index: 0 };
@@ -2352,12 +2352,12 @@ var require_scope = __commonJS({
         return new ValueScopeName(prefix, this._newName(prefix));
       }
       value(nameOrPrefix, value) {
-        var _a;
+        var _a2;
         if (value.ref === void 0)
           throw new Error("CodeGen: ref must be passed in value");
         const name = this.toName(nameOrPrefix);
         const { prefix } = name;
-        const valueKey = (_a = value.key) !== null && _a !== void 0 ? _a : value.ref;
+        const valueKey = (_a2 = value.key) !== null && _a2 !== void 0 ? _a2 : value.ref;
         let vs = this._values[prefix];
         if (vs) {
           const _name = vs.get(valueKey);
@@ -2604,27 +2604,27 @@ var require_codegen = __commonJS({
       }
       optimizeNodes() {
         const { nodes } = this;
-        let i = nodes.length;
-        while (i--) {
-          const n = nodes[i].optimizeNodes();
+        let i2 = nodes.length;
+        while (i2--) {
+          const n = nodes[i2].optimizeNodes();
           if (Array.isArray(n))
-            nodes.splice(i, 1, ...n);
+            nodes.splice(i2, 1, ...n);
           else if (n)
-            nodes[i] = n;
+            nodes[i2] = n;
           else
-            nodes.splice(i, 1);
+            nodes.splice(i2, 1);
         }
         return nodes.length > 0 ? this : void 0;
       }
       optimizeNames(names, constants) {
         const { nodes } = this;
-        let i = nodes.length;
-        while (i--) {
-          const n = nodes[i];
+        let i2 = nodes.length;
+        while (i2--) {
+          const n = nodes[i2];
           if (n.optimizeNames(names, constants))
             continue;
           subtractNames(names, n.names);
-          nodes.splice(i, 1);
+          nodes.splice(i2, 1);
         }
         return nodes.length > 0 ? this : void 0;
       }
@@ -2675,8 +2675,8 @@ var require_codegen = __commonJS({
         return this;
       }
       optimizeNames(names, constants) {
-        var _a;
-        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants);
+        var _a2;
+        this.else = (_a2 = this.else) === null || _a2 === void 0 ? void 0 : _a2.optimizeNames(names, constants);
         if (!(super.optimizeNames(names, constants) || this.else))
           return;
         this.condition = optimizeExpr(this.condition, names, constants);
@@ -2780,17 +2780,17 @@ var require_codegen = __commonJS({
         return code;
       }
       optimizeNodes() {
-        var _a, _b;
+        var _a2, _b2;
         super.optimizeNodes();
-        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNodes();
-        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNodes();
+        (_a2 = this.catch) === null || _a2 === void 0 ? void 0 : _a2.optimizeNodes();
+        (_b2 = this.finally) === null || _b2 === void 0 ? void 0 : _b2.optimizeNodes();
         return this;
       }
       optimizeNames(names, constants) {
-        var _a, _b;
+        var _a2, _b2;
         super.optimizeNames(names, constants);
-        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants);
-        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants);
+        (_a2 = this.catch) === null || _a2 === void 0 ? void 0 : _a2.optimizeNames(names, constants);
+        (_b2 = this.finally) === null || _b2 === void 0 ? void 0 : _b2.optimizeNames(names, constants);
         return this;
       }
       get names() {
@@ -2951,8 +2951,8 @@ var require_codegen = __commonJS({
         const name = this._scope.toName(nameOrPrefix);
         if (this.opts.es5) {
           const arr = iterable instanceof code_1.Name ? iterable : this.var("_arr", iterable);
-          return this.forRange("_i", 0, (0, code_1._)`${arr}.length`, (i) => {
-            this.var(name, (0, code_1._)`${arr}[${i}]`);
+          return this.forRange("_i", 0, (0, code_1._)`${arr}.length`, (i2) => {
+            this.var(name, (0, code_1._)`${arr}[${i2}]`);
             forBody(name);
           });
         }
@@ -3120,8 +3120,8 @@ var require_codegen = __commonJS({
       for (const n in from)
         names[n] = (names[n] || 0) - (from[n] || 0);
     }
-    function not(x) {
-      return typeof x == "boolean" || typeof x == "number" || x === null ? !x : (0, code_1._)`!${par(x)}`;
+    function not(x2) {
+      return typeof x2 == "boolean" || typeof x2 == "number" || x2 === null ? !x2 : (0, code_1._)`!${par(x2)}`;
     }
     exports.not = not;
     var andCode = mappend(exports.operators.AND);
@@ -3135,10 +3135,10 @@ var require_codegen = __commonJS({
     }
     exports.or = or;
     function mappend(op) {
-      return (x, y) => x === code_1.nil ? y : y === code_1.nil ? x : (0, code_1._)`${par(x)} ${op} ${par(y)}`;
+      return (x2, y) => x2 === code_1.nil ? y : y === code_1.nil ? x2 : (0, code_1._)`${par(x2)} ${op} ${par(y)}`;
     }
-    function par(x) {
-      return x instanceof code_1.Name ? x : (0, code_1._)`(${x})`;
+    function par(x2) {
+      return x2 instanceof code_1.Name ? x2 : (0, code_1._)`(${x2})`;
     }
   }
 });
@@ -3228,8 +3228,8 @@ var require_util2 = __commonJS({
     exports.unescapeJsonPointer = unescapeJsonPointer;
     function eachItem(xs, f) {
       if (Array.isArray(xs)) {
-        for (const x of xs)
-          f(x);
+        for (const x2 of xs)
+          f(x2);
       } else {
         f(xs);
       }
@@ -3393,21 +3393,21 @@ var require_errors = __commonJS({
     function extendErrors({ gen, keyword, schemaValue, data, errsCount, it }) {
       if (errsCount === void 0)
         throw new Error("ajv implementation error");
-      const err = gen.name("err");
-      gen.forRange("i", errsCount, names_1.default.errors, (i) => {
-        gen.const(err, (0, codegen_1._)`${names_1.default.vErrors}[${i}]`);
-        gen.if((0, codegen_1._)`${err}.instancePath === undefined`, () => gen.assign((0, codegen_1._)`${err}.instancePath`, (0, codegen_1.strConcat)(names_1.default.instancePath, it.errorPath)));
-        gen.assign((0, codegen_1._)`${err}.schemaPath`, (0, codegen_1.str)`${it.errSchemaPath}/${keyword}`);
+      const err2 = gen.name("err");
+      gen.forRange("i", errsCount, names_1.default.errors, (i2) => {
+        gen.const(err2, (0, codegen_1._)`${names_1.default.vErrors}[${i2}]`);
+        gen.if((0, codegen_1._)`${err2}.instancePath === undefined`, () => gen.assign((0, codegen_1._)`${err2}.instancePath`, (0, codegen_1.strConcat)(names_1.default.instancePath, it.errorPath)));
+        gen.assign((0, codegen_1._)`${err2}.schemaPath`, (0, codegen_1.str)`${it.errSchemaPath}/${keyword}`);
         if (it.opts.verbose) {
-          gen.assign((0, codegen_1._)`${err}.schema`, schemaValue);
-          gen.assign((0, codegen_1._)`${err}.data`, data);
+          gen.assign((0, codegen_1._)`${err2}.schema`, schemaValue);
+          gen.assign((0, codegen_1._)`${err2}.data`, data);
         }
       });
     }
     exports.extendErrors = extendErrors;
     function addError(gen, errObj) {
-      const err = gen.const("err", errObj);
-      gen.if((0, codegen_1._)`${names_1.default.vErrors} === null`, () => gen.assign(names_1.default.vErrors, (0, codegen_1._)`[${err}]`), (0, codegen_1._)`${names_1.default.vErrors}.push(${err})`);
+      const err2 = gen.const("err", errObj);
+      gen.if((0, codegen_1._)`${names_1.default.vErrors} === null`, () => gen.assign(names_1.default.vErrors, (0, codegen_1._)`[${err2}]`), (0, codegen_1._)`${names_1.default.vErrors}.push(${err2})`);
       gen.code((0, codegen_1._)`${names_1.default.errors}++`);
     }
     function returnErrors(it, errs) {
@@ -3530,8 +3530,8 @@ var require_rules = __commonJS({
     exports.getRules = exports.isJSONType = void 0;
     var _jsonTypes = ["string", "number", "integer", "boolean", "null", "object", "array"];
     var jsonTypes = new Set(_jsonTypes);
-    function isJSONType(x) {
-      return typeof x == "string" && jsonTypes.has(x);
+    function isJSONType(x2) {
+      return typeof x2 == "string" && jsonTypes.has(x2);
     }
     exports.isJSONType = isJSONType;
     function getRules() {
@@ -3569,8 +3569,8 @@ var require_applicability = __commonJS({
     }
     exports.shouldUseGroup = shouldUseGroup;
     function shouldUseRule(schema, rule) {
-      var _a;
-      return schema[rule.keyword] !== void 0 || ((_a = rule.definition.implements) === null || _a === void 0 ? void 0 : _a.some((kwd) => schema[kwd] !== void 0));
+      var _a2;
+      return schema[rule.keyword] !== void 0 || ((_a2 = rule.definition.implements) === null || _a2 === void 0 ? void 0 : _a2.some((kwd) => schema[kwd] !== void 0));
     }
     exports.shouldUseRule = shouldUseRule;
   }
@@ -3775,7 +3775,7 @@ var require_defaults = __commonJS({
           assignDefault(it, key, properties[key].default);
         }
       } else if (ty === "array" && Array.isArray(items)) {
-        items.forEach((sch, i) => assignDefault(it, i, sch.default));
+        items.forEach((sch, i2) => assignDefault(it, i2, sch.default));
       }
     }
     exports.assignDefaults = assignDefaults;
@@ -3893,10 +3893,10 @@ var require_code2 = __commonJS({
       return valid;
       function validateItems(notValid) {
         const len = gen.const("len", (0, codegen_1._)`${data}.length`);
-        gen.forRange("i", 0, len, (i) => {
+        gen.forRange("i", 0, len, (i2) => {
           cxt.subschema({
             keyword,
-            dataProp: i,
+            dataProp: i2,
             dataPropType: util_1.Type.Num
           }, valid);
           gen.if((0, codegen_1.not)(valid), notValid);
@@ -3913,10 +3913,10 @@ var require_code2 = __commonJS({
         return;
       const valid = gen.let("valid", false);
       const schValid = gen.name("_valid");
-      gen.block(() => schema.forEach((_sch, i) => {
+      gen.block(() => schema.forEach((_sch, i2) => {
         const schCxt = cxt.subschema({
           keyword,
-          schemaProp: i,
+          schemaProp: i2,
           compositeRule: true
         }, schValid);
         gen.assign(valid, (0, codegen_1._)`${valid} || ${schValid}`);
@@ -3958,14 +3958,14 @@ var require_keyword = __commonJS({
     }
     exports.macroKeywordCode = macroKeywordCode;
     function funcKeywordCode(cxt, def) {
-      var _a;
+      var _a2;
       const { gen, keyword, schema, parentSchema, $data, it } = cxt;
       checkAsyncKeyword(it, def);
       const validate = !$data && def.compile ? def.compile.call(it.self, schema, parentSchema, it) : def.validate;
       const validateRef = useKeyword(gen, keyword, validate);
       const valid = gen.let("valid");
       cxt.block$data(valid, validateKeyword);
-      cxt.ok((_a = def.valid) !== null && _a !== void 0 ? _a : valid);
+      cxt.ok((_a2 = def.valid) !== null && _a2 !== void 0 ? _a2 : valid);
       function validateKeyword() {
         if (def.errors === false) {
           assignValid();
@@ -3996,8 +3996,8 @@ var require_keyword = __commonJS({
         gen.assign(valid, (0, codegen_1._)`${_await}${(0, code_1.callValidateCode)(cxt, validateRef, passCxt, passSchema)}`, def.modifying);
       }
       function reportErrs(errors) {
-        var _a2;
-        gen.if((0, codegen_1.not)((_a2 = def.valid) !== null && _a2 !== void 0 ? _a2 : valid), errors);
+        var _a3;
+        gen.if((0, codegen_1.not)((_a3 = def.valid) !== null && _a3 !== void 0 ? _a3 : valid), errors);
       }
     }
     exports.funcKeywordCode = funcKeywordCode;
@@ -4139,12 +4139,12 @@ var require_fast_deep_equal = __commonJS({
       if (a === b) return true;
       if (a && b && typeof a == "object" && typeof b == "object") {
         if (a.constructor !== b.constructor) return false;
-        var length, i, keys;
+        var length, i2, keys;
         if (Array.isArray(a)) {
           length = a.length;
           if (length != b.length) return false;
-          for (i = length; i-- !== 0; )
-            if (!equal(a[i], b[i])) return false;
+          for (i2 = length; i2-- !== 0; )
+            if (!equal(a[i2], b[i2])) return false;
           return true;
         }
         if (a.constructor === RegExp) return a.source === b.source && a.flags === b.flags;
@@ -4153,10 +4153,10 @@ var require_fast_deep_equal = __commonJS({
         keys = Object.keys(a);
         length = keys.length;
         if (length !== Object.keys(b).length) return false;
-        for (i = length; i-- !== 0; )
-          if (!Object.prototype.hasOwnProperty.call(b, keys[i])) return false;
-        for (i = length; i-- !== 0; ) {
-          var key = keys[i];
+        for (i2 = length; i2-- !== 0; )
+          if (!Object.prototype.hasOwnProperty.call(b, keys[i2])) return false;
+        for (i2 = length; i2-- !== 0; ) {
+          var key = keys[i2];
           if (!equal(a[key], b[key])) return false;
         }
         return true;
@@ -4233,8 +4233,8 @@ var require_json_schema_traverse = __commonJS({
           var sch = schema[key];
           if (Array.isArray(sch)) {
             if (key in traverse.arrayKeywords) {
-              for (var i = 0; i < sch.length; i++)
-                _traverse(opts, pre, post, sch[i], jsonPtr + "/" + key + "/" + i, rootSchema, jsonPtr, key, schema, i);
+              for (var i2 = 0; i2 < sch.length; i2++)
+                _traverse(opts, pre, post, sch[i2], jsonPtr + "/" + key + "/" + i2, rootSchema, jsonPtr, key, schema, i2);
             }
           } else if (key in traverse.propsKeywords) {
             if (sch && typeof sch == "object") {
@@ -4965,7 +4965,7 @@ var require_compile = __commonJS({
     var validate_1 = require_validate();
     var SchemaEnv = class {
       constructor(env) {
-        var _a;
+        var _a2;
         this.refs = {};
         this.dynamicAnchors = {};
         let schema;
@@ -4974,7 +4974,7 @@ var require_compile = __commonJS({
         this.schema = env.schema;
         this.schemaId = env.schemaId;
         this.root = env.root || this;
-        this.baseId = (_a = env.baseId) !== null && _a !== void 0 ? _a : (0, resolve_1.normalizeId)(schema === null || schema === void 0 ? void 0 : schema[env.schemaId || "$id"]);
+        this.baseId = (_a2 = env.baseId) !== null && _a2 !== void 0 ? _a2 : (0, resolve_1.normalizeId)(schema === null || schema === void 0 ? void 0 : schema[env.schemaId || "$id"]);
         this.schemaPath = env.schemaPath;
         this.localRefs = env.localRefs;
         this.meta = env.meta;
@@ -5070,14 +5070,14 @@ var require_compile = __commonJS({
     }
     exports.compileSchema = compileSchema;
     function resolveRef(root, baseId, ref) {
-      var _a;
+      var _a2;
       ref = (0, resolve_1.resolveUrl)(this.opts.uriResolver, baseId, ref);
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
       let _sch = resolve.call(this, root, ref);
       if (_sch === void 0) {
-        const schema = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
+        const schema = (_a2 = root.localRefs) === null || _a2 === void 0 ? void 0 : _a2[ref];
         const { schemaId } = this.opts;
         if (schema)
           _sch = new SchemaEnv({ schema, schemaId, root, baseId });
@@ -5146,8 +5146,8 @@ var require_compile = __commonJS({
       "definitions"
     ]);
     function getJsonPointer(parsedRef, { baseId, schema, root }) {
-      var _a;
-      if (((_a = parsedRef.fragment) === null || _a === void 0 ? void 0 : _a[0]) !== "/")
+      var _a2;
+      if (((_a2 = parsedRef.fragment) === null || _a2 === void 0 ? void 0 : _a2[0]) !== "/")
         return;
       for (const part of parsedRef.fragment.slice(1).split("/")) {
         if (typeof schema === "boolean")
@@ -5206,24 +5206,24 @@ var require_utils = __commonJS({
     function stringArrayToHexStripped(input) {
       let acc = "";
       let code = 0;
-      let i = 0;
-      for (i = 0; i < input.length; i++) {
-        code = input[i].charCodeAt(0);
+      let i2 = 0;
+      for (i2 = 0; i2 < input.length; i2++) {
+        code = input[i2].charCodeAt(0);
         if (code === 48) {
           continue;
         }
         if (!(code >= 48 && code <= 57 || code >= 65 && code <= 70 || code >= 97 && code <= 102)) {
           return "";
         }
-        acc += input[i];
+        acc += input[i2];
         break;
       }
-      for (i += 1; i < input.length; i++) {
-        code = input[i].charCodeAt(0);
+      for (i2 += 1; i2 < input.length; i2++) {
+        code = input[i2].charCodeAt(0);
         if (!(code >= 48 && code <= 57 || code >= 65 && code <= 70 || code >= 97 && code <= 102)) {
           return "";
         }
-        acc += input[i];
+        acc += input[i2];
       }
       return acc;
     }
@@ -5253,8 +5253,8 @@ var require_utils = __commonJS({
       let endipv6Encountered = false;
       let endIpv6 = false;
       let consume = consumeHextets;
-      for (let i = 0; i < input.length; i++) {
-        const cursor = input[i];
+      for (let i2 = 0; i2 < input.length; i2++) {
+        const cursor = input[i2];
         if (cursor === "[" || cursor === "]") {
           continue;
         }
@@ -5269,7 +5269,7 @@ var require_utils = __commonJS({
             output.error = true;
             break;
           }
-          if (i > 0 && input[i - 1] === ":") {
+          if (i2 > 0 && input[i2 - 1] === ":") {
             endipv6Encountered = true;
           }
           address.push(":");
@@ -5315,13 +5315,13 @@ var require_utils = __commonJS({
     }
     function findToken(str, token) {
       let ind = 0;
-      for (let i = 0; i < str.length; i++) {
-        if (str[i] === token) ind++;
+      for (let i2 = 0; i2 < str.length; i2++) {
+        if (str[i2] === token) ind++;
       }
       return ind;
     }
-    function removeDotSegments(path11) {
-      let input = path11;
+    function removeDotSegments(path15) {
+      let input = path15;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -5408,9 +5408,9 @@ var require_utils = __commonJS({
         return input;
       }
       let output = "";
-      for (let i = 0; i < input.length; i++) {
-        if (input[i] === "%" && i + 2 < input.length) {
-          const hex = input.slice(i + 1, i + 3);
+      for (let i2 = 0; i2 < input.length; i2++) {
+        if (input[i2] === "%" && i2 + 2 < input.length) {
+          const hex = input.slice(i2 + 1, i2 + 3);
           if (isHexPair(hex)) {
             const normalizedHex = hex.toUpperCase();
             const decoded = String.fromCharCode(parseInt(normalizedHex, 16));
@@ -5419,19 +5419,19 @@ var require_utils = __commonJS({
             } else {
               output += "%" + normalizedHex;
             }
-            i += 2;
+            i2 += 2;
             continue;
           }
         }
-        output += input[i];
+        output += input[i2];
       }
       return output;
     }
     function normalizePathEncoding(input) {
       let output = "";
-      for (let i = 0; i < input.length; i++) {
-        if (input[i] === "%" && i + 2 < input.length) {
-          const hex = input.slice(i + 1, i + 3);
+      for (let i2 = 0; i2 < input.length; i2++) {
+        if (input[i2] === "%" && i2 + 2 < input.length) {
+          const hex = input.slice(i2 + 1, i2 + 3);
           if (isHexPair(hex)) {
             const normalizedHex = hex.toUpperCase();
             const decoded = String.fromCharCode(parseInt(normalizedHex, 16));
@@ -5440,30 +5440,30 @@ var require_utils = __commonJS({
             } else {
               output += "%" + normalizedHex;
             }
-            i += 2;
+            i2 += 2;
             continue;
           }
         }
-        if (isPathCharacter(input[i])) {
-          output += input[i];
+        if (isPathCharacter(input[i2])) {
+          output += input[i2];
         } else {
-          output += escape(input[i]);
+          output += escape(input[i2]);
         }
       }
       return output;
     }
     function escapePreservingEscapes(input) {
       let output = "";
-      for (let i = 0; i < input.length; i++) {
-        if (input[i] === "%" && i + 2 < input.length) {
-          const hex = input.slice(i + 1, i + 3);
+      for (let i2 = 0; i2 < input.length; i2++) {
+        if (input[i2] === "%" && i2 + 2 < input.length) {
+          const hex = input.slice(i2 + 1, i2 + 3);
           if (isHexPair(hex)) {
             output += "%" + hex.toUpperCase();
-            i += 2;
+            i2 += 2;
             continue;
           }
         }
-        output += escape(input[i]);
+        output += escape(input[i2]);
       }
       return output;
     }
@@ -5573,8 +5573,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path11, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path11 && path11 !== "/" ? path11 : void 0;
+        const [path15, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path15 && path15 !== "/" ? path15 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -6095,11 +6095,11 @@ var require_core = __commonJS({
     };
     var MAX_EXPRESSION = 200;
     function requiredOptions(o) {
-      var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0;
+      var _a2, _b2, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0;
       const s = o.strict;
-      const _optz = (_a = o.code) === null || _a === void 0 ? void 0 : _a.optimize;
+      const _optz = (_a2 = o.code) === null || _a2 === void 0 ? void 0 : _a2.optimize;
       const optimize = _optz === true || _optz === void 0 ? 1 : _optz || 0;
-      const regExp = (_c = (_b = o.code) === null || _b === void 0 ? void 0 : _b.regExp) !== null && _c !== void 0 ? _c : defaultRegExp;
+      const regExp = (_c = (_b2 = o.code) === null || _b2 === void 0 ? void 0 : _b2.regExp) !== null && _c !== void 0 ? _c : defaultRegExp;
       const uriResolver = (_d = o.uriResolver) !== null && _d !== void 0 ? _d : uri_1.default;
       return {
         strictSchema: (_f = (_e = o.strictSchema) !== null && _e !== void 0 ? _e : s) !== null && _f !== void 0 ? _f : true,
@@ -6390,9 +6390,9 @@ var require_core = __commonJS({
         delete RULES.keywords[keyword];
         delete RULES.all[keyword];
         for (const group of RULES.rules) {
-          const i = group.rules.findIndex((rule) => rule.keyword === keyword);
-          if (i >= 0)
-            group.rules.splice(i, 1);
+          const i2 = group.rules.findIndex((rule) => rule.keyword === keyword);
+          if (i2 >= 0)
+            group.rules.splice(i2, 1);
         }
         return this;
       }
@@ -6406,7 +6406,7 @@ var require_core = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text, msg) => text + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text2, msg) => text2 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -6571,7 +6571,7 @@ var require_core = __commonJS({
       }
     }
     function addRule(keyword, definition, dataType) {
-      var _a;
+      var _a2;
       const post = definition === null || definition === void 0 ? void 0 : definition.post;
       if (dataType && post)
         throw new Error('keyword with "post" flag cannot have "type"');
@@ -6597,12 +6597,12 @@ var require_core = __commonJS({
       else
         ruleGroup.rules.push(rule);
       RULES.all[keyword] = rule;
-      (_a = definition.implements) === null || _a === void 0 ? void 0 : _a.forEach((kwd) => this.addKeyword(kwd));
+      (_a2 = definition.implements) === null || _a2 === void 0 ? void 0 : _a2.forEach((kwd) => this.addKeyword(kwd));
     }
     function addBeforeRule(ruleGroup, rule, before) {
-      const i = ruleGroup.rules.findIndex((_rule) => _rule.keyword === before);
-      if (i >= 0) {
-        ruleGroup.rules.splice(i, 0, rule);
+      const i2 = ruleGroup.rules.findIndex((_rule) => _rule.keyword === before);
+      if (i2 >= 0) {
+        ruleGroup.rules.splice(i2, 0, rule);
       } else {
         ruleGroup.rules.push(rule);
         this.logger.warn(`rule ${before} is not defined`);
@@ -6731,10 +6731,10 @@ var require_ref = __commonJS({
         gen.assign(names_1.default.errors, (0, codegen_1._)`${names_1.default.vErrors}.length`);
       }
       function addEvaluatedFrom(source) {
-        var _a;
+        var _a2;
         if (!it.opts.unevaluated)
           return;
-        const schEvaluated = (_a = sch === null || sch === void 0 ? void 0 : sch.validate) === null || _a === void 0 ? void 0 : _a.evaluated;
+        const schEvaluated = (_a2 = sch === null || sch === void 0 ? void 0 : sch.validate) === null || _a2 === void 0 ? void 0 : _a2.evaluated;
         if (it.props !== true) {
           if (schEvaluated && !schEvaluated.dynamicProps) {
             if (schEvaluated.props !== void 0) {
@@ -7099,8 +7099,8 @@ var require_uniqueItems = __commonJS({
     var util_1 = require_util2();
     var equal_1 = require_equal();
     var error2 = {
-      message: ({ params: { i, j } }) => (0, codegen_1.str)`must NOT have duplicate items (items ## ${j} and ${i} are identical)`,
-      params: ({ params: { i, j } }) => (0, codegen_1._)`{i: ${i}, j: ${j}}`
+      message: ({ params: { i: i2, j } }) => (0, codegen_1.str)`must NOT have duplicate items (items ## ${j} and ${i2} are identical)`,
+      params: ({ params: { i: i2, j } }) => (0, codegen_1._)`{i: ${i2}, j: ${j}}`
     };
     var def = {
       keyword: "uniqueItems",
@@ -7117,21 +7117,21 @@ var require_uniqueItems = __commonJS({
         cxt.block$data(valid, validateUniqueItems, (0, codegen_1._)`${schemaCode} === false`);
         cxt.ok(valid);
         function validateUniqueItems() {
-          const i = gen.let("i", (0, codegen_1._)`${data}.length`);
+          const i2 = gen.let("i", (0, codegen_1._)`${data}.length`);
           const j = gen.let("j");
-          cxt.setParams({ i, j });
+          cxt.setParams({ i: i2, j });
           gen.assign(valid, true);
-          gen.if((0, codegen_1._)`${i} > 1`, () => (canOptimize() ? loopN : loopN2)(i, j));
+          gen.if((0, codegen_1._)`${i2} > 1`, () => (canOptimize() ? loopN : loopN2)(i2, j));
         }
         function canOptimize() {
           return itemTypes.length > 0 && !itemTypes.some((t) => t === "object" || t === "array");
         }
-        function loopN(i, j) {
+        function loopN(i2, j) {
           const item = gen.name("item");
           const wrongType = (0, dataType_1.checkDataTypes)(itemTypes, item, it.opts.strictNumbers, dataType_1.DataType.Wrong);
           const indices = gen.const("indices", (0, codegen_1._)`{}`);
-          gen.for((0, codegen_1._)`;${i}--;`, () => {
-            gen.let(item, (0, codegen_1._)`${data}[${i}]`);
+          gen.for((0, codegen_1._)`;${i2}--;`, () => {
+            gen.let(item, (0, codegen_1._)`${data}[${i2}]`);
             gen.if(wrongType, (0, codegen_1._)`continue`);
             if (itemTypes.length > 1)
               gen.if((0, codegen_1._)`typeof ${item} == "string"`, (0, codegen_1._)`${item} += "_"`);
@@ -7139,13 +7139,13 @@ var require_uniqueItems = __commonJS({
               gen.assign(j, (0, codegen_1._)`${indices}[${item}]`);
               cxt.error();
               gen.assign(valid, false).break();
-            }).code((0, codegen_1._)`${indices}[${item}] = ${i}`);
+            }).code((0, codegen_1._)`${indices}[${item}] = ${i2}`);
           });
         }
-        function loopN2(i, j) {
+        function loopN2(i2, j) {
           const eql = (0, util_1.useFunc)(gen, equal_1.default);
           const outer = gen.name("outer");
-          gen.label(outer).for((0, codegen_1._)`;${i}--;`, () => gen.for((0, codegen_1._)`${j} = ${i}; ${j}--;`, () => gen.if((0, codegen_1._)`${eql}(${data}[${i}], ${data}[${j}])`, () => {
+          gen.label(outer).for((0, codegen_1._)`;${i2}--;`, () => gen.for((0, codegen_1._)`${j} = ${i2}; ${j}--;`, () => gen.if((0, codegen_1._)`${eql}(${data}[${i2}], ${data}[${j}])`, () => {
             cxt.error();
             gen.assign(valid, false).break(outer);
           })));
@@ -7217,16 +7217,16 @@ var require_enum = __commonJS({
           if (!Array.isArray(schema))
             throw new Error("ajv implementation error");
           const vSchema = gen.const("vSchema", schemaCode);
-          valid = (0, codegen_1.or)(...schema.map((_x, i) => equalCode(vSchema, i)));
+          valid = (0, codegen_1.or)(...schema.map((_x, i2) => equalCode(vSchema, i2)));
         }
         cxt.pass(valid);
         function loopEnum() {
           gen.assign(valid, false);
           gen.forOf("v", schemaCode, (v) => gen.if((0, codegen_1._)`${getEql()}(${data}, ${v})`, () => gen.assign(valid, true).break()));
         }
-        function equalCode(vSchema, i) {
-          const sch = schema[i];
-          return typeof sch === "object" && sch !== null ? (0, codegen_1._)`${getEql()}(${data}, ${vSchema}[${i}])` : (0, codegen_1._)`${data} === ${sch}`;
+        function equalCode(vSchema, i2) {
+          const sch = schema[i2];
+          return typeof sch === "object" && sch !== null ? (0, codegen_1._)`${getEql()}(${data}, ${vSchema}[${i2}])` : (0, codegen_1._)`${data} === ${sch}`;
         }
       }
     };
@@ -7313,8 +7313,8 @@ var require_additionalItems = __commonJS({
         cxt.ok(valid);
       }
       function validateItems(valid) {
-        gen.forRange("i", items.length, len, (i) => {
-          cxt.subschema({ keyword, dataProp: i, dataPropType: util_1.Type.Num }, valid);
+        gen.forRange("i", items.length, len, (i2) => {
+          cxt.subschema({ keyword, dataProp: i2, dataPropType: util_1.Type.Num }, valid);
           if (!it.allErrors)
             gen.if((0, codegen_1.not)(valid), () => gen.break());
         });
@@ -7357,13 +7357,13 @@ var require_items = __commonJS({
       }
       const valid = gen.name("valid");
       const len = gen.const("len", (0, codegen_1._)`${data}.length`);
-      schArr.forEach((sch, i) => {
+      schArr.forEach((sch, i2) => {
         if ((0, util_1.alwaysValidSchema)(it, sch))
           return;
-        gen.if((0, codegen_1._)`${len} > ${i}`, () => cxt.subschema({
+        gen.if((0, codegen_1._)`${len} > ${i2}`, () => cxt.subschema({
           keyword,
-          schemaProp: i,
-          dataProp: i
+          schemaProp: i2,
+          dataProp: i2
         }, valid));
         cxt.ok(valid);
       });
@@ -7442,8 +7442,8 @@ var require_contains = __commonJS({
     var codegen_1 = require_codegen();
     var util_1 = require_util2();
     var error2 = {
-      message: ({ params: { min, max } }) => max === void 0 ? (0, codegen_1.str)`must contain at least ${min} valid item(s)` : (0, codegen_1.str)`must contain at least ${min} and no more than ${max} valid item(s)`,
-      params: ({ params: { min, max } }) => max === void 0 ? (0, codegen_1._)`{minContains: ${min}}` : (0, codegen_1._)`{minContains: ${min}, maxContains: ${max}}`
+      message: ({ params: { min, max: max2 } }) => max2 === void 0 ? (0, codegen_1.str)`must contain at least ${min} valid item(s)` : (0, codegen_1.str)`must contain at least ${min} and no more than ${max2} valid item(s)`,
+      params: ({ params: { min, max: max2 } }) => max2 === void 0 ? (0, codegen_1._)`{minContains: ${min}}` : (0, codegen_1._)`{minContains: ${min}, maxContains: ${max2}}`
     };
     var def = {
       keyword: "contains",
@@ -7455,39 +7455,39 @@ var require_contains = __commonJS({
       code(cxt) {
         const { gen, schema, parentSchema, data, it } = cxt;
         let min;
-        let max;
+        let max2;
         const { minContains, maxContains } = parentSchema;
         if (it.opts.next) {
           min = minContains === void 0 ? 1 : minContains;
-          max = maxContains;
+          max2 = maxContains;
         } else {
           min = 1;
         }
         const len = gen.const("len", (0, codegen_1._)`${data}.length`);
-        cxt.setParams({ min, max });
-        if (max === void 0 && min === 0) {
+        cxt.setParams({ min, max: max2 });
+        if (max2 === void 0 && min === 0) {
           (0, util_1.checkStrictMode)(it, `"minContains" == 0 without "maxContains": "contains" keyword ignored`);
           return;
         }
-        if (max !== void 0 && min > max) {
+        if (max2 !== void 0 && min > max2) {
           (0, util_1.checkStrictMode)(it, `"minContains" > "maxContains" is always invalid`);
           cxt.fail();
           return;
         }
         if ((0, util_1.alwaysValidSchema)(it, schema)) {
           let cond = (0, codegen_1._)`${len} >= ${min}`;
-          if (max !== void 0)
-            cond = (0, codegen_1._)`${cond} && ${len} <= ${max}`;
+          if (max2 !== void 0)
+            cond = (0, codegen_1._)`${cond} && ${len} <= ${max2}`;
           cxt.pass(cond);
           return;
         }
         it.items = true;
         const valid = gen.name("valid");
-        if (max === void 0 && min === 1) {
+        if (max2 === void 0 && min === 1) {
           validateItems(valid, () => gen.if(valid, () => gen.break()));
         } else if (min === 0) {
           gen.let(valid, true);
-          if (max !== void 0)
+          if (max2 !== void 0)
             gen.if((0, codegen_1._)`${data}.length > 0`, validateItemsWithCount);
         } else {
           gen.let(valid, false);
@@ -7500,10 +7500,10 @@ var require_contains = __commonJS({
           validateItems(schValid, () => gen.if(schValid, () => checkLimits(count)));
         }
         function validateItems(_valid, block) {
-          gen.forRange("i", 0, len, (i) => {
+          gen.forRange("i", 0, len, (i2) => {
             cxt.subschema({
               keyword: "contains",
-              dataProp: i,
+              dataProp: i2,
               dataPropType: util_1.Type.Num,
               compositeRule: true
             }, _valid);
@@ -7512,10 +7512,10 @@ var require_contains = __commonJS({
         }
         function checkLimits(count) {
           gen.code((0, codegen_1._)`${count}++`);
-          if (max === void 0) {
+          if (max2 === void 0) {
             gen.if((0, codegen_1._)`${count} >= ${min}`, () => gen.assign(valid, true).break());
           } else {
-            gen.if((0, codegen_1._)`${count} > ${max}`, () => gen.assign(valid, false).break());
+            gen.if((0, codegen_1._)`${count} > ${max2}`, () => gen.assign(valid, false).break());
             if (min === 1)
               gen.assign(valid, true);
             else
@@ -7981,23 +7981,23 @@ var require_oneOf = __commonJS({
         gen.block(validateOneOf);
         cxt.result(valid, () => cxt.reset(), () => cxt.error(true));
         function validateOneOf() {
-          schArr.forEach((sch, i) => {
+          schArr.forEach((sch, i2) => {
             let schCxt;
             if ((0, util_1.alwaysValidSchema)(it, sch)) {
               gen.var(schValid, true);
             } else {
               schCxt = cxt.subschema({
                 keyword: "oneOf",
-                schemaProp: i,
+                schemaProp: i2,
                 compositeRule: true
               }, schValid);
             }
-            if (i > 0) {
-              gen.if((0, codegen_1._)`${schValid} && ${valid}`).assign(valid, false).assign(passing, (0, codegen_1._)`[${passing}, ${i}]`).else();
+            if (i2 > 0) {
+              gen.if((0, codegen_1._)`${schValid} && ${valid}`).assign(valid, false).assign(passing, (0, codegen_1._)`[${passing}, ${i2}]`).else();
             }
             gen.if(schValid, () => {
               gen.assign(valid, true);
-              gen.assign(passing, i);
+              gen.assign(passing, i2);
               if (schCxt)
                 cxt.mergeEvaluated(schCxt, codegen_1.Name);
             });
@@ -8023,10 +8023,10 @@ var require_allOf = __commonJS({
         if (!Array.isArray(schema))
           throw new Error("ajv implementation error");
         const valid = gen.name("valid");
-        schema.forEach((sch, i) => {
+        schema.forEach((sch, i2) => {
           if ((0, util_1.alwaysValidSchema)(it, sch))
             return;
-          const schCxt = cxt.subschema({ keyword: "allOf", schemaProp: i }, valid);
+          const schCxt = cxt.subschema({ keyword: "allOf", schemaProp: i2 }, valid);
           cxt.ok(valid);
           cxt.mergeEvaluated(schCxt);
         });
@@ -8385,12 +8385,12 @@ var require_discriminator = __commonJS({
           return _valid;
         }
         function getMapping() {
-          var _a;
+          var _a2;
           const oneOfMapping = {};
           const topRequired = hasRequired(parentSchema);
           let tagRequired = true;
-          for (let i = 0; i < oneOf.length; i++) {
-            let sch = oneOf[i];
+          for (let i2 = 0; i2 < oneOf.length; i2++) {
+            let sch = oneOf[i2];
             if ((sch === null || sch === void 0 ? void 0 : sch.$ref) && !(0, util_1.schemaHasRulesButRef)(sch, it.self.RULES)) {
               const ref = sch.$ref;
               sch = compile_1.resolveRef.call(it.self, it.schemaEnv.root, it.baseId, ref);
@@ -8399,12 +8399,12 @@ var require_discriminator = __commonJS({
               if (sch === void 0)
                 throw new ref_error_1.default(it.opts.uriResolver, it.baseId, ref);
             }
-            const propSch = (_a = sch === null || sch === void 0 ? void 0 : sch.properties) === null || _a === void 0 ? void 0 : _a[tagName];
+            const propSch = (_a2 = sch === null || sch === void 0 ? void 0 : sch.properties) === null || _a2 === void 0 ? void 0 : _a2[tagName];
             if (typeof propSch != "object") {
               throw new Error(`discriminator: oneOf subschemas (or referenced schemas) must have "properties/${tagName}"`);
             }
             tagRequired = tagRequired && (topRequired || hasRequired(sch));
-            addMappings(propSch, i);
+            addMappings(propSch, i2);
           }
           if (!tagRequired)
             throw new Error(`discriminator: "${tagName}" must be required`);
@@ -8412,22 +8412,22 @@ var require_discriminator = __commonJS({
           function hasRequired({ required: required2 }) {
             return Array.isArray(required2) && required2.includes(tagName);
           }
-          function addMappings(sch, i) {
+          function addMappings(sch, i2) {
             if (sch.const) {
-              addMapping(sch.const, i);
+              addMapping(sch.const, i2);
             } else if (sch.enum) {
               for (const tagValue of sch.enum) {
-                addMapping(tagValue, i);
+                addMapping(tagValue, i2);
               }
             } else {
               throw new Error(`discriminator: "properties/${tagName}" must have "const" or "enum"`);
             }
           }
-          function addMapping(tagValue, i) {
+          function addMapping(tagValue, i2) {
             if (typeof tagValue != "string" || tagValue in oneOfMapping) {
               throw new Error(`discriminator: "${tagName}" values must be unique strings`);
             }
-            oneOfMapping[tagValue] = i;
+            oneOfMapping[tagValue] = i2;
           }
         }
       }
@@ -8967,12 +8967,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs10, exportName) {
-      var _a;
-      var _b;
-      (_a = (_b = ajv.opts.code).formats) !== null && _a !== void 0 ? _a : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
+    function addFormats(ajv, list, fs17, exportName) {
+      var _a2;
+      var _b2;
+      (_a2 = (_b2 = ajv.opts.code).formats) !== null && _a2 !== void 0 ? _a2 : _b2.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs10[f]);
+        ajv.addFormat(f, fs17[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -8981,7 +8981,7 @@ var require_dist = __commonJS({
 });
 
 // src/index.ts
-import { promises as fs9 } from "node:fs";
+import { promises as fs16 } from "node:fs";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
@@ -8994,12 +8994,12 @@ var NEVER = Object.freeze({
 // @__NO_SIDE_EFFECTS__
 function $constructor(name, initializer3, params) {
   function init(inst, def) {
-    var _a;
+    var _a2;
     Object.defineProperty(inst, "_zod", {
       value: inst._zod ?? {},
       enumerable: false
     });
-    (_a = inst._zod).traits ?? (_a.traits = /* @__PURE__ */ new Set());
+    (_a2 = inst._zod).traits ?? (_a2.traits = /* @__PURE__ */ new Set());
     inst._zod.traits.add(name);
     initializer3(inst, def);
     for (const k in _.prototype) {
@@ -9014,10 +9014,10 @@ function $constructor(name, initializer3, params) {
   }
   Object.defineProperty(Definition, "name", { value: name });
   function _(def) {
-    var _a;
+    var _a2;
     const inst = params?.Parent ? new Definition() : this;
     init(inst, def);
-    (_a = inst._zod).deferred ?? (_a.deferred = []);
+    (_a2 = inst._zod).deferred ?? (_a2.deferred = []);
     for (const fn of inst._zod.deferred) {
       fn();
     }
@@ -9182,18 +9182,18 @@ function assignProp(target, prop, value) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path11) {
-  if (!path11)
+function getElementAtPath(obj, path15) {
+  if (!path15)
     return obj;
-  return path11.reduce((acc, key) => acc?.[key], obj);
+  return path15.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
   const promises = keys.map((key) => promisesObj[key]);
   return Promise.all(promises).then((results) => {
     const resolvedObj = {};
-    for (let i = 0; i < keys.length; i++) {
-      resolvedObj[keys[i]] = results[i];
+    for (let i2 = 0; i2 < keys.length; i2++) {
+      resolvedObj[keys[i2]] = results[i2];
     }
     return resolvedObj;
   });
@@ -9201,7 +9201,7 @@ function promiseAllObject(promisesObj) {
 function randomString(length = 10) {
   const chars = "abcdefghijklmnopqrstuvwxyz";
   let str = "";
-  for (let i = 0; i < length; i++) {
+  for (let i2 = 0; i2 < length; i2++) {
     str += chars[Math.floor(Math.random() * chars.length)];
   }
   return str;
@@ -9498,18 +9498,18 @@ function required(Class2, schema, mask) {
     checks: []
   });
 }
-function aborted(x, startIndex = 0) {
-  for (let i = startIndex; i < x.issues.length; i++) {
-    if (x.issues[i]?.continue !== true)
+function aborted(x2, startIndex = 0) {
+  for (let i2 = startIndex; i2 < x2.issues.length; i2++) {
+    if (x2.issues[i2]?.continue !== true)
       return true;
   }
   return false;
 }
-function prefixIssues(path11, issues) {
+function prefixIssues(path15, issues) {
   return issues.map((iss) => {
-    var _a;
-    (_a = iss).path ?? (_a.path = []);
-    iss.path.unshift(path11);
+    var _a2;
+    (_a2 = iss).path ?? (_a2.path = []);
+    iss.path.unshift(path15);
     return iss;
   });
 }
@@ -9622,10 +9622,10 @@ function formatError(error2, _mapper) {
         fieldErrors._errors.push(mapper(issue2));
       } else {
         let curr = fieldErrors;
-        let i = 0;
-        while (i < issue2.path.length) {
-          const el = issue2.path[i];
-          const terminal = i === issue2.path.length - 1;
+        let i2 = 0;
+        while (i2 < issue2.path.length) {
+          const el = issue2.path[i2];
+          const terminal = i2 === issue2.path.length - 1;
           if (!terminal) {
             curr[el] = curr[el] || { _errors: [] };
           } else {
@@ -9633,7 +9633,7 @@ function formatError(error2, _mapper) {
             curr[el]._errors.push(mapper(issue2));
           }
           curr = curr[el];
-          i++;
+          i2++;
         }
       }
     }
@@ -9754,10 +9754,10 @@ var uppercase = /^[^a-z]*$/;
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
-  var _a;
+  var _a2;
   inst._zod ?? (inst._zod = {});
   inst._zod.def = def;
-  (_a = inst._zod).onattach ?? (_a.onattach = []);
+  (_a2 = inst._zod).onattach ?? (_a2.onattach = []);
 });
 var numericOriginMap = {
   number: "number",
@@ -9823,8 +9823,8 @@ var $ZodCheckGreaterThan = /* @__PURE__ */ $constructor("$ZodCheckGreaterThan", 
 var $ZodCheckMultipleOf = /* @__PURE__ */ $constructor("$ZodCheckMultipleOf", (inst, def) => {
   $ZodCheck.init(inst, def);
   inst._zod.onattach.push((inst2) => {
-    var _a;
-    (_a = inst2._zod.bag).multipleOf ?? (_a.multipleOf = def.value);
+    var _a2;
+    (_a2 = inst2._zod.bag).multipleOf ?? (_a2.multipleOf = def.value);
   });
   inst._zod.check = (payload) => {
     if (typeof payload.value !== typeof def.value)
@@ -9917,9 +9917,9 @@ var $ZodCheckNumberFormat = /* @__PURE__ */ $constructor("$ZodCheckNumberFormat"
   };
 });
 var $ZodCheckMaxLength = /* @__PURE__ */ $constructor("$ZodCheckMaxLength", (inst, def) => {
-  var _a;
+  var _a2;
   $ZodCheck.init(inst, def);
-  (_a = inst._zod.def).when ?? (_a.when = (payload) => {
+  (_a2 = inst._zod.def).when ?? (_a2.when = (payload) => {
     const val = payload.value;
     return !nullish(val) && val.length !== void 0;
   });
@@ -9946,9 +9946,9 @@ var $ZodCheckMaxLength = /* @__PURE__ */ $constructor("$ZodCheckMaxLength", (ins
   };
 });
 var $ZodCheckMinLength = /* @__PURE__ */ $constructor("$ZodCheckMinLength", (inst, def) => {
-  var _a;
+  var _a2;
   $ZodCheck.init(inst, def);
-  (_a = inst._zod.def).when ?? (_a.when = (payload) => {
+  (_a2 = inst._zod.def).when ?? (_a2.when = (payload) => {
     const val = payload.value;
     return !nullish(val) && val.length !== void 0;
   });
@@ -9975,9 +9975,9 @@ var $ZodCheckMinLength = /* @__PURE__ */ $constructor("$ZodCheckMinLength", (ins
   };
 });
 var $ZodCheckLengthEquals = /* @__PURE__ */ $constructor("$ZodCheckLengthEquals", (inst, def) => {
-  var _a;
+  var _a2;
   $ZodCheck.init(inst, def);
-  (_a = inst._zod.def).when ?? (_a.when = (payload) => {
+  (_a2 = inst._zod.def).when ?? (_a2.when = (payload) => {
     const val = payload.value;
     return !nullish(val) && val.length !== void 0;
   });
@@ -10006,7 +10006,7 @@ var $ZodCheckLengthEquals = /* @__PURE__ */ $constructor("$ZodCheckLengthEquals"
   };
 });
 var $ZodCheckStringFormat = /* @__PURE__ */ $constructor("$ZodCheckStringFormat", (inst, def) => {
-  var _a, _b;
+  var _a2, _b2;
   $ZodCheck.init(inst, def);
   inst._zod.onattach.push((inst2) => {
     const bag = inst2._zod.bag;
@@ -10017,7 +10017,7 @@ var $ZodCheckStringFormat = /* @__PURE__ */ $constructor("$ZodCheckStringFormat"
     }
   });
   if (def.pattern)
-    (_a = inst._zod).check ?? (_a.check = (payload) => {
+    (_a2 = inst._zod).check ?? (_a2.check = (payload) => {
       def.pattern.lastIndex = 0;
       if (def.pattern.test(payload.value))
         return;
@@ -10032,7 +10032,7 @@ var $ZodCheckStringFormat = /* @__PURE__ */ $constructor("$ZodCheckStringFormat"
       });
     });
   else
-    (_b = inst._zod).check ?? (_b.check = () => {
+    (_b2 = inst._zod).check ?? (_b2.check = () => {
     });
 });
 var $ZodCheckRegex = /* @__PURE__ */ $constructor("$ZodCheckRegex", (inst, def) => {
@@ -10157,9 +10157,9 @@ var Doc = class {
       return;
     }
     const content = arg;
-    const lines = content.split("\n").filter((x) => x);
-    const minIndent = Math.min(...lines.map((x) => x.length - x.trimStart().length));
-    const dedented = lines.map((x) => x.slice(minIndent)).map((x) => " ".repeat(this.indent * 2) + x);
+    const lines = content.split("\n").filter((x2) => x2);
+    const minIndent = Math.min(...lines.map((x2) => x2.length - x2.trimStart().length));
+    const dedented = lines.map((x2) => x2.slice(minIndent)).map((x2) => " ".repeat(this.indent * 2) + x2);
     for (const line of dedented) {
       this.content.push(line);
     }
@@ -10168,7 +10168,7 @@ var Doc = class {
     const F = Function;
     const args = this?.args;
     const content = this?.content ?? [``];
-    const lines = [...content.map((x) => `  ${x}`)];
+    const lines = [...content.map((x2) => `  ${x2}`)];
     return new F(...args, lines.join("\n"));
   }
 };
@@ -10182,7 +10182,7 @@ var version = {
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
-  var _a;
+  var _a2;
   inst ?? (inst = {});
   inst._zod.def = def;
   inst._zod.bag = inst._zod.bag || {};
@@ -10197,7 +10197,7 @@ var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
     }
   }
   if (checks.length === 0) {
-    (_a = inst._zod).deferred ?? (_a.deferred = []);
+    (_a2 = inst._zod).deferred ?? (_a2.deferred = []);
     inst._zod.deferred?.push(() => {
       inst._zod.run = inst._zod.parse;
     });
@@ -10646,11 +10646,11 @@ var $ZodNever = /* @__PURE__ */ $constructor("$ZodNever", (inst, def) => {
     return payload;
   };
 });
-function handleArrayResult(result, final, index) {
+function handleArrayResult(result, final, index2) {
   if (result.issues.length) {
-    final.issues.push(...prefixIssues(index, result.issues));
+    final.issues.push(...prefixIssues(index2, result.issues));
   }
-  final.value[index] = result.value;
+  final.value[index2] = result.value;
 }
 var $ZodArray = /* @__PURE__ */ $constructor("$ZodArray", (inst, def) => {
   $ZodType.init(inst, def);
@@ -10667,16 +10667,16 @@ var $ZodArray = /* @__PURE__ */ $constructor("$ZodArray", (inst, def) => {
     }
     payload.value = Array(input.length);
     const proms = [];
-    for (let i = 0; i < input.length; i++) {
-      const item = input[i];
+    for (let i2 = 0; i2 < input.length; i2++) {
+      const item = input[i2];
       const result = def.element._zod.run({
         value: item,
         issues: []
       }, ctx);
       if (result instanceof Promise) {
-        proms.push(result.then((result2) => handleArrayResult(result2, payload, i)));
+        proms.push(result.then((result2) => handleArrayResult(result2, payload, i2)));
       } else {
-        handleArrayResult(result, payload, i);
+        handleArrayResult(result, payload, i2);
       }
     }
     if (proms.length) {
@@ -11034,14 +11034,14 @@ function mergeValues(a, b) {
       return { valid: false, mergeErrorPath: [] };
     }
     const newArray = [];
-    for (let index = 0; index < a.length; index++) {
-      const itemA = a[index];
-      const itemB = b[index];
+    for (let index2 = 0; index2 < a.length; index2++) {
+      const itemA = a[index2];
+      const itemB = b[index2];
       const sharedValue = mergeValues(itemA, itemB);
       if (!sharedValue.valid) {
         return {
           valid: false,
-          mergeErrorPath: [index, ...sharedValue.mergeErrorPath]
+          mergeErrorPath: [index2, ...sharedValue.mergeErrorPath]
         };
       }
       newArray.push(sharedValue.data);
@@ -11289,7 +11289,7 @@ var $ZodNonOptional = /* @__PURE__ */ $constructor("$ZodNonOptional", (inst, def
   $ZodType.init(inst, def);
   defineLazy(inst._zod, "values", () => {
     const v = def.innerType._zod.values;
-    return v ? new Set([...v].filter((x) => x !== void 0)) : void 0;
+    return v ? new Set([...v].filter((x2) => x2 !== void 0)) : void 0;
   });
   inst._zod.parse = (payload, ctx) => {
     const result = def.innerType._zod.run(payload, ctx);
@@ -12036,7 +12036,7 @@ var JSONSchemaGenerator = class {
     this.seen = /* @__PURE__ */ new Map();
   }
   process(schema, _params = { path: [], schemaPath: [] }) {
-    var _a;
+    var _a2;
     const def = schema._zod.def;
     const formatMap = {
       guid: "uuid",
@@ -12235,9 +12235,9 @@ var JSONSchemaGenerator = class {
           }
           case "union": {
             const json2 = _json;
-            json2.anyOf = def.options.map((x, i) => this.process(x, {
+            json2.anyOf = def.options.map((x2, i2) => this.process(x2, {
               ...params,
-              path: [...params.path, "anyOf", i]
+              path: [...params.path, "anyOf", i2]
             }));
             break;
           }
@@ -12262,7 +12262,7 @@ var JSONSchemaGenerator = class {
           case "tuple": {
             const json2 = _json;
             json2.type = "array";
-            const prefixItems = def.items.map((x, i) => this.process(x, { ...params, path: [...params.path, "prefixItems", i] }));
+            const prefixItems = def.items.map((x2, i2) => this.process(x2, { ...params, path: [...params.path, "prefixItems", i2] }));
             if (this.target === "draft-2020-12") {
               json2.prefixItems = prefixItems;
             } else {
@@ -12498,7 +12498,7 @@ var JSONSchemaGenerator = class {
       delete result.schema.default;
     }
     if (this.io === "input" && result.schema._prefault)
-      (_a = result.schema).default ?? (_a.default = result.schema._prefault);
+      (_a2 = result.schema).default ?? (_a2.default = result.schema._prefault);
     delete result.schema._prefault;
     const _result = this.seen.get(schema);
     return _result.schema;
@@ -15025,12 +15025,12 @@ var ReadBuffer = class {
     if (!this._buffer) {
       return null;
     }
-    const index = this._buffer.indexOf("\n");
-    if (index === -1) {
+    const index2 = this._buffer.indexOf("\n");
+    if (index2 === -1) {
       return null;
     }
-    const line = this._buffer.toString("utf8", 0, index).replace(/\r$/, "");
-    this._buffer = this._buffer.subarray(index + 1);
+    const line = this._buffer.toString("utf8", 0, index2).replace(/\r$/, "");
+    this._buffer = this._buffer.subarray(index2 + 1);
     return deserializeMessage(line);
   }
   clear() {
@@ -15180,11 +15180,11 @@ var PROBE_FIELDS = [
   "lastDbFileHeldByOther"
 ];
 function parseObservation(stdout) {
-  const text = stdout.replace(/^\uFEFF/, "").trim();
-  if (!text.startsWith("{")) return void 0;
+  const text2 = stdout.replace(/^\uFEFF/, "").trim();
+  if (!text2.startsWith("{")) return void 0;
   let raw;
   try {
-    raw = JSON.parse(text);
+    raw = JSON.parse(text2);
   } catch {
     return void 0;
   }
@@ -15241,6 +15241,7 @@ function log(message) {
 // src/config.ts
 var DEFAULT_EXE = "C:\\Program Files (x86)\\MyLifeOrganized.net\\MLO\\mlo.exe";
 var DEFAULT_CLOUD_PORT = 8181;
+var DEFAULT_WRITE_TTL_MS = 15 * 6e4;
 function resolveDataFile(mloExePath) {
   const pin = process.argv.find((a) => a.startsWith("--data-file="));
   if (pin) return { dataFile: pin.slice("--data-file=".length), autoDetected: false };
@@ -15259,17 +15260,22 @@ function loadCloudConfig() {
   if (!Number.isInteger(cloudPort) || cloudPort < 0 || cloudPort > 65535) {
     throw new Error("MLO_CLOUD_PORT must be an integer from 0 through 65535");
   }
+  const ttlMinutes = Number(process.env.MLO_WRITE_TTL_MINUTES ?? "");
   return {
     cloudHost: process.env.MLO_CLOUD_HOST ?? "127.0.0.1",
     cloudPort,
-    cloudStateRoot: resolveStateRoot()
+    cloudStateRoot: resolveStateRoot(),
+    // `||`, not `??`: a blank override would yield an empty process name, match
+    // nothing, and make detection report MLO as closed — which accepts the
+    // registry candidate unchecked.
+    mloExePath: process.env.MLO_EXE_PATH || DEFAULT_EXE,
+    writeTtlMs: Number.isFinite(ttlMinutes) && ttlMinutes > 0 ? ttlMinutes * 6e4 : DEFAULT_WRITE_TTL_MS
   };
 }
 function loadConfig() {
-  const mloExePath = process.env.MLO_EXE_PATH || DEFAULT_EXE;
-  const { dataFile, autoDetected } = resolveDataFile(mloExePath);
+  const cloud = loadCloudConfig();
+  const { dataFile, autoDetected } = resolveDataFile(cloud.mloExePath);
   return {
-    mloExePath,
     dataFile,
     dataFileAutoDetected: autoDetected,
     exportDir: process.env.MLO_EXPORT_DIR ?? path2.join(os.tmpdir(), "mlo-mcp"),
@@ -15278,11 +15284,11 @@ function loadConfig() {
     // hand-made "Входящие" folder). MLO itself hardcodes the caption "<Inbox>"
     // in every UI language, so most profiles need no override.
     inboxCaption: process.env.MLO_INBOX_CAPTION || void 0,
-    ...loadCloudConfig()
+    ...cloud
   };
 }
 
-// src/mlo-cli.ts
+// src/repo/mlo-cli.ts
 import { spawn } from "node:child_process";
 import { promises as fs } from "node:fs";
 import path3 from "node:path";
@@ -15347,80 +15353,96 @@ async function withFileLock(config2, fn) {
 function withMloFileLock(config2, fn) {
   return withMloLock(() => withFileLock(config2, fn));
 }
+function mloArgs(dataFile, flags) {
+  if (!dataFile) {
+    throw new MloError("refusing a pathless mlo.exe invocation: it can silently no-op against a stale registry profile");
+  }
+  for (const flag of flags) {
+    if (!flag.startsWith("-")) {
+      throw new MloError(
+        `refusing mlo.exe argument "${flag}": a bare argument parses as <FileToOpen> and spawns a second MLO instance`
+      );
+    }
+  }
+  return [dataFile, ...flags, "-console"];
+}
 function delphiQuote(arg) {
   if (arg.length > 0 && !/[\s"]/.test(arg)) return arg;
   return `"${arg.replaceAll('"', '""')}"`;
 }
-function execMlo(config2, args, timeoutMs) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(config2.mloExePath, [...args, "-console"].map(delphiQuote), {
-      timeout: timeoutMs,
-      windowsHide: true,
-      killSignal: "SIGKILL",
-      windowsVerbatimArguments: true,
-      // with verbatim arguments the exe path itself must be quoted in the
-      // command line, or its spaces shift every parameter the child sees
-      argv0: delphiQuote(config2.mloExePath),
-      stdio: "ignore"
-    });
-    child.on("error", (err) => {
-      if (err.code === "ENOENT") {
-        reject(new MloError(`mlo.exe not found at "${config2.mloExePath}". Set MLO_EXE_PATH to the correct location.`));
-      } else {
-        reject(new MloError(`failed to run mlo.exe: ${err.message}`));
-      }
-    });
-    child.on("exit", (code, signal) => {
-      if (signal) {
-        reject(
-          new MloError(
-            `mlo.exe did not finish within ${timeoutMs / 1e3}s and was killed. This happens when MLO opens a modal dialog (e.g. an invalid -task GUID while the GUI is running).`
-          )
-        );
-      } else if (code === 0) {
-        resolve();
-      } else {
-        const detail = EXIT_MESSAGES[code ?? -1] ?? "unknown exit code";
-        reject(new MloError(`mlo.exe exited with code ${code}: ${detail}`, code ?? void 0));
-      }
-    });
+var execMlo = (exePath, args, timeoutMs) => new Promise((resolve, reject) => {
+  const child = spawn(exePath, args.map(delphiQuote), {
+    timeout: timeoutMs,
+    windowsHide: true,
+    killSignal: "SIGKILL",
+    windowsVerbatimArguments: true,
+    // with verbatim arguments the exe path itself must be quoted in the
+    // command line, or its spaces shift every parameter the child sees
+    argv0: delphiQuote(exePath),
+    stdio: "ignore"
   });
-}
-var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function ensureDataFile(config2) {
-  try {
-    await fs.access(config2.dataFile);
-  } catch {
-    throw new MloError(`MLO data file not found at "${config2.dataFile}"`);
-  }
-}
-var exportCounter = 0;
-function exportXml(config2, taskGuid) {
-  return withMloFileLock(config2, async () => {
-    await ensureDataFile(config2);
-    await fs.mkdir(config2.exportDir, { recursive: true });
-    const target = path3.join(config2.exportDir, `export-${process.pid}-${++exportCounter}.xml`);
-    await fs.rm(target, { force: true });
-    const args = [config2.dataFile];
-    if (taskGuid) args.push(`-task=${taskGuid}`);
-    args.push(`-saveXML=${target}`);
-    try {
-      await execMlo(config2, args, 3e4);
-      return await fs.readFile(target, "utf8");
-    } finally {
-      await fs.rm(target, { force: true });
+  child.on("error", (err2) => {
+    if (err2.code === "ENOENT") {
+      reject(new MloError(`mlo.exe not found at "${exePath}". Set MLO_EXE_PATH to the correct location.`));
+    } else {
+      reject(new MloError(`failed to run mlo.exe: ${err2.message}`));
     }
   });
-}
-function quickSync(config2) {
-  return withMloFileLock(config2, async () => {
-    await ensureDataFile(config2);
-    await execMlo(config2, [config2.dataFile, "-QuickSync"], 12e4);
+  child.on("exit", (code, signal) => {
+    if (signal) {
+      reject(
+        new MloError(
+          `mlo.exe did not finish within ${timeoutMs / 1e3}s and was killed. This happens when MLO opens a modal dialog (e.g. an invalid -task GUID while the GUI is running).`
+        )
+      );
+    } else if (code === 0) {
+      resolve();
+    } else {
+      const detail = EXIT_MESSAGES[code ?? -1] ?? "unknown exit code";
+      reject(new MloError(`mlo.exe exited with code ${code}: ${detail}`, code ?? void 0));
+    }
   });
-}
-function readDataFile(config2) {
-  return fs.readFile(config2.dataFile);
-}
+});
+var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+var exportCounter = 0;
+var SystemMloCli = class {
+  constructor(config2, exec = execMlo) {
+    this.config = config2;
+    this.exec = exec;
+  }
+  config;
+  exec;
+  async ensureDataFile() {
+    try {
+      await fs.access(this.config.dataFile);
+    } catch {
+      throw new MloError(`MLO data file not found at "${this.config.dataFile}"`);
+    }
+  }
+  exportXml() {
+    return withMloFileLock(this.config, async () => {
+      await this.ensureDataFile();
+      await fs.mkdir(this.config.exportDir, { recursive: true });
+      const target = path3.join(this.config.exportDir, `export-${process.pid}-${++exportCounter}.xml`);
+      await fs.rm(target, { force: true });
+      try {
+        await this.exec(this.config.mloExePath, mloArgs(this.config.dataFile, [`-saveXML=${target}`]), 3e4);
+        return await fs.readFile(target, "utf8");
+      } finally {
+        await fs.rm(target, { force: true });
+      }
+    });
+  }
+  quickSync() {
+    return withMloFileLock(this.config, async () => {
+      await this.ensureDataFile();
+      await this.exec(this.config.mloExePath, mloArgs(this.config.dataFile, ["-QuickSync"]), 12e4);
+    });
+  }
+  readDataFile() {
+    return fs.readFile(this.config.dataFile);
+  }
+};
 
 // src/xml.ts
 var import_fast_xml_parser = __toESM(require_fxp(), 1);
@@ -15468,7 +15490,7 @@ function num(v) {
   return v === void 0 || v === "" ? void 0 : Number(v);
 }
 function toModel(raw, id, parentPath, depth) {
-  const path11 = [...parentPath, raw["@_Caption"]];
+  const path15 = [...parentPath, raw["@_Caption"]];
   const node = {
     id,
     Guid: raw.IDD,
@@ -15494,14 +15516,21 @@ function toModel(raw, id, parentPath, depth) {
     CompleteSubTasksInOrder: delphiBool(raw.CompleteSubTasksInOrder),
     DependsOn: raw.Dependency?.UID ?? [],
     Children: [],
-    Path: path11,
+    Path: path15,
     Depth: depth
   };
-  node.Children = (raw.TaskNode ?? []).map((c, i) => toModel(c, `${id}.${i + 1}`, path11, depth + 1));
+  node.Children = (raw.TaskNode ?? []).map((c, i2) => toModel(c, `${id}.${i2 + 1}`, path15, depth + 1));
   return node;
 }
 function buildTaskTree(doc) {
-  return (rootNode(doc).TaskNode ?? []).map((c, i) => toModel(c, String(i + 1), [], 0));
+  return (rootNode(doc).TaskNode ?? []).map((c, i2) => toModel(c, String(i2 + 1), [], 0));
+}
+function renumbered(tasks, parentPath = [], depth = 0, parentId = "") {
+  return tasks.map((task, index2) => {
+    const id = parentId ? `${parentId}.${index2 + 1}` : String(index2 + 1);
+    const Path = [...parentPath, task.Caption];
+    return { ...task, id, Path, Depth: depth, Children: renumbered(task.Children, Path, depth + 1, id) };
+  });
 }
 function flatten(tasks) {
   const out = [];
@@ -15518,8 +15547,23 @@ function findById(tasks, id) {
   return flatten(tasks).find((t) => t.id === id);
 }
 var INBOX_CAPTIONS = ["<Inbox>", "Inbox"];
+function inboxCaptions(configCaption) {
+  return configCaption ? [configCaption, ...INBOX_CAPTIONS] : INBOX_CAPTIONS;
+}
 function looksLikeInbox(t) {
   return t.Depth === 0 && INBOX_CAPTIONS.includes(t.Caption);
+}
+function findInbox(tasks, configCaption) {
+  for (const cap of inboxCaptions(configCaption)) {
+    const hit = tasks.find((t) => t.Caption === cap);
+    if (hit) return hit;
+  }
+  return void 0;
+}
+function containerKind(t) {
+  if (t.IsProject) return "project";
+  if (t.HideInToDoThisTask) return "folder";
+  return void 0;
 }
 function searchTasks(tasks, f) {
   const q = f.query?.toLowerCase();
@@ -15540,6 +15584,7 @@ function searchTasks(tasks, f) {
 function renderLine(t) {
   const marks = [];
   if (looksLikeInbox(t)) marks.push("[inbox]");
+  if (t.pending) marks.push("[pending]");
   if (t.CompletionDateTime) marks.push("[done]");
   if (t.IsProject) marks.push("[project]");
   if (t.Starred) marks.push("[*]");
@@ -15581,8 +15626,22 @@ function inflateDataFile(ml) {
   return inflateRawSync(ml.subarray(start, start + compSize));
 }
 function formatGuid(b) {
-  const h = (x) => x.toString(16).padStart(2, "0");
+  const h = (x2) => x2.toString(16).padStart(2, "0");
   return "{" + (h(b[3]) + h(b[2]) + h(b[1]) + h(b[0]) + "-" + h(b[5]) + h(b[4]) + "-" + h(b[7]) + h(b[6]) + "-" + h(b[8]) + h(b[9]) + "-" + [...b.subarray(10, 16)].map(h).join("")).toUpperCase() + "}";
+}
+function guidFooterOffsets(raw) {
+  const offsets = [];
+  let at = raw.indexOf(GUID_PREFIX);
+  while (at !== -1) {
+    offsets.push(at + GUID_PREFIX.length);
+    at = raw.indexOf(GUID_PREFIX, at + 1);
+  }
+  return offsets;
+}
+function taskGuidsInDataFile(mlFile) {
+  const raw = inflateDataFile(mlFile);
+  const offsets = guidFooterOffsets(raw).slice(0, -1);
+  return offsets.map((offset) => formatGuid(raw.subarray(offset, offset + 16)));
 }
 function annotateGuids(mlFile, tasks) {
   const raw = inflateDataFile(mlFile);
@@ -15608,10 +15667,10 @@ function annotateGuids(mlFile, tasks) {
     n.capOff = idx;
     cursor = idx + needle.length;
   }
-  for (let i = 0; i < preList.length; i++) {
+  for (let i2 = 0; i2 < preList.length; i2++) {
     const lastDesc = (function last(n) {
       return n.children.length ? last(n.children[n.children.length - 1]) : n;
-    })(preList[i]);
+    })(preList[i2]);
     const nextIdx = preList.indexOf(lastDesc) + 1;
     let bound = raw.length;
     for (let j = nextIdx; j < preList.length; j++) {
@@ -15620,23 +15679,18 @@ function annotateGuids(mlFile, tasks) {
         break;
       }
     }
-    preList[i].endBound = bound;
+    preList[i2].endBound = bound;
   }
-  const guidOffs = [];
-  let g = raw.indexOf(GUID_PREFIX);
-  while (g !== -1) {
-    guidOffs.push(g + GUID_PREFIX.length);
-    g = raw.indexOf(GUID_PREFIX, g + 1);
-  }
+  const guidOffs = guidFooterOffsets(raw);
   const assignable = guidOffs.slice(0, -1);
   const rootOff = guidOffs.length ? guidOffs[guidOffs.length - 1] : raw.length;
   let gi = 0;
   let assigned = 0;
-  for (let i = 0; i < postList.length; ) {
-    const bound = Math.min(postList[i].endBound, rootOff);
-    let j = i;
+  for (let i2 = 0; i2 < postList.length; ) {
+    const bound = Math.min(postList[i2].endBound, rootOff);
+    let j = i2;
     while (j < postList.length && Math.min(postList[j].endBound, rootOff) === bound) j++;
-    const chain2 = postList.slice(i, j);
+    const chain2 = postList.slice(i2, j);
     let f = gi;
     while (f < assignable.length && assignable[f] < bound) f++;
     const avail = f - gi;
@@ -15648,20 +15702,834 @@ function annotateGuids(mlFile, tasks) {
       });
     }
     gi = f;
-    i = j;
+    i2 = j;
   }
   return assigned;
 }
 
-// src/store.ts
-var MloStore = class {
-  constructor(config2) {
+// src/error-contract.ts
+var ERROR_CONTRACT = {
+  // --- Event: journaled and visible in cloud_status; blocks nothing --------
+  "capture-failed": {
+    tier: "event",
+    retryable: true,
+    meaning: "a proxied sync exchange could not be captured into the row store",
+    endedBy: "the next proxied sync captures ok \u2014 health is a window over the journal, never a stored verdict"
+  },
+  "capture-skipped": {
+    tier: "event",
+    retryable: true,
+    meaning: "an exchange carried nothing worth capturing, or arrived for a partition that is not bound",
+    endedBy: "the next proxied sync captures ok"
+  },
+  "tls-connect-seen": {
+    tier: "event",
+    retryable: false,
+    meaning: "MLO opened a CONNECT tunnel, so the exchange inside it is opaque to capture",
+    endedBy: "MLO syncs over the plain proxied route again, which the next capture records"
+  },
+  "unbound-sighting": {
+    tier: "event",
+    retryable: false,
+    meaning: "a dataFileUID synced through the endpoint with no binding to any profile",
+    endedBy: "auto-initialization binds that UID, or an explicit rebind adopts it"
+  },
+  "write-expired": {
+    tier: "event",
+    retryable: "after-user-action",
+    meaning: "an accepted row was never carried by an Apply before its TTL; the caller's words are dead-lettered",
+    endedBy: "the caller re-issues the write once MLO is syncing again \u2014 nothing re-delivers it automatically"
+  },
+  "injection-skipped": {
+    tier: "event",
+    retryable: true,
+    meaning: "a Get carried queued rows but composing the enriched payload failed, so the vendor's own answer went through verbatim",
+    endedBy: "the next Get composes and carries the rows \u2014 the queue keeps them until an Apply confirms or the TTL expires"
+  },
+  "queue-redelivery": {
+    tier: "event",
+    retryable: true,
+    meaning: "a session ended without resolving rows it carried, so they were unpinned for the next Get",
+    endedBy: "MLO's Apply confirms the row, or the write expires at TTL"
+  },
+  "version-skew-attach": {
+    tier: "event",
+    retryable: false,
+    meaning: "a session attached to a resident from a different build",
+    endedBy: "the newer session replaces the resident, which is the one path that leaves something listening"
+  },
+  "write-superseded": {
+    tier: "event",
+    retryable: false,
+    meaning: "MLO uploaded a different row for the same UID: the user answered the conflict dialog local-wins",
+    endedBy: "nothing to clear \u2014 the user's own answer is the end state; re-author if the change is still wanted"
+  },
+  // --- Op refusal: this call returns isErrored; the next is fresh ----------
+  "snapshot-unavailable": {
+    tier: "op-refusal",
+    retryable: true,
+    meaning: "the profile could not be exported and parsed right now (mlo.exe busy, locked, or failing)",
+    remedy: "ask again in a moment \u2014 MLO refuses to export while a dialog or another operation holds the profile"
+  },
+  "target-unresolvable": {
+    tier: "op-refusal",
+    retryable: false,
+    meaning: "a path id names no task in this snapshot, or the task carries no recoverable GUID",
+    remedy: "re-run list_tasks \u2014 path ids shift when the tree changes \u2014 or make this change in the MLO app"
+  },
+  "unknown-row": {
+    tier: "op-refusal",
+    retryable: "after-user-action",
+    meaning: "the row store has never captured the target's full row, so a rewrite would blank what it omits",
+    remedy: "repull, so the row store is rebuilt from a fresh full-history pull"
+  },
+  "unsupported-edit": {
+    tier: "op-refusal",
+    retryable: false,
+    meaning: "the edit would bypass behaviour only the MLO app performs (recurrence generation)",
+    remedy: "make this change in the MLO app instead"
+  },
+  "invalid-request": {
+    tier: "op-refusal",
+    retryable: false,
+    meaning: "the call contradicts itself before anything is authored (empty batch, duplicate key, unknown context)",
+    remedy: "fix the call and issue it again \u2014 nothing was authored"
+  },
+  "endpoint-down": {
+    tier: "op-refusal",
+    retryable: true,
+    meaning: "no resident answered the write seam; nothing was spooled",
+    remedy: "call again \u2014 the next call re-attaches, spawning a resident if the port is free"
+  },
+  "unknown-write": {
+    tier: "op-refusal",
+    retryable: false,
+    meaning: "the resident holds no receipt under this writeId",
+    remedy: "check the writeId; a receipt older than the outcome ring is one nobody is coming back for"
+  },
+  "quick-sync-failed": {
+    tier: "op-refusal",
+    retryable: true,
+    meaning: "the best-effort sync accelerator failed; delivery still rides MLO's own cadence",
+    remedy: "nothing has to be done \u2014 queued rows still reach the app on MLO's own sync cadence"
+  },
+  "cloud-state-unreadable": {
+    tier: "op-refusal",
+    retryable: true,
+    meaning: "the cloud state root could not be read for this call",
+    remedy: "check that the state root exists and is readable, then call again"
+  },
+  "backup-failed": {
+    tier: "op-refusal",
+    retryable: true,
+    meaning: "the profile could not be copied aside, so the verb that needed the copy did nothing",
+    remedy: "check that the profile is readable and its directory writable, then call the verb again"
+  },
+  "nothing-bound": {
+    tier: "op-refusal",
+    retryable: false,
+    meaning: "the verb needs a bound partition and this profile has none",
+    remedy: "sync MLO once through the proxy so auto-initialization can bind the profile"
+  },
+  "auto-init-pull-failed": {
+    tier: "op-refusal",
+    retryable: true,
+    meaning: "a bootstrap attempt's full-history pull failed; no binding was written",
+    remedy: "sync MLO through the proxy again \u2014 the next sync re-attempts the pull from nothing"
+  },
+  "auto-init-materialize-failed": {
+    tier: "op-refusal",
+    retryable: true,
+    meaning: "a bootstrap attempt pulled but could not materialize or verify the row store; no binding was written",
+    remedy: "sync MLO through the proxy again \u2014 the next sync re-attempts the whole bootstrap from nothing"
+  },
+  unknown: {
+    tier: "op-refusal",
+    retryable: false,
+    meaning: "a refusal this build does not recognize, kept verbatim rather than lost (newer resident, or a proxy)",
+    remedy: "read the carried title and wire type; a newer resident may be serving this build's port"
+  },
+  // --- Write gate: every write refuses the same way until state changes ----
+  "partition-not-ready": {
+    tier: "write-gate",
+    retryable: "after-user-action",
+    meaning: "this profile has no bound cloud partition, so there is nowhere to author against",
+    endedBy: "one proxied sync from MLO through the endpoint, which is what guarded auto-initialization waits for"
+  },
+  "binding-mismatch": {
+    tier: "write-gate",
+    retryable: "after-user-action",
+    // Declared but not yet produced as a refusal: today the mismatch is
+    // reported by `cloud_status` and nothing gates writes on it. The gate
+    // belongs with the mismatch ticket, not here — this row is what it will
+    // refuse with, kept beside the others so the tier stays complete.
+    meaning: "MLO is syncing a dataFileUID other than the bound one, so writes would land where the app never reads",
+    endedBy: "an explicit rebind, then one proxied sync that binds the UID MLO actually presents"
+  },
+  "no-open-profile": {
+    tier: "write-gate",
+    retryable: "after-user-action",
+    meaning: "the running app exposes no open data file, so no candidate can be ground-truthed",
+    endedBy: "MLO opens the profile again; the next proxied sync re-runs the guards"
+  },
+  "binding-conflict": {
+    tier: "write-gate",
+    retryable: "after-user-action",
+    meaning: "the candidate UID is already bound to another profile",
+    endedBy: "an explicit rebind of whichever profile should give up the UID"
+  },
+  "no-bootstrap-candidate": {
+    tier: "write-gate",
+    retryable: "after-user-action",
+    meaning: "the endpoint has seen no cloud file sync that could be this profile",
+    endedBy: "one proxied sync from MLO, which gives the endpoint its candidate"
+  },
+  "ambiguous-bootstrap-candidate": {
+    tier: "write-gate",
+    retryable: "after-user-action",
+    meaning: "more than one cloud file synced through the endpoint, and adopting the wrong one is unrecoverable",
+    endedBy: "sync only the target profile and restart the endpoint, which forgets the contacts it has seen"
+  },
+  "candidate-not-ground-truthed": {
+    tier: "write-gate",
+    retryable: "after-user-action",
+    meaning: "the candidate's task identities do not overlap the running app's open data file",
+    endedBy: "sync the profile MLO actually has open, so its own cloud file becomes the candidate"
+  },
+  // --- Startup verdict: refuse to start, exit 1 — before serving only ------
+  "no-profile": {
+    tier: "startup-verdict",
+    retryable: "after-user-action",
+    meaning: "no MLO profile could be detected to serve",
+    remedy: "open the profile in MLO, then start the server again"
+  },
+  "profile-switched": {
+    tier: "startup-verdict",
+    retryable: "after-user-action",
+    meaning: "the app no longer has the served profile open",
+    remedy: "the client restarts the server, which re-detects whichever profile MLO now has open"
+  },
+  "port-conflict": {
+    tier: "startup-verdict",
+    retryable: "after-user-action",
+    meaning: "a foreign listener holds the resident's port, and overwriting it would take MLO's sync down",
+    remedy: "free the port, or point MLO's proxy and this server at one that is free"
+  }
+};
+function failureFor(kind, detail, remedy) {
+  const declared = ERROR_CONTRACT[kind];
+  return {
+    kind,
+    retryable: declared.retryable,
+    remedy: remedy ?? declared.remedy ?? declared.endedBy ?? declared.meaning,
+    detail
+  };
+}
+var REPO_FAILURE_KINDS = [
+  "snapshot-unavailable",
+  "endpoint-down",
+  "quick-sync-failed",
+  "unknown-write",
+  "invalid-request",
+  "partition-not-ready",
+  "no-open-profile",
+  "binding-conflict",
+  "no-bootstrap-candidate",
+  "ambiguous-bootstrap-candidate",
+  "candidate-not-ground-truthed",
+  "auto-init-pull-failed",
+  "auto-init-materialize-failed",
+  "unknown"
+];
+var OUTLINE_FAILURE_KINDS = [
+  "target-unresolvable",
+  "unknown-row",
+  "unsupported-edit",
+  ...REPO_FAILURE_KINDS
+];
+
+// src/repo/mlo-repository.ts
+function repoFailure(kind, detail, remedy) {
+  return failureFor(kind, detail, remedy);
+}
+function repoFailureFromProblem(problem) {
+  const known = REPO_FAILURE_KINDS.includes(problem.kind);
+  const kind = known ? problem.kind : "unknown";
+  return {
+    ...failureFor(kind, problem.title, problem.remedy),
+    // The producer's own declaration wins over this build's table: a newer
+    // resident knows better than we do whether its refusal is retryable.
+    retryable: problem.retryable,
+    ...problem.type ? { wireType: problem.type } : {},
+    ...Object.keys(problem.extensions).length ? { fields: problem.extensions } : {}
+  };
+}
+
+// src/cloud/delta.ts
+import { randomUUID } from "node:crypto";
+
+// src/cloud/csv.ts
+function parseRecords(input) {
+  const records = [];
+  let record2 = [];
+  let field2 = "";
+  let quoted = false;
+  let afterQuote = false;
+  for (let i2 = 0; i2 < input.length; i2++) {
+    const ch = input[i2];
+    if (quoted) {
+      if (ch === '"') {
+        if (input[i2 + 1] === '"') {
+          field2 += '"';
+          i2++;
+        } else {
+          quoted = false;
+          afterQuote = true;
+        }
+      } else field2 += ch;
+      continue;
+    }
+    if (afterQuote) {
+      if (ch === ",") {
+        record2.push(field2);
+        field2 = "";
+        afterQuote = false;
+      } else if (ch === "\r" || ch === "\n") {
+        record2.push(field2);
+        records.push(record2);
+        record2 = [];
+        field2 = "";
+        afterQuote = false;
+        if (ch === "\r" && input[i2 + 1] === "\n") i2++;
+      } else throw new Error("invalid CSV character after closing quote");
+    } else if (ch === '"') {
+      if (field2.length) throw new Error("invalid quote in unquoted CSV field");
+      quoted = true;
+    } else if (ch === ",") {
+      record2.push(field2);
+      field2 = "";
+    } else if (ch === "\r" || ch === "\n") {
+      record2.push(field2);
+      records.push(record2);
+      record2 = [];
+      field2 = "";
+      if (ch === "\r" && input[i2 + 1] === "\n") i2++;
+    } else field2 += ch;
+  }
+  if (quoted) throw new Error("unterminated quoted CSV field");
+  if (afterQuote || field2.length || record2.length) {
+    record2.push(field2);
+    records.push(record2);
+  }
+  return records;
+}
+function parseSectionedCsv(input) {
+  const text2 = typeof input === "string" ? input : new TextDecoder("utf-8", { fatal: true }).decode(input);
+  if (text2.charCodeAt(0) === 65279) throw new Error("data.csv must not contain a UTF-8 BOM");
+  const records = parseRecords(text2);
+  const sections = [];
+  let current;
+  for (const record2 of records) {
+    if (record2.length === 1 && record2[0] === "") continue;
+    const marker = record2.length === 1 ? /^\[([^\]\r\n]+)\]$/.exec(record2[0]) : null;
+    if (marker) {
+      current = { name: marker[1], header: [], rows: [] };
+      sections.push(current);
+    } else if (!current) throw new Error("CSV row appears before a section marker");
+    else if (!current.header.length) current.header = record2;
+    else current.rows.push(record2);
+  }
+  for (const section of sections) if (!section.header.length) throw new Error(`section [${section.name}] has no header`);
+  return { sections, source: text2 };
+}
+function writeField(value) {
+  return /[",\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+}
+function writeCsvRow(fields) {
+  return fields.map(writeField).join(",");
+}
+function emitSectionedCsv(document) {
+  if (document.source !== void 0) return new TextEncoder().encode(document.source);
+  const lines = [""];
+  for (const section of document.sections) {
+    lines.push(`[${section.name}]`, writeCsvRow(section.header));
+    for (const row of section.rows) lines.push(writeCsvRow(row));
+  }
+  lines.push("");
+  return new TextEncoder().encode(lines.join("\r\n"));
+}
+function findSection(document, name) {
+  return document.sections.find((section) => section.name === name);
+}
+
+// src/cloud/delta.ts
+var FILE_VERSION = "3";
+var PROGRAM_VERSION = "6.1.3";
+var EDITION = "MLO-Windows";
+var TODO_ITEMS_HEADER = "UID,ParentUID,ItemIndex,Caption,Importance,Urgency,HideInToDo,HideInToDoThisTask,ScheduleType,CompletionDateTime,DueDateTime,StartDateTime,EstimateMin,EstimateMax,NextReviewDate,LastReviewed,ReviewEvery,ReviewRecurrenceType,CompleteInOrder,Effort,IsProject,ProjectStatus,DependOper,DependPostpone,CreatedDate,LastModified,TextTag,RecType,RecStartDate,RecEndDate,RecOccurrences,RecInterval,RecInstance,RecDOWMask,RecDayOfMonth,RecMonthOfYear,RecUseCompletionDate,RecUncompleteSubtasks,RecGeneratedCount,RecUncomplIfCompl,RecHourDelta,RecDNCCCopy,RecRecurWSC,GoalFor,FlagUID,Starred,StarToggleDateTime,ccUseCustomColorCoding,ccFont,ccSize,ccBold,ccItalic,ccUnderline,ccStrikethrough,ccFontColor,ccHighlightColor,ccChildrenIheritColorCoding,ccUnderlineColor,ccSideBarColor,ccBackgroundColor1_1,ccBackgroundColor1_2,ccBackgroundColor2_1,ccBackgroundColor2_2,ccUnderlineEntireRowColor,ccUnderlineEntireRowthickness,ccUnderlineDotted,ccBackgroundGradientToCenter,ccIndentRowLineAndBackground,Reminder,NextAlert,AutoAlert,AutoAlertDelta,LimitAutoAlertCount,MaxAutoAlertCount,AutoAlertIndex,ReminderState,AlertAction,Email,AppPath,AudioFile,PPCAudioFile,Note".split(",");
+var SECTION_HEADERS = [
+  ["SysVersions", ["FileVersion", "ProgramVersion", "Edition"]],
+  ["Places", ["UID", "Caption", "HideFromTodo", "HideFromItemProps", "Hotkey", "Latitude", "Longitude", "Radius", "NotifyWhenArrive", "NotifyWhenLeave", "OpenHours", "Note"]],
+  ["PlaceRelations", ["PlaceUID", "ParentPlaceUID"]],
+  ["Places.Deleted", ["PlaceUID"]],
+  ["Flags", ["UID", "Caption", "HideInSelector", "Index", "Shortcut", "Icon"]],
+  ["Flags.Deleted", ["FlagUID"]],
+  ["TodoItems", TODO_ITEMS_HEADER],
+  ["TodoItemPlaces", ["TodoItemUID", "PlaceUID"]],
+  ["TodoItems.Dependency", ["TaskUID", "DependencyUID"]],
+  ["TodoItems.Deleted", ["TodoItemUID"]],
+  ["TodoView.ManualOrdering.Starred", ["UID", "ItemIndex"]]
+];
+var NEW_TASK_DEFAULTS = {
+  ItemIndex: "100",
+  Importance: "100",
+  Urgency: "100",
+  HideInToDo: "0",
+  HideInToDoThisTask: "0",
+  ScheduleType: "0",
+  EstimateMin: "0",
+  EstimateMax: "0",
+  ReviewEvery: "1",
+  ReviewRecurrenceType: "1",
+  CompleteInOrder: "0",
+  Effort: "50",
+  IsProject: "0",
+  ProjectStatus: "0",
+  DependOper: "0",
+  DependPostpone: "0",
+  GoalFor: "0",
+  Starred: "0",
+  ccUseCustomColorCoding: "0"
+};
+function createDeltaSkeleton() {
+  return {
+    sections: SECTION_HEADERS.map(([name, header]) => ({
+      name,
+      header: [...header],
+      rows: name === "SysVersions" ? [[FILE_VERSION, PROGRAM_VERSION, EDITION]] : []
+    }))
+  };
+}
+function normalizeGuid(uid) {
+  const raw = uid.replace(/^\{/, "").replace(/\}$/, "");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
+    throw new Error(`invalid GUID: "${uid}"`);
+  }
+  return `{${raw.toUpperCase()}}`;
+}
+function generateGuid() {
+  return `{${randomUUID().toUpperCase()}}`;
+}
+function buildTaskAddDelta(input) {
+  const document = createDeltaSkeleton();
+  const row = Array(TODO_ITEMS_HEADER.length).fill("");
+  const set = (column2, value) => {
+    if (value !== void 0) row[TODO_ITEMS_HEADER.indexOf(column2)] = value;
+  };
+  for (const [column2, value] of Object.entries(NEW_TASK_DEFAULTS)) set(column2, value);
+  set("UID", normalizeGuid(input.uid));
+  set("ParentUID", input.parentUid ? normalizeGuid(input.parentUid) : "");
+  set("ItemIndex", input.itemIndex ?? NEW_TASK_DEFAULTS.ItemIndex);
+  set("Caption", input.caption);
+  set("DueDateTime", input.dueDateTime);
+  set("StartDateTime", input.startDateTime);
+  if (input.dueDateTime || input.startDateTime) set("ScheduleType", "1");
+  set("CreatedDate", input.createdDate);
+  set("LastModified", input.lastModified);
+  set("Note", input.note);
+  if (input.isProject !== void 0) set("IsProject", input.isProject ? "1" : "0");
+  if (input.starred !== void 0) {
+    set("Starred", input.starred ? "1" : "0");
+    if (input.starred) set("StarToggleDateTime", input.lastModified);
+  }
+  if (input.hideInToDo !== void 0) set("HideInToDo", input.hideInToDo ? "1" : "0");
+  if (input.hideInToDoThisTask !== void 0) set("HideInToDoThisTask", input.hideInToDoThisTask ? "1" : "0");
+  if (input.completeInOrder !== void 0) set("CompleteInOrder", input.completeInOrder ? "1" : "0");
+  if (input.flagUid !== void 0) set("FlagUID", input.flagUid ? normalizeGuid(input.flagUid) : "");
+  findSection(document, "TodoItems").rows.push(row);
+  for (const placeUid of input.placeUids ?? []) {
+    findSection(document, "TodoItemPlaces").rows.push([normalizeGuid(input.uid), normalizeGuid(placeUid)]);
+  }
+  for (const dependencyUid of input.dependencyUids ?? []) {
+    findSection(document, "TodoItems.Dependency").rows.push([
+      normalizeGuid(input.uid),
+      normalizeGuid(dependencyUid)
+    ]);
+  }
+  if (input.starred && input.starredOrderIndex) {
+    findSection(document, "TodoView.ManualOrdering.Starred").rows.push([
+      normalizeGuid(input.uid),
+      input.starredOrderIndex
+    ]);
+  }
+  return document;
+}
+function buildTaskDeleteDelta(uids) {
+  const document = createDeltaSkeleton();
+  const section = findSection(document, "TodoItems.Deleted");
+  for (const uid of uids) section.rows.push([normalizeGuid(uid)]);
+  return document;
+}
+function buildTaskUpdatesDelta(updates) {
+  const document = createDeltaSkeleton();
+  const section = findSection(document, "TodoItems");
+  for (const update of updates) {
+    for (const column2 of update.header) if (!section.header.includes(column2)) section.header.push(column2);
+  }
+  for (const update of updates) {
+    const row = section.header.map((column2) => {
+      const index2 = update.header.indexOf(column2);
+      return index2 < 0 ? "" : update.row[index2] ?? "";
+    });
+    for (const [column2, value] of Object.entries(update.patch)) {
+      const index2 = section.header.indexOf(column2);
+      if (index2 < 0) throw new Error(`unknown TodoItems column "${column2}"`);
+      row[index2] = value;
+    }
+    section.rows.push(row);
+    const uid = normalizeGuid(row[section.header.indexOf("UID")] ?? "");
+    for (const placeUid of update.placeUids ?? []) {
+      findSection(document, "TodoItemPlaces").rows.push([uid, normalizeGuid(placeUid)]);
+    }
+    for (const dependencyUid of update.dependencyUids ?? []) {
+      findSection(document, "TodoItems.Dependency").rows.push([uid, normalizeGuid(dependencyUid)]);
+    }
+    if (update.starredOrderIndex !== void 0) {
+      findSection(document, "TodoView.ManualOrdering.Starred").rows.push([uid, update.starredOrderIndex]);
+    }
+  }
+  return document;
+}
+var CANONICAL_HEADERS = new Map(SECTION_HEADERS);
+function documentFromDeltaRows(rows) {
+  const document = createDeltaSkeleton();
+  for (const row of rows) {
+    const header = CANONICAL_HEADERS.get(row.section);
+    if (!header || row.section === "SysVersions") throw new Error(`unknown delta section "${row.section}"`);
+    if (row.values.length > header.length) {
+      throw new Error(`a "${row.section}" row carries ${row.values.length} values for ${header.length} canonical columns`);
+    }
+    findSection(document, row.section).rows.push(
+      header.map((_, index2) => row.values[index2] ?? "")
+    );
+  }
+  return document;
+}
+function deltaRowsFromDocument(document) {
+  const rows = [];
+  for (const section of document.sections) {
+    if (section.name === "SysVersions") continue;
+    const header = CANONICAL_HEADERS.get(section.name);
+    if (!header || !section.rows.length) continue;
+    for (const row of section.rows) {
+      rows.push({
+        section: section.name,
+        values: header.map((column2) => {
+          const index2 = section.header.indexOf(column2);
+          return index2 < 0 ? "" : row[index2] ?? "";
+        })
+      });
+    }
+  }
+  return rows;
+}
+var KEYS = {
+  Places: ["UID"],
+  PlaceRelations: ["PlaceUID", "ParentPlaceUID"],
+  "Places.Deleted": ["PlaceUID"],
+  Flags: ["UID"],
+  "Flags.Deleted": ["FlagUID"],
+  TodoItems: ["UID"],
+  TodoItemPlaces: ["TodoItemUID", "PlaceUID"],
+  "TodoItems.Dependency": ["TaskUID", "DependencyUID"],
+  "TodoItems.Deleted": ["TodoItemUID"],
+  "TodoView.ManualOrdering.Starred": ["UID"]
+};
+function rowKey(section, row, columns) {
+  return columns.map((column2) => row[section.header.indexOf(column2)] ?? "").join("\0");
+}
+function mergeDeltas(entries) {
+  const result = createDeltaSkeleton();
+  const knownNames = new Set(SECTION_HEADERS.map(([name]) => name));
+  const targets = new Map(result.sections.map((section) => [section.name, section]));
+  for (const document of entries) {
+    for (const section of document.sections) {
+      const target = targets.get(section.name);
+      if (!target) continue;
+      for (const column2 of section.header) if (!target.header.includes(column2)) target.header.push(column2);
+    }
+  }
+  const maps = /* @__PURE__ */ new Map();
+  for (const [name] of SECTION_HEADERS) maps.set(name, /* @__PURE__ */ new Map());
+  const unknown2 = /* @__PURE__ */ new Map();
+  for (const document of entries) {
+    const taskSection = findSection(document, "TodoItems");
+    const deletedSection = findSection(document, "TodoItems.Deleted");
+    const changedUids = /* @__PURE__ */ new Set();
+    const deletedUids = /* @__PURE__ */ new Set();
+    if (taskSection) {
+      const uidIndex = taskSection.header.indexOf("UID");
+      for (const row of taskSection.rows) changedUids.add((row[uidIndex] ?? "").toUpperCase());
+    }
+    if (deletedSection) {
+      const uidIndex = deletedSection.header.indexOf("TodoItemUID");
+      for (const row of deletedSection.rows) deletedUids.add((row[uidIndex] ?? "").toUpperCase());
+    }
+    const purgeRelations = (sectionName, uids) => {
+      const map = maps.get(sectionName);
+      for (const key of [...map.keys()]) if (uids.has(key.split("\0", 1)[0].toUpperCase())) map.delete(key);
+    };
+    purgeRelations("TodoItemPlaces", changedUids);
+    purgeRelations("TodoItems.Dependency", changedUids);
+    purgeRelations("TodoItemPlaces", deletedUids);
+    purgeRelations("TodoItems.Dependency", deletedUids);
+    const starredOrder = maps.get("TodoView.ManualOrdering.Starred");
+    for (const uid of deletedUids) starredOrder.delete(uid);
+    if (taskSection) {
+      const uidIndex = taskSection.header.indexOf("UID");
+      const starredIndex = taskSection.header.indexOf("Starred");
+      if (starredIndex >= 0) {
+        for (const row of taskSection.rows) {
+          if ((row[starredIndex] ?? "") === "0") starredOrder.delete((row[uidIndex] ?? "").toUpperCase());
+        }
+      }
+    }
+    for (const section of document.sections) {
+      if (section.name === "SysVersions") continue;
+      if (!knownNames.has(section.name)) {
+        const target = unknown2.get(section.name);
+        if (target) {
+          for (const column2 of section.header) {
+            if (!target.header.includes(column2)) {
+              target.header.push(column2);
+              for (const row of target.rows) row.push("");
+            }
+          }
+          target.rows.push(...section.rows.map((row) => target.header.map((column2) => {
+            const index2 = section.header.indexOf(column2);
+            return index2 < 0 ? "" : row[index2] ?? "";
+          })));
+        } else unknown2.set(section.name, { name: section.name, header: [...section.header], rows: section.rows.map((row) => [...row]) });
+        continue;
+      }
+      const keys = KEYS[section.name];
+      if (!keys) continue;
+      const map = maps.get(section.name);
+      for (const row of section.rows) {
+        const key = rowKey(section, row, keys);
+        if ((section.name === "TodoItemPlaces" || section.name === "TodoItems.Dependency") && deletedUids.has((row[0] ?? "").toUpperCase())) continue;
+        const targetHeader = targets.get(section.name).header;
+        const projected = targetHeader.map((column2) => {
+          const index2 = section.header.indexOf(column2);
+          return index2 < 0 ? "" : row[index2] ?? "";
+        });
+        map.set(key, projected);
+        if (section.name === "TodoItems.Deleted") maps.get("TodoItems").delete(key);
+        if (section.name === "Places.Deleted") maps.get("Places").delete(key);
+        if (section.name === "Flags.Deleted") maps.get("Flags").delete(key);
+      }
+    }
+  }
+  for (const section of result.sections) {
+    if (section.name !== "SysVersions") section.rows = [...maps.get(section.name)?.values() ?? []];
+  }
+  result.sections.push(...unknown2.values());
+  return result;
+}
+
+// src/repo/pending-overlay.ts
+var COLUMN = new Map(TODO_ITEMS_HEADER.map((name, index2) => [name, index2]));
+var STRINGS = [
+  ["Note", "Note"],
+  ["DueDateTime", "DueDateTime"],
+  ["StartDateTime", "StartDateTime"],
+  ["CompletionDateTime", "CompletionDateTime"]
+];
+var NUMBERS = [
+  ["Importance", "Importance"],
+  ["Effort", "Effort"],
+  ["EstimateMin", "EstimateMin"],
+  ["EstimateMax", "EstimateMax"],
+  ["ProjectStatus", "ProjectStatus"],
+  ["GoalFor", "TheGoal"]
+];
+var BOOLEANS = [
+  ["IsProject", "IsProject"],
+  ["Starred", "Starred"],
+  ["HideInToDo", "HideInToDo"],
+  ["HideInToDoThisTask", "HideInToDoThisTask"],
+  ["CompleteInOrder", "CompleteSubTasksInOrder"]
+];
+function cell(values, column2) {
+  const index2 = COLUMN.get(column2);
+  return index2 === void 0 ? "" : values[index2] ?? "";
+}
+function truthy(value) {
+  return value !== "" && value !== "0";
+}
+function uidOf(value) {
+  try {
+    return value ? normalizeGuid(value) : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function fieldsFrom(values) {
+  const fields = {};
+  const caption = cell(values, "Caption");
+  if (caption !== "") fields.Caption = caption;
+  for (const [column2, field2] of STRINGS) {
+    const raw = cell(values, column2);
+    fields[field2] = raw === "" ? void 0 : raw;
+  }
+  for (const [column2, field2] of NUMBERS) {
+    const raw = cell(values, column2);
+    const parsed = Number(raw);
+    fields[field2] = raw === "" || Number.isNaN(parsed) ? void 0 : parsed;
+  }
+  for (const [column2, field2] of BOOLEANS) {
+    fields[field2] = truthy(cell(values, column2)) ? true : void 0;
+  }
+  return fields;
+}
+function clone2(tasks) {
+  return tasks.map((task) => ({ ...task, Places: [...task.Places], DependsOn: [...task.DependsOn], Children: clone2(task.Children) }));
+}
+function index(tasks, placed) {
+  for (const task of tasks) {
+    const uid = uidOf(task.Guid ?? "");
+    if (uid) placed.byUid.set(uid, task);
+    placed.siblingsOf.set(task, tasks);
+    index(task.Children, placed);
+  }
+  return placed;
+}
+function reparent(task, destination, placed) {
+  const siblings = placed.siblingsOf.get(task);
+  if (siblings === destination) return;
+  if (siblings) {
+    const at = siblings.indexOf(task);
+    if (at >= 0) siblings.splice(at, 1);
+  }
+  destination.push(task);
+  placed.siblingsOf.set(task, destination);
+}
+function removeAll(tasks, doomed) {
+  return tasks.filter((task) => !doomed.has(task)).map((task) => {
+    task.Children = removeAll(task.Children, doomed);
+    return task;
+  });
+}
+function overlayPendingWrites(tasks, pending, now = Date.now()) {
+  const live = pending.filter((write) => {
+    if (!write.expiresAt) return true;
+    const expiresAt = Date.parse(write.expiresAt);
+    return Number.isNaN(expiresAt) || expiresAt > now;
+  });
+  if (!live.length) return tasks;
+  let overlaid = clone2(tasks);
+  const placed = index(overlaid, { byUid: /* @__PURE__ */ new Map(), siblingsOf: /* @__PURE__ */ new Map() });
+  const { byUid } = placed;
+  const doomed = /* @__PURE__ */ new Set();
+  for (const write of live) {
+    for (const row of write.rows) {
+      if (row.section !== "TodoItems") continue;
+      const uid = uidOf(cell(row.values, "UID"));
+      if (!uid) continue;
+      const parentUid = uidOf(cell(row.values, "ParentUID"));
+      const parent = parentUid ? byUid.get(parentUid) : void 0;
+      const destination = parent ? parent.Children : overlaid;
+      const existing = byUid.get(uid);
+      if (existing) {
+        Object.assign(existing, fieldsFrom(row.values), { pending: true, writeId: write.writeId });
+        reparent(existing, destination, placed);
+        continue;
+      }
+      const phantom = {
+        id: "",
+        Guid: uid,
+        Caption: "",
+        Places: [],
+        DependsOn: [],
+        Children: [],
+        Path: [],
+        Depth: 0,
+        ...fieldsFrom(row.values),
+        pending: true,
+        writeId: write.writeId
+      };
+      byUid.set(uid, phantom);
+      destination.push(phantom);
+      placed.siblingsOf.set(phantom, destination);
+    }
+    for (const row of write.rows) {
+      if (row.section !== "TodoItems.Deleted") continue;
+      const uid = uidOf(row.values[0] ?? "");
+      const target = uid ? byUid.get(uid) : void 0;
+      if (target) doomed.add(target);
+    }
+  }
+  if (doomed.size) overlaid = removeAll(overlaid, doomed);
+  return renumbered(overlaid);
+}
+
+// src/result.ts
+function ok(value, advisories) {
+  return advisories?.length ? { isErrored: false, value, advisories } : { isErrored: false, value };
+}
+function failed(failure) {
+  return { isErrored: true, failure };
+}
+function failureText(failure) {
+  const named = failure.kind === "unknown" && failure.wireType ? ` (${failure.wireType})` : "";
+  return `${failure.detail}${named} \u2014 ${failure.remedy}`;
+}
+
+// src/repo/local-mlo-repository.ts
+var LocalMloRepository = class {
+  constructor(config2, cli, resident, queue) {
     this.config = config2;
+    this.cli = cli;
+    this.resident = resident;
+    this.queue = queue;
   }
   config;
+  cli;
+  resident;
+  queue;
   snap;
   pending;
-  async getSnapshot(fresh = false) {
+  async snapshot(fresh = false) {
+    try {
+      const snapshot = await this.exported(fresh);
+      const tasks = overlayPendingWrites(snapshot.tasks, await this.queuedWrites());
+      return ok(tasks === snapshot.tasks ? snapshot : { ...snapshot, tasks });
+    } catch (error2) {
+      return failed(
+        repoFailure(
+          "snapshot-unavailable",
+          `could not export the profile: ${error2 instanceof Error ? error2.message : String(error2)}`,
+          "try again in a moment \u2014 MLO refuses to export while a dialog or another operation holds the profile"
+        )
+      );
+    }
+  }
+  /**
+   * The queue as the overlay sees it. An unreadable queue serves export truth
+   * rather than failing the read: a read is not the surface a state-root fault
+   * belongs on (`cloud_status` refuses out loud), and the export is still the
+   * honest answer to what MLO holds.
+   */
+  async queuedWrites() {
+    if (!this.queue) return [];
+    try {
+      return await this.queue.pending();
+    } catch (error2) {
+      log(`pending-write overlay skipped (reads fall back to export truth): ${error2 instanceof Error ? error2.message : String(error2)}`);
+      return [];
+    }
+  }
+  async exported(fresh) {
     if (!fresh && this.snap && Date.now() - this.snap.at < this.config.cacheStaleMs) {
       return this.snap;
     }
@@ -15678,11 +16546,11 @@ var MloStore = class {
     return this.pending;
   }
   async refresh() {
-    const xml2 = await exportXml(this.config);
+    const xml2 = await this.cli.exportXml();
     const doc = parseMloXml(xml2);
     const tasks = buildTaskTree(doc);
     try {
-      annotateGuids(await readDataFile(this.config), tasks);
+      annotateGuids(await this.cli.readDataFile(), tasks);
     } catch (e) {
       log(`GUID extraction failed (continuing without GUIDs): ${e.message}`);
     }
@@ -15692,7 +16560,1853 @@ var MloStore = class {
     this.snap = void 0;
     this.pending = void 0;
   }
+  requireResident() {
+    if (!this.resident) {
+      throw new Error("this repository was wired without a ResidentClient \u2014 a read-only wiring cannot write");
+    }
+    return this.resident;
+  }
+  async write(rows) {
+    const result = await this.requireResident().postWrite({ profile: this.config.dataFile, rows });
+    if (!result.ok) return failed(repoFailureFromProblem(result.refusal));
+    void this.quickSync().then((nudge) => {
+      if (nudge.isErrored) {
+        log(`QuickSync nudge after accept failed (delivery rides MLO's own cadence): ${nudge.failure.detail}`);
+      }
+    });
+    return ok({ writeId: result.value.writeId, expiresAt: result.value.expiresAt });
+  }
+  async status(id) {
+    const result = await this.requireResident().writeStatus(id);
+    if (!result.ok) return failed(repoFailureFromProblem(result.refusal));
+    const state = result.value;
+    return ok({
+      writeId: state.writeId,
+      status: state.status,
+      ...state.uid ? { uid: state.uid } : {},
+      ...state.expiresAt ? { expiresAt: state.expiresAt } : {},
+      ...state.at ? { at: state.at } : {},
+      ...state.detail ? { detail: state.detail } : {}
+    });
+  }
+  async quickSync() {
+    try {
+      await this.cli.quickSync();
+    } catch (error2) {
+      return failed(
+        repoFailure("quick-sync-failed", error2 instanceof Error ? error2.message : String(error2))
+      );
+    }
+    this.invalidate();
+    return ok(void 0);
+  }
 };
+
+// src/cloud/endpoint.ts
+import { spawn as spawn2 } from "node:child_process";
+import net from "node:net";
+
+// src/version.ts
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+function shippedVersion() {
+  const manifest = fileURLToPath(new URL("../package.json", import.meta.url));
+  try {
+    return JSON.parse(readFileSync(manifest, "utf8")).version;
+  } catch (error2) {
+    throw new Error(
+      `cannot read the server version from ${manifest}: ${error2 instanceof Error ? error2.message : String(error2)} \u2014 the single-file bundle still needs its sibling package.json`
+    );
+  }
+}
+var SERVER_INFO = { name: "mlo-mcp", version: shippedVersion() };
+
+// src/cloud/endpoint.ts
+var RESIDENT_FLAG = "--serve-cloud";
+var ENDPOINT_RECOVERY = "A new MCP client session starts one automatically, so restarting this client is the fix; a session already running will not start one by itself.";
+var PROBE_TIMEOUT_MS2 = 2e3;
+var START_TIMEOUT_MS = 15e3;
+var POLL_INTERVAL_MS = 100;
+function sleep2(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+function compareVersions(left, right) {
+  const leftParts = left.split(".");
+  const rightParts = right.split(".");
+  for (let index2 = 0; index2 < Math.max(leftParts.length, rightParts.length); index2 += 1) {
+    const a = Number.parseInt(leftParts[index2] ?? "0", 10) || 0;
+    const b = Number.parseInt(rightParts[index2] ?? "0", 10) || 0;
+    if (a !== b) return a < b ? -1 : 1;
+  }
+  return 0;
+}
+function portIsTaken(host, port, timeoutMs) {
+  return new Promise((resolve) => {
+    const socket = net.connect({ host, port });
+    const settle = (taken) => {
+      socket.destroy();
+      resolve(taken);
+    };
+    socket.setTimeout(timeoutMs, () => settle(false));
+    socket.once("connect", () => settle(true));
+    socket.once("error", () => settle(false));
+  });
+}
+async function askStatus(host, port) {
+  let response;
+  try {
+    response = await fetch(`http://${host}:${port}/v1/status`, { signal: AbortSignal.timeout(PROBE_TIMEOUT_MS2) });
+  } catch (error2) {
+    return { kind: "foreign", detail: `it accepts connections but does not answer /v1/status (${error2 instanceof Error ? error2.message : String(error2)})` };
+  }
+  if (!response.ok) return { kind: "foreign", detail: `/v1/status answered HTTP ${response.status}` };
+  let body;
+  try {
+    body = await response.json();
+  } catch {
+    return { kind: "foreign", detail: "/v1/status did not answer with JSON" };
+  }
+  const currentShape = typeof body.version === "string" && Array.isArray(body.contactUids);
+  const legacyShape = typeof body.cursor === "string" && typeof body.entries === "object" && body.entries !== null;
+  if (!currentShape && !legacyShape) {
+    return { kind: "foreign", detail: "/v1/status answered without the fields an mlo-mcp endpoint serves" };
+  }
+  return {
+    kind: "endpoint",
+    status: {
+      ...typeof body.version === "string" ? { version: body.version } : {},
+      contactUids: Array.isArray(body.contactUids) ? body.contactUids.filter((uid) => typeof uid === "string") : [],
+      ...typeof body.stateRoot === "string" ? { stateRoot: body.stateRoot } : {},
+      ...Array.isArray(body.writesHeldOpen) ? { writesHeldOpen: body.writesHeldOpen.filter((id) => typeof id === "string") } : {}
+    }
+  };
+}
+async function readStatus(host, port) {
+  const answer = await askStatus(host, port);
+  return answer.kind === "endpoint" ? answer.status : void 0;
+}
+async function probe(host, port) {
+  if (!await portIsTaken(host, port, PROBE_TIMEOUT_MS2)) return { kind: "free" };
+  return askStatus(host, port);
+}
+async function waitFor(deadlineMs, attempt) {
+  const deadline = Date.now() + deadlineMs;
+  for (; ; ) {
+    const value = await attempt();
+    if (value !== void 0) return value;
+    if (Date.now() >= deadline) return void 0;
+    await sleep2(POLL_INTERVAL_MS);
+  }
+}
+async function ensureEndpoint(options) {
+  const { host, port } = options;
+  const ourVersion = options.ourVersion ?? SERVER_INFO.version;
+  const endpoint = new ResidentEndpoint(host, port);
+  const found = await probe(host, port);
+  if (found.kind === "foreign") {
+    throw new Error(
+      `port ${port} on ${host} is held by something that is not an mlo-mcp sync endpoint (${found.detail}) \u2014 MLO's sync proxy points at that port, so free it (or set MLO_CLOUD_PORT and repoint the proxy) before using this server`
+    );
+  }
+  if (found.kind === "endpoint") {
+    const theirVersion = found.status.version;
+    if (theirVersion !== void 0 && compareVersions(ourVersion, theirVersion) <= 0) {
+      endpoint.adopt(found.status);
+      return endpoint;
+    }
+    log(`resident endpoint on ${host}:${port} is ${theirVersion ?? "an older build"}; this session is ${ourVersion} \u2014 replacing it`);
+    const asked = await endpoint.requestShutdown().then(() => true, () => false);
+    const freed = asked && await waitFor(START_TIMEOUT_MS, async () => await portIsTaken(host, port, PROBE_TIMEOUT_MS2) ? void 0 : true);
+    if (!freed) {
+      log(`the endpoint on ${host}:${port} did not step aside \u2014 attaching to it instead of replacing it`);
+      endpoint.adopt(found.status);
+      return endpoint;
+    }
+  }
+  await options.spawn();
+  const started = await waitFor(options.startTimeoutMs ?? START_TIMEOUT_MS, () => readStatus(host, port));
+  if (started) endpoint.adopt(started);
+  else {
+    log(
+      `no resident sync endpoint came up on ${host}:${port} \u2014 reads still work, but MLO's sync has nowhere to connect and writes will be refused until one starts`
+    );
+  }
+  return endpoint;
+}
+function residentSpawnArgs(entry) {
+  return {
+    command: process.execPath,
+    args: [...process.execArgv, entry, RESIDENT_FLAG],
+    options: { detached: true, stdio: "ignore", windowsHide: true }
+  };
+}
+function residentSpawner(entry) {
+  return () => {
+    const { command, args, options } = residentSpawnArgs(entry);
+    const child = spawn2(command, args, options);
+    child.on("error", (error2) => log(`could not start the resident sync endpoint: ${error2.message}`));
+    child.unref();
+  };
+}
+var ResidentEndpoint = class {
+  constructor(host, port) {
+    this.host = host;
+    this.port = port;
+  }
+  host;
+  port;
+  last;
+  get url() {
+    return `http://${this.host}:${this.port}`;
+  }
+  /** Version observed at the last successful probe, if any. */
+  get version() {
+    return this.last?.version;
+  }
+  get reachable() {
+    return this.last !== void 0;
+  }
+  /** Internal: record what a probe found. */
+  adopt(status) {
+    this.last = status;
+  }
+  /** Re-probe; undefined means nothing is serving the port right now. */
+  async status() {
+    const status = await readStatus(this.host, this.port);
+    this.last = status;
+    return status;
+  }
+  /**
+   * Ask a stale resident process to exit so a newer build can take the port.
+   * Short timeout: a resident too wedged to answer is one the caller falls back
+   * to attaching to, not one worth blocking a session's startup on.
+   */
+  async requestShutdown() {
+    await this.post("/v1/shutdown", {}, PROBE_TIMEOUT_MS2);
+  }
+  async post(route, body, timeoutMs = PROBE_TIMEOUT_MS2) {
+    let response;
+    try {
+      response = await fetch(`${this.url}${route}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(timeoutMs)
+      });
+    } catch (error2) {
+      this.last = void 0;
+      throw new Error(
+        `the resident MLO sync endpoint at ${this.url} did not answer (${error2 instanceof Error ? error2.message : String(error2)}). ${ENDPOINT_RECOVERY}`
+      );
+    }
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const reason = typeof payload.error === "string" ? payload.error : `HTTP ${response.status}`;
+      throw new Error(reason);
+    }
+    return payload;
+  }
+};
+
+// src/cloud/problem.ts
+var PROBLEM_TYPE_PREFIX = "urn:mlo-mcp:";
+var PROBLEM_CONTENT_TYPE = "application/problem+json";
+var AUTO_INIT_REFUSAL_KINDS = [
+  "no-open-profile",
+  "binding-conflict",
+  "no-bootstrap-candidate",
+  "ambiguous-bootstrap-candidate",
+  "candidate-not-ground-truthed",
+  "auto-init-pull-failed",
+  "auto-init-materialize-failed"
+];
+var RESIDENT_PROBLEM_KINDS = /* @__PURE__ */ new Set([
+  "invalid-request",
+  "partition-not-ready",
+  "unknown-write",
+  ...AUTO_INIT_REFUSAL_KINDS
+]);
+function problemBody(problem) {
+  return JSON.stringify({
+    type: `${PROBLEM_TYPE_PREFIX}${problem.kind}`,
+    title: problem.title,
+    retryable: problem.retryable,
+    ...problem.remedy ? { remedy: problem.remedy } : {},
+    ...problem.extensions
+  });
+}
+function asRetryable(value) {
+  return value === true || value === false || value === "after-user-action" ? value : false;
+}
+var CARRIER_FIELDS = /* @__PURE__ */ new Set(["type", "title", "retryable", "remedy", "status", "detail", "instance"]);
+function parseProblem(status, bodyText, knownKinds = RESIDENT_PROBLEM_KINDS) {
+  let parsed;
+  try {
+    const value = JSON.parse(bodyText);
+    if (value && typeof value === "object" && !Array.isArray(value)) parsed = value;
+  } catch {
+  }
+  if (!parsed) {
+    return {
+      kind: "unknown",
+      title: bodyText.slice(0, 200) || `resident answered HTTP ${status}`,
+      retryable: false,
+      status,
+      extensions: {}
+    };
+  }
+  const type = typeof parsed.type === "string" ? parsed.type : void 0;
+  const kind = type?.startsWith(PROBLEM_TYPE_PREFIX) ? type.slice(PROBLEM_TYPE_PREFIX.length) : void 0;
+  const title = typeof parsed.title === "string" && parsed.title.length ? parsed.title : `resident answered HTTP ${status}`;
+  const extensions = {};
+  for (const [name, value] of Object.entries(parsed)) {
+    if (!CARRIER_FIELDS.has(name)) extensions[name] = value;
+  }
+  if (!kind || !knownKinds.has(kind)) {
+    return {
+      kind: "unknown",
+      title,
+      retryable: asRetryable(parsed.retryable),
+      ...type ? { type } : {},
+      status,
+      extensions
+    };
+  }
+  return {
+    kind,
+    title,
+    retryable: asRetryable(parsed.retryable),
+    ...typeof parsed.remedy === "string" ? { remedy: parsed.remedy } : {},
+    ...type ? { type } : {},
+    status,
+    extensions
+  };
+}
+
+// src/repo/resident-client.ts
+function endpointDownRefusal(detail) {
+  return {
+    kind: "endpoint-down",
+    title: `the resident sync endpoint did not answer (${detail})`,
+    retryable: true,
+    remedy: "retry \u2014 the next call re-attaches, spawning a resident if the port is free",
+    status: 0,
+    extensions: {}
+  };
+}
+var REQUEST_TIMEOUT_MS = 1e4;
+var HttpResidentClient = class {
+  constructor(options) {
+    this.options = options;
+  }
+  options;
+  get url() {
+    return `http://${this.options.host}:${this.options.port}`;
+  }
+  postWrite(write) {
+    return this.request("/v1/write", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(write)
+    });
+  }
+  writeStatus(id) {
+    return this.request(`/v1/write/${encodeURIComponent(id)}`, { method: "GET" });
+  }
+  async probe() {
+    try {
+      const response = await fetch(`${this.url}/v1/status`, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+      if (!response.ok) return void 0;
+      const body = await response.json();
+      return {
+        ...typeof body.version === "string" ? { version: body.version } : {},
+        contactUids: Array.isArray(body.contactUids) ? body.contactUids.filter((uid) => typeof uid === "string") : [],
+        ...typeof body.stateRoot === "string" ? { stateRoot: body.stateRoot } : {}
+      };
+    } catch {
+      return void 0;
+    }
+  }
+  async request(route, init) {
+    const first = await this.tryOnce(route, init);
+    if (first !== void 0) return first;
+    if (this.options.spawn) {
+      try {
+        await ensureEndpoint({
+          host: this.options.host,
+          port: this.options.port,
+          spawn: this.options.spawn,
+          ...this.options.startTimeoutMs !== void 0 ? { startTimeoutMs: this.options.startTimeoutMs } : {}
+        });
+      } catch (error2) {
+        return { ok: false, refusal: endpointDownRefusal(error2 instanceof Error ? error2.message : String(error2)) };
+      }
+      const second = await this.tryOnce(route, init);
+      if (second !== void 0) return second;
+    }
+    return { ok: false, refusal: endpointDownRefusal(`no resident answers ${this.url}`) };
+  }
+  /** One HTTP attempt; undefined means the resident was unreachable. */
+  async tryOnce(route, init) {
+    let response;
+    try {
+      response = await fetch(`${this.url}${route}`, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+    } catch (error2) {
+      log(`resident endpoint unreachable at ${this.url}: ${error2 instanceof Error ? error2.message : String(error2)}`);
+      return void 0;
+    }
+    const bodyText = await response.text().catch(() => "");
+    if (!response.ok) {
+      return { ok: false, refusal: parseProblem(response.status, bodyText) };
+    }
+    try {
+      return { ok: true, value: JSON.parse(bodyText) };
+    } catch {
+      return {
+        ok: false,
+        refusal: {
+          kind: "unknown",
+          title: "the resident answered 200 without a JSON body",
+          retryable: false,
+          status: response.status,
+          extensions: {}
+        }
+      };
+    }
+  }
+};
+
+// src/places.ts
+function many(value) {
+  return value === void 0 ? [] : Array.isArray(value) ? value : [value];
+}
+function readPlaces(doc) {
+  const list = doc["MyLifeOrganized-xml"].PlacesList;
+  return many(list?.TaskPlace).map((p) => ({
+    Caption: p["@_Caption"],
+    open: many(p.Open).filter((o) => o["@_StartTime"] && o["@_EndTime"]).map((o) => ({
+      days: (o["@_Days"] ?? "").split(/\s+/).filter(Boolean).map((d) => d.toUpperCase()),
+      start: o["@_StartTime"],
+      end: o["@_EndTime"]
+    })),
+    includes: many(p.Includes).map((i2) => i2["@_Place"]).filter((c) => Boolean(c))
+  }));
+}
+function normalizeContext(caption) {
+  return caption.replace(/^@/, "").toLowerCase();
+}
+var DAY_CODES = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+function clockOf(at) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(at.getHours())}:${pad(at.getMinutes())}:${pad(at.getSeconds())}`;
+}
+function isOpenAt(place, at) {
+  if (!place || place.open.length === 0) return true;
+  const day = DAY_CODES[at.getDay()];
+  const clock = clockOf(at);
+  return place.open.some((w) => w.days.includes(day) && w.start <= clock && clock <= w.end);
+}
+function expandContext(places, caption) {
+  const byCaption = new Map(places.map((p) => [normalizeContext(p.Caption), p]));
+  const reached = /* @__PURE__ */ new Set();
+  const queue = [normalizeContext(caption)];
+  while (queue.length) {
+    const next = queue.shift();
+    if (reached.has(next)) continue;
+    reached.add(next);
+    for (const child of byCaption.get(next)?.includes ?? []) queue.push(normalizeContext(child));
+  }
+  return reached;
+}
+
+// src/services/outline-authoring.ts
+function csvTruthy(value) {
+  return value !== "" && value !== "0";
+}
+function rowValue(row, column2) {
+  const index2 = row.header.indexOf(column2);
+  return index2 < 0 ? "" : row.cells[index2] ?? "";
+}
+function nowIso(date3 = /* @__PURE__ */ new Date()) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date3.getFullYear()}-${pad(date3.getMonth() + 1)}-${pad(date3.getDate())}T${pad(date3.getHours())}:${pad(date3.getMinutes())}:${pad(date3.getSeconds())}`;
+}
+var STRING_COLUMNS = ["Caption", "Note", "DueDateTime", "StartDateTime", "CompletionDateTime"];
+var NUMBER_COLUMNS = [
+  ["Importance", "Importance"],
+  ["Effort", "Effort"],
+  ["ProjectStatus", "ProjectStatus"],
+  ["EstimateMin", "EstimateMin"],
+  ["EstimateMax", "EstimateMax"],
+  ["TheGoal", "GoalFor"]
+];
+var BOOLEAN_COLUMNS = [
+  ["IsProject", "IsProject"],
+  ["Starred", "Starred"],
+  ["Folder", "HideInToDoThisTask"],
+  ["HideInToDo", "HideInToDo"],
+  ["CompleteSubTasksInOrder", "CompleteInOrder"]
+];
+function updatePatch(patch, row, now, move, flagUid) {
+  const columns = { LastModified: now };
+  for (const column2 of STRING_COLUMNS) {
+    const value = patch[column2];
+    if (value !== void 0) columns[column2] = value;
+  }
+  for (const [field2, column2] of NUMBER_COLUMNS) {
+    const value = patch[field2];
+    if (value !== void 0) columns[column2] = String(value);
+  }
+  for (const [field2, column2] of BOOLEAN_COLUMNS) {
+    const value = patch[field2];
+    if (typeof value === "boolean") columns[column2] = value ? "1" : "0";
+  }
+  if (patch.Starred !== void 0 && csvTruthy(rowValue(row, "Starred")) !== patch.Starred) {
+    columns.StarToggleDateTime = now;
+  }
+  if (patch.Flag !== void 0) columns.FlagUID = flagUid ?? "";
+  if (move) {
+    columns.ParentUID = move.parentUid;
+    if (move.itemIndex !== void 0) columns.ItemIndex = move.itemIndex;
+  }
+  if (patch.DueDateTime !== void 0 || patch.StartDateTime !== void 0) {
+    const due = patch.DueDateTime ?? rowValue(row, "DueDateTime");
+    const start = patch.StartDateTime ?? rowValue(row, "StartDateTime");
+    if (due === "" && start === "") columns.ScheduleType = "0";
+    else if (!csvTruthy(rowValue(row, "ScheduleType"))) columns.ScheduleType = "1";
+  }
+  return columns;
+}
+function completionPatch(row, now) {
+  return {
+    CompletionDateTime: now,
+    LastModified: now,
+    ...csvTruthy(rowValue(row, "IsProject")) ? { ProjectStatus: "3" } : {}
+  };
+}
+function reopenPatch(row, now) {
+  return {
+    CompletionDateTime: "",
+    LastModified: now,
+    // complete sets ProjectStatus 3 (completed); 0 = default/active
+    ...rowValue(row, "ProjectStatus") === "3" ? { ProjectStatus: "0" } : {}
+  };
+}
+var ITEM_INDEX_STEP = 100;
+function itemIndexAt(siblings, position) {
+  const ordered = [...siblings].sort((a, b) => a - b);
+  const last = ordered.length ? ordered[ordered.length - 1] : 0;
+  if (position === void 0 || position >= ordered.length) return last + ITEM_INDEX_STEP;
+  const after = ordered[Math.max(0, position)];
+  if (position <= 0) return after > 0 ? Math.floor(after / 2) : after - ITEM_INDEX_STEP;
+  const before = ordered[position - 1];
+  const midpoint = Math.floor((before + after) / 2);
+  return midpoint > before ? midpoint : after;
+}
+function parseCaptureLine(line) {
+  const [head = "", ...rest] = line.split(/\r?\n\r?\n/);
+  const note = rest.join("\n\n").trim();
+  const words = head.trim().split(/\s+/).filter(Boolean);
+  const places = [];
+  while (words.length > 1 && /^@\S+$/.test(words[words.length - 1])) {
+    places.unshift(words.pop().slice(1));
+  }
+  return { caption: words.join(" "), places, ...note ? { note } : {} };
+}
+
+// src/services/failures.ts
+function unresolvable(id, detail) {
+  return { ...failureFor("target-unresolvable", detail), id };
+}
+
+// src/services/outline.ts
+var PROGRESS_WORDS = {
+  accepted: {
+    detail: "durably queued \u2014 it lands the next time MLO syncs through the endpoint",
+    remedy: "nothing to do; MLO syncs on its own within about 90 seconds, or run `sync` to hurry it"
+  },
+  delivered: { detail: "MLO applied this write to the profile" },
+  verified: { detail: "MLO applied this write and a fresh export confirmed it" },
+  expired: {
+    detail: "MLO did not sync before the write's TTL ran out, so it was never applied \u2014 the rows are in the dead-letter file",
+    remedy: "check MLO is running and syncing through the endpoint (`cloud_status`), then make the change again"
+  },
+  superseded: {
+    detail: "MLO applied a different version of this task instead \u2014 a conflict the app resolved in favour of its own copy, so this write's content is gone",
+    remedy: "read the task again and re-apply the change on top of what MLO kept"
+  }
+};
+function refusal(kind, detail, remedy) {
+  return failureFor(kind, detail, remedy);
+}
+var UNBOUND = failureFor(
+  "partition-not-ready",
+  "this profile has no bound cloud partition, so there is nowhere to author against"
+);
+var OutlineService = class {
+  constructor(repo, identity, rows, options = {}) {
+    this.repo = repo;
+    this.identity = identity;
+    this.rows = rows;
+    this.options = options;
+  }
+  repo;
+  identity;
+  rows;
+  options;
+  /** Visible outline entries under `parentId` (or the root). */
+  async list(opts) {
+    const read = await this.repo.snapshot();
+    if (read.isErrored) return failed(read.failure);
+    const snap = read.value;
+    let tasks = snap.tasks;
+    if (opts.parentId) {
+      const parent = findById(snap.tasks, opts.parentId);
+      if (!parent) return failed(unresolvable(opts.parentId, `no task with id "${opts.parentId}" in this snapshot`));
+      tasks = parent.Children;
+    }
+    const entries = collectVisible(tasks, { includeCompleted: opts.includeCompleted, maxDepth: opts.maxDepth });
+    return ok({ entries, total: entries.length });
+  }
+  async search(filters) {
+    const read = await this.repo.snapshot();
+    if (read.isErrored) return failed(read.failure);
+    return ok(searchTasks(read.value.tasks, filters));
+  }
+  /** Full detail of one task by path id. */
+  async get(id) {
+    const read = await this.repo.snapshot();
+    if (read.isErrored) return failed(read.failure);
+    const snap = read.value;
+    const task = findById(snap.tasks, id);
+    if (!task) return failed(unresolvable(id, `no task with id "${id}" in this snapshot`));
+    const resolver = this.identity.resolverFor(snap);
+    const resolution = resolver.uidFor(id);
+    const resolvedUid = resolution.kind === "resolved" ? resolution.uid : void 0;
+    const dependsOn = task.DependsOn.map((uid) => {
+      const dep = resolver.taskFor(uid);
+      return { id: dep?.id, Caption: dep?.Caption, uid };
+    });
+    const dependedOnBy = resolvedUid ? resolver.dependentsOf(resolvedUid).map((x2) => ({ id: x2.id, Caption: x2.Caption })) : [];
+    return ok({ task, uid: resolvedUid, dependsOn, dependedOnBy });
+  }
+  /** The profile's contexts: defined Places plus any referenced by tasks, with usage counts. */
+  async contexts() {
+    const read = await this.repo.snapshot();
+    if (read.isErrored) return failed(read.failure);
+    const snap = read.value;
+    const defined = readPlaces(snap.doc).map((p) => p.Caption);
+    const usage = /* @__PURE__ */ new Map();
+    for (const t of flatten(snap.tasks)) {
+      for (const p of t.Places) usage.set(p, (usage.get(p) ?? 0) + 1);
+    }
+    const captions = [.../* @__PURE__ */ new Set([...defined, ...usage.keys()])];
+    return ok(
+      captions.map((Caption) => ({ Caption, defined: defined.includes(Caption), tasksUsing: usage.get(Caption) ?? 0 })).sort((a, b) => b.tasksUsing - a.tasksUsing || a.Caption.localeCompare(b.Caption))
+    );
+  }
+  // ---------------------------------------------------------------- writes
+  /** Create one task. */
+  add(spec) {
+    return this.addMany([spec]);
+  }
+  /**
+   * Create a whole outline as one write: `key`/`parentKey` express arbitrary
+   * parent/child nesting and within-batch dependencies, `parentId` links to a
+   * task that already exists. Input order is sibling order.
+   */
+  async addMany(specs) {
+    const opened = await this.authoring();
+    if (opened.isErrored) return opened;
+    return this.addInto(opened.value, specs);
+  }
+  /** The add pipeline over an already-opened authoring context (capture shares it). */
+  async addInto(opened, specs) {
+    if (!specs.length) {
+      return failed(refusal("invalid-request", "no tasks to add", "pass at least one task"));
+    }
+    const { snapshot, resolver, catalog, rows } = opened;
+    const keyed = specs.map((spec, index2) => ({ key: spec.key ?? `#${index2 + 1}`, spec }));
+    const byKey = /* @__PURE__ */ new Map();
+    for (const { key, spec } of keyed) {
+      if (byKey.has(key)) {
+        return failed(refusal("invalid-request", `duplicate task key "${key}"`, "give each task a unique key"));
+      }
+      byKey.set(key, spec);
+    }
+    const graph = validateAddGraph(keyed, byKey);
+    if (graph) return failed(graph);
+    const uids = new Map(keyed.map(({ key }) => [key, generateGuid()]));
+    const nextIndex = /* @__PURE__ */ new Map();
+    let starredOrder = catalog.maxStarredOrderIndex;
+    const documents = [];
+    for (const { key, spec } of keyed) {
+      let parentUid;
+      if (spec.parentKey !== void 0) parentUid = uids.get(spec.parentKey);
+      else if (spec.parentId !== void 0) {
+        const resolved = this.resolveTarget(resolver, spec.parentId);
+        if (resolved.isErrored) return resolved;
+        parentUid = resolved.value;
+      }
+      const parentKey = parentUid?.toUpperCase() ?? "";
+      if (!nextIndex.has(parentKey)) {
+        const siblings = spec.parentKey !== void 0 ? [] : await this.siblingIndices(opened, parentUid);
+        nextIndex.set(parentKey, itemIndexAt(siblings));
+      }
+      const itemIndex = nextIndex.get(parentKey);
+      nextIndex.set(parentKey, itemIndex + ITEM_INDEX_STEP);
+      const places = this.resolvePlaces(spec.Places, catalog);
+      if (places.isErrored) return places;
+      const flag = this.resolveFlag(spec.Flag, catalog);
+      if (flag.isErrored) return flag;
+      const dependencies = [];
+      for (const id of spec.dependsOnIds ?? []) {
+        const resolved = this.resolveTarget(resolver, id);
+        if (resolved.isErrored) return resolved;
+        dependencies.push(resolved.value);
+      }
+      for (const dependencyKey of spec.dependsOnKeys ?? []) dependencies.push(uids.get(dependencyKey));
+      if (new Set(dependencies.map((uid) => uid.toUpperCase())).size !== dependencies.length) {
+        return failed(
+          refusal("invalid-request", `task "${key}" has duplicate dependency targets`, "name each dependency once")
+        );
+      }
+      if (spec.Starred) starredOrder += STARRED_ORDER_STEP;
+      documents.push(
+        buildTaskAddDelta({
+          uid: uids.get(key),
+          ...parentUid !== void 0 ? { parentUid } : {},
+          itemIndex: String(itemIndex),
+          caption: spec.caption,
+          createdDate: this.now(),
+          lastModified: this.now(),
+          ...spec.note !== void 0 ? { note: spec.note } : {},
+          ...spec.dueDateTime !== void 0 ? { dueDateTime: spec.dueDateTime } : {},
+          ...spec.startDateTime !== void 0 ? { startDateTime: spec.startDateTime } : {},
+          ...spec.IsProject !== void 0 ? { isProject: spec.IsProject } : {},
+          ...spec.Starred !== void 0 ? { starred: spec.Starred } : {},
+          ...spec.Folder !== void 0 ? { hideInToDoThisTask: spec.Folder } : {},
+          ...spec.HideInToDo !== void 0 ? { hideInToDo: spec.HideInToDo } : {},
+          ...spec.CompleteSubTasksInOrder !== void 0 ? { completeInOrder: spec.CompleteSubTasksInOrder } : {},
+          ...flag.value !== void 0 ? { flagUid: flag.value } : {},
+          ...spec.Places !== void 0 ? { placeUids: places.value } : {},
+          ...dependencies.length ? { dependencyUids: dependencies } : {},
+          ...spec.Starred ? { starredOrderIndex: String(starredOrder) } : {}
+        })
+      );
+    }
+    return this.commit(
+      deltaRowsFromDocument(mergeDeltas(documents)),
+      keyed.map(({ key }) => uids.get(key))
+    );
+  }
+  /**
+   * Rapid entry: one line in, one task in the inbox out. Inbox defaulting is
+   * the write policy that makes capture usable — a captured thought with no
+   * home belongs in MLO's own `<Inbox>` node, and falls back to the top level
+   * only when the profile has none.
+   */
+  async capture(line) {
+    const parsed = parseCaptureLine(line);
+    if (!parsed.caption) {
+      return failed(refusal("invalid-request", "nothing to capture: the line has no caption", "pass some text"));
+    }
+    const opened = await this.authoring();
+    if (opened.isErrored) return opened;
+    const inbox = findInbox(opened.value.snapshot.tasks, this.options.inboxCaption);
+    return this.addInto(opened.value, [
+      {
+        caption: parsed.caption,
+        ...parsed.note !== void 0 ? { note: parsed.note } : {},
+        ...parsed.places.length ? { Places: parsed.places } : {},
+        ...inbox ? { parentId: inbox.id } : {}
+      }
+    ]);
+  }
+  /** Change fields of one existing task. Only provided fields change. */
+  async update(id, patch) {
+    if (!Object.values(patch).some((value) => value !== void 0)) {
+      return failed(refusal("invalid-request", `nothing to update on "${id}"`, "pass at least one field"));
+    }
+    return this.rewrite(id, (target) => {
+      const editsDates = patch.DueDateTime !== void 0 || patch.StartDateTime !== void 0 || patch.CompletionDateTime !== void 0;
+      if (editsDates && csvTruthy(rowValue(target.row, "RecType"))) {
+        return failed(recurrenceRefusal(target.caption, "date edits"));
+      }
+      const places = this.resolvePlaces(patch.Places, target.catalog);
+      if (places.isErrored) return places;
+      const flag = this.resolveFlag(patch.Flag, target.catalog);
+      if (flag.isErrored) return flag;
+      const dependencies = [];
+      for (const dependencyId of patch.dependsOnIds ?? []) {
+        const resolved = this.resolveTarget(target.resolver, dependencyId);
+        if (resolved.isErrored) return resolved;
+        if (resolved.value.toUpperCase() === target.uid.toUpperCase()) {
+          return failed(
+            refusal("invalid-request", `"${target.caption}" cannot depend on itself`, "drop it from dependsOnIds")
+          );
+        }
+        dependencies.push(resolved.value);
+      }
+      return ok({
+        columns: updatePatch(patch, target.row, this.now(), void 0, flag.value),
+        ...patch.Places !== void 0 ? { placeUids: places.value } : {},
+        ...patch.dependsOnIds !== void 0 ? { dependencyUids: dependencies } : {},
+        ...patch.Starred !== void 0 ? { starred: patch.Starred } : {}
+      });
+    });
+  }
+  /**
+   * Mark a task completed. Recurring tasks refuse: completing one in MLO
+   * spawns the next occurrence, and a full-row rewrite through the sync loop
+   * would not — it would silently end the series.
+   */
+  complete(id) {
+    return this.rewrite(
+      id,
+      (target) => csvTruthy(rowValue(target.row, "RecType")) ? failed(recurrenceRefusal(target.caption, "completion")) : ok({ columns: completionPatch(target.row, this.now()) })
+    );
+  }
+  /**
+   * Reopen a completed task. Unlike `complete`, recurring tasks are allowed:
+   * reopening generates no occurrence, so there is no MLO-side behaviour for a
+   * full-row rewrite to bypass.
+   */
+  uncomplete(id) {
+    return this.rewrite(id, (target) => ok({ columns: reopenPatch(target.row, this.now()) }));
+  }
+  /** Move a task (with its subtree) under another parent, optionally into a slot. */
+  move(id, newParentId, position) {
+    return this.rewrite(id, async (target) => {
+      let parentUid = "";
+      if (newParentId !== void 0 && newParentId !== "") {
+        const destination = findById(target.opened.snapshot.tasks, newParentId);
+        const task = target.resolver.taskFor(target.uid);
+        if (destination && task && flatten([task]).includes(destination)) {
+          return failed(
+            refusal(
+              "invalid-request",
+              `cannot move "${target.caption}" into its own subtree`,
+              "pick a destination outside the moved branch"
+            )
+          );
+        }
+        const resolved = this.resolveTarget(target.resolver, newParentId);
+        if (resolved.isErrored) return resolved;
+        parentUid = resolved.value;
+      }
+      const siblings = await this.siblingIndices(target.opened, parentUid || void 0, target.uid);
+      const move = { parentUid, itemIndex: String(itemIndexAt(siblings, position)) };
+      return ok({ columns: updatePatch({}, target.row, this.now(), move) });
+    });
+  }
+  /** Tombstone a task and every descendant — a partial subtree would orphan children. */
+  async delete(id) {
+    const opened = await this.authoring();
+    if (opened.isErrored) return opened;
+    const { snapshot } = opened.value;
+    const task = findById(snapshot.tasks, id);
+    if (!task) return failed(unresolvable(id, `no task with id "${id}" in this snapshot`));
+    const uids = [];
+    for (const node of flatten([task])) {
+      if (!node.Guid) {
+        return failed(
+          unresolvable(node.id, `no recoverable GUID for "${node.Caption}" in the branch under "${task.Caption}"`)
+        );
+      }
+      uids.push(normalizeGuid(node.Guid));
+    }
+    return this.commit(deltaRowsFromDocument(buildTaskDeleteDelta(uids)), uids);
+  }
+  /**
+   * Where an accept receipt stands. The one read on this service that is about
+   * a write rather than the outline: a receipt outlives the call that returned
+   * it, and the caller that holds one has nowhere else to ask.
+   */
+  async writeStatus(writeId) {
+    const state = await this.repo.status(writeId);
+    if (state.isErrored) return failed(state.failure);
+    const { detail, remedy } = PROGRESS_WORDS[state.value.status];
+    return ok({
+      writeId: state.value.writeId,
+      status: state.value.status,
+      ...state.value.uid ? { uid: state.value.uid } : {},
+      ...state.value.expiresAt ? { expiresAt: state.value.expiresAt } : {},
+      ...state.value.at ? { at: state.value.at } : {},
+      // The write path's own words come first when it has any: they name the
+      // task and the session, which no generic sentence can.
+      detail: state.value.detail ? `${state.value.detail} \u2014 ${detail}` : detail,
+      ...remedy ? { remedy } : {}
+    });
+  }
+  // -------------------------------------------------------- Organize verbs
+  /** Promote a task to a project (Organize). */
+  makeProject(id, isProject = true) {
+    return this.update(id, { IsProject: isProject });
+  }
+  /** Replace the complete set of tasks this one waits for (Organize). */
+  setDependencies(id, dependsOnIds) {
+    return this.update(id, { dependsOnIds });
+  }
+  /** Sequential vs parallel subtasks (Organize). */
+  setSequential(id, sequential) {
+    return this.update(id, { CompleteSubTasksInOrder: sequential });
+  }
+  // -------------------------------------------------------------- internals
+  /** Overridable clock seam; MLO stores naive local timestamps. */
+  now() {
+    return nowIso();
+  }
+  /**
+   * The shared opening move of every write: a fresh snapshot (ids come from a
+   * read the caller already did, and a stale tree resolves them to the wrong
+   * rows), its resolver, and the row store this profile authors against.
+   */
+  async authoring() {
+    if (!this.rows) return failed(UNBOUND);
+    const read = await this.repo.snapshot(true);
+    if (read.isErrored) return failed(read.failure);
+    const snapshot = read.value;
+    return ok({
+      snapshot,
+      resolver: this.identity.resolverFor(snapshot),
+      rows: this.rows,
+      catalog: await this.rows.catalog()
+    });
+  }
+  /**
+   * Author one full-row rewrite from the row store's latest captured row. The
+   * row IS the authoring source: a TodoItems row merges as a full-record
+   * replacement, so anything it omits is blanked in the profile — which is why
+   * a row-store miss refuses with `repull` instead of authoring from the
+   * export.
+   */
+  async rewrite(id, plan) {
+    const opened = await this.authoring();
+    if (opened.isErrored) return opened;
+    const { resolver, rows, catalog } = opened.value;
+    const resolvedUid = this.resolveTarget(resolver, id);
+    if (resolvedUid.isErrored) return resolvedUid;
+    const uid = resolvedUid.value;
+    const lookup = await rows.latest(uid);
+    if (lookup.kind !== "row") {
+      return failed({
+        kind: "unknown-row",
+        uid: lookup.uid,
+        retryable: lookup.retryable,
+        remedy: lookup.remedy,
+        detail: lookup.detail
+      });
+    }
+    const caption = resolver.taskFor(uid)?.Caption ?? rowValue(lookup, "Caption");
+    const planned = await plan({ opened: opened.value, resolver, catalog, uid, caption, row: lookup });
+    if (planned.isErrored) return planned;
+    const { columns, placeUids, dependencyUids, starred } = planned.value;
+    const starredOrderIndex = starredOrderFor(lookup, catalog, starred);
+    const document = buildTaskUpdatesDelta([
+      {
+        header: lookup.header,
+        row: lookup.cells,
+        patch: columns,
+        // Relations travel on every rewrite, defaulting to what the captured
+        // row carries: omitting them would clear the task's contexts.
+        placeUids: placeUids ?? lookup.placeUids,
+        dependencyUids: dependencyUids ?? lookup.dependencyUids,
+        ...starredOrderIndex !== void 0 ? { starredOrderIndex } : {}
+      }
+    ]);
+    return this.commit(deltaRowsFromDocument(document), [uid]);
+  }
+  resolveTarget(resolver, id) {
+    const resolution = resolver.uidFor(id);
+    return resolution.kind === "resolved" ? ok(resolution.uid) : failed(unresolvable(id, resolution.detail));
+  }
+  resolvePlaces(captions, catalog) {
+    if (captions === void 0) return ok([]);
+    const seen = /* @__PURE__ */ new Set();
+    const uids = [];
+    for (const caption of captions) {
+      const key = caption.toLocaleLowerCase();
+      if (seen.has(key)) {
+        return failed(refusal("invalid-request", `duplicate context "${caption}"`, "name each context once"));
+      }
+      seen.add(key);
+      const match = catalog.places.find((place) => place.caption.toLocaleLowerCase() === key);
+      if (!match) {
+        return failed(
+          refusal(
+            "invalid-request",
+            `no context named "${caption}" in this profile`,
+            "create the context in MLO first, or run list_contexts to see the existing ones"
+          )
+        );
+      }
+      uids.push(match.uid);
+    }
+    return ok(uids);
+  }
+  /** `undefined` = untouched, `""` = cleared, otherwise the flag's UID. */
+  resolveFlag(caption, catalog) {
+    if (caption === void 0) return ok(void 0);
+    if (caption === "") return ok("");
+    const match = catalog.flags.find((flag) => flag.caption.toLocaleLowerCase() === caption.toLocaleLowerCase());
+    return match ? ok(match.uid) : failed(refusal("invalid-request", `no flag named "${caption}" in this profile`, "create the flag in MLO first"));
+  }
+  /** Current ItemIndex values of a parent's children, from their captured rows. */
+  async siblingIndices({ snapshot, resolver, rows }, parentUid, excludeUid) {
+    const parent = parentUid ? resolver.taskFor(parentUid) : void 0;
+    if (parentUid && !parent) return [];
+    const siblings = parent ? parent.Children : snapshot.tasks;
+    const indices = [];
+    let unknown2 = 0;
+    for (const sibling of siblings) {
+      const lookup = sibling.Guid ? await rows.latest(sibling.Guid) : void 0;
+      if (lookup?.kind !== "row") {
+        unknown2 += 1;
+        continue;
+      }
+      if (excludeUid && sibling.Guid.toUpperCase() === excludeUid.toUpperCase()) continue;
+      const index2 = Number(rowValue(lookup, "ItemIndex"));
+      if (Number.isFinite(index2)) indices.push(index2);
+      else unknown2 += 1;
+    }
+    if (unknown2) indices.push((indices.length ? Math.max(...indices) : 0) + unknown2 * ITEM_INDEX_STEP);
+    return indices;
+  }
+  /** The one place a service touches the repository seam. */
+  async commit(rows, uids) {
+    const written = await this.repo.write(rows);
+    if (written.isErrored) return failed(written.failure);
+    return ok({ uids, writeId: written.value.writeId, expiresAt: written.value.expiresAt });
+  }
+};
+var STARRED_ORDER_STEP = 500;
+function starredOrderFor(row, catalog, starred) {
+  const isStarred = starred ?? csvTruthy(rowValue(row, "Starred"));
+  if (!isStarred) return void 0;
+  return row.starredOrderIndex ?? String(catalog.maxStarredOrderIndex + STARRED_ORDER_STEP);
+}
+function recurrenceRefusal(caption, what) {
+  return failureFor(
+    "unsupported-edit",
+    `"${caption}" is recurring \u2014 ${what} through the sync path would bypass MLO's recurrence generation and silently end the series`,
+    "do this in the MLO app, so it generates the next occurrence"
+  );
+}
+function validateAddGraph(keyed, byKey) {
+  const bad = (detail, remedy) => refusal("invalid-request", detail, remedy);
+  for (const { key, spec } of keyed) {
+    if (spec.parentKey !== void 0 && spec.parentId !== void 0) {
+      return bad(`task "${key}" has both parentKey and parentId`, "pick one parent");
+    }
+    if (spec.parentKey !== void 0 && !byKey.has(spec.parentKey)) {
+      return bad(`task "${key}" references unknown parentKey "${spec.parentKey}"`, "name a key present in this batch");
+    }
+    const keys = spec.dependsOnKeys ?? [];
+    if (new Set(keys).size !== keys.length) return bad(`task "${key}" has duplicate dependsOnKeys`, "name each once");
+    for (const dependencyKey of keys) {
+      if (!byKey.has(dependencyKey)) {
+        return bad(
+          `task "${key}" references unknown dependsOnKey "${dependencyKey}"`,
+          "name a key present in this batch"
+        );
+      }
+      if (dependencyKey === key) return bad(`task "${key}" cannot depend on itself`, "drop it from dependsOnKeys");
+    }
+  }
+  for (const { key, spec } of keyed) {
+    const seen = /* @__PURE__ */ new Set([key]);
+    let parentKey = spec.parentKey;
+    while (parentKey !== void 0) {
+      if (seen.has(parentKey)) return bad(`parentKey cycle involving "${key}" and "${parentKey}"`, "break the cycle");
+      seen.add(parentKey);
+      parentKey = byKey.get(parentKey).parentKey;
+    }
+  }
+  return void 0;
+}
+
+// src/services/identity.ts
+var IdentityService = class {
+  constructor(rows) {
+    this.rows = rows;
+  }
+  rows;
+  resolvers = /* @__PURE__ */ new WeakMap();
+  /** The single resolver construction site: one resolver per snapshot, cached by identity. */
+  resolverFor(snapshot) {
+    let resolver = this.resolvers.get(snapshot);
+    if (!resolver) {
+      resolver = new SnapshotResolver(snapshot.tasks, this.rows);
+      this.resolvers.set(snapshot, resolver);
+    }
+    return resolver;
+  }
+};
+var SnapshotResolver = class {
+  constructor(tasks, rows) {
+    this.tasks = tasks;
+    this.rows = rows;
+    this.all = flatten(tasks);
+    for (const task of this.all) {
+      if (task.Guid) this.byUid.set(task.Guid.toUpperCase(), task);
+    }
+  }
+  tasks;
+  rows;
+  byUid = /* @__PURE__ */ new Map();
+  all;
+  /** Resolve a path id to the row UID a write would target — a typed refusal, never a guess. */
+  uidFor(pathId) {
+    const task = findById(this.tasks, pathId);
+    if (!task) {
+      return { kind: "unresolvable", reason: "unknown-id", detail: `no task with id "${pathId}" in this snapshot` };
+    }
+    if (!task.Guid) {
+      return {
+        kind: "unresolvable",
+        reason: "no-recoverable-guid",
+        detail: `"${task.Caption}" has no recoverable GUID \u2014 MLO has not re-serialized it yet`
+      };
+    }
+    const uid = task.Guid.toUpperCase();
+    const confidence = this.rows.captionOf(uid) !== void 0 ? "confirmed" : "unconfirmed";
+    return { kind: "resolved", uid, confidence };
+  }
+  taskFor(uid) {
+    return this.byUid.get(uid.toUpperCase());
+  }
+  /** Tasks whose DependsOn names this UID. */
+  dependentsOf(uid) {
+    const needle = uid.toUpperCase();
+    return this.all.filter((t) => t.DependsOn.some((d) => d.toUpperCase() === needle));
+  }
+};
+
+// src/cloud/row-store.ts
+import { promises as fs3 } from "node:fs";
+import path4 from "node:path";
+
+// src/cloud/atomic-file.ts
+import { promises as fs2 } from "node:fs";
+async function atomicWrite(target, text2, options) {
+  const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
+  if (options?.fsync) {
+    const handle = await fs2.open(temporary, "w");
+    try {
+      await handle.writeFile(text2);
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+  } else {
+    await fs2.writeFile(temporary, text2);
+  }
+  await fs2.rename(temporary, target);
+}
+var WriteChain = class {
+  chain = Promise.resolve();
+  run(operation) {
+    const next = this.chain.then(operation, operation);
+    this.chain = next.catch(() => void 0);
+    return next;
+  }
+};
+
+// src/cloud/row-store.ts
+function unknownRowRefusal(uid) {
+  return {
+    kind: "unknown-row",
+    uid,
+    retryable: "after-user-action",
+    remedy: "repull",
+    detail: `no captured row for ${uid} \u2014 the row store has a gap; repull refreshes it from the vendor history`
+  };
+}
+var EMPTY_ROW_STORE_VIEW = { captionOf: () => void 0 };
+function keyOf(uid) {
+  try {
+    return normalizeGuid(uid);
+  } catch {
+    return void 0;
+  }
+}
+function uidColumn(document, section, column2) {
+  const found = findSection(document, section);
+  if (!found) return [];
+  const index2 = found.header.indexOf(column2);
+  if (index2 < 0) return [];
+  const uids = [];
+  for (const row of found.rows) {
+    const uid = keyOf(row[index2] ?? "");
+    if (uid) uids.push(uid);
+  }
+  return uids;
+}
+function namedColumn(document, section) {
+  const found = findSection(document, section);
+  if (!found) return [];
+  const uidIndex = found.header.indexOf("UID");
+  const captionIndex = found.header.indexOf("Caption");
+  if (uidIndex < 0 || captionIndex < 0) return [];
+  const named = [];
+  for (const row of found.rows) {
+    const uid = keyOf(row[uidIndex] ?? "");
+    if (uid) named.push({ uid, caption: row[captionIndex] ?? "" });
+  }
+  return named;
+}
+function relationIndex(document, section, from, to) {
+  const grouped = /* @__PURE__ */ new Map();
+  const found = findSection(document, section);
+  if (!found) return grouped;
+  const fromIndex = found.header.indexOf(from);
+  const toIndex = found.header.indexOf(to);
+  if (fromIndex < 0 || toIndex < 0) return grouped;
+  for (const row of found.rows) {
+    const owner = keyOf(row[fromIndex] ?? "");
+    const target = keyOf(row[toIndex] ?? "");
+    if (!owner || !target) continue;
+    const current = grouped.get(owner);
+    if (current) current.push(target);
+    else grouped.set(owner, [target]);
+  }
+  return grouped;
+}
+function harvestTaskRows(document) {
+  const places = relationIndex(document, "TodoItemPlaces", "TodoItemUID", "PlaceUID");
+  const dependencies = relationIndex(document, "TodoItems.Dependency", "TaskUID", "DependencyUID");
+  const starred = /* @__PURE__ */ new Map();
+  const starredSection = findSection(document, "TodoView.ManualOrdering.Starred");
+  if (starredSection) {
+    const uidIndex = starredSection.header.indexOf("UID");
+    const orderIndex = starredSection.header.indexOf("ItemIndex");
+    if (uidIndex >= 0 && orderIndex >= 0) {
+      for (const row of starredSection.rows) {
+        const uid = keyOf(row[uidIndex] ?? "");
+        if (uid) starred.set(uid, row[orderIndex] ?? "");
+      }
+    }
+  }
+  const harvested = {
+    rows: [],
+    tombstones: uidColumn(document, "TodoItems.Deleted", "TodoItemUID"),
+    places: namedColumn(document, "Places"),
+    flags: namedColumn(document, "Flags"),
+    deletedPlaces: uidColumn(document, "Places.Deleted", "PlaceUID"),
+    deletedFlags: uidColumn(document, "Flags.Deleted", "FlagUID")
+  };
+  const tasks = findSection(document, "TodoItems");
+  if (tasks) {
+    const uidIndex = tasks.header.indexOf("UID");
+    if (uidIndex >= 0) {
+      for (const row of tasks.rows) {
+        const uid = keyOf(row[uidIndex] ?? "");
+        if (!uid) continue;
+        const starredOrderIndex = starred.get(uid);
+        harvested.rows.push({
+          uid,
+          header: tasks.header,
+          cells: [...row],
+          // Absent relation rows for an emitted task mean "none", never
+          // "unchanged" — the replacement rule, applied at capture time.
+          placeUids: places.get(uid) ?? [],
+          dependencyUids: dependencies.get(uid) ?? [],
+          ...starredOrderIndex !== void 0 ? { starredOrderIndex } : {}
+        });
+      }
+    }
+  }
+  return harvested;
+}
+var FILE_NAME = "rows.json";
+function applyCatalog(catalog, harvested) {
+  for (const { uid, caption } of harvested.places) catalog.places.set(uid, caption);
+  for (const { uid, caption } of harvested.flags) catalog.flags.set(uid, caption);
+  for (const uid of harvested.deletedPlaces) catalog.places.delete(uid);
+  for (const uid of harvested.deletedFlags) catalog.flags.delete(uid);
+  return harvested.places.length + harvested.flags.length + harvested.deletedPlaces.length + harvested.deletedFlags.length;
+}
+function maxStarredOrderIndex(indices) {
+  const values = indices.map(Number).filter((value) => Number.isFinite(value));
+  return values.length ? Math.max(...values) : 0;
+}
+var FileRowStore = class {
+  constructor(dir) {
+    this.dir = dir;
+  }
+  dir;
+  headers = [];
+  rows = /* @__PURE__ */ new Map();
+  places = /* @__PURE__ */ new Map();
+  flags = /* @__PURE__ */ new Map();
+  loadedMtime;
+  loaded = false;
+  writes = new WriteChain();
+  file() {
+    return path4.join(this.dir, FILE_NAME);
+  }
+  /** Re-read the file when it changed on disk (or was never loaded). */
+  async ensureFresh() {
+    let mtime;
+    try {
+      mtime = (await fs3.stat(this.file())).mtimeMs;
+    } catch {
+      this.loaded = true;
+      return;
+    }
+    if (this.loaded && mtime === this.loadedMtime) return;
+    const parsed = JSON.parse(await fs3.readFile(this.file(), "utf8"));
+    this.headers = parsed.headers ?? [];
+    this.rows = new Map(Object.entries(parsed.rows ?? {}));
+    this.places = new Map(Object.entries(parsed.places ?? {}));
+    this.flags = new Map(Object.entries(parsed.flags ?? {}));
+    this.loadedMtime = mtime;
+    this.loaded = true;
+  }
+  async save() {
+    const value = {
+      savedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      headers: this.headers,
+      rows: Object.fromEntries(this.rows),
+      places: Object.fromEntries(this.places),
+      flags: Object.fromEntries(this.flags)
+    };
+    await atomicWrite(this.file(), JSON.stringify(value));
+    this.loadedMtime = (await fs3.stat(this.file())).mtimeMs;
+  }
+  headerIndex(header) {
+    const existing = this.headers.findIndex(
+      (candidate) => candidate.length === header.length && candidate.every((column2, i2) => column2 === header[i2])
+    );
+    if (existing >= 0) return existing;
+    this.headers.push([...header]);
+    return this.headers.length - 1;
+  }
+  applyDocument(document, source) {
+    const harvested = harvestTaskRows(document);
+    const at = (/* @__PURE__ */ new Date()).toISOString();
+    for (const { uid, header, cells, placeUids, dependencyUids, starredOrderIndex } of harvested.rows) {
+      this.rows.set(uid, {
+        h: this.headerIndex(header),
+        cells,
+        at,
+        source,
+        places: placeUids,
+        deps: dependencyUids,
+        ...starredOrderIndex !== void 0 ? { star: starredOrderIndex } : {}
+      });
+    }
+    const named = applyCatalog({ places: this.places, flags: this.flags }, harvested);
+    let tombstones = 0;
+    for (const uid of harvested.tombstones) {
+      if (this.rows.delete(uid)) tombstones += 1;
+    }
+    return { upserts: harvested.rows.length, tombstones, named };
+  }
+  ingest(document, source) {
+    return this.writes.run(async () => {
+      await this.ensureFresh();
+      const { named, ...counts } = this.applyDocument(document, source);
+      if (counts.upserts || counts.tombstones || named) await this.save();
+      return counts;
+    });
+  }
+  replaceAll(document, source) {
+    return this.writes.run(async () => {
+      const previous = { headers: this.headers, rows: this.rows, places: this.places, flags: this.flags };
+      this.headers = [];
+      this.rows = /* @__PURE__ */ new Map();
+      this.places = /* @__PURE__ */ new Map();
+      this.flags = /* @__PURE__ */ new Map();
+      let upserts;
+      try {
+        upserts = this.applyDocument(document, source).upserts;
+        await this.save();
+      } catch (error2) {
+        Object.assign(this, previous);
+        throw error2;
+      }
+      this.loaded = true;
+      return { upserts };
+    });
+  }
+  async latest(uid) {
+    const key = keyOf(uid);
+    if (key) {
+      await this.ensureFresh();
+      const stored = this.rows.get(key);
+      if (stored) {
+        return {
+          kind: "row",
+          header: this.headers[stored.h] ?? [],
+          cells: stored.cells,
+          capturedAt: stored.at,
+          source: stored.source,
+          placeUids: stored.places ?? [],
+          dependencyUids: stored.deps ?? [],
+          ...stored.star !== void 0 ? { starredOrderIndex: stored.star } : {}
+        };
+      }
+    }
+    return unknownRowRefusal(uid);
+  }
+  async catalog() {
+    await this.ensureFresh();
+    return {
+      places: [...this.places].map(([uid, caption]) => ({ uid, caption })),
+      flags: [...this.flags].map(([uid, caption]) => ({ uid, caption })),
+      maxStarredOrderIndex: maxStarredOrderIndex([...this.rows.values()].map((row) => row.star))
+    };
+  }
+  async size() {
+    await this.ensureFresh();
+    return this.rows.size;
+  }
+  view() {
+    void this.ensureFresh().catch(() => void 0);
+    return {
+      captionOf: (uid) => {
+        void this.ensureFresh().catch(() => void 0);
+        const key = keyOf(uid);
+        const stored = key ? this.rows.get(key) : void 0;
+        if (!stored) return void 0;
+        const captionIndex = (this.headers[stored.h] ?? []).indexOf("Caption");
+        return captionIndex >= 0 ? stored.cells[captionIndex] : void 0;
+      }
+    };
+  }
+};
+
+// src/services/availability.ts
+var INVISIBLE = /* @__PURE__ */ new Set(["completed", "branch", "folder", "hidden", "out-of-order"]);
+var AvailabilityEngine = class {
+  places;
+  placeByCaption;
+  entries;
+  byId;
+  /** Context expansion is per caption, not per task: memoized so a filter walks the includes graph once. */
+  expansions = /* @__PURE__ */ new Map();
+  constructor(snapshot, opts = {}) {
+    const now = opts.now ?? /* @__PURE__ */ new Date();
+    this.places = readPlaces(snapshot.doc);
+    this.placeByCaption = new Map(this.places.map((p) => [normalizeContext(p.Caption), p]));
+    this.entries = this.evaluate(snapshot.tasks, now);
+    this.byId = new Map(this.entries.map((e) => [e.task.id, e]));
+  }
+  /** Every task in the outline, evaluated. Outline order. */
+  all() {
+    return this.entries;
+  }
+  /** What the To-Do list would list, highest-ranked first. Includes deferred actions — filter on `available`. */
+  actions() {
+    return this.entries.filter((e) => e.visible).sort(byRank);
+  }
+  of(id) {
+    return this.byId.get(id);
+  }
+  /**
+   * Does a filter for `caption` reach this task? Contexts are hierarchical, so
+   * a filter for Home matches a task tagged only Phone when Home includes it.
+   */
+  inContext(entry, caption) {
+    let reached = this.expansions.get(caption);
+    if (!reached) {
+      reached = expandContext(this.places, caption);
+      this.expansions.set(caption, reached);
+    }
+    return entry.task.Places.some((p) => reached.has(normalizeContext(p)));
+  }
+  evaluate(tasks, now) {
+    const completedUids = /* @__PURE__ */ new Set();
+    const knownUids = /* @__PURE__ */ new Set();
+    const walkUids = (list) => {
+      for (const t of list) {
+        if (t.Guid) {
+          const uid = normalizeUid(t.Guid);
+          knownUids.add(uid);
+          if (t.CompletionDateTime) completedUids.add(uid);
+        }
+        walkUids(t.Children);
+      }
+    };
+    walkUids(tasks);
+    const out = [];
+    const walk = (list, inherited) => {
+      let sequentialTaken = false;
+      for (const t of list) {
+        const importance = inherited.importance * ((t.Importance ?? 100) / 100);
+        const outOfOrder = inherited.outOfOrderAbove || inherited.sequentialParent && sequentialTaken;
+        if (inherited.sequentialParent && !t.CompletionDateTime) sequentialTaken = true;
+        const blocks = this.blocksFor(t, {
+          now,
+          hiddenAbove: inherited.hiddenAbove,
+          outOfOrder,
+          completedUids,
+          knownUids
+        });
+        out.push({
+          task: t,
+          visible: !blocks.some((b) => INVISIBLE.has(b.kind)),
+          available: blocks.length === 0,
+          blocks,
+          importance,
+          score: score(importance, t, now)
+        });
+        walk(t.Children, {
+          importance,
+          hiddenAbove: inherited.hiddenAbove || Boolean(t.HideInToDo),
+          outOfOrderAbove: outOfOrder,
+          sequentialParent: Boolean(t.CompleteSubTasksInOrder)
+        });
+      }
+    };
+    walk(tasks, { importance: 100, hiddenAbove: false, outOfOrderAbove: false, sequentialParent: false });
+    return out;
+  }
+  blocksFor(t, ctx) {
+    const blocks = [];
+    if (t.CompletionDateTime) blocks.push({ kind: "completed", detail: `completed ${t.CompletionDateTime}` });
+    if (t.Children.some((c) => !c.CompletionDateTime)) {
+      blocks.push({ kind: "branch", detail: "has uncompleted subtasks \u2014 its leaves are the actions" });
+    }
+    if (containerKind(t) === "folder") {
+      blocks.push({ kind: "folder", detail: "marked Folder: a container, never an action" });
+    }
+    if (t.HideInToDo || ctx.hiddenAbove) {
+      blocks.push({ kind: "hidden", detail: "hidden from To-Do views by a hide-in-todo branch" });
+    }
+    if (ctx.outOfOrder) {
+      blocks.push({ kind: "out-of-order", detail: "its parent completes subtasks in order and an earlier one is open" });
+    }
+    const waitingOn = t.DependsOn.map(normalizeUid).filter(
+      (uid) => ctx.knownUids.has(uid) && !ctx.completedUids.has(uid)
+    );
+    if (waitingOn.length) {
+      blocks.push({ kind: "blocked-by-dependency", detail: `waits for ${waitingOn.length} uncompleted task(s)` });
+    }
+    if (t.StartDateTime && t.StartDateTime > localIso(ctx.now)) {
+      blocks.push({ kind: "starts-later", detail: `starts ${t.StartDateTime}` });
+    }
+    if (t.Places.length && !t.Places.some((p) => isOpenAt(this.placeByCaption.get(normalizeContext(p)), ctx.now))) {
+      blocks.push({ kind: "context-closed", detail: `every context is closed now: ${t.Places.join(", ")}` });
+    }
+    return blocks;
+  }
+};
+function normalizeUid(uid) {
+  return uid.replace(/[{}]/g, "").toLowerCase();
+}
+function localIso(at) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}T${pad(at.getHours())}:${pad(at.getMinutes())}:${pad(at.getSeconds())}`;
+}
+var MS_PER_DAY = 864e5;
+var START_WEIGHT = 1;
+var DUE_WEIGHT = 1;
+function daysSince(dateTime, now) {
+  const parsed = Date.parse(dateTime);
+  return Number.isNaN(parsed) ? 0 : (now.getTime() - parsed) / MS_PER_DAY;
+}
+function score(importance, t, now) {
+  const start = t.StartDateTime ? START_WEIGHT * daysSince(t.StartDateTime, now) : 0;
+  const due = t.DueDateTime ? DUE_WEIGHT * daysSince(t.DueDateTime, now) : 0;
+  return importance + start + due;
+}
+function byRank(a, b) {
+  if (a.available !== b.available) return a.available ? -1 : 1;
+  if (b.score !== a.score) return b.score - a.score;
+  const due = (a.task.DueDateTime ?? "\uFFFF").localeCompare(b.task.DueDateTime ?? "\uFFFF");
+  if (due !== 0) return due;
+  return a.task.id.localeCompare(b.task.id);
+}
+
+// src/services/next-actions.ts
+var MINUTES_PER_DAY = 1440;
+function estimatedMinutes(t) {
+  const days = t.EstimateMax ?? t.EstimateMin;
+  return days === void 0 ? void 0 : days * MINUTES_PER_DAY;
+}
+var NextActionsService = class {
+  constructor(repo, options = {}) {
+    this.repo = repo;
+    this.options = options;
+  }
+  repo;
+  options;
+  /** Ranked next actions, highest computed score first. */
+  async nextActions(query = {}) {
+    const read = await this.repo.snapshot();
+    if (read.isErrored) return failed(read.failure);
+    const engine = new AvailabilityEngine(read.value, { now: this.options.now?.() });
+    const availableOnly = query.availableOnly ?? true;
+    const matches = engine.actions().filter((entry) => {
+      if (availableOnly && !entry.available) return false;
+      if (query.context !== void 0 && !engine.inContext(entry, query.context)) return false;
+      if (query.maxTimeMin !== void 0) {
+        const minutes = estimatedMinutes(entry.task);
+        if (minutes !== void 0 && minutes > query.maxTimeMin) return false;
+      }
+      if (query.maxEffort !== void 0 && (entry.task.Effort ?? 100) > query.maxEffort) return false;
+      return true;
+    });
+    return ok(
+      matches.slice(0, query.limit ?? matches.length).map(({ task, score: score2, available, blocks }) => ({ task, score: score2, available, blocks }))
+    );
+  }
+};
+
+// src/services/review.ts
+var ReviewService = class {
+  constructor(repo, options = {}) {
+    this.repo = repo;
+    this.options = options;
+  }
+  repo;
+  options;
+  /** Unclarified captures: the open tasks filed directly under the inbox node. */
+  async inbox() {
+    const read = await this.repo.snapshot();
+    if (read.isErrored) return failed(read.failure);
+    const inbox = findInbox(read.value.tasks, this.options.inboxCaption);
+    if (!inbox) return ok([]);
+    return ok(inbox.Children.filter((t) => !t.CompletionDateTime));
+  }
+  /** The outline's project and folder containers with the tasks nested under each. */
+  async projects(query = {}) {
+    const read = await this.repo.snapshot();
+    if (read.isErrored) return failed(read.failure);
+    const snapshot = read.value;
+    const engine = new AvailabilityEngine(snapshot, { now: this.options.now?.() });
+    return ok(flatten(snapshot.tasks).filter((t) => query.includeCompleted || !t.CompletionDateTime).flatMap((task) => {
+      const kind = containerKind(task);
+      if (!kind) return [];
+      if (query.kind && query.kind !== kind) return [];
+      if (query.status !== void 0 && task.ProjectStatus !== query.status) return [];
+      const nested = flatten(task.Children);
+      const open = nested.filter((t) => !t.CompletionDateTime);
+      return [
+        {
+          task,
+          kind,
+          status: task.ProjectStatus,
+          tasks: open,
+          availableActions: open.filter((t) => engine.of(t.id)?.available).length,
+          completed: nested.length - open.length
+        }
+      ];
+    }));
+  }
+};
+
+// src/cloud/profile-backup.ts
+import { promises as fs4 } from "node:fs";
+async function backupDataFile(dataFile, at = /* @__PURE__ */ new Date()) {
+  const stamp = at.toISOString().replace(/[:.]/g, "-");
+  const target = `${dataFile}.rebind-backup-${stamp}`;
+  await fs4.copyFile(dataFile, target, fs4.constants.COPYFILE_EXCL);
+  return target;
+}
+
+// src/services/admin.ts
+function adminFailure(kind, detail, remedy) {
+  return failureFor(kind, detail, remedy);
+}
+var DEAD_LETTER_TAIL = 5;
+var AdminService = class {
+  constructor(config2, repo, gateway, endpoint) {
+    this.config = config2;
+    this.repo = repo;
+    this.gateway = gateway;
+    this.endpoint = endpoint;
+  }
+  config;
+  repo;
+  gateway;
+  endpoint;
+  /**
+   * Drop this profile's cloud binding so the endpoint binds it afresh — the
+   * remedy when MLO is syncing a cloud file the profile is not bound to.
+   *
+   * The `.ml` is backed up FIRST and the copy's failure aborts the whole verb:
+   * rebinding is the one endpoint operation whose blast radius reaches the
+   * user's own data (a wrong new binding delivers writes into a history MLO
+   * never reads). The old partition directory is left intact as evidence; only
+   * the pointer moves. Re-binding then happens on the next proxied sync, under
+   * the same three guards as a first-run initialization — a rebind is explicit
+   * about discarding, never about what to adopt next.
+   *
+   * When the discarded cloud file keeps syncing too, the endpoint then sees two
+   * candidates and refuses `ambiguous-bootstrap-candidate` rather than guess.
+   * Its remedy — sync only the target profile and restart the endpoint, which
+   * forgets the contacts it has seen — is what completes such a rebind. That
+   * refusal is the design (ADR-0002: report a mismatch, never repair it), not
+   * a gap in it.
+   */
+  rebind() {
+    return this.overCloudState(async () => {
+      const existing = await this.gateway.bindings.forProfile(this.config.dataFile);
+      if (!existing?.dataFileUID) {
+        return failed(
+          adminFailure(
+            "nothing-bound",
+            "this profile is not bound to a cloud file, so there is nothing to rebind",
+            "run one sync in MLO through this proxy first, so auto-initialization binds the profile"
+          )
+        );
+      }
+      let backup;
+      try {
+        backup = await backupDataFile(this.config.dataFile);
+      } catch (error2) {
+        return failed(
+          adminFailure(
+            "backup-failed",
+            `the profile could not be copied aside, so the binding was left alone: ${error2 instanceof Error ? error2.message : String(error2)}`,
+            `check that ${this.config.dataFile} is readable and its directory writable, then rebind again`
+          )
+        );
+      }
+      await this.gateway.bindings.unbindUid(this.config.dataFile);
+      return ok({ backup, previousDataFileUID: existing.dataFileUID });
+    });
+  }
+  /**
+   * Ask for the row store to be rebuilt from a fresh full-history pull — the
+   * remedy an `unknown-row` refusal names. The binding is not touched: this
+   * repairs a gap in what the endpoint has captured, it does not reconsider
+   * which cloud file the profile belongs to.
+   *
+   * The pull itself happens in the resident after MLO's next sync, so the
+   * answer here is "requested", not "done"; `cloud_status` reports the result
+   * through the partition's capture journal.
+   */
+  repull() {
+    return this.overCloudState(async () => {
+      const bound = await this.gateway.boundPartition(this.config.dataFile);
+      if (bound.kind !== "bound") {
+        return failed(
+          adminFailure(
+            "partition-not-ready",
+            "this profile has no bound cloud partition, so there is no row store to refresh",
+            "sync MLO once through the proxy and let the endpoint bind it first"
+          )
+        );
+      }
+      const requestedAt = (/* @__PURE__ */ new Date()).toISOString();
+      await bound.partition.requestRepull(requestedAt);
+      return ok({ dataFileUID: bound.partition.uid, requestedAt });
+    });
+  }
+  /** Run the profile's QuickSync — a best-effort accelerator, never load-bearing (spec section 2.5). */
+  async quickSync() {
+    const nudged = await this.repo.quickSync();
+    if (nudged.isErrored) {
+      return failed(adminFailure("quick-sync-failed", nudged.failure.detail, nudged.failure.remedy));
+    }
+    return ok(void 0);
+  }
+  status() {
+    return this.overCloudState(async () => ok(await this.readStatus()));
+  }
+  /**
+   * Every verb here reads or writes the cloud state root, and a state root
+   * that cannot be read is an op refusal like any other: this session keeps
+   * serving reads, and the next call is fresh.
+   */
+  async overCloudState(run) {
+    try {
+      return await run();
+    } catch (error2) {
+      return failed(
+        adminFailure(
+          "cloud-state-unreadable",
+          `could not read the cloud state root: ${error2 instanceof Error ? error2.message : String(error2)}`,
+          `check that ${this.gateway.stateRoot} is readable`
+        )
+      );
+    }
+  }
+  async readStatus() {
+    const endpointStatus = await this.endpoint.status();
+    const endpoint = {
+      url: this.endpoint.url,
+      reachable: endpointStatus !== void 0,
+      ...endpointStatus?.version ? { version: endpointStatus.version } : {}
+    };
+    let mode = "unbound";
+    let lifecycle = "uninitialized";
+    let dataFileUID;
+    let repullRequestedAt;
+    let writes = { pendingWrites: 0, recentDeadLetters: [] };
+    const bound = await this.gateway.boundPartition(this.config.dataFile);
+    if (bound.kind === "bound") {
+      mode = bound.binding.mode;
+      lifecycle = bound.lifecycle;
+      dataFileUID = bound.binding.dataFileUID;
+      repullRequestedAt = await bound.partition.repullRequestedAt();
+      writes = await this.writeAggregate(bound.partition, endpointStatus);
+    }
+    const partitions = (await this.gateway.registry.list()).map((partition) => ({
+      key: partition.key,
+      mode: partition.mode,
+      lifecycle: partition.lifecycle
+    }));
+    const [unboundSightings, mismatch] = await Promise.all([
+      this.gateway.unboundSightings(),
+      this.gateway.bindingMismatch(this.config.dataFile)
+    ]);
+    return {
+      host: this.config.cloudHost,
+      port: this.config.cloudPort,
+      endpoint,
+      mode,
+      lifecycle,
+      dataFileUID,
+      mismatch,
+      ...repullRequestedAt ? { repullRequestedAt } : {},
+      unboundSightings,
+      writes,
+      stateRoot: this.gateway.stateRoot,
+      partitions
+    };
+  }
+  /**
+   * The write aggregate. The partition's own handle derives what is outstanding
+   * and what it lost; this adds the one fact that lives in neither the queue nor
+   * the outcome ring — whether MLO is holding a session open over the writes
+   * right now, which only the resident can see.
+   */
+  async writeAggregate(partition, endpointStatus) {
+    const gauge = await partition.writeGauge(DEAD_LETTER_TAIL);
+    return {
+      pendingWrites: gauge.pendingWrites,
+      ...gauge.oldestPendingAgeMs !== void 0 ? { oldestPendingAgeMs: gauge.oldestPendingAgeMs } : {},
+      recentDeadLetters: gauge.deadLetters.map((dead) => ({
+        writeId: dead.writeId,
+        uid: dead.uid,
+        ...dead.caption ? { caption: dead.caption } : {},
+        status: dead.status,
+        at: dead.at,
+        ...dead.detail ? { reason: dead.detail } : {}
+      })),
+      ...endpointStatus?.writesHeldOpen ? { sessionHeldOpen: endpointStatus.writesHeldOpen.length > 0 } : {}
+    };
+  }
+};
+
+// src/context.ts
+function createToolContext(config2, repo, cloud, endpoint, rows) {
+  const identity = new IdentityService(rows?.view() ?? EMPTY_ROW_STORE_VIEW);
+  return {
+    outline: new OutlineService(repo, identity, rows, { inboxCaption: config2.inboxCaption }),
+    nextActions: new NextActionsService(repo),
+    review: new ReviewService(repo, { inboxCaption: config2.inboxCaption }),
+    admin: new AdminService(config2, repo, cloud, endpoint),
+    config: config2,
+    log
+  };
+}
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/external.js
 var external_exports = {};
@@ -16002,10 +18716,10 @@ var ZodError2 = class _ZodError extends Error {
           fieldErrors._errors.push(mapper(issue2));
         } else {
           let curr = fieldErrors;
-          let i = 0;
-          while (i < issue2.path.length) {
-            const el = issue2.path[i];
-            const terminal = i === issue2.path.length - 1;
+          let i2 = 0;
+          while (i2 < issue2.path.length) {
+            const el = issue2.path[i2];
+            const terminal = i2 === issue2.path.length - 1;
             if (!terminal) {
               curr[el] = curr[el] || { _errors: [] };
             } else {
@@ -16013,7 +18727,7 @@ var ZodError2 = class _ZodError extends Error {
               curr[el]._errors.push(mapper(issue2));
             }
             curr = curr[el];
-            i++;
+            i2++;
           }
         }
       }
@@ -16172,8 +18886,8 @@ function getErrorMap() {
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path11, errorMaps, issueData } = params;
-  const fullPath = [...path11, ...issueData.path || []];
+  const { data, path: path15, errorMaps, issueData } = params;
+  const fullPath = [...path15, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -16212,7 +18926,7 @@ function addIssueToContext(ctx, issueData) {
       // then global override map
       overrideMap === en_default2 ? void 0 : en_default2
       // then global default map
-    ].filter((x) => !!x)
+    ].filter((x2) => !!x2)
   });
   ctx.common.issues.push(issue2);
 }
@@ -16275,10 +18989,10 @@ var INVALID = Object.freeze({
 });
 var DIRTY = (value) => ({ status: "dirty", value });
 var OK = (value) => ({ status: "valid", value });
-var isAborted = (x) => x.status === "aborted";
-var isDirty = (x) => x.status === "dirty";
-var isValid = (x) => x.status === "valid";
-var isAsync = (x) => typeof Promise !== "undefined" && x instanceof Promise;
+var isAborted = (x2) => x2.status === "aborted";
+var isDirty = (x2) => x2.status === "dirty";
+var isValid = (x2) => x2.status === "valid";
+var isAsync = (x2) => typeof Promise !== "undefined" && x2 instanceof Promise;
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/errorUtil.js
 var errorUtil;
@@ -16289,11 +19003,11 @@ var errorUtil;
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path11, key) {
+  constructor(parent, value, path15, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path11;
+    this._path = path15;
     this._key = key;
   }
   get path() {
@@ -16432,8 +19146,8 @@ var ZodType2 = class {
         } : {
           issues: ctx.common.issues
         };
-      } catch (err) {
-        if (err?.message?.toLowerCase()?.includes("encountered")) {
+      } catch (err2) {
+        if (err2?.message?.toLowerCase()?.includes("encountered")) {
           this["~standard"].async = true;
         }
         ctx.common = {
@@ -17240,14 +19954,14 @@ var ZodString2 = class _ZodString2 extends ZodType2 {
     return min;
   }
   get maxLength() {
-    let max = null;
+    let max2 = null;
     for (const ch of this._def.checks) {
       if (ch.kind === "max") {
-        if (max === null || ch.value < max)
-          max = ch.value;
+        if (max2 === null || ch.value < max2)
+          max2 = ch.value;
       }
     }
-    return max;
+    return max2;
   }
 };
 ZodString2.create = (params) => {
@@ -17461,20 +20175,20 @@ var ZodNumber2 = class _ZodNumber extends ZodType2 {
     return min;
   }
   get maxValue() {
-    let max = null;
+    let max2 = null;
     for (const ch of this._def.checks) {
       if (ch.kind === "max") {
-        if (max === null || ch.value < max)
-          max = ch.value;
+        if (max2 === null || ch.value < max2)
+          max2 = ch.value;
       }
     }
-    return max;
+    return max2;
   }
   get isInt() {
     return !!this._def.checks.find((ch) => ch.kind === "int" || ch.kind === "multipleOf" && util.isInteger(ch.value));
   }
   get isFinite() {
-    let max = null;
+    let max2 = null;
     let min = null;
     for (const ch of this._def.checks) {
       if (ch.kind === "finite" || ch.kind === "int" || ch.kind === "multipleOf") {
@@ -17483,11 +20197,11 @@ var ZodNumber2 = class _ZodNumber extends ZodType2 {
         if (min === null || ch.value > min)
           min = ch.value;
       } else if (ch.kind === "max") {
-        if (max === null || ch.value < max)
-          max = ch.value;
+        if (max2 === null || ch.value < max2)
+          max2 = ch.value;
       }
     }
-    return Number.isFinite(min) && Number.isFinite(max);
+    return Number.isFinite(min) && Number.isFinite(max2);
   }
 };
 ZodNumber2.create = (params) => {
@@ -17652,14 +20366,14 @@ var ZodBigInt = class _ZodBigInt extends ZodType2 {
     return min;
   }
   get maxValue() {
-    let max = null;
+    let max2 = null;
     for (const ch of this._def.checks) {
       if (ch.kind === "max") {
-        if (max === null || ch.value < max)
-          max = ch.value;
+        if (max2 === null || ch.value < max2)
+          max2 = ch.value;
       }
     }
-    return max;
+    return max2;
   }
 };
 ZodBigInt.create = (params) => {
@@ -17786,14 +20500,14 @@ var ZodDate = class _ZodDate extends ZodType2 {
     return min != null ? new Date(min) : null;
   }
   get maxDate() {
-    let max = null;
+    let max2 = null;
     for (const ch of this._def.checks) {
       if (ch.kind === "max") {
-        if (max === null || ch.value < max)
-          max = ch.value;
+        if (max2 === null || ch.value < max2)
+          max2 = ch.value;
       }
     }
-    return max != null ? new Date(max) : null;
+    return max2 != null ? new Date(max2) : null;
   }
 };
 ZodDate.create = (params) => {
@@ -17990,14 +20704,14 @@ var ZodArray2 = class _ZodArray extends ZodType2 {
       }
     }
     if (ctx.common.async) {
-      return Promise.all([...ctx.data].map((item, i) => {
-        return def.type._parseAsync(new ParseInputLazyPath(ctx, item, ctx.path, i));
+      return Promise.all([...ctx.data].map((item, i2) => {
+        return def.type._parseAsync(new ParseInputLazyPath(ctx, item, ctx.path, i2));
       })).then((result2) => {
         return ParseStatus.mergeArray(status, result2);
       });
     }
-    const result = [...ctx.data].map((item, i) => {
-      return def.type._parseSync(new ParseInputLazyPath(ctx, item, ctx.path, i));
+    const result = [...ctx.data].map((item, i2) => {
+      return def.type._parseSync(new ParseInputLazyPath(ctx, item, ctx.path, i2));
     });
     return ParseStatus.mergeArray(status, result);
   }
@@ -18299,10 +21013,10 @@ var ZodObject2 = class _ZodObject extends ZodType2 {
   //   }) as any;
   //   return merged;
   // }
-  catchall(index) {
+  catchall(index2) {
     return new _ZodObject({
       ...this._def,
-      catchall: index
+      catchall: index2
     });
   }
   pick(mask) {
@@ -18620,9 +21334,9 @@ function mergeValues2(a, b) {
       return { valid: false };
     }
     const newArray = [];
-    for (let index = 0; index < a.length; index++) {
-      const itemA = a[index];
-      const itemB = b[index];
+    for (let index2 = 0; index2 < a.length; index2++) {
+      const itemA = a[index2];
+      const itemB = b[index2];
       const sharedValue = mergeValues2(itemA, itemB);
       if (!sharedValue.valid) {
         return { valid: false };
@@ -18726,7 +21440,7 @@ var ZodTuple = class _ZodTuple extends ZodType2 {
       if (!schema)
         return null;
       return schema._parse(new ParseInputLazyPath(ctx, item, ctx.path, itemIndex));
-    }).filter((x) => !!x);
+    }).filter((x2) => !!x2);
     if (ctx.common.async) {
       return Promise.all(items).then((results) => {
         return ParseStatus.mergeArray(status, results);
@@ -18828,10 +21542,10 @@ var ZodMap = class extends ZodType2 {
     }
     const keyType = this._def.keyType;
     const valueType = this._def.valueType;
-    const pairs = [...ctx.data.entries()].map(([key, value], index) => {
+    const pairs = [...ctx.data.entries()].map(([key, value], index2) => {
       return {
-        key: keyType._parse(new ParseInputLazyPath(ctx, key, ctx.path, [index, "key"])),
-        value: valueType._parse(new ParseInputLazyPath(ctx, value, ctx.path, [index, "value"]))
+        key: keyType._parse(new ParseInputLazyPath(ctx, key, ctx.path, [index2, "key"])),
+        value: valueType._parse(new ParseInputLazyPath(ctx, value, ctx.path, [index2, "value"]))
       };
     });
     if (ctx.common.async) {
@@ -18925,7 +21639,7 @@ var ZodSet = class _ZodSet extends ZodType2 {
       }
       return { status: status.value, value: parsedSet };
     }
-    const elements = [...ctx.data.values()].map((item, i) => valueType._parse(new ParseInputLazyPath(ctx, item, ctx.path, i)));
+    const elements = [...ctx.data.values()].map((item, i2) => valueType._parse(new ParseInputLazyPath(ctx, item, ctx.path, i2)));
     if (ctx.common.async) {
       return Promise.all(elements).then((elements2) => finalizeSet(elements2));
     } else {
@@ -18979,7 +21693,7 @@ var ZodFunction = class _ZodFunction extends ZodType2 {
       return makeIssue({
         data: args,
         path: ctx.path,
-        errorMaps: [ctx.common.contextualErrorMap, ctx.schemaErrorMap, getErrorMap(), en_default2].filter((x) => !!x),
+        errorMaps: [ctx.common.contextualErrorMap, ctx.schemaErrorMap, getErrorMap(), en_default2].filter((x2) => !!x2),
         issueData: {
           code: ZodIssueCode.invalid_arguments,
           argumentsError: error2
@@ -18990,7 +21704,7 @@ var ZodFunction = class _ZodFunction extends ZodType2 {
       return makeIssue({
         data: returns,
         path: ctx.path,
-        errorMaps: [ctx.common.contextualErrorMap, ctx.schemaErrorMap, getErrorMap(), en_default2].filter((x) => !!x),
+        errorMaps: [ctx.common.contextualErrorMap, ctx.schemaErrorMap, getErrorMap(), en_default2].filter((x2) => !!x2),
         issueData: {
           code: ZodIssueCode.invalid_return_type,
           returnTypeError: error2
@@ -20003,12 +22717,12 @@ function setResponseValueAndErrors(res, key, value, errorMessage, refs) {
 
 // node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/getRelativePath.js
 var getRelativePath = (pathA, pathB) => {
-  let i = 0;
-  for (; i < pathA.length && i < pathB.length; i++) {
-    if (pathA[i] !== pathB[i])
+  let i2 = 0;
+  for (; i2 < pathA.length && i2 < pathB.length; i2++) {
+    if (pathA[i2] !== pathB[i2])
       break;
   }
-  return [(pathA.length - i).toString(), ...pathB.slice(i)].join("/");
+  return [(pathA.length - i2).toString(), ...pathB.slice(i2)].join("/");
 };
 
 // node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/any.js
@@ -20119,7 +22833,7 @@ function parseDateDef(def, refs, overrideDateStrategy) {
   const strategy = overrideDateStrategy ?? refs.dateStrategy;
   if (Array.isArray(strategy)) {
     return {
-      anyOf: strategy.map((item, i) => parseDateDef(def, refs, item))
+      anyOf: strategy.map((item, i2) => parseDateDef(def, refs, item))
     };
   }
   switch (strategy) {
@@ -20210,7 +22924,7 @@ function parseIntersectionDef(def, refs) {
       ...refs,
       currentPath: [...refs.currentPath, "allOf", "1"]
     })
-  ].filter((x) => !!x);
+  ].filter((x2) => !!x2);
   let unevaluatedProperties = refs.target === "jsonSchema2019-09" ? { unevaluatedProperties: false } : void 0;
   const mergedAllOf = [];
   allOf.forEach((schema) => {
@@ -20441,16 +23155,16 @@ function escapeLiteralCheckValue(literal2, refs) {
 var ALPHA_NUMERIC = new Set("ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvxyz0123456789");
 function escapeNonAlphaNumeric(source) {
   let result = "";
-  for (let i = 0; i < source.length; i++) {
-    if (!ALPHA_NUMERIC.has(source[i])) {
+  for (let i2 = 0; i2 < source.length; i2++) {
+    if (!ALPHA_NUMERIC.has(source[i2])) {
       result += "\\";
     }
-    result += source[i];
+    result += source[i2];
   }
   return result;
 }
 function addFormat(schema, value, message, refs) {
-  if (schema.format || schema.anyOf?.some((x) => x.format)) {
+  if (schema.format || schema.anyOf?.some((x2) => x2.format)) {
     if (!schema.anyOf) {
       schema.anyOf = [];
     }
@@ -20478,7 +23192,7 @@ function addFormat(schema, value, message, refs) {
   }
 }
 function addPattern(schema, regex, message, refs) {
-  if (schema.pattern || schema.allOf?.some((x) => x.pattern)) {
+  if (schema.pattern || schema.allOf?.some((x2) => x2.pattern)) {
     if (!schema.allOf) {
       schema.allOf = [];
     }
@@ -20520,55 +23234,55 @@ function stringifyRegExpWithFlags(regex, refs) {
   let isEscaped = false;
   let inCharGroup = false;
   let inCharRange = false;
-  for (let i = 0; i < source.length; i++) {
+  for (let i2 = 0; i2 < source.length; i2++) {
     if (isEscaped) {
-      pattern += source[i];
+      pattern += source[i2];
       isEscaped = false;
       continue;
     }
     if (flags.i) {
       if (inCharGroup) {
-        if (source[i].match(/[a-z]/)) {
+        if (source[i2].match(/[a-z]/)) {
           if (inCharRange) {
-            pattern += source[i];
-            pattern += `${source[i - 2]}-${source[i]}`.toUpperCase();
+            pattern += source[i2];
+            pattern += `${source[i2 - 2]}-${source[i2]}`.toUpperCase();
             inCharRange = false;
-          } else if (source[i + 1] === "-" && source[i + 2]?.match(/[a-z]/)) {
-            pattern += source[i];
+          } else if (source[i2 + 1] === "-" && source[i2 + 2]?.match(/[a-z]/)) {
+            pattern += source[i2];
             inCharRange = true;
           } else {
-            pattern += `${source[i]}${source[i].toUpperCase()}`;
+            pattern += `${source[i2]}${source[i2].toUpperCase()}`;
           }
           continue;
         }
-      } else if (source[i].match(/[a-z]/)) {
-        pattern += `[${source[i]}${source[i].toUpperCase()}]`;
+      } else if (source[i2].match(/[a-z]/)) {
+        pattern += `[${source[i2]}${source[i2].toUpperCase()}]`;
         continue;
       }
     }
     if (flags.m) {
-      if (source[i] === "^") {
+      if (source[i2] === "^") {
         pattern += `(^|(?<=[\r
 ]))`;
         continue;
-      } else if (source[i] === "$") {
+      } else if (source[i2] === "$") {
         pattern += `($|(?=[\r
 ]))`;
         continue;
       }
     }
-    if (flags.s && source[i] === ".") {
-      pattern += inCharGroup ? `${source[i]}\r
-` : `[${source[i]}\r
+    if (flags.s && source[i2] === ".") {
+      pattern += inCharGroup ? `${source[i2]}\r
+` : `[${source[i2]}\r
 ]`;
       continue;
     }
-    pattern += source[i];
-    if (source[i] === "\\") {
+    pattern += source[i2];
+    if (source[i2] === "\\") {
       isEscaped = true;
-    } else if (inCharGroup && source[i] === "]") {
+    } else if (inCharGroup && source[i2] === "]") {
       inCharGroup = false;
-    } else if (!inCharGroup && source[i] === "[") {
+    } else if (!inCharGroup && source[i2] === "[") {
       inCharGroup = true;
     }
   }
@@ -20704,17 +23418,17 @@ function parseUnionDef(def, refs) {
   if (refs.target === "openApi3")
     return asAnyOf(def, refs);
   const options = def.options instanceof Map ? Array.from(def.options.values()) : def.options;
-  if (options.every((x) => x._def.typeName in primitiveMappings && (!x._def.checks || !x._def.checks.length))) {
-    const types = options.reduce((types2, x) => {
-      const type = primitiveMappings[x._def.typeName];
+  if (options.every((x2) => x2._def.typeName in primitiveMappings && (!x2._def.checks || !x2._def.checks.length))) {
+    const types = options.reduce((types2, x2) => {
+      const type = primitiveMappings[x2._def.typeName];
       return type && !types2.includes(type) ? [...types2, type] : types2;
     }, []);
     return {
       type: types.length > 1 ? types : types[0]
     };
-  } else if (options.every((x) => x._def.typeName === "ZodLiteral" && !x.description)) {
-    const types = options.reduce((acc, x) => {
-      const type = typeof x._def.value;
+  } else if (options.every((x2) => x2._def.typeName === "ZodLiteral" && !x2.description)) {
+    const types = options.reduce((acc, x2) => {
+      const type = typeof x2._def.value;
       switch (type) {
         case "string":
         case "number":
@@ -20723,7 +23437,7 @@ function parseUnionDef(def, refs) {
         case "bigint":
           return [...acc, "integer"];
         case "object":
-          if (x._def.value === null)
+          if (x2._def.value === null)
             return [...acc, "null"];
         case "symbol":
         case "undefined":
@@ -20733,30 +23447,30 @@ function parseUnionDef(def, refs) {
       }
     }, []);
     if (types.length === options.length) {
-      const uniqueTypes = types.filter((x, i, a) => a.indexOf(x) === i);
+      const uniqueTypes = types.filter((x2, i2, a) => a.indexOf(x2) === i2);
       return {
         type: uniqueTypes.length > 1 ? uniqueTypes : uniqueTypes[0],
-        enum: options.reduce((acc, x) => {
-          return acc.includes(x._def.value) ? acc : [...acc, x._def.value];
+        enum: options.reduce((acc, x2) => {
+          return acc.includes(x2._def.value) ? acc : [...acc, x2._def.value];
         }, [])
       };
     }
-  } else if (options.every((x) => x._def.typeName === "ZodEnum")) {
+  } else if (options.every((x2) => x2._def.typeName === "ZodEnum")) {
     return {
       type: "string",
-      enum: options.reduce((acc, x) => [
+      enum: options.reduce((acc, x2) => [
         ...acc,
-        ...x._def.values.filter((x2) => !acc.includes(x2))
+        ...x2._def.values.filter((x3) => !acc.includes(x3))
       ], [])
     };
   }
   return asAnyOf(def, refs);
 }
 var asAnyOf = (def, refs) => {
-  const anyOf = (def.options instanceof Map ? Array.from(def.options.values()) : def.options).map((x, i) => parseDef(x._def, {
+  const anyOf = (def.options instanceof Map ? Array.from(def.options.values()) : def.options).map((x2, i2) => parseDef(x2._def, {
     ...refs,
-    currentPath: [...refs.currentPath, "anyOf", `${i}`]
-  })).filter((x) => !!x && (!refs.strictUnions || typeof x === "object" && Object.keys(x).length > 0));
+    currentPath: [...refs.currentPath, "anyOf", `${i2}`]
+  })).filter((x2) => !!x2 && (!refs.strictUnions || typeof x2 === "object" && Object.keys(x2).length > 0));
   return anyOf.length ? { anyOf } : void 0;
 };
 
@@ -20946,7 +23660,7 @@ var parsePipelineDef = (def, refs) => {
     currentPath: [...refs.currentPath, "allOf", a ? "1" : "0"]
   });
   return {
-    allOf: [a, b].filter((x) => x !== void 0)
+    allOf: [a, b].filter((x2) => x2 !== void 0)
   };
 };
 
@@ -20981,10 +23695,10 @@ function parseTupleDef(def, refs) {
     return {
       type: "array",
       minItems: def.items.length,
-      items: def.items.map((x, i) => parseDef(x._def, {
+      items: def.items.map((x2, i2) => parseDef(x2._def, {
         ...refs,
-        currentPath: [...refs.currentPath, "items", `${i}`]
-      })).reduce((acc, x) => x === void 0 ? acc : [...acc, x], []),
+        currentPath: [...refs.currentPath, "items", `${i2}`]
+      })).reduce((acc, x2) => x2 === void 0 ? acc : [...acc, x2], []),
       additionalItems: parseDef(def.rest._def, {
         ...refs,
         currentPath: [...refs.currentPath, "additionalItems"]
@@ -20995,10 +23709,10 @@ function parseTupleDef(def, refs) {
       type: "array",
       minItems: def.items.length,
       maxItems: def.items.length,
-      items: def.items.map((x, i) => parseDef(x._def, {
+      items: def.items.map((x2, i2) => parseDef(x2._def, {
         ...refs,
-        currentPath: [...refs.currentPath, "items", `${i}`]
-      })).reduce((acc, x) => x === void 0 ? acc : [...acc, x], [])
+        currentPath: [...refs.currentPath, "items", `${i2}`]
+      })).reduce((acc, x2) => x2 === void 0 ? acc : [...acc, x2], [])
     };
   }
 }
@@ -21134,7 +23848,7 @@ var get$ref = (item, refs) => {
       return { $ref: getRelativePath(refs.currentPath, item.path) };
     case "none":
     case "seen": {
-      if (item.path.length < refs.currentPath.length && item.path.every((value, index) => refs.currentPath[index] === value)) {
+      if (item.path.length < refs.currentPath.length && item.path.every((value, index2) => refs.currentPath[index2] === value)) {
         console.warn(`Recursive reference detected at ${refs.currentPath.join("/")}! Defaulting to any`);
         return parseAnyDef(refs);
       }
@@ -22535,7 +25249,7 @@ var Server = class extends Protocol {
     super(options);
     this._serverInfo = _serverInfo;
     this._loggingLevels = /* @__PURE__ */ new Map();
-    this.LOG_LEVEL_SEVERITY = new Map(LoggingLevelSchema.options.map((level, index) => [level, index]));
+    this.LOG_LEVEL_SEVERITY = new Map(LoggingLevelSchema.options.map((level, index2) => [level, index2]));
     this.isMessageIgnored = (level, sessionId) => {
       const currentLevel = this._loggingLevels.get(sessionId);
       return currentLevel ? this.LOG_LEVEL_SEVERITY.get(level) < this.LOG_LEVEL_SEVERITY.get(currentLevel) : false;
@@ -22949,7 +25663,7 @@ function validateToolName(name) {
     warnings.push("Tool name starts or ends with a dot, which may cause parsing issues in some contexts");
   }
   if (!TOOL_NAME_REGEX.test(name)) {
-    const invalidChars = name.split("").filter((char) => !/[A-Za-z0-9._-]/.test(char)).filter((char, index, arr) => arr.indexOf(char) === index);
+    const invalidChars = name.split("").filter((char) => !/[A-Za-z0-9._-]/.test(char)).filter((char, index2, arr) => arr.indexOf(char) === index2);
     warnings.push(`Tool name contains invalid characters: ${invalidChars.map((c) => `"${c}"`).join(", ")}`, "Allowed characters are: A-Z, a-z, 0-9, underscore (_), dash (-), and dot (.)");
     return {
       isValid: false,
@@ -23785,7 +26499,44 @@ var EMPTY_COMPLETION_RESULT = {
   }
 };
 
-// src/tools/shared.ts
+// src/task-summary.ts
+var TaskSummaryShape = {
+  id: external_exports.string().describe('Path-based id ("1.2.3"); stable only until the tree changes'),
+  Guid: external_exports.string().optional().describe("Internal MLO GUID (stable), when recoverable"),
+  Caption: external_exports.string(),
+  completed: external_exports.boolean(),
+  IsProject: external_exports.boolean().optional(),
+  Starred: external_exports.boolean().optional(),
+  DueDateTime: external_exports.string().optional(),
+  StartDateTime: external_exports.string().optional(),
+  Importance: external_exports.number().optional().describe("0\u2013200; 100 = normal (omitted in MLO's XML); -iN entry maps to (N-1)*50"),
+  Flag: external_exports.string().optional(),
+  Places: external_exports.array(external_exports.string()).describe("Contexts, e.g. @Office"),
+  parentPath: external_exports.string().describe("Captions of ancestors joined with ' > '"),
+  pending: external_exports.literal(true).optional().describe("This task reflects an accepted write MLO has not applied yet (read-your-own-writes)"),
+  writeId: external_exports.string().optional().describe("The accept receipt behind `pending` \u2014 pass it to write_status")
+};
+var TaskSummarySchema = external_exports.object(TaskSummaryShape);
+function toSummary(t) {
+  return {
+    id: t.id,
+    Guid: t.Guid,
+    Caption: t.Caption,
+    completed: Boolean(t.CompletionDateTime),
+    IsProject: t.IsProject || void 0,
+    Starred: t.Starred || void 0,
+    DueDateTime: t.DueDateTime,
+    StartDateTime: t.StartDateTime,
+    Importance: t.Importance,
+    Flag: t.Flag,
+    Places: t.Places,
+    parentPath: t.Path.slice(0, -1).join(" > "),
+    ...t.pending ? { pending: t.pending } : {},
+    ...t.writeId ? { writeId: t.writeId } : {}
+  };
+}
+
+// src/tools/contract.ts
 function defineTool(tool) {
   return tool;
 }
@@ -23805,42 +26556,14 @@ function registerTool(server, tool, ctx) {
 var DEFAULT_RESULT_LIMIT = 200;
 var PATH_ID_CAVEAT = "ids shift when the tree changes";
 var NOTE_DESCRIPTION = "Free-form text on the task \u2014 context that does not fit in the caption, such as where a captured idea came from";
-var TaskSummaryShape = {
-  id: external_exports.string().describe('Path-based id ("1.2.3"); stable only until the tree changes'),
-  Guid: external_exports.string().optional().describe("Internal MLO GUID (stable), when recoverable"),
-  Caption: external_exports.string(),
-  completed: external_exports.boolean(),
-  IsProject: external_exports.boolean().optional(),
-  Starred: external_exports.boolean().optional(),
-  DueDateTime: external_exports.string().optional(),
-  StartDateTime: external_exports.string().optional(),
-  Importance: external_exports.number().optional().describe("0\u2013200; 100 = normal (omitted in MLO's XML); -iN entry maps to (N-1)*50"),
-  Flag: external_exports.string().optional(),
-  Places: external_exports.array(external_exports.string()).describe("Contexts, e.g. @Office"),
-  parentPath: external_exports.string().describe("Captions of ancestors joined with ' > '")
-};
-var TaskSummarySchema = external_exports.object(TaskSummaryShape);
-function toSummary(t) {
-  return {
-    id: t.id,
-    Guid: t.Guid,
-    Caption: t.Caption,
-    completed: Boolean(t.CompletionDateTime),
-    IsProject: t.IsProject || void 0,
-    Starred: t.Starred || void 0,
-    DueDateTime: t.DueDateTime,
-    StartDateTime: t.StartDateTime,
-    Importance: t.Importance,
-    Flag: t.Flag,
-    Places: t.Places,
-    parentPath: t.Path.slice(0, -1).join(" > ")
-  };
-}
-function textResult(text, structuredContent) {
-  return { content: [{ type: "text", text }], ...structuredContent ? { structuredContent } : {} };
+function textResult(text2, structuredContent) {
+  return { content: [{ type: "text", text: text2 }], ...structuredContent ? { structuredContent } : {} };
 }
 function errorResult(message) {
   return { isError: true, content: [{ type: "text", text: message }] };
+}
+function failureResult(failure) {
+  return errorResult(`${failureText(failure)} [${failure.kind}]`);
 }
 function guard(name, fn) {
   return async (...args) => {
@@ -23872,21 +26595,16 @@ var listTasksTool = defineTool({
   },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   async execute({ format, includeCompleted, parentId, maxDepth, limit }, ctx) {
-    const snap = await ctx.store.getSnapshot();
-    let tasks = snap.tasks;
-    if (parentId) {
-      const parent = findById(snap.tasks, parentId);
-      if (!parent) return errorResult(`no task with id "${parentId}" \u2014 call list_tasks or search_tasks first`);
-      tasks = parent.Children;
+    const result = await ctx.outline.list({ parentId, includeCompleted, maxDepth });
+    if (result.isErrored) return failureResult(result.failure);
+    const listing = result.value;
+    const shown = listing.entries.slice(0, limit ?? DEFAULT_RESULT_LIMIT);
+    let text2 = renderVisible(shown, format);
+    if (shown.length < listing.total) {
+      text2 += `
+\u2026 showing ${shown.length} of ${listing.total} tasks \u2014 narrow with parentId/maxDepth or raise limit`;
     }
-    const entries = collectVisible(tasks, { includeCompleted, maxDepth });
-    const shown = entries.slice(0, limit ?? DEFAULT_RESULT_LIMIT);
-    let text = renderVisible(shown, format);
-    if (shown.length < entries.length) {
-      text += `
-\u2026 showing ${shown.length} of ${entries.length} tasks \u2014 narrow with parentId/maxDepth or raise limit`;
-    }
-    return textResult(text, { tasks: shown.map((e) => toSummary(e.task)), total: entries.length });
+    return textResult(text2, { tasks: shown.map((e) => toSummary(e.task)), total: listing.total });
   }
 });
 
@@ -23913,15 +26631,16 @@ var searchTasksTool = defineTool({
   },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   async execute({ limit, ...filters }, ctx) {
-    const snap = await ctx.store.getSnapshot();
-    const matches = searchTasks(snap.tasks, filters);
+    const result = await ctx.outline.search(filters);
+    if (result.isErrored) return failureResult(result.failure);
+    const matches = result.value;
     const shown = matches.slice(0, limit ?? DEFAULT_RESULT_LIMIT);
-    let text = shown.length ? shown.map((t) => `${renderLine(t)}  (${t.Path.slice(0, -1).join(" > ") || "top level"})`).join("\n") : "no matching tasks";
+    let text2 = shown.length ? shown.map((t) => `${renderLine(t)}  (${t.Path.slice(0, -1).join(" > ") || "top level"})`).join("\n") : "no matching tasks";
     if (shown.length < matches.length) {
-      text += `
+      text2 += `
 \u2026 showing ${shown.length} of ${matches.length} matches \u2014 narrow the filters or raise limit`;
     }
-    return textResult(text, { tasks: shown.map(toSummary), total: matches.length });
+    return textResult(text2, { tasks: shown.map(toSummary), total: matches.length });
   }
 });
 
@@ -23951,20 +26670,9 @@ var getTaskTool = defineTool({
   },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   async execute({ id }, ctx) {
-    const snap = await ctx.store.getSnapshot();
-    const t = findById(snap.tasks, id);
-    if (!t) return errorResult(`no task with id "${id}" \u2014 ids shift when the tree changes; re-run list_tasks`);
-    const all = flatten(snap.tasks);
-    const resolvedUid = t.Guid?.toUpperCase();
-    const byGuid = /* @__PURE__ */ new Map();
-    for (const task2 of all) {
-      if (task2.Guid) byGuid.set(task2.Guid.toUpperCase(), task2);
-    }
-    const dependsOn = t.DependsOn.map((uid) => {
-      const dep = byGuid.get(uid.toUpperCase());
-      return { id: dep?.id, Caption: dep?.Caption, uid };
-    });
-    const dependedOnBy = all.filter((x) => resolvedUid && x.DependsOn.map((uid) => uid.toUpperCase()).includes(resolvedUid)).map((x) => ({ id: x.id, Caption: x.Caption }));
+    const result = await ctx.outline.get(id);
+    if (result.isErrored) return failureResult(result.failure);
+    const { task: t, uid: resolvedUid, dependsOn, dependedOnBy } = result.value;
     const task = {
       ...toSummary(t),
       Guid: resolvedUid,
@@ -24014,17 +26722,11 @@ var listContextsTool = defineTool({
   },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   async execute(_args, ctx) {
-    const snap = await ctx.store.getSnapshot();
-    const placesList = snap.doc["MyLifeOrganized-xml"].PlacesList;
-    const defined = (placesList?.TaskPlace ?? []).map((p) => p["@_Caption"]);
-    const usage = /* @__PURE__ */ new Map();
-    for (const t of flatten(snap.tasks)) {
-      for (const p of t.Places) usage.set(p, (usage.get(p) ?? 0) + 1);
-    }
-    const captions = [.../* @__PURE__ */ new Set([...defined, ...usage.keys()])];
-    const contexts = captions.map((Caption) => ({ Caption, defined: defined.includes(Caption), tasksUsing: usage.get(Caption) ?? 0 })).sort((a, b) => b.tasksUsing - a.tasksUsing || a.Caption.localeCompare(b.Caption));
-    const text = contexts.length ? contexts.map((c) => `${c.Caption}  (${c.tasksUsing} task${c.tasksUsing === 1 ? "" : "s"}${c.defined ? "" : ", not in places list"})`).join("\n") : "(no contexts defined)";
-    return textResult(text, { contexts });
+    const result = await ctx.outline.contexts();
+    if (result.isErrored) return failureResult(result.failure);
+    const contexts = result.value;
+    const text2 = contexts.length ? contexts.map((c) => `${c.Caption}  (${c.tasksUsing} task${c.tasksUsing === 1 ? "" : "s"}${c.defined ? "" : ", not in places list"})`).join("\n") : "(no contexts defined)";
+    return textResult(text2, { contexts });
   }
 });
 
@@ -24038,216 +26740,11 @@ var syncTool = defineTool({
   // openWorldHint: QuickSync talks to the MLO cloud / Wi-Fi sync endpoint.
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   async execute(_args, ctx) {
-    await quickSync(ctx.config);
-    ctx.store.invalidate();
+    const result = await ctx.admin.quickSync();
+    if (result.isErrored) return failureResult(result.failure);
     return textResult("QuickSync finished", { ok: true });
   }
 });
-
-// src/cloud/endpoint.ts
-import { spawn as spawn2 } from "node:child_process";
-import net from "node:net";
-
-// src/version.ts
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-function shippedVersion() {
-  const manifest = fileURLToPath(new URL("../package.json", import.meta.url));
-  try {
-    return JSON.parse(readFileSync(manifest, "utf8")).version;
-  } catch (error2) {
-    throw new Error(
-      `cannot read the server version from ${manifest}: ${error2 instanceof Error ? error2.message : String(error2)} \u2014 the single-file bundle still needs its sibling package.json`
-    );
-  }
-}
-var SERVER_INFO = { name: "mlo-mcp", version: shippedVersion() };
-
-// src/cloud/endpoint.ts
-var RESIDENT_FLAG = "--serve-cloud";
-var ENDPOINT_RECOVERY = "A new MCP client session starts one automatically, so restarting this client is the fix; a session already running will not start one by itself.";
-var PROBE_TIMEOUT_MS2 = 2e3;
-var START_TIMEOUT_MS = 15e3;
-var POLL_INTERVAL_MS = 100;
-function sleep2(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-function compareVersions(left, right) {
-  const leftParts = left.split(".");
-  const rightParts = right.split(".");
-  for (let index = 0; index < Math.max(leftParts.length, rightParts.length); index += 1) {
-    const a = Number.parseInt(leftParts[index] ?? "0", 10) || 0;
-    const b = Number.parseInt(rightParts[index] ?? "0", 10) || 0;
-    if (a !== b) return a < b ? -1 : 1;
-  }
-  return 0;
-}
-function portIsTaken(host, port, timeoutMs) {
-  return new Promise((resolve) => {
-    const socket = net.connect({ host, port });
-    const settle = (taken) => {
-      socket.destroy();
-      resolve(taken);
-    };
-    socket.setTimeout(timeoutMs, () => settle(false));
-    socket.once("connect", () => settle(true));
-    socket.once("error", () => settle(false));
-  });
-}
-async function askStatus(host, port) {
-  let response;
-  try {
-    response = await fetch(`http://${host}:${port}/v1/status`, { signal: AbortSignal.timeout(PROBE_TIMEOUT_MS2) });
-  } catch (error2) {
-    return { kind: "foreign", detail: `it accepts connections but does not answer /v1/status (${error2 instanceof Error ? error2.message : String(error2)})` };
-  }
-  if (!response.ok) return { kind: "foreign", detail: `/v1/status answered HTTP ${response.status}` };
-  let body;
-  try {
-    body = await response.json();
-  } catch {
-    return { kind: "foreign", detail: "/v1/status did not answer with JSON" };
-  }
-  const currentShape = typeof body.version === "string" && Array.isArray(body.contactUids);
-  const legacyShape = typeof body.cursor === "string" && typeof body.entries === "object" && body.entries !== null;
-  if (!currentShape && !legacyShape) {
-    return { kind: "foreign", detail: "/v1/status answered without the fields an mlo-mcp endpoint serves" };
-  }
-  return {
-    kind: "endpoint",
-    status: {
-      ...typeof body.version === "string" ? { version: body.version } : {},
-      contactUids: Array.isArray(body.contactUids) ? body.contactUids.filter((uid) => typeof uid === "string") : [],
-      ...typeof body.stateRoot === "string" ? { stateRoot: body.stateRoot } : {}
-    }
-  };
-}
-async function readStatus(host, port) {
-  const answer = await askStatus(host, port);
-  return answer.kind === "endpoint" ? answer.status : void 0;
-}
-async function probe(host, port) {
-  if (!await portIsTaken(host, port, PROBE_TIMEOUT_MS2)) return { kind: "free" };
-  return askStatus(host, port);
-}
-async function waitFor(deadlineMs, attempt) {
-  const deadline = Date.now() + deadlineMs;
-  for (; ; ) {
-    const value = await attempt();
-    if (value !== void 0) return value;
-    if (Date.now() >= deadline) return void 0;
-    await sleep2(POLL_INTERVAL_MS);
-  }
-}
-async function ensureEndpoint(options) {
-  const { host, port } = options;
-  const ourVersion = options.ourVersion ?? SERVER_INFO.version;
-  const endpoint = new ResidentEndpoint(host, port);
-  const found = await probe(host, port);
-  if (found.kind === "foreign") {
-    throw new Error(
-      `port ${port} on ${host} is held by something that is not an mlo-mcp sync endpoint (${found.detail}) \u2014 MLO's sync proxy points at that port, so free it (or set MLO_CLOUD_PORT and repoint the proxy) before using this server`
-    );
-  }
-  if (found.kind === "endpoint") {
-    const theirVersion = found.status.version;
-    if (theirVersion !== void 0 && compareVersions(ourVersion, theirVersion) <= 0) {
-      endpoint.adopt(found.status);
-      return endpoint;
-    }
-    log(`resident endpoint on ${host}:${port} is ${theirVersion ?? "an older build"}; this session is ${ourVersion} \u2014 replacing it`);
-    const asked = await endpoint.requestShutdown().then(() => true, () => false);
-    const freed = asked && await waitFor(START_TIMEOUT_MS, async () => await portIsTaken(host, port, PROBE_TIMEOUT_MS2) ? void 0 : true);
-    if (!freed) {
-      log(`the endpoint on ${host}:${port} did not step aside \u2014 attaching to it instead of replacing it`);
-      endpoint.adopt(found.status);
-      return endpoint;
-    }
-  }
-  await options.spawn();
-  const started = await waitFor(options.startTimeoutMs ?? START_TIMEOUT_MS, () => readStatus(host, port));
-  if (started) endpoint.adopt(started);
-  else {
-    log(
-      `no resident sync endpoint came up on ${host}:${port} \u2014 reads still work, but MLO's sync has nowhere to connect and writes will be refused until one starts`
-    );
-  }
-  return endpoint;
-}
-function residentSpawnArgs(entry) {
-  return {
-    command: process.execPath,
-    args: [...process.execArgv, entry, RESIDENT_FLAG],
-    options: { detached: true, stdio: "ignore", windowsHide: true }
-  };
-}
-function residentSpawner(entry) {
-  return () => {
-    const { command, args, options } = residentSpawnArgs(entry);
-    const child = spawn2(command, args, options);
-    child.on("error", (error2) => log(`could not start the resident sync endpoint: ${error2.message}`));
-    child.unref();
-  };
-}
-var ResidentEndpoint = class {
-  constructor(host, port) {
-    this.host = host;
-    this.port = port;
-  }
-  host;
-  port;
-  last;
-  get url() {
-    return `http://${this.host}:${this.port}`;
-  }
-  /** Version observed at the last successful probe, if any. */
-  get version() {
-    return this.last?.version;
-  }
-  get reachable() {
-    return this.last !== void 0;
-  }
-  /** Internal: record what a probe found. */
-  adopt(status) {
-    this.last = status;
-  }
-  /** Re-probe; undefined means nothing is serving the port right now. */
-  async status() {
-    const status = await readStatus(this.host, this.port);
-    this.last = status;
-    return status;
-  }
-  /**
-   * Ask a stale resident process to exit so a newer build can take the port.
-   * Short timeout: a resident too wedged to answer is one the caller falls back
-   * to attaching to, not one worth blocking a session's startup on.
-   */
-  async requestShutdown() {
-    await this.post("/v1/shutdown", {}, PROBE_TIMEOUT_MS2);
-  }
-  async post(route, body, timeoutMs = PROBE_TIMEOUT_MS2) {
-    let response;
-    try {
-      response = await fetch(`${this.url}${route}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(timeoutMs)
-      });
-    } catch (error2) {
-      this.last = void 0;
-      throw new Error(
-        `the resident MLO sync endpoint at ${this.url} did not answer (${error2 instanceof Error ? error2.message : String(error2)}). ${ENDPOINT_RECOVERY}`
-      );
-    }
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const reason = typeof payload.error === "string" ? payload.error : `HTTP ${response.status}`;
-      throw new Error(reason);
-    }
-    return payload;
-  }
-};
 
 // src/tools/cloud-status.ts
 var cloudStatusTool = defineTool({
@@ -24266,7 +26763,7 @@ var cloudStatusTool = defineTool({
       url: external_exports.string(),
       reachable: external_exports.boolean(),
       version: external_exports.string().optional()
-    }).optional().describe(
+    }).describe(
       "The resident sync endpoint every session attaches to: MLO's proxy target. Unreachable means MLO cannot sync through it; reads still work"
     ),
     bindingMismatch: external_exports.boolean().describe(
@@ -24278,63 +26775,282 @@ var cloudStatusTool = defineTool({
       lastSeen: external_exports.string(),
       count: external_exports.number()
     })).optional().describe("dataFileUIDs seen syncing through the endpoint with no binding \u2014 what MLO actually presents"),
-    stateRoot: external_exports.string().optional(),
-    partitions: external_exports.array(external_exports.object({ key: external_exports.string(), mode: external_exports.string(), lifecycle: external_exports.string() })).optional()
+    writes: external_exports.object({
+      pendingWrites: external_exports.number().describe("Accepted writes still waiting for MLO to sync"),
+      oldestPendingAgeMs: external_exports.number().optional().describe("Age of the oldest one \u2014 a queue that is not draining shows here first"),
+      recentDeadLetters: external_exports.array(
+        external_exports.object({
+          writeId: external_exports.string(),
+          uid: external_exports.string(),
+          caption: external_exports.string().optional(),
+          status: external_exports.enum(["expired", "superseded"]),
+          at: external_exports.string(),
+          reason: external_exports.string().optional()
+        })
+      ).describe("Newest first: writes that left the queue without landing, including ones nobody was waiting on"),
+      sessionHeldOpen: external_exports.boolean().optional().describe(
+        "Delivery is stalled: MLO holds a sync session open over these writes, most likely a conflict dialog waiting on the user. Absent means the endpoint could not say"
+      )
+    }).describe(
+      "The write path's aggregate. A writeId receipt dies with the session that took it, so this is the only place an outcome nobody waited for can be seen"
+    ),
+    stateRoot: external_exports.string(),
+    partitions: external_exports.array(external_exports.object({ key: external_exports.string(), mode: external_exports.string(), lifecycle: external_exports.string() }))
   },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   async execute(_args, ctx) {
-    const endpointStatus = await ctx.endpoint?.status();
-    const endpoint = ctx.endpoint ? {
-      url: ctx.endpoint.url,
-      reachable: endpointStatus !== void 0,
-      ...endpointStatus?.version ? { version: endpointStatus.version } : {}
-    } : void 0;
-    const gateway = ctx.cloud;
-    let mode = "unpartitioned";
-    let lifecycle;
-    let dataFileUID;
-    let sightings = [];
-    let mismatch;
-    let partitions;
-    if (gateway) {
-      const bound = await gateway.boundPartition(ctx.config.dataFile);
-      if (bound.kind === "bound") {
-        mode = bound.binding.mode;
-        lifecycle = bound.lifecycle;
-        dataFileUID = bound.binding.dataFileUID;
-      } else {
-        mode = "unbound";
-        lifecycle = "uninitialized";
-      }
-      partitions = (await gateway.registry.list()).map((partition) => ({
-        key: partition.key,
-        mode: partition.mode,
-        lifecycle: partition.lifecycle
-      }));
-      [sightings, mismatch] = await Promise.all([
-        gateway.unboundSightings(),
-        gateway.bindingMismatch(ctx.config.dataFile)
-      ]);
-    }
+    const answered = await ctx.admin.status();
+    if (answered.isErrored) return failureResult(answered.failure);
+    const status = answered.value;
     const result = {
-      host: ctx.config.cloudHost,
-      port: ctx.config.cloudPort,
-      mode,
-      ...lifecycle ? { lifecycle } : {},
-      ...dataFileUID ? { dataFileUID } : {},
-      ...endpoint ? { endpoint } : {},
-      bindingMismatch: mismatch !== void 0,
-      ...sightings.length ? { unboundSightings: sightings } : {},
-      ...gateway?.stateRoot ? { stateRoot: gateway.stateRoot } : {},
-      ...partitions ? { partitions } : {}
+      host: status.host,
+      port: status.port,
+      mode: status.mode,
+      ...status.lifecycle ? { lifecycle: status.lifecycle } : {},
+      ...status.dataFileUID ? { dataFileUID: status.dataFileUID } : {},
+      endpoint: status.endpoint,
+      bindingMismatch: status.mismatch !== void 0,
+      ...status.unboundSightings.length ? { unboundSightings: status.unboundSightings } : {},
+      writes: status.writes,
+      stateRoot: status.stateRoot,
+      partitions: status.partitions
     };
-    const bindingNote = mode === "unbound" ? "no partition bound" : `${mode} partition, ${lifecycle ?? "n/a"}`;
-    const bindingMismatchNote = mismatch ? `; BINDING MISMATCH: bound to ${mismatch.boundDataFileUID} but MLO is syncing ${mismatch.observedDataFileUIDs.join(", ")}` : "";
-    const endpointNote = !endpoint ? "" : endpoint.reachable ? `; endpoint reachable${endpoint.version ? ` (${endpoint.version})` : ""}` : `; ENDPOINT UNREACHABLE \u2014 MLO cannot sync through it. ${ENDPOINT_RECOVERY}`;
+    const bindingNote = status.mode === "unbound" ? "no partition bound" : `${status.mode} partition, ${status.lifecycle ?? "n/a"}`;
+    const bindingMismatchNote = status.mismatch ? `; BINDING MISMATCH: bound to ${status.mismatch.boundDataFileUID} but MLO is syncing ${status.mismatch.observedDataFileUIDs.join(", ")}` : "";
+    const endpointNote = status.endpoint.reachable ? `; endpoint reachable${status.endpoint.version ? ` (${status.endpoint.version})` : ""}` : `; ENDPOINT UNREACHABLE \u2014 MLO cannot sync through it. ${ENDPOINT_RECOVERY}`;
+    const { pendingWrites, oldestPendingAgeMs, recentDeadLetters, sessionHeldOpen } = status.writes;
+    const pendingNote = pendingWrites ? `; ${pendingWrites} write(s) queued for MLO's next sync${oldestPendingAgeMs !== void 0 ? ` (oldest ${Math.round(oldestPendingAgeMs / 6e4)}m)` : ""}${sessionHeldOpen ? "; DELIVERY STALLED \u2014 MLO is holding a sync session open over them, likely awaiting user input (check for a conflict dialog in MLO)" : ""}` : "";
+    const deadLetterNote = recentDeadLetters.length ? `; ${recentDeadLetters.length} write(s) NEVER LANDED: ` + recentDeadLetters.map((dead) => `${dead.caption ?? dead.uid} (${dead.status}, ${dead.at})`).join(", ") : "";
     return textResult(
-      `Cloud endpoint ${result.host}:${result.port}${endpointNote}; ${bindingNote}${bindingMismatchNote}.`,
+      `Cloud endpoint ${result.host}:${result.port}${endpointNote}; ${bindingNote}${bindingMismatchNote}${pendingNote}${deadLetterNote}.`,
       result
     );
+  }
+});
+
+// src/tools/accepted.ts
+var WRITE_ACCEPT_OUTPUT = {
+  uid: external_exports.string().describe("Stable GUID of the task the write addressed \u2014 the first one, for a batch"),
+  uids: external_exports.array(external_exports.string()).optional().describe("Every GUID the write addressed, when it addressed more than one"),
+  writeId: external_exports.string().describe("The accept receipt \u2014 pass it to write_status to see where the write got to"),
+  status: external_exports.literal("accepted").describe("Durably queued. Never a claim that MLO has applied it"),
+  expiresAt: external_exports.string().describe("Local ISO time this write gives up if MLO has not synced by then; it then becomes a dead letter"),
+  message: external_exports.string()
+};
+function clockTime(expiresAt) {
+  const match = expiresAt.match(/T(\d{2}:\d{2})/);
+  if (match) return match[1];
+  const parsed = new Date(expiresAt);
+  return Number.isNaN(parsed.getTime()) ? expiresAt : `${String(parsed.getHours()).padStart(2, "0")}:${String(parsed.getMinutes()).padStart(2, "0")}`;
+}
+function accepted(receipt, what) {
+  const message = `accepted - ${what} lands on MLO's next sync; expires at ${clockTime(receipt.expiresAt)} if MLO doesn't sync. Reads already show it, flagged pending.`;
+  return textResult(`${message} [writeId ${receipt.writeId}]`, {
+    uid: receipt.uids[0] ?? "",
+    ...receipt.uids.length > 1 ? { uids: receipt.uids } : {},
+    writeId: receipt.writeId,
+    status: "accepted",
+    expiresAt: receipt.expiresAt,
+    message
+  });
+}
+function acceptResult(result, what) {
+  return result.isErrored ? failureResult(result.failure) : accepted(result.value, what);
+}
+
+// src/tools/add-task.ts
+var TASK_FIELDS = {
+  caption: external_exports.string().min(1),
+  note: external_exports.string().optional().describe(NOTE_DESCRIPTION),
+  dueDateTime: external_exports.string().optional().describe('Local ISO like "2026-08-01T15:00:00"'),
+  startDateTime: external_exports.string().optional(),
+  IsProject: external_exports.boolean().optional(),
+  Starred: external_exports.boolean().optional(),
+  Folder: external_exports.boolean().optional().describe("Hide only this task from To-Do views; children remain eligible"),
+  HideInToDo: external_exports.boolean().optional().describe("Hide this task and its whole branch from To-Do views"),
+  CompleteSubTasksInOrder: external_exports.boolean().optional(),
+  Flag: external_exports.string().optional().describe("Existing flag caption"),
+  Places: external_exports.array(external_exports.string().min(1)).max(25).optional().describe("Existing context captions, e.g. @Office")
+};
+var PARENT_ID = external_exports.string().optional().describe(`Path-based id of an existing parent from list_tasks/search_tasks (${PATH_ID_CAVEAT}); omit for top level`);
+var DEPENDS_ON_IDS = external_exports.array(external_exports.string()).max(25).optional().describe(`Path ids of existing tasks this one waits for (${PATH_ID_CAVEAT})`);
+var addTaskTool = defineTool({
+  name: "add_task",
+  title: "Add a task",
+  description: "Create one task. Returns at durable accept: MLO applies it on its own next sync, and reads show it immediately, flagged pending. Use write_status to see where the write got to.",
+  inputSchema: { ...TASK_FIELDS, parentId: PARENT_ID, dependsOnIds: DEPENDS_ON_IDS },
+  outputSchema: WRITE_ACCEPT_OUTPUT,
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  async execute(args, ctx) {
+    return acceptResult(await ctx.outline.add(args), `"${args.caption}"`);
+  }
+});
+
+// src/tools/add-tasks.ts
+var TaskEntry = external_exports.object({
+  ...TASK_FIELDS,
+  key: external_exports.string().min(1).optional().describe("Batch-local name for this task, referenced by parentKey/dependsOnKeys"),
+  parentKey: external_exports.string().min(1).optional().describe("key of another task in this batch \u2014 nest without needing ids"),
+  parentId: external_exports.string().optional().describe(
+    `Path-based id of an existing parent from list_tasks/search_tasks (${PATH_ID_CAVEAT}); mutually exclusive with parentKey, omit both for top level`
+  ),
+  dependsOnKeys: external_exports.array(external_exports.string()).max(25).optional().describe("keys of tasks in this batch this one waits for"),
+  dependsOnIds: external_exports.array(external_exports.string()).max(25).optional().describe(`Path ids of existing tasks this one waits for (${PATH_ID_CAVEAT})`)
+});
+var addTasksTool = defineTool({
+  name: "add_tasks",
+  title: "Add several tasks",
+  description: "Create 1\u201350 tasks as ONE write \u2014 a whole nested outline, in input order. Atomic: one bad entry and nothing is queued. Returns at durable accept; reads show the tasks immediately, flagged pending.",
+  inputSchema: {
+    tasks: external_exports.array(TaskEntry).min(1).max(50).describe("The tasks to create; input order is sibling order")
+  },
+  outputSchema: WRITE_ACCEPT_OUTPUT,
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  async execute({ tasks }, ctx) {
+    return acceptResult(await ctx.outline.addMany(tasks), `${tasks.length} task${tasks.length === 1 ? "" : "s"}`);
+  }
+});
+
+// src/tools/capture-task.ts
+var captureTaskTool = defineTool({
+  name: "capture_task",
+  title: "Capture a thought",
+  description: "Rapid entry: one line in, one task in MLO's inbox out (top level when the profile has no inbox). The tool for a thought that should not have to be filed before it is written down.",
+  inputSchema: {
+    line: external_exports.string().min(1).describe(
+      "The caption, optionally ending in @context tokens; anything after a blank line becomes the note. Dates and importance are NOT parsed \u2014 they land in the caption verbatim, so pass them via add_task instead"
+    )
+  },
+  outputSchema: WRITE_ACCEPT_OUTPUT,
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  async execute({ line }, ctx) {
+    return acceptResult(await ctx.outline.capture(line), "the captured task");
+  }
+});
+
+// src/tools/update-task.ts
+var updateTaskTool = defineTool({
+  name: "update_task",
+  title: "Update a task",
+  description: 'Change fields of one existing task. Only the fields you pass change; "" clears a text field, and Places / dependsOnIds are COMPLETE replacement sets ([] clears them). Covers the Organize flags too \u2014 IsProject, Folder, sequential subtasks, dependencies. Date edits on recurring tasks are refused: a full-row rewrite would end the series instead of rolling it forward. Returns at durable accept.',
+  inputSchema: {
+    id: external_exports.string().describe(`Path-based id from list_tasks/search_tasks, e.g. "1.2.3"; ${PATH_ID_CAVEAT}`),
+    Caption: external_exports.string().min(1).optional(),
+    Note: external_exports.string().optional().describe(`${NOTE_DESCRIPTION}; "" clears`),
+    Importance: external_exports.number().min(0).max(200).optional().describe("0\u2013200; 100 = normal"),
+    Effort: external_exports.number().min(0).max(200).optional(),
+    DueDateTime: external_exports.string().optional().describe('Local ISO like "2026-08-01T15:00:00"; "" clears'),
+    StartDateTime: external_exports.string().optional(),
+    CompletionDateTime: external_exports.string().optional().describe('"" reopens (or use uncomplete_task)'),
+    ProjectStatus: external_exports.number().int().optional(),
+    EstimateMin: external_exports.number().optional().describe("fractional days"),
+    EstimateMax: external_exports.number().optional(),
+    TheGoal: external_exports.number().int().min(0).max(3).optional().describe("0 none, 1 weekly, 2 monthly, 3 yearly"),
+    IsProject: external_exports.boolean().optional(),
+    Starred: external_exports.boolean().optional(),
+    Folder: external_exports.boolean().optional().describe("Hide only this task from To-Do views; its children remain eligible"),
+    HideInToDo: external_exports.boolean().optional().describe("Hide this task and its whole branch from To-Do views"),
+    CompleteSubTasksInOrder: external_exports.boolean().optional().describe("Sequential subtasks: only the first uncompleted child is available"),
+    Flag: external_exports.string().optional().describe('Existing flag caption; "" clears'),
+    Places: external_exports.array(external_exports.string().min(1)).max(25).optional().describe("Complete replacement set of existing context captions; [] clears all contexts"),
+    dependsOnIds: external_exports.array(external_exports.string()).max(25).optional().describe(
+      `Complete replacement set of Path ids this task waits for (${PATH_ID_CAVEAT}); [] clears all dependencies`
+    )
+  },
+  outputSchema: WRITE_ACCEPT_OUTPUT,
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  async execute({ id, ...patch }, ctx) {
+    return acceptResult(await ctx.outline.update(id, patch), `the edit to [${id}]`);
+  }
+});
+
+// src/tools/complete-task.ts
+var ID = external_exports.string().describe(`Path-based id from list_tasks/search_tasks, e.g. "1.2.3"; ${PATH_ID_CAVEAT}`);
+var completeTaskTool = defineTool({
+  name: "complete_task",
+  title: "Complete a task",
+  description: "Mark one task completed (projects also get their project status closed). Recurring tasks are refused \u2014 completing one in MLO spawns the next occurrence and this write would silently end the series; complete it in the app instead. Returns at durable accept.",
+  inputSchema: { id: ID },
+  outputSchema: WRITE_ACCEPT_OUTPUT,
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  async execute({ id }, ctx) {
+    return acceptResult(await ctx.outline.complete(id), `completing [${id}]`);
+  }
+});
+var uncompleteTaskTool = defineTool({
+  name: "uncomplete_task",
+  title: "Reopen a task",
+  description: "Clear one task's completion. Allowed on recurring tasks: reopening generates no occurrence, so there is no app behaviour for this write to bypass. Returns at durable accept.",
+  inputSchema: { id: ID },
+  outputSchema: WRITE_ACCEPT_OUTPUT,
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  async execute({ id }, ctx) {
+    return acceptResult(await ctx.outline.uncomplete(id), `reopening [${id}]`);
+  }
+});
+
+// src/tools/move-task.ts
+var moveTaskTool = defineTool({
+  name: "move_task",
+  title: "Move a task",
+  description: "Re-parent one task, taking its whole subtree with it, optionally into a specific slot among its new siblings. Moving a task into its own subtree is refused. Returns at durable accept.",
+  inputSchema: {
+    id: external_exports.string().describe(`Path-based id of the task to move (${PATH_ID_CAVEAT})`),
+    newParentId: external_exports.string().optional().describe(`Path-based id of the new parent (${PATH_ID_CAVEAT}); "" or omitted moves it to the top level`),
+    position: external_exports.number().int().min(0).optional().describe("0-based slot among the new siblings (0 = first); omitted or past the end appends after them")
+  },
+  outputSchema: WRITE_ACCEPT_OUTPUT,
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  async execute({ id, newParentId, position }, ctx) {
+    return acceptResult(await ctx.outline.move(id, newParentId, position), `moving [${id}]`);
+  }
+});
+
+// src/tools/delete-task.ts
+var deleteTaskTool = defineTool({
+  name: "delete_task",
+  title: "Delete a task",
+  description: "Tombstone one task AND ITS WHOLE SUBTREE \u2014 a partial tombstone would orphan the children. Every task in the branch must resolve to its stable GUID, or nothing is queued. Returns at durable accept; reads hide the branch immediately. There is no undo through this server: MLO's own recycle bin is the only recovery.",
+  inputSchema: {
+    id: external_exports.string().describe(`Path-based id of the task to delete (${PATH_ID_CAVEAT}) \u2014 re-read it first, ids shift`)
+  },
+  outputSchema: WRITE_ACCEPT_OUTPUT,
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  async execute({ id }, ctx) {
+    return acceptResult(await ctx.outline.delete(id), `deleting [${id}] and its subtree`);
+  }
+});
+
+// src/tools/write-status.ts
+var writeStatusTool = defineTool({
+  name: "write_status",
+  title: "Write status",
+  description: "Where one accepted write got to, by its writeId. Five states: accepted (durably queued, MLO has not synced yet), delivered (MLO applied it), verified (applied and confirmed by a fresh export), expired (MLO never synced before the TTL \u2014 the rows are dead-lettered, nothing was applied), superseded (MLO applied its own conflicting version instead, so this write's content is gone). Receipts age out; cloud_status carries the recent dead letters for writes nobody was waiting on.",
+  inputSchema: {
+    writeId: external_exports.string().describe("The receipt a write tool returned")
+  },
+  outputSchema: {
+    writeId: external_exports.string(),
+    status: external_exports.enum(["accepted", "delivered", "verified", "expired", "superseded"]),
+    uid: external_exports.string().optional().describe("Stable GUID of the task the write addressed"),
+    expiresAt: external_exports.string().optional().describe("Present while still queued: when the write gives up"),
+    at: external_exports.string().optional().describe("When the write resolved, for every state past accepted"),
+    detail: external_exports.string(),
+    remedy: external_exports.string().optional().describe("What ends this state, when anything can")
+  },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  async execute({ writeId }, ctx) {
+    const answered = await ctx.outline.writeStatus(writeId);
+    if (answered.isErrored) return failureResult(answered.failure);
+    const progress = answered.value;
+    const lines = [
+      `${progress.writeId}: ${progress.status} \u2014 ${progress.detail}`,
+      progress.uid ? `task: ${progress.uid}` : void 0,
+      progress.expiresAt ? `expires: ${progress.expiresAt}` : void 0,
+      progress.at ? `resolved: ${progress.at}` : void 0,
+      progress.remedy ? `remedy: ${progress.remedy}` : void 0
+    ].filter(Boolean);
+    return textResult(lines.join("\n"), { ...progress });
   }
 });
 
@@ -24344,6 +27060,15 @@ var allTools = [
   searchTasksTool,
   getTaskTool,
   listContextsTool,
+  captureTaskTool,
+  addTaskTool,
+  addTasksTool,
+  updateTaskTool,
+  completeTaskTool,
+  uncompleteTaskTool,
+  moveTaskTool,
+  deleteTaskTool,
+  writeStatusTool,
   syncTool,
   cloudStatusTool
 ];
@@ -24354,9 +27079,17 @@ var INSTRUCTIONS = `
 
 MLO is an OUTLINER: tasks live in one deep tree, and deep nesting is idiomatic.
 
-### Reads only, for now
-This build serves reads while the write path is re-architected (local-landing writes,
-ADR-0005). There are no write tools; suggest making changes in the MLO app directly.
+### Writes land on MLO's own next sync
+A write tool returns as soon as the change is DURABLY QUEUED - not when MLO has applied it.
+The response carries a \`writeId\` and an \`expiresAt\`; nothing waits, and there is no
+"verified" flag to read. MLO picks the write up on its own sync (about 90 seconds, or
+immediately if you run sync), and reads show the change straight away, flagged
+\`pending: true\` with the writeId that made it.
+
+Do not poll: report the change as made. If you want the outcome anyway, write_status(writeId)
+gives the five states - accepted, delivered, verified, expired (MLO never synced; nothing was
+applied), superseded (MLO kept its own conflicting version). cloud_status carries the queue
+depth and the recent writes that never landed.
 
 ### Ids
 Task ids are PATH-BASED ("1.2.3" = position in the tree) and shift whenever the tree changes.
@@ -24383,19 +27116,186 @@ function createMcpServer(ctx) {
 }
 
 // src/cloud/gateway.ts
-import { execFile as execFile3 } from "node:child_process";
-import { promises as fs7 } from "node:fs";
+import { execFile as execFile2 } from "node:child_process";
+import { promises as fs13 } from "node:fs";
 import os2 from "node:os";
-import path9 from "node:path";
+import path13 from "node:path";
 
 // src/cloud/binding.ts
-import { promises as fs4 } from "node:fs";
-import path6 from "node:path";
+import { promises as fs10 } from "node:fs";
+import path10 from "node:path";
 
 // src/cloud/partition.ts
 import { createHash } from "node:crypto";
-import { promises as fs2 } from "node:fs";
-import path4 from "node:path";
+import { promises as fs8 } from "node:fs";
+import path8 from "node:path";
+
+// src/cloud/capture-journal.ts
+import { promises as fs5 } from "node:fs";
+import path5 from "node:path";
+var FILE_NAME2 = "capture-journal.json";
+var DEFAULT_JOURNAL_CAP = 256;
+var DEFAULT_GAUGE_WINDOW_MS = 24 * 60 * 60 * 1e3;
+var FileCaptureJournal = class {
+  constructor(dir, now = () => /* @__PURE__ */ new Date(), cap = DEFAULT_JOURNAL_CAP) {
+    this.dir = dir;
+    this.now = now;
+    this.cap = cap;
+  }
+  dir;
+  now;
+  cap;
+  writes = new WriteChain();
+  file() {
+    return path5.join(this.dir, FILE_NAME2);
+  }
+  async load() {
+    try {
+      const parsed = JSON.parse(await fs5.readFile(this.file(), "utf8"));
+      return (parsed.entries ?? []).filter((entry) => typeof entry?.at === "string");
+    } catch (error2) {
+      if (error2.code !== "ENOENT") {
+        log(`could not read the capture journal (treated as empty): ${error2 instanceof Error ? error2.message : String(error2)}`);
+      }
+      return [];
+    }
+  }
+  record(outcome, detail) {
+    return this.writes.run(async () => {
+      const at = this.now().toISOString();
+      const entries = [...await this.load(), { at, outcome, ...detail ? { detail } : {} }];
+      const value = { entries: entries.slice(-this.cap), at };
+      await atomicWrite(this.file(), `${JSON.stringify(value, null, 2)}
+`);
+    });
+  }
+  entries() {
+    return this.load();
+  }
+  async gauge(windowMs = DEFAULT_GAUGE_WINDOW_MS) {
+    return deriveGauge(await this.load(), windowMs, this.now());
+  }
+};
+function deriveGauge(entries, windowMs, now) {
+  const cutoff = now.getTime() - windowMs;
+  const recent = entries.filter((entry) => Date.parse(entry.at) >= cutoff);
+  const counts = { ok: 0, failed: 0, skipped: 0, "tls-connect-seen": 0 };
+  let lastAt;
+  let lastOkAt;
+  for (const entry of recent) {
+    if (entry.outcome in counts) counts[entry.outcome] += 1;
+    lastAt = entry.at;
+    if (entry.outcome === "ok") lastOkAt = entry.at;
+  }
+  const latest = recent.at(-1);
+  const state = !latest ? "idle" : latest.outcome === "ok" ? "ok" : "degraded";
+  return {
+    windowMs,
+    state,
+    counts,
+    ...lastAt ? { lastAt } : {},
+    ...lastOkAt ? { lastOkAt } : {}
+  };
+}
+
+// src/cloud/injection-queue.ts
+import { promises as fs6 } from "node:fs";
+import path6 from "node:path";
+var FILE_NAME3 = "injection-queue.json";
+var FileInjectionQueue = class {
+  constructor(dir) {
+    this.dir = dir;
+  }
+  dir;
+  writes = new WriteChain();
+  file() {
+    return path6.join(this.dir, FILE_NAME3);
+  }
+  async load() {
+    try {
+      const parsed = JSON.parse(await fs6.readFile(this.file(), "utf8"));
+      return (parsed.writes ?? []).filter((write) => typeof write?.writeId === "string");
+    } catch (error2) {
+      if (error2.code !== "ENOENT") throw error2;
+      return [];
+    }
+  }
+  /**
+   * Write-fsync-rename: the temp file is flushed to disk before it replaces
+   * the queue, so the rename either exposes a durable file or nothing.
+   */
+  save(writes) {
+    const value = { writes, at: (/* @__PURE__ */ new Date()).toISOString() };
+    return atomicWrite(this.file(), JSON.stringify(value), { fsync: true });
+  }
+  enqueue(write) {
+    return this.writes.run(async () => {
+      const writes = await this.load();
+      if (writes.some((queued) => queued.writeId === write.writeId)) {
+        throw new Error(`writeId ${write.writeId} is already queued \u2014 writeIds are accept receipts, never reused`);
+      }
+      await this.save([...writes, write]);
+    });
+  }
+  pending() {
+    return this.load();
+  }
+  remove(writeId) {
+    return this.writes.run(async () => {
+      const writes = await this.load();
+      const index2 = writes.findIndex((write) => write.writeId === writeId);
+      if (index2 < 0) return void 0;
+      const [removed] = writes.splice(index2, 1);
+      await this.save(writes);
+      return removed;
+    });
+  }
+};
+
+// src/cloud/write-outcomes.ts
+import { promises as fs7 } from "node:fs";
+import path7 from "node:path";
+var FILE_NAME4 = "write-outcomes.json";
+var DEFAULT_OUTCOME_CAP = 200;
+var FileWriteOutcomes = class {
+  constructor(dir, cap = DEFAULT_OUTCOME_CAP) {
+    this.dir = dir;
+    this.cap = cap;
+  }
+  dir;
+  cap;
+  writes = new WriteChain();
+  file() {
+    return path7.join(this.dir, FILE_NAME4);
+  }
+  async load() {
+    try {
+      const parsed = JSON.parse(await fs7.readFile(this.file(), "utf8"));
+      return (parsed.outcomes ?? []).filter((outcome) => typeof outcome?.writeId === "string");
+    } catch (error2) {
+      if (error2.code !== "ENOENT") {
+        log(`could not read the write-outcome file (treated as empty): ${error2 instanceof Error ? error2.message : String(error2)}`);
+      }
+      return [];
+    }
+  }
+  record(outcome) {
+    return this.writes.run(async () => {
+      const outcomes = [...await this.load(), outcome];
+      const value = { outcomes: outcomes.slice(-this.cap), at: outcome.at };
+      await atomicWrite(this.file(), `${JSON.stringify(value)}
+`);
+    });
+  }
+  all() {
+    return this.load();
+  }
+  async byId(writeId) {
+    return (await this.load()).findLast((outcome) => outcome.writeId === writeId);
+  }
+};
+
+// src/cloud/partition.ts
 var GUID_BODY = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/;
 function normalizeDataFileUid(raw) {
   const body = raw.trim().replace(/^\{/, "").replace(/\}$/, "").toUpperCase();
@@ -24405,25 +27305,52 @@ function normalizeDataFileUid(raw) {
 function partitionKey(uid) {
   return createHash("sha256").update(normalizeDataFileUid(uid), "utf8").digest("hex").slice(0, 16);
 }
-async function atomicWrite(target, text) {
-  const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
-  await fs2.writeFile(temporary, text);
-  await fs2.rename(temporary, target);
-}
-var PartitionHandle = class {
+var PartitionStore = class {
   constructor(uid, key, dir) {
     this.uid = uid;
     this.key = key;
     this.dir = dir;
+    this.rows = new FileRowStore(dir);
+    this.journal = new FileCaptureJournal(dir);
+    this.queue = new FileInjectionQueue(dir);
+    this.outcomes = new FileWriteOutcomes(dir);
   }
   uid;
   key;
   dir;
+  /** UID -> latest full captured TodoItems row (authoring source for update/complete). */
+  rows;
+  /** Timestamped capture outcomes — the gauge source, never a latch. */
+  journal;
+  /** Durably accepted writes awaiting injection into a forwarded Get. */
+  queue;
+  /** Writes that left the queue: delivered / superseded / expired receipts. */
+  outcomes;
+  /**
+   * What this partition's write path has outstanding and what it lost: the
+   * queue depth with the oldest entry's age, and the writes that left the queue
+   * without landing (expired or superseded), newest first and capped at `tail`.
+   *
+   * Derived here rather than by the caller because the queue and the outcome
+   * ring are this handle's own state (spec section 4): a reader that walked them
+   * itself would be reimplementing "what is outstanding" against a layout it is
+   * not supposed to know.
+   */
+  async writeGauge(tail) {
+    const [pending, outcomes] = await Promise.all([this.queue.pending(), this.outcomes.all()]);
+    const queuedAt = pending.map((write) => Date.parse(write.queuedAt)).filter((at) => !Number.isNaN(at));
+    const oldest = queuedAt.length ? Math.min(...queuedAt) : void 0;
+    return {
+      pendingWrites: pending.length,
+      ...oldest !== void 0 ? { oldestPendingAgeMs: Math.max(0, Date.now() - oldest) } : {},
+      deadLetters: outcomes.filter((outcome) => outcome.status === "expired" || outcome.status === "superseded").slice(-tail).reverse()
+    };
+  }
   metaPath() {
-    return path4.join(this.dir, "meta.json");
+    return path8.join(this.dir, "meta.json");
   }
   async meta() {
-    const parsed = JSON.parse(await fs2.readFile(this.metaPath(), "utf8"));
+    const parsed = JSON.parse(await fs8.readFile(this.metaPath(), "utf8"));
     return parsed;
   }
   async mode() {
@@ -24433,8 +27360,22 @@ var PartitionHandle = class {
     return (await this.meta()).lifecycle;
   }
   async setLifecycle(next) {
+    await this.amendMeta({ lifecycle: next });
+  }
+  /** Ask the resident for a fresh full-history pull into the row store. */
+  async requestRepull(at = (/* @__PURE__ */ new Date()).toISOString()) {
+    await this.amendMeta({ repullRequestedAt: at });
+  }
+  /** When a repull is outstanding; undefined when none is. */
+  async repullRequestedAt() {
+    return (await this.meta()).repullRequestedAt;
+  }
+  async clearRepullRequest() {
+    await this.amendMeta({ repullRequestedAt: void 0 });
+  }
+  async amendMeta(patch) {
     const current = await this.meta();
-    await atomicWrite(this.metaPath(), `${JSON.stringify({ ...current, lifecycle: next }, null, 2)}
+    await atomicWrite(this.metaPath(), `${JSON.stringify({ ...current, ...patch }, null, 2)}
 `);
   }
 };
@@ -24445,7 +27386,7 @@ var PartitionRegistry = class {
   stateRoot;
   handles = /* @__PURE__ */ new Map();
   partitionsDir() {
-    return path4.join(this.stateRoot, "partitions");
+    return path8.join(this.stateRoot, "partitions");
   }
   /**
    * Open a partition, creating its directory and meta on first use.
@@ -24457,9 +27398,9 @@ var PartitionRegistry = class {
     const key = partitionKey(uid);
     const cached2 = this.handles.get(key);
     if (cached2) return cached2;
-    const dir = path4.join(this.partitionsDir(), key);
-    await fs2.mkdir(dir, { recursive: true });
-    const handle = new PartitionHandle(uid, key, dir);
+    const dir = path8.join(this.partitionsDir(), key);
+    await fs8.mkdir(dir, { recursive: true });
+    const handle = new PartitionStore(uid, key, dir);
     try {
       const meta = await handle.meta();
       if (normalizeDataFileUid(meta.dataFileUID) !== uid) {
@@ -24473,7 +27414,7 @@ var PartitionRegistry = class {
         lifecycle: "uninitialized",
         createdAt: (/* @__PURE__ */ new Date()).toISOString()
       };
-      await atomicWrite(path4.join(dir, "meta.json"), `${JSON.stringify(meta, null, 2)}
+      await atomicWrite(path8.join(dir, "meta.json"), `${JSON.stringify(meta, null, 2)}
 `);
     }
     this.handles.set(key, handle);
@@ -24485,9 +27426,9 @@ var PartitionRegistry = class {
     const key = partitionKey(uid);
     const cached2 = this.handles.get(key);
     if (cached2) return cached2;
-    const dir = path4.join(this.partitionsDir(), key);
+    const dir = path8.join(this.partitionsDir(), key);
     try {
-      await fs2.stat(path4.join(dir, "meta.json"));
+      await fs8.stat(path8.join(dir, "meta.json"));
     } catch {
       return void 0;
     }
@@ -24496,7 +27437,7 @@ var PartitionRegistry = class {
   async list() {
     let keys;
     try {
-      keys = await fs2.readdir(this.partitionsDir());
+      keys = await fs8.readdir(this.partitionsDir());
     } catch {
       return [];
     }
@@ -24504,7 +27445,7 @@ var PartitionRegistry = class {
     for (const key of keys.sort()) {
       try {
         const meta = JSON.parse(
-          await fs2.readFile(path4.join(this.partitionsDir(), key, "meta.json"), "utf8")
+          await fs8.readFile(path8.join(this.partitionsDir(), key, "meta.json"), "utf8")
         );
         summaries.push({ key, ...meta });
       } catch {
@@ -24515,8 +27456,8 @@ var PartitionRegistry = class {
 };
 
 // src/cloud/state-lock.ts
-import { promises as fs3 } from "node:fs";
-import path5 from "node:path";
+import { promises as fs9 } from "node:fs";
+import path9 from "node:path";
 var StateRootLock = class {
   constructor(stateRoot, name) {
     this.stateRoot = stateRoot;
@@ -24526,19 +27467,19 @@ var StateRootLock = class {
   name;
   chain = Promise.resolve();
   async withLock(operation) {
-    const lockDir = path5.join(this.stateRoot, `.${this.name}-lock`);
+    const lockDir = path9.join(this.stateRoot, `.${this.name}-lock`);
     const deadline = Date.now() + 1e4;
-    await fs3.mkdir(this.stateRoot, { recursive: true });
+    await fs9.mkdir(this.stateRoot, { recursive: true });
     for (; ; ) {
       try {
-        await fs3.mkdir(lockDir);
+        await fs9.mkdir(lockDir);
         break;
       } catch (error2) {
         if (error2.code !== "EEXIST") throw error2;
         try {
-          const stat = await fs3.stat(lockDir);
+          const stat = await fs9.stat(lockDir);
           if (Date.now() - stat.mtimeMs > 3e4) {
-            await fs3.rm(lockDir, { recursive: true, force: true });
+            await fs9.rm(lockDir, { recursive: true, force: true });
             continue;
           }
         } catch {
@@ -24551,7 +27492,26 @@ var StateRootLock = class {
     try {
       return await operation();
     } finally {
-      await fs3.rm(lockDir, { recursive: true, force: true });
+      await this.release(lockDir);
+    }
+  }
+  /**
+   * Drop the lock directory. On Windows a directory whose handle the OS has
+   * not finished closing answers `EBUSY` to `rmdir`, and `force` does not
+   * cover that one — a release is not a failure, so it may never surface as
+   * the operation's own error. A few short attempts clear it in practice, and
+   * the stale timeout above is the backstop if they do not. Any other error is
+   * left to the same backstop rather than replacing the caller's result.
+   */
+  async release(lockDir) {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      try {
+        await fs9.rm(lockDir, { recursive: true, force: true });
+        return;
+      } catch (error2) {
+        if (error2.code !== "EBUSY") return;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
     }
   }
   /** Run `operation` with the lock held, queued behind this process's own calls. */
@@ -24565,7 +27525,7 @@ var StateRootLock = class {
 
 // src/cloud/binding.ts
 function canonicalProfilePath(profilePath) {
-  return path6.resolve(profilePath).toLowerCase();
+  return path10.resolve(profilePath).toLowerCase();
 }
 var BindingStore = class {
   constructor(stateRoot) {
@@ -24575,14 +27535,14 @@ var BindingStore = class {
   stateRoot;
   lock;
   file() {
-    return path6.join(this.stateRoot, "bindings.json");
+    return path10.join(this.stateRoot, "bindings.json");
   }
   serialize(operation) {
     return this.lock.serialize(operation);
   }
   async load() {
     try {
-      const parsed = JSON.parse(await fs4.readFile(this.file(), "utf8"));
+      const parsed = JSON.parse(await fs10.readFile(this.file(), "utf8"));
       return parsed.bindings ?? [];
     } catch (error2) {
       if (error2.code !== "ENOENT") throw error2;
@@ -24592,9 +27552,9 @@ var BindingStore = class {
   async save(bindings) {
     const target = this.file();
     const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
-    await fs4.writeFile(temporary, `${JSON.stringify({ bindings }, null, 2)}
+    await fs10.writeFile(temporary, `${JSON.stringify({ bindings }, null, 2)}
 `);
-    await fs4.rename(temporary, target);
+    await fs10.rename(temporary, target);
   }
   async forProfile(profilePath) {
     const canonical = canonicalProfilePath(profilePath);
@@ -24648,6 +27608,37 @@ var BindingStore = class {
     });
   }
   /**
+   * Bind a profile to a UID in ONE write — what auto-initialization uses.
+   * `create` followed by `bindUid` would leave a UID-less binding behind if the
+   * process died between them; harmless, but then "no binding on a partial
+   * failure" would rest on the reader's leniency rather than on the write.
+   */
+  async bind(profilePath, mode, rawUid) {
+    return this.serialize(async () => {
+      const uid = normalizeDataFileUid(rawUid);
+      const bindings = await this.load();
+      const canonical = canonicalProfilePath(profilePath);
+      const existing = bindings.find((entry) => canonicalProfilePath(entry.profilePath) === canonical);
+      if (existing?.dataFileUID && existing.dataFileUID !== uid) {
+        throw new Error("profile is already bound to a different dataFileUID; rebinding requires an explicit rebind");
+      }
+      const other = bindings.find((entry) => entry !== existing && entry.dataFileUID === uid);
+      if (other) throw new Error(`dataFileUID is already bound to a different profile (${other.profilePath})`);
+      const now = (/* @__PURE__ */ new Date()).toISOString();
+      const binding = {
+        profilePath,
+        mode,
+        dataFileUID: uid,
+        boundAt: now,
+        createdAt: existing?.createdAt ?? now
+      };
+      if (existing) bindings[bindings.indexOf(existing)] = binding;
+      else bindings.push(binding);
+      await this.save(bindings);
+      return binding;
+    });
+  }
+  /**
    * Explicit rebind: reset the profile's binding to `mode` with no UID. The
    * old partition directory is left intact as evidence; only the pointer
    * moves. This is the ONLY way a binding's mode changes.
@@ -24656,9 +27647,9 @@ var BindingStore = class {
     return this.serialize(async () => {
       const bindings = await this.load();
       const canonical = canonicalProfilePath(profilePath);
-      const index = bindings.findIndex((entry) => canonicalProfilePath(entry.profilePath) === canonical);
+      const index2 = bindings.findIndex((entry) => canonicalProfilePath(entry.profilePath) === canonical);
       const binding = { profilePath, mode, createdAt: (/* @__PURE__ */ new Date()).toISOString() };
-      if (index >= 0) bindings[index] = binding;
+      if (index2 >= 0) bindings[index2] = binding;
       else bindings.push(binding);
       await this.save(bindings);
       return binding;
@@ -24685,8 +27676,8 @@ var BindingStore = class {
 };
 
 // src/cloud/sightings.ts
-import { promises as fs5 } from "node:fs";
-import path7 from "node:path";
+import { promises as fs11 } from "node:fs";
+import path11 from "node:path";
 var MAX_SIGHTINGS = 8;
 var SightingStore = class {
   constructor(stateRoot) {
@@ -24695,12 +27686,12 @@ var SightingStore = class {
   stateRoot;
   writes = Promise.resolve();
   file() {
-    return path7.join(this.stateRoot, "unbound-sightings.json");
+    return path11.join(this.stateRoot, "unbound-sightings.json");
   }
   /** Every recorded sighting, most recently seen first. */
   async all() {
     try {
-      const parsed = JSON.parse(await fs5.readFile(this.file(), "utf8"));
+      const parsed = JSON.parse(await fs11.readFile(this.file(), "utf8"));
       return (parsed.sightings ?? []).filter((sighting) => typeof sighting?.dataFileUID === "string");
     } catch (error2) {
       if (error2.code !== "ENOENT") {
@@ -24725,9 +27716,9 @@ var SightingStore = class {
       const value = { sightings: sightings.slice(0, MAX_SIGHTINGS), at: now };
       const target = this.file();
       const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
-      await fs5.writeFile(temporary, `${JSON.stringify(value, null, 2)}
+      await fs11.writeFile(temporary, `${JSON.stringify(value, null, 2)}
 `);
-      await fs5.rename(temporary, target);
+      await fs11.rename(temporary, target);
     };
     const next = this.writes.then(run, run);
     this.writes = next.catch(() => void 0);
@@ -24736,8 +27727,8 @@ var SightingStore = class {
 };
 
 // src/cloud/dead-letter.ts
-import { promises as fs6 } from "node:fs";
-import path8 from "node:path";
+import { promises as fs12 } from "node:fs";
+import path12 from "node:path";
 var MAX_LETTERS = 50;
 var MAX_CONTENT = 4e3;
 function clamp(content) {
@@ -24752,12 +27743,12 @@ var DeadLetterStore = class {
   lock;
   /** The path a refusal names, so recovery does not require knowing the state root. */
   file() {
-    return path8.join(this.stateRoot, "dead-letters.json");
+    return path12.join(this.stateRoot, "dead-letters.json");
   }
   /** Every preserved write, oldest first. */
   async all() {
     try {
-      const parsed = JSON.parse(await fs6.readFile(this.file(), "utf8"));
+      const parsed = JSON.parse(await fs12.readFile(this.file(), "utf8"));
       return (parsed.refused ?? []).filter((letter) => typeof letter?.content === "string");
     } catch (error2) {
       if (error2.code !== "ENOENT") {
@@ -24773,9 +27764,9 @@ var DeadLetterStore = class {
       const value = { refused: refused.slice(-MAX_LETTERS), at: letter.at };
       const target = this.file();
       const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
-      await fs6.writeFile(temporary, `${JSON.stringify(value, null, 2)}
+      await fs12.writeFile(temporary, `${JSON.stringify(value, null, 2)}
 `);
-      await fs6.rename(temporary, target);
+      await fs12.rename(temporary, target);
     });
   }
 };
@@ -24823,7 +27814,7 @@ var CloudGateway = class {
       await this.prepareRoot();
       const line = `${JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), ...record2 })}
 `;
-      await fs7.appendFile(path9.join(this.stateRoot, VENDOR_CLIENT_FILE), line);
+      await fs13.appendFile(path13.join(this.stateRoot, VENDOR_CLIENT_FILE), line);
     } catch (error2) {
       log(`vendor exchange log write failed: ${error2 instanceof Error ? error2.message : String(error2)}`);
     }
@@ -24927,6 +27918,20 @@ var CloudGateway = class {
     return { kind: "bound", binding, partition, lifecycle: await partition.lifecycle() };
   }
   /**
+   * The two bound-partition stores a session composes itself around: the row
+   * store identity and authoring read, and the injection queue the read path
+   * overlays. Both undefined when the profile is unbound (or the root
+   * unreadable) — every resolution then honestly reads as unconfirmed, every
+   * write refuses, and there is no queue to overlay because nothing could have
+   * been accepted. Resolved once at composition time; a binding that appears
+   * later reaches new sessions.
+   */
+  async boundStores(profilePath) {
+    const bound = await this.boundPartition(profilePath).catch(() => void 0);
+    if (bound?.kind !== "bound") return {};
+    return { rows: bound.partition.rows, queue: bound.partition.queue };
+  }
+  /**
    * Create the private state root on first use, restricting it to the current
    * user. Node has no native Windows ACL API, so this is a best-effort
    * `icacls` call; failure only logs — the root still works, with inherited
@@ -24940,17 +27945,17 @@ var CloudGateway = class {
     this.rootPrepared = true;
     let created = false;
     try {
-      await fs7.mkdir(this.stateRoot, { recursive: false });
+      await fs13.mkdir(this.stateRoot, { recursive: false });
       created = true;
     } catch (error2) {
       if (error2.code !== "EEXIST") {
-        await fs7.mkdir(this.stateRoot, { recursive: true });
+        await fs13.mkdir(this.stateRoot, { recursive: true });
         created = true;
       }
     }
     if (created && process.platform === "win32") {
       const user = process.env.USERNAME ?? os2.userInfo().username;
-      execFile3(
+      execFile2(
         "icacls",
         [this.stateRoot, "/inheritance:r", "/grant:r", `${user}:(OI)(CI)F`],
         (error2) => {
@@ -24967,8 +27972,8 @@ import https2 from "node:https";
 import net2 from "node:net";
 
 // src/cloud/sync-observer.ts
-import { promises as fs8 } from "node:fs";
-import path10 from "node:path";
+import { promises as fs14 } from "node:fs";
+import path14 from "node:path";
 import zlib from "node:zlib";
 var VENDOR_SYNC_HOST = "sync.mylifeorganized.net";
 var SUMMARY_FILE = "soap-summary.jsonl";
@@ -24976,8 +27981,8 @@ var SENSITIVE = /pass|credential|token|secret|session|cookie|email|user|login/i;
 var BODY = /<(?:[\w.-]+:)?Body(?:\s[^>]*)?>([\s\S]*?)<\/(?:[\w.-]+:)?Body\s*>/i;
 var TAG = /<(?!\/)(?:[\w.-]+:)?([\w.-]+)(?:\s[^>]*)?>/gi;
 var CAPTURE_LIMIT = 4 * 1024 * 1024;
-function escapeRegExp(text) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function escapeRegExp(text2) {
+  return text2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 function operationShape(xml2) {
   const body = BODY.exec(xml2)?.[1] ?? "";
@@ -25097,9 +28102,1032 @@ var SyncObserver = class {
   append(record2) {
     const line = `${JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), ...record2 })}
 `;
-    void fs8.mkdir(this.stateDir, { recursive: true }).then(() => fs8.appendFile(path10.join(this.stateDir, SUMMARY_FILE), line)).catch((error2) => log(`sync observer write failed: ${error2 instanceof Error ? error2.message : String(error2)}`));
+    void fs14.mkdir(this.stateDir, { recursive: true }).then(() => fs14.appendFile(path14.join(this.stateDir, SUMMARY_FILE), line)).catch((error2) => log(`sync observer write failed: ${error2 instanceof Error ? error2.message : String(error2)}`));
   }
 };
+
+// src/cloud/auto-init.ts
+import { promises as fs15 } from "node:fs";
+
+// src/cloud/upstream.ts
+var import_fast_xml_parser3 = __toESM(require_fxp(), 1);
+import http from "node:http";
+import https from "node:https";
+import zlib2 from "node:zlib";
+
+// src/cloud/cursor.ts
+var ZERO_CURSOR = 0n;
+function cursorToDecimalString(value) {
+  return value.toString(10);
+}
+function parseCursor(value) {
+  if (!/^[0-9]+$/.test(value)) throw new Error(`invalid cloud cursor: "${value}"`);
+  const parsed = BigInt(value);
+  if (parsed > 9223372036854775807n) throw new Error(`cloud cursor exceeds signed 64-bit range: "${value}"`);
+  return parsed;
+}
+
+// node_modules/.pnpm/fflate@0.8.2/node_modules/fflate/esm/index.mjs
+import { createRequire } from "module";
+var require2 = createRequire("/");
+var Worker;
+try {
+  Worker = require2("worker_threads").Worker;
+} catch (e) {
+}
+var u8 = Uint8Array;
+var u16 = Uint16Array;
+var i32 = Int32Array;
+var fleb = new u8([
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  1,
+  1,
+  1,
+  2,
+  2,
+  2,
+  2,
+  3,
+  3,
+  3,
+  3,
+  4,
+  4,
+  4,
+  4,
+  5,
+  5,
+  5,
+  5,
+  0,
+  /* unused */
+  0,
+  0,
+  /* impossible */
+  0
+]);
+var fdeb = new u8([
+  0,
+  0,
+  0,
+  0,
+  1,
+  1,
+  2,
+  2,
+  3,
+  3,
+  4,
+  4,
+  5,
+  5,
+  6,
+  6,
+  7,
+  7,
+  8,
+  8,
+  9,
+  9,
+  10,
+  10,
+  11,
+  11,
+  12,
+  12,
+  13,
+  13,
+  /* unused */
+  0,
+  0
+]);
+var clim = new u8([16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15]);
+var freb = function(eb, start) {
+  var b = new u16(31);
+  for (var i2 = 0; i2 < 31; ++i2) {
+    b[i2] = start += 1 << eb[i2 - 1];
+  }
+  var r = new i32(b[30]);
+  for (var i2 = 1; i2 < 30; ++i2) {
+    for (var j = b[i2]; j < b[i2 + 1]; ++j) {
+      r[j] = j - b[i2] << 5 | i2;
+    }
+  }
+  return { b, r };
+};
+var _a = freb(fleb, 2);
+var fl = _a.b;
+var revfl = _a.r;
+fl[28] = 258, revfl[258] = 28;
+var _b = freb(fdeb, 0);
+var fd = _b.b;
+var revfd = _b.r;
+var rev = new u16(32768);
+for (i = 0; i < 32768; ++i) {
+  x = (i & 43690) >> 1 | (i & 21845) << 1;
+  x = (x & 52428) >> 2 | (x & 13107) << 2;
+  x = (x & 61680) >> 4 | (x & 3855) << 4;
+  rev[i] = ((x & 65280) >> 8 | (x & 255) << 8) >> 1;
+}
+var x;
+var i;
+var hMap = (function(cd, mb, r) {
+  var s = cd.length;
+  var i2 = 0;
+  var l = new u16(mb);
+  for (; i2 < s; ++i2) {
+    if (cd[i2])
+      ++l[cd[i2] - 1];
+  }
+  var le = new u16(mb);
+  for (i2 = 1; i2 < mb; ++i2) {
+    le[i2] = le[i2 - 1] + l[i2 - 1] << 1;
+  }
+  var co;
+  if (r) {
+    co = new u16(1 << mb);
+    var rvb = 15 - mb;
+    for (i2 = 0; i2 < s; ++i2) {
+      if (cd[i2]) {
+        var sv = i2 << 4 | cd[i2];
+        var r_1 = mb - cd[i2];
+        var v = le[cd[i2] - 1]++ << r_1;
+        for (var m = v | (1 << r_1) - 1; v <= m; ++v) {
+          co[rev[v] >> rvb] = sv;
+        }
+      }
+    }
+  } else {
+    co = new u16(s);
+    for (i2 = 0; i2 < s; ++i2) {
+      if (cd[i2]) {
+        co[i2] = rev[le[cd[i2] - 1]++] >> 15 - cd[i2];
+      }
+    }
+  }
+  return co;
+});
+var flt = new u8(288);
+for (i = 0; i < 144; ++i)
+  flt[i] = 8;
+var i;
+for (i = 144; i < 256; ++i)
+  flt[i] = 9;
+var i;
+for (i = 256; i < 280; ++i)
+  flt[i] = 7;
+var i;
+for (i = 280; i < 288; ++i)
+  flt[i] = 8;
+var i;
+var fdt = new u8(32);
+for (i = 0; i < 32; ++i)
+  fdt[i] = 5;
+var i;
+var flm = /* @__PURE__ */ hMap(flt, 9, 0);
+var flrm = /* @__PURE__ */ hMap(flt, 9, 1);
+var fdm = /* @__PURE__ */ hMap(fdt, 5, 0);
+var fdrm = /* @__PURE__ */ hMap(fdt, 5, 1);
+var max = function(a) {
+  var m = a[0];
+  for (var i2 = 1; i2 < a.length; ++i2) {
+    if (a[i2] > m)
+      m = a[i2];
+  }
+  return m;
+};
+var bits = function(d, p, m) {
+  var o = p / 8 | 0;
+  return (d[o] | d[o + 1] << 8) >> (p & 7) & m;
+};
+var bits16 = function(d, p) {
+  var o = p / 8 | 0;
+  return (d[o] | d[o + 1] << 8 | d[o + 2] << 16) >> (p & 7);
+};
+var shft = function(p) {
+  return (p + 7) / 8 | 0;
+};
+var slc = function(v, s, e) {
+  if (s == null || s < 0)
+    s = 0;
+  if (e == null || e > v.length)
+    e = v.length;
+  return new u8(v.subarray(s, e));
+};
+var ec = [
+  "unexpected EOF",
+  "invalid block type",
+  "invalid length/literal",
+  "invalid distance",
+  "stream finished",
+  "no stream handler",
+  ,
+  "no callback",
+  "invalid UTF-8 data",
+  "extra field too long",
+  "date not in range 1980-2099",
+  "filename too long",
+  "stream finishing",
+  "invalid zip data"
+  // determined by unknown compression method
+];
+var err = function(ind, msg, nt) {
+  var e = new Error(msg || ec[ind]);
+  e.code = ind;
+  if (Error.captureStackTrace)
+    Error.captureStackTrace(e, err);
+  if (!nt)
+    throw e;
+  return e;
+};
+var inflt = function(dat, st, buf, dict) {
+  var sl = dat.length, dl = dict ? dict.length : 0;
+  if (!sl || st.f && !st.l)
+    return buf || new u8(0);
+  var noBuf = !buf;
+  var resize = noBuf || st.i != 2;
+  var noSt = st.i;
+  if (noBuf)
+    buf = new u8(sl * 3);
+  var cbuf = function(l2) {
+    var bl = buf.length;
+    if (l2 > bl) {
+      var nbuf = new u8(Math.max(bl * 2, l2));
+      nbuf.set(buf);
+      buf = nbuf;
+    }
+  };
+  var final = st.f || 0, pos = st.p || 0, bt = st.b || 0, lm = st.l, dm = st.d, lbt = st.m, dbt = st.n;
+  var tbts = sl * 8;
+  do {
+    if (!lm) {
+      final = bits(dat, pos, 1);
+      var type = bits(dat, pos + 1, 3);
+      pos += 3;
+      if (!type) {
+        var s = shft(pos) + 4, l = dat[s - 4] | dat[s - 3] << 8, t = s + l;
+        if (t > sl) {
+          if (noSt)
+            err(0);
+          break;
+        }
+        if (resize)
+          cbuf(bt + l);
+        buf.set(dat.subarray(s, t), bt);
+        st.b = bt += l, st.p = pos = t * 8, st.f = final;
+        continue;
+      } else if (type == 1)
+        lm = flrm, dm = fdrm, lbt = 9, dbt = 5;
+      else if (type == 2) {
+        var hLit = bits(dat, pos, 31) + 257, hcLen = bits(dat, pos + 10, 15) + 4;
+        var tl = hLit + bits(dat, pos + 5, 31) + 1;
+        pos += 14;
+        var ldt = new u8(tl);
+        var clt = new u8(19);
+        for (var i2 = 0; i2 < hcLen; ++i2) {
+          clt[clim[i2]] = bits(dat, pos + i2 * 3, 7);
+        }
+        pos += hcLen * 3;
+        var clb = max(clt), clbmsk = (1 << clb) - 1;
+        var clm = hMap(clt, clb, 1);
+        for (var i2 = 0; i2 < tl; ) {
+          var r = clm[bits(dat, pos, clbmsk)];
+          pos += r & 15;
+          var s = r >> 4;
+          if (s < 16) {
+            ldt[i2++] = s;
+          } else {
+            var c = 0, n = 0;
+            if (s == 16)
+              n = 3 + bits(dat, pos, 3), pos += 2, c = ldt[i2 - 1];
+            else if (s == 17)
+              n = 3 + bits(dat, pos, 7), pos += 3;
+            else if (s == 18)
+              n = 11 + bits(dat, pos, 127), pos += 7;
+            while (n--)
+              ldt[i2++] = c;
+          }
+        }
+        var lt = ldt.subarray(0, hLit), dt = ldt.subarray(hLit);
+        lbt = max(lt);
+        dbt = max(dt);
+        lm = hMap(lt, lbt, 1);
+        dm = hMap(dt, dbt, 1);
+      } else
+        err(1);
+      if (pos > tbts) {
+        if (noSt)
+          err(0);
+        break;
+      }
+    }
+    if (resize)
+      cbuf(bt + 131072);
+    var lms = (1 << lbt) - 1, dms = (1 << dbt) - 1;
+    var lpos = pos;
+    for (; ; lpos = pos) {
+      var c = lm[bits16(dat, pos) & lms], sym = c >> 4;
+      pos += c & 15;
+      if (pos > tbts) {
+        if (noSt)
+          err(0);
+        break;
+      }
+      if (!c)
+        err(2);
+      if (sym < 256)
+        buf[bt++] = sym;
+      else if (sym == 256) {
+        lpos = pos, lm = null;
+        break;
+      } else {
+        var add = sym - 254;
+        if (sym > 264) {
+          var i2 = sym - 257, b = fleb[i2];
+          add = bits(dat, pos, (1 << b) - 1) + fl[i2];
+          pos += b;
+        }
+        var d = dm[bits16(dat, pos) & dms], dsym = d >> 4;
+        if (!d)
+          err(3);
+        pos += d & 15;
+        var dt = fd[dsym];
+        if (dsym > 3) {
+          var b = fdeb[dsym];
+          dt += bits16(dat, pos) & (1 << b) - 1, pos += b;
+        }
+        if (pos > tbts) {
+          if (noSt)
+            err(0);
+          break;
+        }
+        if (resize)
+          cbuf(bt + 131072);
+        var end = bt + add;
+        if (bt < dt) {
+          var shift = dl - dt, dend = Math.min(dt, end);
+          if (shift + bt < 0)
+            err(3);
+          for (; bt < dend; ++bt)
+            buf[bt] = dict[shift + bt];
+        }
+        for (; bt < end; ++bt)
+          buf[bt] = buf[bt - dt];
+      }
+    }
+    st.l = lm, st.p = lpos, st.b = bt, st.f = final;
+    if (lm)
+      final = 1, st.m = lbt, st.d = dm, st.n = dbt;
+  } while (!final);
+  return bt != buf.length && noBuf ? slc(buf, 0, bt) : buf.subarray(0, bt);
+};
+var wbits = function(d, p, v) {
+  v <<= p & 7;
+  var o = p / 8 | 0;
+  d[o] |= v;
+  d[o + 1] |= v >> 8;
+};
+var wbits16 = function(d, p, v) {
+  v <<= p & 7;
+  var o = p / 8 | 0;
+  d[o] |= v;
+  d[o + 1] |= v >> 8;
+  d[o + 2] |= v >> 16;
+};
+var hTree = function(d, mb) {
+  var t = [];
+  for (var i2 = 0; i2 < d.length; ++i2) {
+    if (d[i2])
+      t.push({ s: i2, f: d[i2] });
+  }
+  var s = t.length;
+  var t2 = t.slice();
+  if (!s)
+    return { t: et, l: 0 };
+  if (s == 1) {
+    var v = new u8(t[0].s + 1);
+    v[t[0].s] = 1;
+    return { t: v, l: 1 };
+  }
+  t.sort(function(a, b) {
+    return a.f - b.f;
+  });
+  t.push({ s: -1, f: 25001 });
+  var l = t[0], r = t[1], i0 = 0, i1 = 1, i22 = 2;
+  t[0] = { s: -1, f: l.f + r.f, l, r };
+  while (i1 != s - 1) {
+    l = t[t[i0].f < t[i22].f ? i0++ : i22++];
+    r = t[i0 != i1 && t[i0].f < t[i22].f ? i0++ : i22++];
+    t[i1++] = { s: -1, f: l.f + r.f, l, r };
+  }
+  var maxSym = t2[0].s;
+  for (var i2 = 1; i2 < s; ++i2) {
+    if (t2[i2].s > maxSym)
+      maxSym = t2[i2].s;
+  }
+  var tr = new u16(maxSym + 1);
+  var mbt = ln(t[i1 - 1], tr, 0);
+  if (mbt > mb) {
+    var i2 = 0, dt = 0;
+    var lft = mbt - mb, cst = 1 << lft;
+    t2.sort(function(a, b) {
+      return tr[b.s] - tr[a.s] || a.f - b.f;
+    });
+    for (; i2 < s; ++i2) {
+      var i2_1 = t2[i2].s;
+      if (tr[i2_1] > mb) {
+        dt += cst - (1 << mbt - tr[i2_1]);
+        tr[i2_1] = mb;
+      } else
+        break;
+    }
+    dt >>= lft;
+    while (dt > 0) {
+      var i2_2 = t2[i2].s;
+      if (tr[i2_2] < mb)
+        dt -= 1 << mb - tr[i2_2]++ - 1;
+      else
+        ++i2;
+    }
+    for (; i2 >= 0 && dt; --i2) {
+      var i2_3 = t2[i2].s;
+      if (tr[i2_3] == mb) {
+        --tr[i2_3];
+        ++dt;
+      }
+    }
+    mbt = mb;
+  }
+  return { t: new u8(tr), l: mbt };
+};
+var ln = function(n, l, d) {
+  return n.s == -1 ? Math.max(ln(n.l, l, d + 1), ln(n.r, l, d + 1)) : l[n.s] = d;
+};
+var lc = function(c) {
+  var s = c.length;
+  while (s && !c[--s])
+    ;
+  var cl = new u16(++s);
+  var cli = 0, cln = c[0], cls = 1;
+  var w = function(v) {
+    cl[cli++] = v;
+  };
+  for (var i2 = 1; i2 <= s; ++i2) {
+    if (c[i2] == cln && i2 != s)
+      ++cls;
+    else {
+      if (!cln && cls > 2) {
+        for (; cls > 138; cls -= 138)
+          w(32754);
+        if (cls > 2) {
+          w(cls > 10 ? cls - 11 << 5 | 28690 : cls - 3 << 5 | 12305);
+          cls = 0;
+        }
+      } else if (cls > 3) {
+        w(cln), --cls;
+        for (; cls > 6; cls -= 6)
+          w(8304);
+        if (cls > 2)
+          w(cls - 3 << 5 | 8208), cls = 0;
+      }
+      while (cls--)
+        w(cln);
+      cls = 1;
+      cln = c[i2];
+    }
+  }
+  return { c: cl.subarray(0, cli), n: s };
+};
+var clen = function(cf, cl) {
+  var l = 0;
+  for (var i2 = 0; i2 < cl.length; ++i2)
+    l += cf[i2] * cl[i2];
+  return l;
+};
+var wfblk = function(out, pos, dat) {
+  var s = dat.length;
+  var o = shft(pos + 2);
+  out[o] = s & 255;
+  out[o + 1] = s >> 8;
+  out[o + 2] = out[o] ^ 255;
+  out[o + 3] = out[o + 1] ^ 255;
+  for (var i2 = 0; i2 < s; ++i2)
+    out[o + i2 + 4] = dat[i2];
+  return (o + 4 + s) * 8;
+};
+var wblk = function(dat, out, final, syms, lf, df, eb, li, bs, bl, p) {
+  wbits(out, p++, final);
+  ++lf[256];
+  var _a2 = hTree(lf, 15), dlt = _a2.t, mlb = _a2.l;
+  var _b2 = hTree(df, 15), ddt = _b2.t, mdb = _b2.l;
+  var _c = lc(dlt), lclt = _c.c, nlc = _c.n;
+  var _d = lc(ddt), lcdt = _d.c, ndc = _d.n;
+  var lcfreq = new u16(19);
+  for (var i2 = 0; i2 < lclt.length; ++i2)
+    ++lcfreq[lclt[i2] & 31];
+  for (var i2 = 0; i2 < lcdt.length; ++i2)
+    ++lcfreq[lcdt[i2] & 31];
+  var _e = hTree(lcfreq, 7), lct = _e.t, mlcb = _e.l;
+  var nlcc = 19;
+  for (; nlcc > 4 && !lct[clim[nlcc - 1]]; --nlcc)
+    ;
+  var flen = bl + 5 << 3;
+  var ftlen = clen(lf, flt) + clen(df, fdt) + eb;
+  var dtlen = clen(lf, dlt) + clen(df, ddt) + eb + 14 + 3 * nlcc + clen(lcfreq, lct) + 2 * lcfreq[16] + 3 * lcfreq[17] + 7 * lcfreq[18];
+  if (bs >= 0 && flen <= ftlen && flen <= dtlen)
+    return wfblk(out, p, dat.subarray(bs, bs + bl));
+  var lm, ll, dm, dl;
+  wbits(out, p, 1 + (dtlen < ftlen)), p += 2;
+  if (dtlen < ftlen) {
+    lm = hMap(dlt, mlb, 0), ll = dlt, dm = hMap(ddt, mdb, 0), dl = ddt;
+    var llm = hMap(lct, mlcb, 0);
+    wbits(out, p, nlc - 257);
+    wbits(out, p + 5, ndc - 1);
+    wbits(out, p + 10, nlcc - 4);
+    p += 14;
+    for (var i2 = 0; i2 < nlcc; ++i2)
+      wbits(out, p + 3 * i2, lct[clim[i2]]);
+    p += 3 * nlcc;
+    var lcts = [lclt, lcdt];
+    for (var it = 0; it < 2; ++it) {
+      var clct = lcts[it];
+      for (var i2 = 0; i2 < clct.length; ++i2) {
+        var len = clct[i2] & 31;
+        wbits(out, p, llm[len]), p += lct[len];
+        if (len > 15)
+          wbits(out, p, clct[i2] >> 5 & 127), p += clct[i2] >> 12;
+      }
+    }
+  } else {
+    lm = flm, ll = flt, dm = fdm, dl = fdt;
+  }
+  for (var i2 = 0; i2 < li; ++i2) {
+    var sym = syms[i2];
+    if (sym > 255) {
+      var len = sym >> 18 & 31;
+      wbits16(out, p, lm[len + 257]), p += ll[len + 257];
+      if (len > 7)
+        wbits(out, p, sym >> 23 & 31), p += fleb[len];
+      var dst = sym & 31;
+      wbits16(out, p, dm[dst]), p += dl[dst];
+      if (dst > 3)
+        wbits16(out, p, sym >> 5 & 8191), p += fdeb[dst];
+    } else {
+      wbits16(out, p, lm[sym]), p += ll[sym];
+    }
+  }
+  wbits16(out, p, lm[256]);
+  return p + ll[256];
+};
+var deo = /* @__PURE__ */ new i32([65540, 131080, 131088, 131104, 262176, 1048704, 1048832, 2114560, 2117632]);
+var et = /* @__PURE__ */ new u8(0);
+var dflt = function(dat, lvl, plvl, pre, post, st) {
+  var s = st.z || dat.length;
+  var o = new u8(pre + s + 5 * (1 + Math.ceil(s / 7e3)) + post);
+  var w = o.subarray(pre, o.length - post);
+  var lst = st.l;
+  var pos = (st.r || 0) & 7;
+  if (lvl) {
+    if (pos)
+      w[0] = st.r >> 3;
+    var opt = deo[lvl - 1];
+    var n = opt >> 13, c = opt & 8191;
+    var msk_1 = (1 << plvl) - 1;
+    var prev = st.p || new u16(32768), head = st.h || new u16(msk_1 + 1);
+    var bs1_1 = Math.ceil(plvl / 3), bs2_1 = 2 * bs1_1;
+    var hsh = function(i3) {
+      return (dat[i3] ^ dat[i3 + 1] << bs1_1 ^ dat[i3 + 2] << bs2_1) & msk_1;
+    };
+    var syms = new i32(25e3);
+    var lf = new u16(288), df = new u16(32);
+    var lc_1 = 0, eb = 0, i2 = st.i || 0, li = 0, wi = st.w || 0, bs = 0;
+    for (; i2 + 2 < s; ++i2) {
+      var hv = hsh(i2);
+      var imod = i2 & 32767, pimod = head[hv];
+      prev[imod] = pimod;
+      head[hv] = imod;
+      if (wi <= i2) {
+        var rem = s - i2;
+        if ((lc_1 > 7e3 || li > 24576) && (rem > 423 || !lst)) {
+          pos = wblk(dat, w, 0, syms, lf, df, eb, li, bs, i2 - bs, pos);
+          li = lc_1 = eb = 0, bs = i2;
+          for (var j = 0; j < 286; ++j)
+            lf[j] = 0;
+          for (var j = 0; j < 30; ++j)
+            df[j] = 0;
+        }
+        var l = 2, d = 0, ch_1 = c, dif = imod - pimod & 32767;
+        if (rem > 2 && hv == hsh(i2 - dif)) {
+          var maxn = Math.min(n, rem) - 1;
+          var maxd = Math.min(32767, i2);
+          var ml = Math.min(258, rem);
+          while (dif <= maxd && --ch_1 && imod != pimod) {
+            if (dat[i2 + l] == dat[i2 + l - dif]) {
+              var nl = 0;
+              for (; nl < ml && dat[i2 + nl] == dat[i2 + nl - dif]; ++nl)
+                ;
+              if (nl > l) {
+                l = nl, d = dif;
+                if (nl > maxn)
+                  break;
+                var mmd = Math.min(dif, nl - 2);
+                var md = 0;
+                for (var j = 0; j < mmd; ++j) {
+                  var ti = i2 - dif + j & 32767;
+                  var pti = prev[ti];
+                  var cd = ti - pti & 32767;
+                  if (cd > md)
+                    md = cd, pimod = ti;
+                }
+              }
+            }
+            imod = pimod, pimod = prev[imod];
+            dif += imod - pimod & 32767;
+          }
+        }
+        if (d) {
+          syms[li++] = 268435456 | revfl[l] << 18 | revfd[d];
+          var lin = revfl[l] & 31, din = revfd[d] & 31;
+          eb += fleb[lin] + fdeb[din];
+          ++lf[257 + lin];
+          ++df[din];
+          wi = i2 + l;
+          ++lc_1;
+        } else {
+          syms[li++] = dat[i2];
+          ++lf[dat[i2]];
+        }
+      }
+    }
+    for (i2 = Math.max(i2, wi); i2 < s; ++i2) {
+      syms[li++] = dat[i2];
+      ++lf[dat[i2]];
+    }
+    pos = wblk(dat, w, lst, syms, lf, df, eb, li, bs, i2 - bs, pos);
+    if (!lst) {
+      st.r = pos & 7 | w[pos / 8 | 0] << 3;
+      pos -= 7;
+      st.h = head, st.p = prev, st.i = i2, st.w = wi;
+    }
+  } else {
+    for (var i2 = st.w || 0; i2 < s + lst; i2 += 65535) {
+      var e = i2 + 65535;
+      if (e >= s) {
+        w[pos / 8 | 0] = lst;
+        e = s;
+      }
+      pos = wfblk(w, pos + 1, dat.subarray(i2, e));
+    }
+    st.i = s;
+  }
+  return slc(o, 0, pre + shft(pos) + post);
+};
+var crct = /* @__PURE__ */ (function() {
+  var t = new Int32Array(256);
+  for (var i2 = 0; i2 < 256; ++i2) {
+    var c = i2, k = 9;
+    while (--k)
+      c = (c & 1 && -306674912) ^ c >>> 1;
+    t[i2] = c;
+  }
+  return t;
+})();
+var crc = function() {
+  var c = -1;
+  return {
+    p: function(d) {
+      var cr = c;
+      for (var i2 = 0; i2 < d.length; ++i2)
+        cr = crct[cr & 255 ^ d[i2]] ^ cr >>> 8;
+      c = cr;
+    },
+    d: function() {
+      return ~c;
+    }
+  };
+};
+var dopt = function(dat, opt, pre, post, st) {
+  if (!st) {
+    st = { l: 1 };
+    if (opt.dictionary) {
+      var dict = opt.dictionary.subarray(-32768);
+      var newDat = new u8(dict.length + dat.length);
+      newDat.set(dict);
+      newDat.set(dat, dict.length);
+      dat = newDat;
+      st.w = dict.length;
+    }
+  }
+  return dflt(dat, opt.level == null ? 6 : opt.level, opt.mem == null ? st.l ? Math.ceil(Math.max(8, Math.min(13, Math.log(dat.length))) * 1.5) : 20 : 12 + opt.mem, pre, post, st);
+};
+var mrg = function(a, b) {
+  var o = {};
+  for (var k in a)
+    o[k] = a[k];
+  for (var k in b)
+    o[k] = b[k];
+  return o;
+};
+var b2 = function(d, b) {
+  return d[b] | d[b + 1] << 8;
+};
+var b4 = function(d, b) {
+  return (d[b] | d[b + 1] << 8 | d[b + 2] << 16 | d[b + 3] << 24) >>> 0;
+};
+var b8 = function(d, b) {
+  return b4(d, b) + b4(d, b + 4) * 4294967296;
+};
+var wbytes = function(d, b, v) {
+  for (; v; ++b)
+    d[b] = v, v >>>= 8;
+};
+function deflateSync(data, opts) {
+  return dopt(data, opts || {}, 0, 0);
+}
+function inflateSync(data, opts) {
+  return inflt(data, { i: 2 }, opts && opts.out, opts && opts.dictionary);
+}
+var fltn = function(d, p, t, o) {
+  for (var k in d) {
+    var val = d[k], n = p + k, op = o;
+    if (Array.isArray(val))
+      op = mrg(o, val[1]), val = val[0];
+    if (val instanceof u8)
+      t[n] = [val, op];
+    else {
+      t[n += "/"] = [new u8(0), op];
+      fltn(val, n, t, o);
+    }
+  }
+};
+var te = typeof TextEncoder != "undefined" && /* @__PURE__ */ new TextEncoder();
+var td = typeof TextDecoder != "undefined" && /* @__PURE__ */ new TextDecoder();
+var tds = 0;
+try {
+  td.decode(et, { stream: true });
+  tds = 1;
+} catch (e) {
+}
+var dutf8 = function(d) {
+  for (var r = "", i2 = 0; ; ) {
+    var c = d[i2++];
+    var eb = (c > 127) + (c > 223) + (c > 239);
+    if (i2 + eb > d.length)
+      return { s: r, r: slc(d, i2 - 1) };
+    if (!eb)
+      r += String.fromCharCode(c);
+    else if (eb == 3) {
+      c = ((c & 15) << 18 | (d[i2++] & 63) << 12 | (d[i2++] & 63) << 6 | d[i2++] & 63) - 65536, r += String.fromCharCode(55296 | c >> 10, 56320 | c & 1023);
+    } else if (eb & 1)
+      r += String.fromCharCode((c & 31) << 6 | d[i2++] & 63);
+    else
+      r += String.fromCharCode((c & 15) << 12 | (d[i2++] & 63) << 6 | d[i2++] & 63);
+  }
+};
+function strToU8(str, latin1) {
+  if (latin1) {
+    var ar_1 = new u8(str.length);
+    for (var i2 = 0; i2 < str.length; ++i2)
+      ar_1[i2] = str.charCodeAt(i2);
+    return ar_1;
+  }
+  if (te)
+    return te.encode(str);
+  var l = str.length;
+  var ar = new u8(str.length + (str.length >> 1));
+  var ai = 0;
+  var w = function(v) {
+    ar[ai++] = v;
+  };
+  for (var i2 = 0; i2 < l; ++i2) {
+    if (ai + 5 > ar.length) {
+      var n = new u8(ai + 8 + (l - i2 << 1));
+      n.set(ar);
+      ar = n;
+    }
+    var c = str.charCodeAt(i2);
+    if (c < 128 || latin1)
+      w(c);
+    else if (c < 2048)
+      w(192 | c >> 6), w(128 | c & 63);
+    else if (c > 55295 && c < 57344)
+      c = 65536 + (c & 1023 << 10) | str.charCodeAt(++i2) & 1023, w(240 | c >> 18), w(128 | c >> 12 & 63), w(128 | c >> 6 & 63), w(128 | c & 63);
+    else
+      w(224 | c >> 12), w(128 | c >> 6 & 63), w(128 | c & 63);
+  }
+  return slc(ar, 0, ai);
+}
+function strFromU8(dat, latin1) {
+  if (latin1) {
+    var r = "";
+    for (var i2 = 0; i2 < dat.length; i2 += 16384)
+      r += String.fromCharCode.apply(null, dat.subarray(i2, i2 + 16384));
+    return r;
+  } else if (td) {
+    return td.decode(dat);
+  } else {
+    var _a2 = dutf8(dat), s = _a2.s, r = _a2.r;
+    if (r.length)
+      err(8);
+    return s;
+  }
+}
+var slzh = function(d, b) {
+  return b + 30 + b2(d, b + 26) + b2(d, b + 28);
+};
+var zh = function(d, b, z) {
+  var fnl = b2(d, b + 28), fn = strFromU8(d.subarray(b + 46, b + 46 + fnl), !(b2(d, b + 8) & 2048)), es = b + 46 + fnl, bs = b4(d, b + 20);
+  var _a2 = z && bs == 4294967295 ? z64e(d, es) : [bs, b4(d, b + 24), b4(d, b + 42)], sc = _a2[0], su = _a2[1], off = _a2[2];
+  return [b2(d, b + 10), sc, su, fn, es + b2(d, b + 30) + b2(d, b + 32), off];
+};
+var z64e = function(d, b) {
+  for (; b2(d, b) != 1; b += 4 + b2(d, b + 2))
+    ;
+  return [b8(d, b + 12), b8(d, b + 4), b8(d, b + 20)];
+};
+var exfl = function(ex) {
+  var le = 0;
+  if (ex) {
+    for (var k in ex) {
+      var l = ex[k].length;
+      if (l > 65535)
+        err(9);
+      le += l + 4;
+    }
+  }
+  return le;
+};
+var wzh = function(d, b, f, fn, u, c, ce, co) {
+  var fl2 = fn.length, ex = f.extra, col = co && co.length;
+  var exl = exfl(ex);
+  wbytes(d, b, ce != null ? 33639248 : 67324752), b += 4;
+  if (ce != null)
+    d[b++] = 20, d[b++] = f.os;
+  d[b] = 20, b += 2;
+  d[b++] = f.flag << 1 | (c < 0 && 8), d[b++] = u && 8;
+  d[b++] = f.compression & 255, d[b++] = f.compression >> 8;
+  var dt = new Date(f.mtime == null ? Date.now() : f.mtime), y = dt.getFullYear() - 1980;
+  if (y < 0 || y > 119)
+    err(10);
+  wbytes(d, b, y << 25 | dt.getMonth() + 1 << 21 | dt.getDate() << 16 | dt.getHours() << 11 | dt.getMinutes() << 5 | dt.getSeconds() >> 1), b += 4;
+  if (c != -1) {
+    wbytes(d, b, f.crc);
+    wbytes(d, b + 4, c < 0 ? -c - 2 : c);
+    wbytes(d, b + 8, f.size);
+  }
+  wbytes(d, b + 12, fl2);
+  wbytes(d, b + 14, exl), b += 16;
+  if (ce != null) {
+    wbytes(d, b, col);
+    wbytes(d, b + 6, f.attrs);
+    wbytes(d, b + 10, ce), b += 14;
+  }
+  d.set(fn, b);
+  b += fl2;
+  if (exl) {
+    for (var k in ex) {
+      var exf = ex[k], l = exf.length;
+      wbytes(d, b, +k);
+      wbytes(d, b + 2, l);
+      d.set(exf, b + 4), b += 4 + l;
+    }
+  }
+  if (col)
+    d.set(co, b), b += col;
+  return b;
+};
+var wzf = function(o, b, c, d, e) {
+  wbytes(o, b, 101010256);
+  wbytes(o, b + 8, c);
+  wbytes(o, b + 10, c);
+  wbytes(o, b + 12, d);
+  wbytes(o, b + 16, e);
+};
+function zipSync(data, opts) {
+  if (!opts)
+    opts = {};
+  var r = {};
+  var files = [];
+  fltn(data, "", r, opts);
+  var o = 0;
+  var tot = 0;
+  for (var fn in r) {
+    var _a2 = r[fn], file = _a2[0], p = _a2[1];
+    var compression = p.level == 0 ? 0 : 8;
+    var f = strToU8(fn), s = f.length;
+    var com = p.comment, m = com && strToU8(com), ms = m && m.length;
+    var exl = exfl(p.extra);
+    if (s > 65535)
+      err(11);
+    var d = compression ? deflateSync(file, p) : file, l = d.length;
+    var c = crc();
+    c.p(file);
+    files.push(mrg(p, {
+      size: file.length,
+      crc: c.d(),
+      c: d,
+      f,
+      m,
+      u: s != fn.length || m && com.length != ms,
+      o,
+      compression
+    }));
+    o += 30 + s + exl + l;
+    tot += 76 + 2 * (s + exl) + (ms || 0) + l;
+  }
+  var out = new u8(tot + 22), oe = o, cdl = tot - o;
+  for (var i2 = 0; i2 < files.length; ++i2) {
+    var f = files[i2];
+    wzh(out, f.o, f, f.f, f.u, f.c.length);
+    var badd = 30 + f.f.length + exfl(f.extra);
+    out.set(f.c, f.o + badd);
+    wzh(out, o, f, f.f, f.u, f.c.length, f.o, f.m), o += 16 + badd + (f.m ? f.m.length : 0);
+  }
+  wzf(out, o, files.length, cdl, oe);
+  return out;
+}
+function unzipSync(data, opts) {
+  var files = {};
+  var e = data.length - 22;
+  for (; b4(data, e) != 101010256; --e) {
+    if (!e || data.length - e > 65558)
+      err(13);
+  }
+  ;
+  var c = b2(data, e + 8);
+  if (!c)
+    return {};
+  var o = b4(data, e + 16);
+  var z = o == 4294967295 || c == 65535;
+  if (z) {
+    var ze = b4(data, e - 12);
+    z = b4(data, ze) == 101075792;
+    if (z) {
+      c = b4(data, ze + 32);
+      o = b4(data, ze + 48);
+    }
+  }
+  var fltr = opts && opts.filter;
+  for (var i2 = 0; i2 < c; ++i2) {
+    var _a2 = zh(data, o, z), c_2 = _a2[0], sc = _a2[1], su = _a2[2], fn = _a2[3], no = _a2[4], off = _a2[5], b = slzh(data, off);
+    o = no;
+    if (!fltr || fltr({
+      name: fn,
+      size: sc,
+      originalSize: su,
+      compression: c_2
+    })) {
+      if (!c_2)
+        files[fn] = slc(data, b, b + sc);
+      else if (c_2 == 8)
+        files[fn] = inflateSync(data.subarray(b, b + sc), { out: new u8(su) });
+      else
+        err(14, "unknown compression type " + c_2);
+    }
+  }
+  return files;
+}
+
+// src/cloud/envelope.ts
+function packEnvelope(document) {
+  return zipSync({ "data.csv": [emitSectionedCsv(document), { level: 6 }] });
+}
+function unpackEnvelope(bytes) {
+  if (bytes.length < 30 || bytes[0] !== 80 || bytes[1] !== 75 || bytes[2] !== 3 || bytes[3] !== 4) {
+    throw new Error("invalid ZIP envelope: missing local file header");
+  }
+  const method = bytes[8] | bytes[9] << 8;
+  if (method !== 8) throw new Error(`invalid ZIP envelope: data.csv must use Deflate method 8 (found ${method})`);
+  let files;
+  try {
+    files = unzipSync(bytes);
+  } catch (error2) {
+    throw new Error(`invalid ZIP envelope: ${error2.message}`);
+  }
+  const names = Object.keys(files);
+  if (!names.includes("data.csv")) throw new Error("ZIP envelope is missing data.csv");
+  if (names.length !== 1) throw new Error("ZIP envelope must contain only data.csv");
+  let document;
+  try {
+    document = parseSectionedCsv(files["data.csv"]);
+  } catch (error2) {
+    throw new Error(`invalid data.csv: ${error2.message}`);
+  }
+  const versions = findSection(document, "SysVersions");
+  const versionIndex = versions?.header.indexOf("FileVersion") ?? -1;
+  if (!versions || versionIndex < 0 || versions.rows[0]?.[versionIndex] !== "3") {
+    throw new Error('unsupported or missing SysVersions FileVersion (expected "3")');
+  }
+  return document;
+}
 
 // src/cloud/soap.ts
 var import_fast_xml_parser2 = __toESM(require_fxp(), 1);
@@ -25110,6 +29138,7 @@ var SOAP_OPERATIONS = [
   "ApplyModificationsBytesEx",
   "ReleaseSyncSessionBytes"
 ];
+var GET_FILE_TS = "GetFileTS";
 var OPERATIONS = new Set(SOAP_OPERATIONS);
 var parser2 = new import_fast_xml_parser2.XMLParser({
   removeNSPrefix: true,
@@ -25149,28 +29178,46 @@ function peekSoapFields(xml2, operation) {
     return {};
   }
 }
+function peekSoapResponseFields(xml2, operation) {
+  try {
+    return parseFields(xml2, `${operation}Response`);
+  } catch {
+    return {};
+  }
+}
+function soapFieldText(fields, name) {
+  const value = fields[name];
+  return typeof value === "string" && value.length ? value : void 0;
+}
 function soapOperationFailure(operation, message) {
   return envelope(operation, field(`${operation}Result`, "false") + field("errorMessage", message));
 }
-function soapOperationFromAction(action) {
+function actionName(action) {
   const value = Array.isArray(action) ? action[0] : action;
   if (!value) return void 0;
   const normalized = value.trim().replace(/^"|"$/g, "");
-  const name = normalized.slice(normalized.lastIndexOf("/") + 1);
-  return OPERATIONS.has(name) ? name : void 0;
+  return normalized.slice(normalized.lastIndexOf("/") + 1);
+}
+function soapOperationFromAction(action) {
+  const name = actionName(action);
+  return name !== void 0 && OPERATIONS.has(name) ? name : void 0;
+}
+function isGetFileTsAction(action) {
+  return actionName(action) === GET_FILE_TS;
+}
+function buildGetFileTsResponse(version2) {
+  return envelope(GET_FILE_TS, field(`${GET_FILE_TS}Result`, version2));
+}
+function buildGetModificationsResponse(maxVersion, dataBase64) {
+  return envelope(
+    "GetModificationsBytesEx",
+    field("GetModificationsBytesExResult", "true") + field("maxVersion", maxVersion) + field("data", dataBase64)
+  );
 }
 function soapFault(message) {
   const xml2 = `<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="${SOAP_NAMESPACE}"><soap:Body><soap:Fault>` + field("faultcode", "soap:Client") + field("faultstring", message) + `</soap:Fault></soap:Body></soap:Envelope>`;
   return new TextEncoder().encode(xml2);
 }
-
-// src/cloud/upstream.ts
-import http from "node:http";
-import https from "node:https";
-var import_fast_xml_parser3 = __toESM(require_fxp(), 1);
-
-// src/cloud/delta.ts
-var TODO_ITEMS_HEADER = "UID,ParentUID,ItemIndex,Caption,Importance,Urgency,HideInToDo,HideInToDoThisTask,ScheduleType,CompletionDateTime,DueDateTime,StartDateTime,EstimateMin,EstimateMax,NextReviewDate,LastReviewed,ReviewEvery,ReviewRecurrenceType,CompleteInOrder,Effort,IsProject,ProjectStatus,DependOper,DependPostpone,CreatedDate,LastModified,TextTag,RecType,RecStartDate,RecEndDate,RecOccurrences,RecInterval,RecInstance,RecDOWMask,RecDayOfMonth,RecMonthOfYear,RecUseCompletionDate,RecUncompleteSubtasks,RecGeneratedCount,RecUncomplIfCompl,RecHourDelta,RecDNCCCopy,RecRecurWSC,GoalFor,FlagUID,Starred,StarToggleDateTime,ccUseCustomColorCoding,ccFont,ccSize,ccBold,ccItalic,ccUnderline,ccStrikethrough,ccFontColor,ccHighlightColor,ccChildrenIheritColorCoding,ccUnderlineColor,ccSideBarColor,ccBackgroundColor1_1,ccBackgroundColor1_2,ccBackgroundColor2_1,ccBackgroundColor2_2,ccUnderlineEntireRowColor,ccUnderlineEntireRowthickness,ccUnderlineDotted,ccBackgroundGradientToCenter,ccIndentRowLineAndBackground,Reminder,NextAlert,AutoAlert,AutoAlertDelta,LimitAutoAlertCount,MaxAutoAlertCount,AutoAlertIndex,ReminderState,AlertAction,Email,AppPath,AudioFile,PPCAudioFile,Note".split(",");
 
 // src/cloud/upstream.ts
 var CONTACT_FIELDS = ["loginBytes", "passwordBytes", "additionalParams", "encoding"];
@@ -25210,6 +29257,12 @@ async function forwardBuffered(target, method, headers, body) {
     request.end(body);
   });
 }
+function decodeForwardBody(result) {
+  const encoding = (result.headers["content-encoding"] ?? "").toString().toLowerCase();
+  if (encoding.includes("gzip")) return zlib2.gunzipSync(result.body).toString("utf8");
+  if (encoding.includes("deflate")) return zlib2.inflateSync(result.body).toString("utf8");
+  return result.body.toString("utf8");
+}
 var parser3 = new import_fast_xml_parser3.XMLParser({
   removeNSPrefix: true,
   ignoreAttributes: true,
@@ -25217,12 +29270,873 @@ var parser3 = new import_fast_xml_parser3.XMLParser({
   trimValues: true,
   processEntities: true
 });
+function responseFields(xml2, operation) {
+  try {
+    const document = parser3.parse(xml2);
+    const body = document.Envelope?.Body;
+    const node = body?.[`${operation}Response`];
+    if (!node || typeof node !== "object" || Array.isArray(node)) return void 0;
+    return node;
+  } catch {
+    return void 0;
+  }
+}
+function text(fields, name) {
+  return fields ? soapFieldText(fields, name) : void 0;
+}
 async function forwardVendorSoap(gateway, target, requestHeaders, requestBytes, requestFields) {
   const rawUid = typeof requestFields.dataFileUID === "string" ? requestFields.dataFileUID : void 0;
   const contact = contactFromRequest(target, requestFields);
   if (rawUid && contact) gateway.noteVendorContact(rawUid, contact);
   return forwardBuffered(target, "POST", requestHeaders, requestBytes);
 }
+function xmlEscape(value) {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;");
+}
+var MLO_NAMESPACE2 = "http://www.mylifeorganized.net/";
+var VendorClient = class {
+  constructor(contact, dataFileUID, observe) {
+    this.contact = contact;
+    this.dataFileUID = dataFileUID;
+    this.observe = observe;
+  }
+  contact;
+  dataFileUID;
+  observe;
+  request(operation, extra) {
+    const ordered = operation === "ReleaseSyncSessionBytes" ? [
+      ["loginBytes", this.contact.loginBytes],
+      ["passwordBytes", this.contact.passwordBytes],
+      ...this.contact.encoding ? [["encoding", this.contact.encoding]] : [],
+      ["dataFileUID", this.dataFileUID],
+      ...extra
+    ] : [
+      ["loginBytes", this.contact.loginBytes],
+      ["passwordBytes", this.contact.passwordBytes],
+      ...this.contact.additionalParams ? [["additionalParams", this.contact.additionalParams]] : [],
+      ...extra.filter(([name]) => name === "sessionID"),
+      ...this.contact.encoding ? [["encoding", this.contact.encoding]] : [],
+      ["dataFileUID", this.dataFileUID],
+      ...extra.filter(([name]) => name !== "sessionID")
+    ];
+    const body = ordered.map(([name, value]) => `<${name}>${xmlEscape(value)}</${name}>`).join("");
+    const xml2 = `<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><${operation} xmlns="${MLO_NAMESPACE2}">${body}</${operation}></soap:Body></soap:Envelope>`;
+    return forwardBuffered(this.contact.target, "POST", {
+      "content-type": "text/xml; charset=utf-8",
+      soapaction: `"${MLO_NAMESPACE2}${operation}"`
+    }, Buffer.from(xml2, "utf8"));
+  }
+  /** One full round trip: send, observe durably, then enforce the result. */
+  async call(operation, extra) {
+    const result = await this.request(operation, extra);
+    const fields = result.status === 200 ? responseFields(decodeForwardBody(result), operation) : void 0;
+    await this.note(operation, extra, result.status, fields);
+    if (result.status !== 200) throw new Error(`vendor ${operation} failed with HTTP ${result.status}`);
+    if (text(fields, `${operation}Result`) !== "true") {
+      const message = text(fields, "errorMessage") ?? "vendor reported failure";
+      throw new Error(`vendor ${operation} rejected: ${message}`);
+    }
+    return fields;
+  }
+  async note(operation, extra, status, fields) {
+    if (!this.observe) return;
+    const request = {};
+    for (const [name, value] of extra) {
+      if (name === "data") request.dataBytes = value.length;
+      else request[name] = value;
+    }
+    const optional2 = (name, key = name) => {
+      const value = text(fields, name);
+      return value ? { [key]: value } : {};
+    };
+    try {
+      await this.observe({
+        operation,
+        dataFileUID: this.dataFileUID,
+        request,
+        status,
+        ...fields ? {
+          result: text(fields, `${operation}Result`) ?? "<absent>",
+          ...optional2("errorMessage"),
+          ...optional2("newServerTimeStamp"),
+          ...optional2("maxVersion"),
+          ...text(fields, "data") ? { responseDataBytes: text(fields, "data").length } : {}
+        } : {}
+      });
+    } catch {
+    }
+  }
+  /** Pull all changes newer than `newerThan`; returns the vendor version and payload. */
+  async pull(sessionId, newerThan) {
+    const fields = await this.call("GetModificationsBytesEx", [
+      ["sessionID", sessionId],
+      ["newerThan", cursorToDecimalString(newerThan)]
+    ]);
+    const maxVersion = parseCursor(text(fields, "maxVersion") ?? "0");
+    const data = text(fields, "data");
+    return { maxVersion, ...data ? { data: Buffer.from(data.replace(/\s+/g, ""), "base64") } : {} };
+  }
+  /** Upload one envelope; the vendor assigns and returns the new remote version. */
+  async apply(sessionId, envelope2) {
+    const fields = await this.call("ApplyModificationsBytesEx", [
+      ["sessionID", sessionId],
+      // Opaque local baseline of THIS client; zero mirrors a first-sync
+      // client, which the vendor demonstrably accepts.
+      ["lastSyncTimestamp", "0"],
+      ["data", Buffer.from(envelope2).toString("base64")]
+    ]);
+    const stamp = text(fields, "newServerTimeStamp");
+    if (!stamp) {
+      throw new Error(
+        "vendor ApplyModificationsBytesEx answered success without a newServerTimeStamp \u2014 a malformed response, so the upload cannot be trusted as stored"
+      );
+    }
+    return parseCursor(stamp);
+  }
+  async release(sessionId) {
+    await this.call("ReleaseSyncSessionBytes", [["sessionID", sessionId]]);
+  }
+};
+async function pullVendorHistory(contact, uid, observe) {
+  const client = new VendorClient(contact, uid, observe);
+  const sessionId = generateGuid();
+  const pulled = await client.pull(sessionId, ZERO_CURSOR);
+  await client.release(sessionId).catch(() => void 0);
+  if (!pulled.data) throw new Error("vendor returned no payload for a full-history pull");
+  return { version: pulled.maxVersion, envelope: pulled.data };
+}
+function normalizeVendorHistory(bytes) {
+  if (bytes.length >= 4 && bytes[0] === 80 && bytes[1] === 75 && bytes[2] === 3 && bytes[3] === 4) {
+    return { document: unpackEnvelope(bytes), envelope: bytes };
+  }
+  let raw;
+  try {
+    raw = parseSectionedCsv(bytes);
+  } catch (error2) {
+    throw new Error(
+      `invalid vendor full-history payload: expected a ZIP envelope or raw sectioned CSV (${error2 instanceof Error ? error2.message : String(error2)})`
+    );
+  }
+  const canonicalNames = new Set(SECTION_HEADERS.map(([name]) => name));
+  const sections = SECTION_HEADERS.map(([name, canonicalHeader]) => {
+    const required2 = canonicalHeader;
+    const source = findSection(raw, name);
+    if (!source) return { name, header: [...required2], rows: [] };
+    const extras = source.header.filter((column2) => !required2.includes(column2));
+    const header = [...required2, ...extras];
+    return {
+      name,
+      header,
+      rows: source.rows.map(
+        (row) => header.map((column2) => {
+          const index2 = source.header.indexOf(column2);
+          return index2 < 0 ? "" : row[index2] ?? "";
+        })
+      )
+    };
+  });
+  sections.push(...raw.sections.filter((section) => !canonicalNames.has(section.name)).map((section) => ({
+    name: section.name,
+    header: [...section.header],
+    rows: section.rows.map((row) => [...row])
+  })));
+  const document = { sections };
+  return { document, envelope: packEnvelope(document) };
+}
+
+// src/cloud/auto-init.ts
+function refuse(problem) {
+  return { kind: "refused", problem };
+}
+function groundTruthVerdict(localGuids, pulledUids) {
+  const pulled = new Set(pulledUids);
+  let overlap = 0;
+  for (const guid2 of new Set(localGuids)) if (pulled.has(guid2)) overlap += 1;
+  if (overlap > 0 || !localGuids.length || !pulledUids.length) return { ok: true, overlap };
+  return {
+    ok: false,
+    overlap: 0,
+    detail: `the pulled cloud history (${pulled.size} tasks) shares no task identity with the open data file (${new Set(localGuids).size} tasks) \u2014 it belongs to a different profile`
+  };
+}
+var AutoInitializer = class {
+  constructor(gateway, ports) {
+    this.gateway = gateway;
+    this.ports = ports;
+  }
+  gateway;
+  ports;
+  /** Single-flight: every proxied sync pokes this, and a pull takes seconds. */
+  inFlight;
+  /**
+   * Try to initialize, or say why not. Concurrent callers share one attempt;
+   * the cheap "nothing is unbound" answer costs no probe and no vendor call,
+   * which is what keeps the steady-state invariant at zero endpoint-initiated
+   * vendor exchanges.
+   */
+  attempt() {
+    this.inFlight ??= this.run().finally(() => {
+      this.inFlight = void 0;
+    });
+    return this.inFlight;
+  }
+  async run() {
+    const seen = this.gateway.vendorContactUids();
+    const candidates = [];
+    for (const uid2 of seen) {
+      if (!await this.gateway.bindings.forUid(uid2)) candidates.push(uid2);
+    }
+    if (seen.length && !candidates.length) return { kind: "already-bound", dataFileUID: seen[0] };
+    const profilePath = await this.ports.openProfile();
+    if (!profilePath) {
+      return refuse({
+        kind: "no-open-profile",
+        title: "cannot tell which profile MLO has open, so there is nothing to bind a cloud file to",
+        retryable: "after-user-action",
+        remedy: "open your profile in MLO, then sync once through the proxy"
+      });
+    }
+    const existing = await this.gateway.bindings.forProfile(profilePath);
+    if (existing?.dataFileUID) {
+      return refuse({
+        kind: "binding-conflict",
+        title: `this profile is bound to ${existing.dataFileUID}, but the sync traffic seen through the proxy is for ${seen.join(", ")} \u2014 auto-initialization never moves an existing binding`,
+        retryable: "after-user-action",
+        remedy: "rebind explicitly (the current binding is backed up first) if the new cloud file is the right one",
+        extensions: { boundDataFileUID: existing.dataFileUID, observedDataFileUIDs: seen }
+      });
+    }
+    if (!candidates.length) {
+      return refuse({
+        kind: "no-bootstrap-candidate",
+        title: "no vendor sync traffic has been observed since the sync endpoint started",
+        retryable: "after-user-action",
+        remedy: 'run one ordinary sync in MLO through this proxy ("Use secure connection" unchecked) so the endpoint sees the cloud file'
+      });
+    }
+    if (candidates.length > 1) {
+      return refuse({
+        kind: "ambiguous-bootstrap-candidate",
+        title: `${candidates.length} unbound cloud files have synced through this proxy (${candidates.join(", ")})`,
+        retryable: "after-user-action",
+        remedy: "sync only the target profile, restart the sync endpoint, and sync once more",
+        extensions: { candidates }
+      });
+    }
+    const uid = normalizeDataFileUid(candidates[0]);
+    let materialized;
+    try {
+      materialized = await this.pullAndVerify(uid);
+    } catch (error2) {
+      return refuse(pullFailure(uid, error2));
+    }
+    const verdict = groundTruthVerdict(await this.localGuids(profilePath), materialized.uids);
+    if (!verdict.ok) {
+      return refuse({
+        kind: "candidate-not-ground-truthed",
+        title: `${uid} did not ground-truth against ${profilePath}: ${verdict.detail}`,
+        retryable: "after-user-action",
+        remedy: "make sure the profile MLO has open is the one whose cloud file synced through this proxy, then sync again",
+        extensions: { dataFileUID: uid, profilePath }
+      });
+    }
+    const partition = await this.gateway.registry.open(uid, "upstream");
+    try {
+      await partition.rows.replaceAll(materialized.document, "history-pull");
+      await partition.setLifecycle("ready");
+    } catch (error2) {
+      return refuse({
+        kind: "auto-init-materialize-failed",
+        title: `the history for ${uid} pulled cleanly but could not be written to the row store: ${error2 instanceof Error ? error2.message : String(error2)}`,
+        retryable: true,
+        remedy: "check the endpoint's state root is writable; the next proxied sync retries",
+        extensions: { dataFileUID: uid }
+      });
+    }
+    await partition.journal.record(
+      "ok",
+      `auto-init: full history at version ${materialized.version} (${materialized.uids.length} tasks)`
+    );
+    await this.gateway.bindings.bind(profilePath, "upstream", uid);
+    log(`auto-initialized ${profilePath} -> ${uid} at vendor version ${materialized.version} (${materialized.uids.length} tasks, ground-truth overlap ${verdict.overlap})`);
+    return {
+      kind: "bound",
+      profilePath,
+      dataFileUID: uid,
+      tasks: materialized.uids.length,
+      version: materialized.version
+    };
+  }
+  /**
+   * The whole of the endpoint's own cloud-plane work, run once a proxied
+   * session has closed: bind if the guards pass, then service any repull a
+   * human asked for. This is the ONE moment the endpoint may talk to the
+   * vendor itself, and it never throws — a proxied sync must not be able to
+   * notice that any of it happened.
+   */
+  async serviceAfterSession(rawUid) {
+    try {
+      const result = await this.attempt();
+      if (result.kind === "refused") {
+        log(`auto-initialization declined (${result.problem.kind}): ${result.problem.title}`);
+      }
+      const partition = rawUid ? await this.gateway.registry.resolveExisting(rawUid).catch(() => void 0) : void 0;
+      if (partition) await this.servicePendingRepull(partition);
+    } catch (error2) {
+      log(`cloud-plane service failed (sync unaffected): ${error2 instanceof Error ? error2.message : String(error2)}`);
+    }
+  }
+  /**
+   * Service a human's `repull`: refresh the row store from a fresh full
+   * history, leaving the binding exactly where it is. The request is left on
+   * disk rather than sent, because only the resident can make the vendor call.
+   */
+  async servicePendingRepull(partition) {
+    const requestedAt = await partition.repullRequestedAt().catch(() => void 0);
+    if (!requestedAt) return { kind: "none" };
+    try {
+      const materialized = await this.pullAndVerify(partition.uid);
+      await partition.rows.replaceAll(materialized.document, "history-pull");
+      await partition.clearRepullRequest();
+      await partition.journal.record(
+        "ok",
+        `repull: full history at version ${materialized.version} (${materialized.uids.length} tasks)`
+      );
+      log(`repulled ${partition.uid} at vendor version ${materialized.version} (${materialized.uids.length} tasks)`);
+      return { kind: "repulled", tasks: materialized.uids.length, version: materialized.version };
+    } catch (error2) {
+      const problem = pullFailure(partition.uid, error2);
+      await partition.journal.record("failed", problem.title).catch(() => void 0);
+      return { kind: "failed", problem };
+    }
+  }
+  /** Pull, then prove the payload is a readable history before anything acts on it. */
+  async pullAndVerify(uid) {
+    const pulled = await this.ports.pullHistory(uid);
+    const { document } = normalizeVendorHistory(pulled.envelope);
+    const tasks = findSection(document, "TodoItems");
+    if (!tasks || !tasks.header.includes("UID")) {
+      throw new Error("the pulled history carries no readable TodoItems section");
+    }
+    const uids = harvestTaskRows(document).rows.map((row) => row.uid);
+    return { document, uids, version: pulled.version };
+  }
+  /** Ground-truth evidence is optional by design: an unreadable `.ml` refutes nothing. */
+  async localGuids(profilePath) {
+    try {
+      return await this.ports.localTaskGuids(profilePath);
+    } catch (error2) {
+      log(`could not read task GUIDs from ${profilePath} (ground-truth left unproven): ${error2 instanceof Error ? error2.message : String(error2)}`);
+      return [];
+    }
+  }
+};
+function pullFailure(uid, error2) {
+  return {
+    kind: "auto-init-pull-failed",
+    title: `the full-history pull for ${uid} did not complete: ${error2 instanceof Error ? error2.message : String(error2)}`,
+    // Nothing was bound and nothing was half-written, so the next proxied sync
+    // simply tries again — no user action, no cleanup.
+    retryable: true,
+    remedy: "sync MLO once more through the proxy; the endpoint retries the pull on its own",
+    extensions: { dataFileUID: uid }
+  };
+}
+function systemAutoInitPorts(gateway, mloExePath) {
+  return {
+    async openProfile() {
+      const verdict = await detectProfile(mloExePath);
+      return verdict.ok ? verdict.dataFile : void 0;
+    },
+    async localTaskGuids(profilePath) {
+      return taskGuidsInDataFile(await fs15.readFile(profilePath));
+    },
+    async pullHistory(uid) {
+      const contact = gateway.vendorContact(uid);
+      if (!contact) {
+        throw new Error(`no vendor contact for ${uid} \u2014 the endpoint has seen no sync traffic for it since it started`);
+      }
+      const pulled = await pullVendorHistory(contact, uid, (record2) => gateway.noteVendorExchange(record2));
+      return { version: pulled.version.toString(), envelope: pulled.envelope };
+    }
+  };
+}
+
+// src/cloud/capture.ts
+function isZipPayload(bytes) {
+  return bytes.length >= 4 && bytes[0] === 80 && bytes[1] === 75 && bytes[2] === 3 && bytes[3] === 4;
+}
+async function existingPartition(gateway, requestFields) {
+  const rawUid = soapFieldText(requestFields, "dataFileUID");
+  if (!rawUid) return void 0;
+  try {
+    return await gateway.registry.resolveExisting(rawUid);
+  } catch {
+    return void 0;
+  }
+}
+async function capture(gateway, operation, requestFields, result) {
+  const partition = await existingPartition(gateway, requestFields);
+  if (!partition) return;
+  if (operation === "GetModificationsBytesEx") {
+    if (result.status !== 200) {
+      await partition.journal.record("failed", `get: vendor answered HTTP ${result.status}`);
+      return;
+    }
+    const fields = peekSoapResponseFields(decodeForwardBody(result), operation);
+    if (soapFieldText(fields, "GetModificationsBytesExResult") !== "true") {
+      await partition.journal.record("skipped", "get: vendor reported failure \u2014 nothing to capture");
+      return;
+    }
+    const encoded = soapFieldText(fields, "data")?.replace(/\s+/g, "");
+    if (!encoded) {
+      await partition.journal.record("ok", "get: empty payload");
+      return;
+    }
+    const bytes = Buffer.from(encoded, "base64");
+    if (!isZipPayload(bytes)) {
+      await partition.journal.record("skipped", "get: raw projection payload (full-history shape), not a delta envelope");
+      return;
+    }
+    const { upserts, tombstones } = await partition.rows.ingest(unpackEnvelope(bytes), "vendor-get");
+    await partition.journal.record("ok", `get: ${upserts} rows, ${tombstones} tombstones`);
+    return;
+  }
+  if (operation === "ApplyModificationsBytesEx") {
+    const encoded = soapFieldText(requestFields, "data")?.replace(/\s+/g, "");
+    if (!encoded) {
+      await partition.journal.record("skipped", "apply: no payload field");
+      return;
+    }
+    const bytes = Buffer.from(encoded, "base64");
+    if (!isZipPayload(bytes)) {
+      await partition.journal.record("skipped", "apply: payload is not a delta envelope");
+      return;
+    }
+    const { upserts, tombstones } = await partition.rows.ingest(unpackEnvelope(bytes), "mlo-apply");
+    await partition.journal.record("ok", `apply: ${upserts} rows, ${tombstones} tombstones`);
+  }
+}
+async function captureVendorSession(gateway, operation, requestFields, result) {
+  try {
+    await capture(gateway, operation, requestFields, result);
+  } catch (error2) {
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    log(`capture failed (forward path unaffected): ${message}`);
+    try {
+      const partition = await existingPartition(gateway, requestFields);
+      await partition?.journal.record("failed", `${operation}: ${message}`);
+    } catch {
+    }
+  }
+}
+async function captureTlsConnectSeen(gateway, host, port) {
+  try {
+    for (const summary of await gateway.registry.list()) {
+      const partition = await gateway.registry.resolveExisting(summary.dataFileUID);
+      await partition?.journal.record("tls-connect-seen", `${host}:${port}`);
+    }
+  } catch (error2) {
+    log(`tls-connect journal write failed: ${error2 instanceof Error ? error2.message : String(error2)}`);
+  }
+}
+
+// src/cloud/write-path.ts
+import { randomUUID as randomUUID2 } from "node:crypto";
+var SUPERSEDE_VOLATILE_COLUMNS = /* @__PURE__ */ new Set(["LastModified", "ItemIndex"]);
+var IN_FLIGHT_TTL_MS = 10 * 6e4;
+var SESSION_HELD_OPEN_MS = 3e4;
+function presentedGetVersion(vendorMax, newerThan) {
+  return vendorMax > newerThan ? vendorMax : newerThan + 1n;
+}
+function nudgedFileTsVersion(vendorTs, lastStored) {
+  const floor = (lastStored ?? vendorTs) + 1n;
+  return vendorTs > floor ? vendorTs : floor;
+}
+function column(name) {
+  return TODO_ITEMS_HEADER.indexOf(name);
+}
+function describeWriteRows(rows) {
+  const task = rows.find((row) => row.section === "TodoItems");
+  if (task) {
+    let uid;
+    try {
+      uid = normalizeGuid(task.values[column("UID")] ?? "");
+    } catch {
+      return void 0;
+    }
+    const caption = task.values[column("Caption")] || void 0;
+    const completed = (task.values[column("CompletionDateTime")] ?? "") !== "";
+    const created = task.values[column("CreatedDate")] ?? "";
+    const modified = task.values[column("LastModified")] ?? "";
+    const verb = completed ? "complete" : created !== "" && created === modified ? "add" : "update";
+    return { uid, verb, ...caption ? { caption } : {} };
+  }
+  const tombstone = rows.find((row) => row.section === "TodoItems.Deleted");
+  if (tombstone) {
+    try {
+      return { uid: normalizeGuid(tombstone.values[0] ?? ""), verb: "delete" };
+    } catch {
+      return void 0;
+    }
+  }
+  return void 0;
+}
+function rowsMatch(injected, applied) {
+  const columns = /* @__PURE__ */ new Set([...injected.header, ...applied.header]);
+  for (const name of columns) {
+    if (SUPERSEDE_VOLATILE_COLUMNS.has(name)) continue;
+    const left = injected.cells[injected.header.indexOf(name)] ?? "";
+    const right = applied.cells[applied.header.indexOf(name)] ?? "";
+    if (left !== right) return false;
+  }
+  return true;
+}
+function refusal2(httpStatus, problem) {
+  return { kind: "refused", httpStatus, problem };
+}
+function isDeltaRow(value) {
+  const row = value;
+  return !!row && typeof row.section === "string" && Array.isArray(row.values) && row.values.every((cell2) => typeof cell2 === "string");
+}
+function isZipPayload2(bytes) {
+  return bytes.length >= 4 && bytes[0] === 80 && bytes[1] === 75 && bytes[2] === 3 && bytes[3] === 4;
+}
+function parseStamp(value) {
+  if (!value || !/^\d+$/.test(value)) return void 0;
+  return BigInt(value);
+}
+var WritePath = class {
+  constructor(gateway, options = {}) {
+    this.gateway = gateway;
+    this.autoInit = options.autoInit;
+    this.ttlMs = options.ttlMs ?? DEFAULT_WRITE_TTL_MS;
+    this.inFlightTtlMs = options.inFlightTtlMs ?? IN_FLIGHT_TTL_MS;
+    this.now = options.now ?? (() => /* @__PURE__ */ new Date());
+  }
+  gateway;
+  ttlMs;
+  inFlightTtlMs;
+  now;
+  /** writeId -> the session an injection pinned it to. In-memory: a resident restart safely re-delivers. */
+  inFlight = /* @__PURE__ */ new Map();
+  /** partition key -> MLO's stored remote cursor, as last observed (Get `newerThan`, Apply `newServerTimeStamp`). */
+  stored = /* @__PURE__ */ new Map();
+  autoInit;
+  /**
+   * The partition a forwarded exchange may inject into: the BINDING is the
+   * injection gate (spec section 5) — a UID nobody explicitly bound forwards
+   * verbatim forever, no matter what it queues elsewhere.
+   */
+  async boundPartition(rawUid) {
+    if (!rawUid) return void 0;
+    let binding;
+    try {
+      binding = await this.gateway.bindings.forUid(rawUid);
+    } catch {
+      return void 0;
+    }
+    if (!binding?.dataFileUID || binding.mode !== "upstream") return void 0;
+    return this.gateway.registry.open(binding.dataFileUID, binding.mode);
+  }
+  /**
+   * Lazy TTL sweep, run wherever the queue is consulted. An expired write
+   * leaves the queue for good: dead-letter file + `write-expired` outcome,
+   * never injected again.
+   */
+  async expireDue(partition) {
+    const now = this.now();
+    for (const write of await partition.queue.pending()) {
+      const expiresAt = Date.parse(write.expiresAt);
+      if (Number.isNaN(expiresAt) ? true : expiresAt > now.getTime()) continue;
+      const removed = await partition.queue.remove(write.writeId);
+      if (!removed) continue;
+      this.inFlight.delete(write.writeId);
+      const detail = `write-expired: MLO did not apply the row before ${write.expiresAt}`;
+      await partition.outcomes.record({
+        writeId: write.writeId,
+        uid: write.uid,
+        verb: write.verb,
+        ...write.caption ? { caption: write.caption } : {},
+        status: "expired",
+        at: now.toISOString(),
+        detail
+      });
+      await this.gateway.deadLetters.record({
+        at: now.toISOString(),
+        tool: `write:${write.verb}`,
+        reason: detail,
+        content: write.caption ?? write.uid
+      });
+      log(`write ${write.writeId} (${write.verb} ${write.uid}) expired into the dead-letter file`);
+    }
+  }
+  /** Queued writes not currently riding an unresolved session. */
+  async deliverable(partition) {
+    const nowMs = this.now().getTime();
+    const pending = await partition.queue.pending();
+    return pending.filter((write) => {
+      const pin = this.inFlight.get(write.writeId);
+      if (!pin) return true;
+      if (nowMs - pin.atMs >= this.inFlightTtlMs) {
+        this.inFlight.delete(write.writeId);
+        return true;
+      }
+      return false;
+    });
+  }
+  /**
+   * The session-held-open gauge (spec section 6): writes injected into a Get
+   * that no Apply has resolved for longer than `SESSION_HELD_OPEN_MS`. That is
+   * the endpoint's only cross-process view of a pending conflict dialog — MLO
+   * normally applies within a second, so a pin this old means delivery is
+   * stalled, most likely on a human.
+   *
+   * A young pin is not reported: a healthy exchange in flight is not a stall.
+   * Pins past the in-flight TTL are not either — that session is written off
+   * and the row is deliverable again. In-memory and process-local by nature (a
+   * pin is a fact about a live exchange), which is why an attached session can
+   * only learn it by asking: it rides `/v1/status`, not the state root. A pure
+   * query: the sweep that drops released pins belongs to `deliverable()`.
+   */
+  writesHeldOpen() {
+    const nowMs = this.now().getTime();
+    return [...this.inFlight].filter(([, pin]) => {
+      const age = nowMs - pin.atMs;
+      return age >= SESSION_HELD_OPEN_MS && age < this.inFlightTtlMs;
+    }).map(([writeId]) => writeId);
+  }
+  /** Durable accept: resolves `accepted` only after the queue write is fsync'd. */
+  async accept(profilePath, rows) {
+    if (typeof profilePath !== "string" || !profilePath.length) {
+      return refusal2(400, {
+        kind: "invalid-request",
+        title: "a write must name the profile whose bound partition carries it",
+        retryable: false
+      });
+    }
+    if (!Array.isArray(rows) || !rows.length || !rows.every(isDeltaRow)) {
+      return refusal2(400, {
+        kind: "invalid-request",
+        title: "a write carries a non-empty array of section-addressed rows",
+        retryable: false
+      });
+    }
+    const described = describeWriteRows(rows);
+    if (!described) {
+      return refusal2(400, {
+        kind: "invalid-request",
+        title: "the rows carry no TodoItems row and no tombstone with a GUID-shaped UID",
+        retryable: false
+      });
+    }
+    try {
+      documentFromDeltaRows(rows);
+    } catch (error2) {
+      return refusal2(400, {
+        kind: "invalid-request",
+        title: error2 instanceof Error ? error2.message : String(error2),
+        retryable: false
+      });
+    }
+    let bound = await this.gateway.boundPartition(profilePath);
+    if (bound.kind !== "bound") {
+      const initialized = await this.autoInit?.attempt();
+      if (initialized && initialized.kind === "refused") return refusal2(409, initialized.problem);
+      bound = await this.gateway.boundPartition(profilePath);
+    }
+    if (bound.kind !== "bound") {
+      return refusal2(409, {
+        kind: "partition-not-ready",
+        title: "this profile has no bound cloud partition \u2014 writes have nowhere to land",
+        retryable: "after-user-action",
+        remedy: 'sync MLO once through the proxy ("Use secure connection" unchecked) so the endpoint can bind it'
+      });
+    }
+    await this.expireDue(bound.partition);
+    const now = this.now();
+    const write = {
+      writeId: `w-${randomUUID2()}`,
+      uid: described.uid,
+      verb: described.verb,
+      ...described.caption ? { caption: described.caption } : {},
+      rows,
+      queuedAt: now.toISOString(),
+      expiresAt: new Date(now.getTime() + this.ttlMs).toISOString()
+    };
+    await bound.partition.queue.enqueue(write);
+    return {
+      kind: "accepted",
+      writeId: write.writeId,
+      uid: write.uid,
+      verb: write.verb,
+      ...write.caption ? { caption: write.caption } : {},
+      expiresAt: write.expiresAt
+    };
+  }
+  /** The five-state answer for one receipt, from the queue or the outcome ring. */
+  async status(writeId) {
+    for (const summary of await this.gateway.registry.list()) {
+      const partition = await this.gateway.registry.resolveExisting(summary.dataFileUID);
+      if (!partition) continue;
+      await this.expireDue(partition);
+      const queued = (await partition.queue.pending()).find((write) => write.writeId === writeId);
+      if (queued) {
+        return {
+          writeId,
+          uid: queued.uid,
+          verb: queued.verb,
+          ...queued.caption ? { caption: queued.caption } : {},
+          status: "accepted",
+          expiresAt: queued.expiresAt
+        };
+      }
+      const outcome = await partition.outcomes.byId(writeId);
+      if (outcome) {
+        return {
+          writeId,
+          uid: outcome.uid,
+          verb: outcome.verb,
+          ...outcome.caption ? { caption: outcome.caption } : {},
+          status: outcome.status,
+          at: outcome.at,
+          ...outcome.detail ? { detail: outcome.detail } : {}
+        };
+      }
+    }
+    return void 0;
+  }
+  /**
+   * Inject pending writes into a forwarded Get response for the bound UID.
+   * Returns the rebuilt response bytes, or undefined for "send the vendor's
+   * payload verbatim". Called from the forward path: the caller treats any
+   * throw as undefined.
+   */
+  async enrichGetResponse(requestFields, result) {
+    const partition = await this.boundPartition(soapFieldText(requestFields, "dataFileUID"));
+    if (!partition) return void 0;
+    const newerThan = parseStamp(soapFieldText(requestFields, "newerThan"));
+    if (newerThan !== void 0) this.stored.set(partition.key, newerThan);
+    if (result.status !== 200) return void 0;
+    await this.expireDue(partition);
+    const pending = await this.deliverable(partition);
+    if (!pending.length) return void 0;
+    const fields = peekSoapResponseFields(decodeForwardBody(result), "GetModificationsBytesEx");
+    if (soapFieldText(fields, "GetModificationsBytesExResult") !== "true") return void 0;
+    const vendorMax = parseStamp(soapFieldText(fields, "maxVersion"));
+    if (vendorMax === void 0) return void 0;
+    const encoded = soapFieldText(fields, "data")?.replace(/\s+/g, "");
+    let vendorDocument;
+    if (encoded) {
+      const bytes = Buffer.from(encoded, "base64");
+      if (!isZipPayload2(bytes)) return void 0;
+      vendorDocument = unpackEnvelope(bytes);
+    }
+    const session = soapFieldText(requestFields, "sessionID") ?? "";
+    const injectedDocument = mergeDeltas(pending.map((write) => documentFromDeltaRows(write.rows)));
+    const merged = vendorDocument ? mergeDeltas([vendorDocument, injectedDocument]) : injectedDocument;
+    const presented = presentedGetVersion(vendorMax, newerThan ?? 0n);
+    const payload = Buffer.from(packEnvelope(merged)).toString("base64");
+    const nowMs = this.now().getTime();
+    for (const write of pending) this.inFlight.set(write.writeId, { session, atMs: nowMs });
+    this.stored.set(partition.key, presented);
+    await partition.rows.ingest(injectedDocument, "injected").catch((error2) => log(`row-store ingest of injected rows failed (injection unaffected): ${error2 instanceof Error ? error2.message : String(error2)}`));
+    log(`injected ${pending.length} pending write(s) into a forwarded Get for ${partition.uid} (presented ${presented})`);
+    return buildGetModificationsResponse(presented.toString(), payload);
+  }
+  /**
+   * Watch MLO's own Apply carry injected rows back out. Delivered requires
+   * matching content; same UID with differing content is superseded. Called
+   * fire-and-forget after the response has been written.
+   */
+  async observeApply(requestFields, result) {
+    const partition = await this.boundPartition(soapFieldText(requestFields, "dataFileUID"));
+    if (!partition) return;
+    const session = soapFieldText(requestFields, "sessionID") ?? "";
+    let accepted2 = false;
+    if (result.status === 200) {
+      const fields = peekSoapResponseFields(decodeForwardBody(result), "ApplyModificationsBytesEx");
+      accepted2 = soapFieldText(fields, "ApplyModificationsBytesExResult") === "true";
+      const stamp = parseStamp(soapFieldText(fields, "newServerTimeStamp"));
+      if (accepted2 && stamp !== void 0) this.stored.set(partition.key, stamp);
+    }
+    if (!accepted2) return;
+    const encoded = soapFieldText(requestFields, "data")?.replace(/\s+/g, "");
+    if (!encoded) return;
+    const bytes = Buffer.from(encoded, "base64");
+    if (!isZipPayload2(bytes)) return;
+    const applied = harvestTaskRows(unpackEnvelope(bytes));
+    const appliedByUid = new Map(applied.rows.map((row) => [row.uid, row]));
+    const tombstoned = new Set(applied.tombstones);
+    const now = this.now().toISOString();
+    for (const write of await partition.queue.pending()) {
+      if (!this.inFlight.has(write.writeId)) continue;
+      let verdict;
+      let detail;
+      if (write.verb === "delete") {
+        if (tombstoned.has(write.uid)) verdict = "delivered";
+        else if (appliedByUid.has(write.uid)) {
+          verdict = "superseded";
+          detail = "MLO uploaded a live row for a UID this write tombstoned \u2014 the user's row won";
+        }
+      } else {
+        const appliedRow = appliedByUid.get(write.uid);
+        if (appliedRow) {
+          const injected = write.rows.find((row) => row.section === "TodoItems");
+          const match = injected !== void 0 && rowsMatch({ header: TODO_ITEMS_HEADER, cells: injected.values }, appliedRow);
+          verdict = match ? "delivered" : "superseded";
+          if (!match) detail = "MLO uploaded a different row for this UID \u2014 a conflict resolved local-wins supersedes the write";
+        } else if (tombstoned.has(write.uid)) {
+          verdict = "superseded";
+          detail = "MLO tombstoned the UID this write updated \u2014 the user's deletion won";
+        }
+      }
+      if (!verdict) continue;
+      const removed = await partition.queue.remove(write.writeId);
+      if (!removed) continue;
+      this.inFlight.delete(write.writeId);
+      await partition.outcomes.record({
+        writeId: write.writeId,
+        uid: write.uid,
+        verb: write.verb,
+        ...write.caption ? { caption: write.caption } : {},
+        status: verdict,
+        at: now,
+        ...detail ? { detail } : {}
+      });
+      log(`write ${write.writeId} (${write.verb} ${write.uid}) ${verdict} via session ${session || "?"}`);
+    }
+  }
+  /**
+   * A released session is over: writes it carried but did not resolve are
+   * unpinned, so the next Get re-delivers them (the safety net, spec
+   * mechanic 8).
+   */
+  observeRelease(requestFields) {
+    const session = soapFieldText(requestFields, "sessionID");
+    if (!session) return;
+    for (const [writeId, pin] of this.inFlight) {
+      if (pin.session === session) this.inFlight.delete(writeId);
+    }
+  }
+  /**
+   * The GetFileTS nudge: an advanced answer only while the queue is
+   * non-empty, undefined (forward verbatim) otherwise.
+   */
+  async nudgeFileTs(requestFields, result) {
+    const partition = await this.boundPartition(soapFieldText(requestFields, "dataFileUID"));
+    if (!partition || result.status !== 200) return void 0;
+    await this.expireDue(partition);
+    if (!(await partition.queue.pending()).length) return void 0;
+    const fields = peekSoapResponseFields(decodeForwardBody(result), GET_FILE_TS);
+    const vendorTs = parseStamp(soapFieldText(fields, `${GET_FILE_TS}Result`));
+    if (vendorTs === void 0) return void 0;
+    const advanced = nudgedFileTsVersion(vendorTs, this.stored.get(partition.key));
+    if (advanced <= vendorTs) return void 0;
+    log(`GetFileTS nudged for ${partition.uid}: ${vendorTs} -> ${advanced} (queue non-empty)`);
+    return buildGetFileTsResponse(advanced.toString());
+  }
+};
 
 // src/cloud/server.ts
 var BODY_LIMIT = 32 * 1024 * 1024;
@@ -25252,7 +30166,11 @@ function xml(response, status, body) {
 function isAbsoluteRequestTarget(target) {
   return /^https?:\/\//i.test(target);
 }
-async function interceptVendorSoap(request, response, gateway, observer) {
+function problemJson(response, status, problem) {
+  response.writeHead(status, { "content-type": `${PROBLEM_CONTENT_TYPE}; charset=utf-8` });
+  response.end(problemBody(problem));
+}
+async function interceptVendorSoap(request, response, gateway, observer, writePath, autoInit) {
   if (request.method !== "POST") return false;
   let target;
   try {
@@ -25277,10 +30195,67 @@ async function interceptVendorSoap(request, response, gateway, observer) {
   }
   try {
     const result = await forwardVendorSoap(gateway, target, request.headers, requestBytes, fields);
-    exchange.addResponseChunk(result.body);
-    exchange.finish(result.status, result.headers);
-    response.writeHead(result.status, result.headers);
-    response.end(result.body);
+    let body = result.body;
+    let headers = result.headers;
+    if (operation === "GetModificationsBytesEx") {
+      const enriched = await writePath.enrichGetResponse(fields, result).catch((error2) => {
+        log(`injection skipped (forward path unaffected): ${error2 instanceof Error ? error2.message : String(error2)}`);
+        return void 0;
+      });
+      if (enriched) {
+        body = Buffer.from(enriched);
+        headers = { "content-type": "text/xml; charset=utf-8", "content-length": String(body.byteLength) };
+      }
+    }
+    exchange.addResponseChunk(body);
+    exchange.finish(result.status, headers);
+    response.writeHead(result.status, headers);
+    response.end(body);
+    void captureVendorSession(gateway, operation, fields, result);
+    if (operation === "ApplyModificationsBytesEx") {
+      void writePath.observeApply(fields, result).catch((error2) => log(`apply observation failed (forward path unaffected): ${error2 instanceof Error ? error2.message : String(error2)}`));
+    }
+    if (operation === "ReleaseSyncSessionBytes") {
+      writePath.observeRelease(fields);
+      void autoInit?.serviceAfterSession(soapFieldText(fields, "dataFileUID"));
+    }
+  } catch (error2) {
+    const message = `vendor forward failed: ${error2 instanceof Error ? error2.message : String(error2)}`;
+    exchange.finish(502, {});
+    xml(response, 502, soapFault(message));
+  }
+  return true;
+}
+async function interceptGetFileTs(request, response, observer, writePath) {
+  if (request.method !== "POST") return false;
+  let target;
+  try {
+    target = new URL(request.url ?? "");
+  } catch {
+    return false;
+  }
+  if (!observer.matches(target.hostname) || !/\/MLOInetSync\.asmx$/i.test(target.pathname)) return false;
+  if (!isGetFileTsAction(request.headers.soapaction)) return false;
+  const requestBytes = await readBytes(request);
+  const exchange = observer.begin(request.method, target, request.headers);
+  exchange.addRequestChunk(requestBytes);
+  const fields = peekSoapFields(requestBytes.toString("utf8"), GET_FILE_TS);
+  try {
+    const result = await forwardBuffered(target, "POST", request.headers, requestBytes);
+    let body = result.body;
+    let headers = result.headers;
+    const nudged = await writePath.nudgeFileTs(fields, result).catch((error2) => {
+      log(`GetFileTS nudge skipped (forward path unaffected): ${error2 instanceof Error ? error2.message : String(error2)}`);
+      return void 0;
+    });
+    if (nudged) {
+      body = Buffer.from(nudged);
+      headers = { "content-type": "text/xml; charset=utf-8", "content-length": String(body.byteLength) };
+    }
+    exchange.addResponseChunk(body);
+    exchange.finish(result.status, headers);
+    response.writeHead(result.status, headers);
+    response.end(body);
   } catch (error2) {
     const message = `vendor forward failed: ${error2 instanceof Error ? error2.message : String(error2)}`;
     exchange.finish(502, {});
@@ -25320,7 +30295,7 @@ function forwardRequest(request, response, observer) {
   if (exchange) request.on("data", (chunk) => exchange.addRequestChunk(chunk));
   request.pipe(upstream);
 }
-function tunnelConnect(request, client, head, observer) {
+function tunnelConnect(request, client, head, observer, gateway) {
   const separator = (request.url ?? "").lastIndexOf(":");
   const host = separator > 0 ? request.url.slice(0, separator) : "";
   const port = Number(separator > 0 ? request.url.slice(separator + 1) : "");
@@ -25331,6 +30306,7 @@ function tunnelConnect(request, client, head, observer) {
   if (observer.matches(host)) {
     observer.recordConnect(host, port);
     log(`HTTPS CONNECT to the vendor sync host: sync is TLS-tunneled and invisible to the endpoint \u2014 uncheck "Use secure connection" in MLO's cloud login`);
+    void captureTlsConnectSeen(gateway, host, port);
   }
   const upstream = net2.connect(port, host);
   upstream.once("connect", () => {
@@ -25350,15 +30326,67 @@ async function startCloudServer(options) {
   if (!options.gateway && !options.stateRoot) throw new Error("cloud server needs a gateway or a stateRoot");
   const gateway = options.gateway ?? new CloudGateway({ stateRoot: options.stateRoot });
   const observer = new SyncObserver(gateway.observerDir(), options.observeHost);
+  const autoInit = options.autoInit ?? (options.mloExePath ? new AutoInitializer(gateway, systemAutoInitPorts(gateway, options.mloExePath)) : void 0);
+  const writePath = new WritePath(gateway, {
+    ...options.writeTtlMs !== void 0 ? { ttlMs: options.writeTtlMs } : {},
+    ...options.now ? { now: options.now } : {},
+    ...autoInit ? { autoInit } : {}
+  });
   let stopped;
   const server = http2.createServer(async (request, response) => {
     try {
       if (isAbsoluteRequestTarget(request.url ?? "")) {
-        if (await interceptVendorSoap(request, response, gateway, observer)) return;
+        if (await interceptVendorSoap(request, response, gateway, observer, writePath, autoInit)) return;
+        if (await interceptGetFileTs(request, response, observer, writePath)) return;
         forwardRequest(request, response, observer);
         return;
       }
       const url = new URL(request.url ?? "/", "http://localhost");
+      if (request.method === "POST" && url.pathname === "/v1/write") {
+        let parsed;
+        try {
+          const value = JSON.parse((await readBytes(request)).toString("utf8"));
+          if (value && typeof value === "object" && !Array.isArray(value)) parsed = value;
+        } catch {
+        }
+        if (!parsed) {
+          problemJson(response, 400, {
+            kind: "invalid-request",
+            title: "the write body must be a JSON object",
+            retryable: false
+          });
+          return;
+        }
+        const outcome = await writePath.accept(parsed.profile, parsed.rows);
+        if (outcome.kind === "refused") {
+          problemJson(response, outcome.httpStatus, outcome.problem);
+          return;
+        }
+        json(response, 200, {
+          writeId: outcome.writeId,
+          uid: outcome.uid,
+          verb: outcome.verb,
+          ...outcome.caption ? { caption: outcome.caption } : {},
+          status: "accepted",
+          expiresAt: outcome.expiresAt
+        });
+        return;
+      }
+      const writeStatusMatch = url.pathname.match(/^\/v1\/write\/([^/]+)$/);
+      if (request.method === "GET" && writeStatusMatch) {
+        const writeId = decodeURIComponent(writeStatusMatch[1]);
+        const lookup = await writePath.status(writeId);
+        if (!lookup) {
+          problemJson(response, 404, {
+            kind: "unknown-write",
+            title: `no write with id "${writeId}" \u2014 receipts age out of the outcome ring eventually`,
+            retryable: false
+          });
+          return;
+        }
+        json(response, 200, lookup);
+        return;
+      }
       if (request.method === "GET" && url.pathname === "/v1/status") {
         json(response, 200, {
           stateRoot: gateway.stateRoot,
@@ -25367,7 +30395,12 @@ async function startCloudServer(options) {
           // can replace a stale resident) and which cloud files this process
           // has seen sync traffic for.
           version: SERVER_INFO.version,
-          contactUids: gateway.vendorContactUids()
+          contactUids: gateway.vendorContactUids(),
+          // The one write-path fact that lives nowhere but this process: which
+          // injected writes an MLO sync session has held unresolved long enough
+          // to read as stalled. Everything else about a write is in the state
+          // root, which sessions read for themselves.
+          writesHeldOpen: writePath.writesHeldOpen()
         });
         return;
       }
@@ -25385,7 +30418,7 @@ async function startCloudServer(options) {
       json(response, status, { error: error2 instanceof Error ? error2.message : String(error2) });
     }
   });
-  server.on("connect", (request, socket, head) => tunnelConnect(request, socket, head, observer));
+  server.on("connect", (request, socket, head) => tunnelConnect(request, socket, head, observer, gateway));
   function stopSelf() {
     stopped ??= (async () => {
       await new Promise((resolve, reject) => {
@@ -25406,21 +30439,24 @@ async function startCloudServer(options) {
   const address = server.address();
   const port = typeof address === "object" && address ? address.port : options.port ?? DEFAULT_CLOUD_PORT;
   log(`cloud server listening on http://${host}:${port}`);
-  return { server, gateway, host, port, stop: stopSelf };
+  return { server, gateway, writePath, host, port, stop: stopSelf };
 }
 
 // src/index.ts
 async function main() {
   if (process.argv.includes(RESIDENT_FLAG)) return serveResidentEndpoint();
   const config2 = loadConfig();
-  const store = new MloStore(config2);
+  const spawn3 = residentSpawner(fileURLToPath2(import.meta.url));
+  const resident = new HttpResidentClient({ host: config2.cloudHost, port: config2.cloudPort, spawn: spawn3 });
   const cloud = new CloudGateway({ stateRoot: config2.cloudStateRoot });
+  const { rows, queue } = await cloud.boundStores(config2.dataFile);
+  const repo = new LocalMloRepository(config2, new SystemMloCli(config2), resident, queue);
   const endpoint = await ensureEndpoint({
     host: config2.cloudHost,
     port: config2.cloudPort,
-    spawn: residentSpawner(fileURLToPath2(import.meta.url))
+    spawn: spawn3
   });
-  const ctx = { config: config2, store, cloud, endpoint };
+  const ctx = createToolContext(config2, repo, cloud, endpoint, rows);
   const server = createMcpServer(ctx);
   await server.connect(new StdioServerTransport());
   log(`ready \u2014 data file: ${config2.dataFile}`);
@@ -25430,7 +30466,15 @@ async function main() {
 async function serveResidentEndpoint() {
   const config2 = loadCloudConfig();
   const gateway = new CloudGateway({ stateRoot: config2.cloudStateRoot });
-  const handle = await startCloudServer({ host: config2.cloudHost, port: config2.cloudPort, gateway });
+  const handle = await startCloudServer({
+    host: config2.cloudHost,
+    port: config2.cloudPort,
+    gateway,
+    writeTtlMs: config2.writeTtlMs,
+    // What lets the resident bind a cloud file by itself: it asks the running
+    // app which profile is open, and pulls with the contact it captured.
+    mloExePath: config2.mloExePath
+  });
   log(`resident cloud endpoint serving on http://${handle.host}:${handle.port} (state root: ${config2.cloudStateRoot})`);
   const stop = () => void handle.stop().finally(() => process.exit(0));
   process.once("SIGINT", stop);
@@ -25441,7 +30485,7 @@ function watchOwnBuild() {
   let startMtime;
   const timer = setInterval(async () => {
     try {
-      const mtime = (await fs9.stat(entry)).mtimeMs;
+      const mtime = (await fs16.stat(entry)).mtimeMs;
       startMtime ??= mtime;
       if (mtime !== startMtime && !isMloBusy()) {
         log("server build changed on disk \u2014 exiting so the client restarts the new version");

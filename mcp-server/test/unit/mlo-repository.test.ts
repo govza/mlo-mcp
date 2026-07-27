@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { LocalMloRepository } from "../../src/repo/local-mlo-repository.js";
 import type { MloCli } from "../../src/repo/mlo-cli.js";
 import type { MloConfig } from "../../src/types.js";
+import { TODO_ITEMS_HEADER } from "../../src/cloud/delta.js";
 import { FakeMloRepository } from "../fakes/fake-mlo-repository.js";
 import { describeMloRepositoryContract } from "../contract/mlo-repository-contract.js";
 import { expectOk } from "../expect-result.js";
@@ -17,7 +18,7 @@ describe("FakeMloRepository hand-driven transitions", () => {
     const { writeId } = expectOk(await repo.write([{ section: "TodoItems", values: [] }]));
     for (const state of ["delivered", "verified", "expired", "superseded"] as const) {
       repo.transition(writeId, state);
-      expect(expectOk(await repo.status(writeId))).toBe(state);
+      expect(expectOk(await repo.status(writeId)).status).toBe(state);
     }
   });
 });
@@ -106,6 +107,50 @@ describe("LocalMloRepository snapshot coalescing", () => {
     await repo.quickSync();
     expect(cli.quickSyncs).toBe(1);
     expect(expectOk(await repo.snapshot()).tasks[0]?.Caption).toBe("after");
+  });
+});
+
+describe("LocalMloRepository pending-write overlay", () => {
+  const queued = (writeId: string, uid: string, caption: string) => ({
+    writeId,
+    rows: [
+      {
+        section: "TodoItems",
+        values: TODO_ITEMS_HEADER.map((column) => (column === "UID" ? uid : column === "Caption" ? caption : "")),
+      },
+    ],
+  });
+
+  it("composes the queue onto the export, flagged pending", async () => {
+    const cli = new ScriptedMloCli();
+    cli.queueExport(Promise.resolve(xmlWithTask("exported")));
+    const queue = { pending: async () => [queued("w1", "{11111111-0000-0000-0000-000000000001}", "phantom")] };
+    const repo = new LocalMloRepository(config, cli, undefined, queue);
+    const tasks = expectOk(await repo.snapshot()).tasks;
+    expect(tasks.map((t) => t.Caption)).toEqual(["exported", "phantom"]);
+    expect(tasks[1]!.pending).toBe(true);
+    expect(tasks[1]!.writeId).toBe("w1");
+  });
+
+  it("re-derives the overlay per read, so a drained queue needs no invalidation", async () => {
+    const cli = new ScriptedMloCli();
+    cli.queueExport(Promise.resolve(xmlWithTask("exported")));
+    let pending = [queued("w1", "{11111111-0000-0000-0000-000000000001}", "phantom")];
+    const repo = new LocalMloRepository(config, cli, undefined, { pending: async () => pending });
+    expect(expectOk(await repo.snapshot()).tasks).toHaveLength(2);
+    pending = [];
+    // Same cached export (one exportCall), overlay gone: the entry drops silently.
+    expect(expectOk(await repo.snapshot()).tasks.map((t) => t.Caption)).toEqual(["exported"]);
+    expect(cli.exportCalls).toBe(1);
+  });
+
+  it("serves export truth when the queue cannot be read — a read is not that fault's surface", async () => {
+    const cli = new ScriptedMloCli();
+    cli.queueExport(Promise.resolve(xmlWithTask("exported")));
+    const repo = new LocalMloRepository(config, cli, undefined, {
+      pending: () => Promise.reject(new Error("state root gone")),
+    });
+    expect(expectOk(await repo.snapshot()).tasks.map((t) => t.Caption)).toEqual(["exported"]);
   });
 });
 

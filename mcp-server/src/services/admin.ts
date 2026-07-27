@@ -1,7 +1,8 @@
 import type { MloConfig } from "../types.js";
 import type { BindingMismatch, CloudGateway } from "../cloud/gateway.js";
 import type { UnboundSighting } from "../cloud/sightings.js";
-import type { ResidentEndpoint } from "../cloud/endpoint.js";
+import type { EndpointStatus, ResidentEndpoint } from "../cloud/endpoint.js";
+import type { PartitionStore } from "../cloud/partition.js";
 import type { MloRepository } from "../repo/mlo-repository.js";
 import { backupDataFile } from "../cloud/profile-backup.js";
 import { failureFor, type AdminFailureKind } from "../error-contract.js";
@@ -13,6 +14,46 @@ export type AdminFailure = Failure & { kind: AdminFailureKind };
 function adminFailure(kind: AdminFailureKind, detail: string, remedy?: string): AdminFailure {
   return failureFor(kind, detail, remedy);
 }
+
+/**
+ * A write that left the queue without landing. Named after where its rows went
+ * (the dead-letter file) rather than after its status, because the two states
+ * that get here — expired and superseded — differ in cause but not in what the
+ * caller lost.
+ */
+export interface DeadLetter {
+  writeId: string;
+  uid: string;
+  caption?: string;
+  status: "expired" | "superseded";
+  at: string;
+  /** The write path's own words for why the rows never landed. */
+  reason?: string;
+}
+
+/**
+ * The write-path aggregate (spec section 2): the only surface for outcomes
+ * nobody is waiting on. A `writeId` receipt dies with the ephemeral MCP session
+ * that took it, so a write that expired after the caller went away has no other
+ * way to be seen.
+ */
+export interface WriteAggregate {
+  pendingWrites: number;
+  /** Age of the oldest queued write, in milliseconds — a queue that is not draining shows up here first. */
+  oldestPendingAgeMs?: number;
+  /** Most recent first, newest N only: an old dead letter is one nobody is coming back for. */
+  recentDeadLetters: DeadLetter[];
+  /**
+   * Delivery is stalled: MLO took writes into a sync session and has not
+   * resolved it, which in practice means a conflict dialog is waiting on the
+   * user (spec section 6). Absent when the endpoint is unreachable or too old
+   * to report it — unknown, not "no".
+   */
+  sessionHeldOpen?: boolean;
+}
+
+/** How many dead letters `cloud_status` carries. */
+const DEAD_LETTER_TAIL = 5;
 
 export interface CloudPlaneStatus {
   host: string;
@@ -26,6 +67,8 @@ export interface CloudPlaneStatus {
   /** A repull the resident has not serviced yet — outstanding, not failed. */
   repullRequestedAt?: string;
   unboundSightings: UnboundSighting[];
+  /** Empty-but-present while unbound: there is no queue, so there is nothing pending. */
+  writes: WriteAggregate;
   stateRoot: string;
   partitions: { key: string; mode: string; lifecycle: string }[];
 }
@@ -198,12 +241,14 @@ export class AdminService {
     let lifecycle: string | undefined = "uninitialized";
     let dataFileUID: string | undefined;
     let repullRequestedAt: string | undefined;
+    let writes: WriteAggregate = { pendingWrites: 0, recentDeadLetters: [] };
     const bound = await this.gateway.boundPartition(this.config.dataFile);
     if (bound.kind === "bound") {
       mode = bound.binding.mode;
       lifecycle = bound.lifecycle;
       dataFileUID = bound.binding.dataFileUID;
       repullRequestedAt = await bound.partition.repullRequestedAt();
+      writes = await this.writeAggregate(bound.partition, endpointStatus);
     }
     const partitions = (await this.gateway.registry.list()).map((partition) => ({
       key: partition.key,
@@ -227,8 +272,35 @@ export class AdminService {
       mismatch,
       ...(repullRequestedAt ? { repullRequestedAt } : {}),
       unboundSightings,
+      writes,
       stateRoot: this.gateway.stateRoot,
       partitions,
+    };
+  }
+
+  /**
+   * The write aggregate. The partition's own handle derives what is outstanding
+   * and what it lost; this adds the one fact that lives in neither the queue nor
+   * the outcome ring — whether MLO is holding a session open over the writes
+   * right now, which only the resident can see.
+   */
+  private async writeAggregate(
+    partition: PartitionStore,
+    endpointStatus: EndpointStatus | undefined,
+  ): Promise<WriteAggregate> {
+    const gauge = await partition.writeGauge(DEAD_LETTER_TAIL);
+    return {
+      pendingWrites: gauge.pendingWrites,
+      ...(gauge.oldestPendingAgeMs !== undefined ? { oldestPendingAgeMs: gauge.oldestPendingAgeMs } : {}),
+      recentDeadLetters: gauge.deadLetters.map((dead) => ({
+        writeId: dead.writeId,
+        uid: dead.uid,
+        ...(dead.caption ? { caption: dead.caption } : {}),
+        status: dead.status,
+        at: dead.at,
+        ...(dead.detail ? { reason: dead.detail } : {}),
+      })),
+      ...(endpointStatus?.writesHeldOpen ? { sessionHeldOpen: endpointStatus.writesHeldOpen.length > 0 } : {}),
     };
   }
 }

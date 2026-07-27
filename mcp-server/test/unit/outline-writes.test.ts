@@ -347,7 +347,13 @@ describe("OutlineService rewrites", () => {
     value(await h.outline.move("1.1", "2"));
     expect(taskRow(h.written()).ParentUID).toBe(normalizeGuid(UID_OTHER));
 
-    const refused = failure(await h.outline.move("1", "1.1"));
+    // A fresh harness for the refusal: the move above is already in h's next
+    // read (read-your-own-writes), so its ids have shifted — which is exactly
+    // why path ids are only good for the call after the read that produced them.
+    const fresh = harness([task("1", "parent", { Guid: UID_ROOT, Children: [task("1.1", "child", { Guid: UID_CHILD, Depth: 1 })] })]);
+    fresh.rows.setRow(UID_ROOT, [...TODO_ITEMS_HEADER], fullRow(UID_ROOT));
+    fresh.rows.setRow(UID_CHILD, [...TODO_ITEMS_HEADER], fullRow(UID_CHILD));
+    const refused = failure(await fresh.outline.move("1", "1.1"));
     expect(refused.kind).toBe("invalid-request");
     expect(refused.detail).toContain("own subtree");
   });

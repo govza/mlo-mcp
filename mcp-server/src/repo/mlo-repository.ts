@@ -5,9 +5,10 @@ import { failureFor, REPO_FAILURE_KINDS, type RepoFailureKind } from "../error-c
 import type { Failure, ServiceResult } from "../result.js";
 
 /**
- * A fresh export parsed into the task tree. The pending-write overlay
- * (read-your-own-writes, spec section 2) composes into this once the resident
- * write path lands.
+ * A fresh export parsed into the task tree, with the pending-write overlay
+ * (read-your-own-writes, spec section 2) already composed in: overlaid tasks
+ * carry `pending: true` and their `writeId`. Derived per read from the
+ * injection queue, so it self-empties as the queue drains.
  */
 export interface Snapshot {
   doc: MloDocument;
@@ -39,6 +40,23 @@ export interface PendingWrite {
 
 /** Five-state write outcome keyed by writeId (spec section 2). */
 export type WriteStatus = "accepted" | "delivered" | "verified" | "expired" | "superseded";
+
+/**
+ * Everything known about one accept receipt. Carries the producer's own words
+ * (`detail`) rather than a status alone: what makes an `expired` actionable is
+ * which task it was and when it gave up, and only the write path knows that.
+ */
+export interface WriteState {
+  writeId: WriteId;
+  status: WriteStatus;
+  /** The task the write addressed. */
+  uid?: string;
+  /** Present while the write is still queued. */
+  expiresAt?: string;
+  /** When the write resolved, for every state past `accepted`. */
+  at?: string;
+  detail?: string;
+}
 
 /**
  * The repository's closed failure union (spec section 6): infra kinds only.
@@ -102,13 +120,13 @@ export function repoFailureFromProblem(problem: RehydratedProblem): RepoFailure 
  */
 export interface MloRepository {
   /**
-   * Fresh export + (eventually) the pending-write overlay. `fresh` bypasses
-   * the snapshot cache and never coalesces onto an in-flight refresh.
+   * Fresh export plus the pending-write overlay. `fresh` bypasses the snapshot
+   * cache and never coalesces onto an in-flight refresh.
    */
   snapshot(fresh?: boolean): Promise<ServiceResult<Snapshot, SnapshotFailure>>;
   /** Durably accept authored rows; resolves only once the rows are safe. */
   write(rows: DeltaRow[]): Promise<RepoResult<PendingWrite>>;
-  status(id: WriteId): Promise<RepoResult<WriteStatus>>;
+  status(id: WriteId): Promise<RepoResult<WriteState>>;
   /**
    * Best-effort sync accelerator, never load-bearing (spec section 2.5). On
    * the interface only because the `sync` tool surfaces it; it may fold away

@@ -184,9 +184,14 @@ describe("LocalMloRepository write path", () => {
     const pending = expectOk(await repo.write(sampleAddRows()));
     expect(pending.writeId).toBeTruthy();
     expect(resident.accepted[0]?.profile).toBe(PROFILE);
-    expect(expectOk(await repo.status(pending.writeId))).toBe("accepted");
+    // The whole state crosses the seam, not just the enum: an actionable
+    // receipt needs the uid it addressed and when it gives up.
+    const accepted = expectOk(await repo.status(pending.writeId));
+    expect(accepted.status).toBe("accepted");
+    expect(accepted.uid).toBeTruthy();
+    expect(accepted.expiresAt).toBeTruthy();
     resident.transition(pending.writeId, "delivered");
-    expect(expectOk(await repo.status(pending.writeId))).toBe("delivered");
+    expect(expectOk(await repo.status(pending.writeId)).status).toBe("delivered");
   });
 
   it("an unknown kind keeps its wire type and typed fields across the repository seam", async () => {

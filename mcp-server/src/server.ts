@@ -9,9 +9,17 @@ const INSTRUCTIONS = `
 
 MLO is an OUTLINER: tasks live in one deep tree, and deep nesting is idiomatic.
 
-### Reads only, for now
-This build serves reads while the write path is re-architected (local-landing writes,
-ADR-0005). There are no write tools; suggest making changes in the MLO app directly.
+### Writes land on MLO's own next sync
+A write tool returns as soon as the change is DURABLY QUEUED - not when MLO has applied it.
+The response carries a \`writeId\` and an \`expiresAt\`; nothing waits, and there is no
+"verified" flag to read. MLO picks the write up on its own sync (about 90 seconds, or
+immediately if you run sync), and reads show the change straight away, flagged
+\`pending: true\` with the writeId that made it.
+
+Do not poll: report the change as made. If you want the outcome anyway, write_status(writeId)
+gives the five states - accepted, delivered, verified, expired (MLO never synced; nothing was
+applied), superseded (MLO kept its own conflicting version). cloud_status carries the queue
+depth and the recent writes that never landed.
 
 ### Ids
 Task ids are PATH-BASED ("1.2.3" = position in the tree) and shift whenever the tree changes.

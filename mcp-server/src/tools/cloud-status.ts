@@ -39,6 +39,34 @@ export const cloudStatusTool = defineTool({
       }))
       .optional()
       .describe("dataFileUIDs seen syncing through the endpoint with no binding — what MLO actually presents"),
+    writes: z
+      .object({
+        pendingWrites: z.number().describe("Accepted writes still waiting for MLO to sync"),
+        oldestPendingAgeMs: z.number().optional().describe("Age of the oldest one — a queue that is not draining shows here first"),
+        recentDeadLetters: z
+          .array(
+            z.object({
+              writeId: z.string(),
+              uid: z.string(),
+              caption: z.string().optional(),
+              status: z.enum(["expired", "superseded"]),
+              at: z.string(),
+              reason: z.string().optional(),
+            }),
+          )
+          .describe("Newest first: writes that left the queue without landing, including ones nobody was waiting on"),
+        sessionHeldOpen: z
+          .boolean()
+          .optional()
+          .describe(
+            "Delivery is stalled: MLO holds a sync session open over these writes, most likely a conflict dialog " +
+              "waiting on the user. Absent means the endpoint could not say",
+          ),
+      })
+      .describe(
+        "The write path's aggregate. A writeId receipt dies with the session that took it, so this is the only " +
+          "place an outcome nobody waited for can be seen",
+      ),
     stateRoot: z.string(),
     partitions: z.array(z.object({ key: z.string(), mode: z.string(), lifecycle: z.string() })),
   },
@@ -56,6 +84,7 @@ export const cloudStatusTool = defineTool({
       endpoint: status.endpoint,
       bindingMismatch: status.mismatch !== undefined,
       ...(status.unboundSightings.length ? { unboundSightings: status.unboundSightings } : {}),
+      writes: status.writes,
       stateRoot: status.stateRoot,
       partitions: status.partitions,
     };
@@ -71,8 +100,22 @@ export const cloudStatusTool = defineTool({
     const endpointNote = status.endpoint.reachable
       ? `; endpoint reachable${status.endpoint.version ? ` (${status.endpoint.version})` : ""}`
       : `; ENDPOINT UNREACHABLE — MLO cannot sync through it. ${ENDPOINT_RECOVERY}`;
+    // Said out loud rather than left in the structure: a dead letter is a
+    // change the user asked for that never happened, and nothing else will
+    // ever mention it again.
+    const { pendingWrites, oldestPendingAgeMs, recentDeadLetters, sessionHeldOpen } = status.writes;
+    const pendingNote = pendingWrites
+      ? `; ${pendingWrites} write(s) queued for MLO's next sync` +
+        `${oldestPendingAgeMs !== undefined ? ` (oldest ${Math.round(oldestPendingAgeMs / 60_000)}m)` : ""}` +
+        `${sessionHeldOpen ? "; DELIVERY STALLED — MLO is holding a sync session open over them, likely awaiting user input (check for a conflict dialog in MLO)" : ""}`
+      : "";
+    const deadLetterNote = recentDeadLetters.length
+      ? `; ${recentDeadLetters.length} write(s) NEVER LANDED: ` +
+        recentDeadLetters.map((dead) => `${dead.caption ?? dead.uid} (${dead.status}, ${dead.at})`).join(", ")
+      : "";
     return textResult(
-      `Cloud endpoint ${result.host}:${result.port}${endpointNote}; ${bindingNote}${bindingMismatchNote}.`,
+      `Cloud endpoint ${result.host}:${result.port}${endpointNote}; ${bindingNote}${bindingMismatchNote}` +
+        `${pendingNote}${deadLetterNote}.`,
       result,
     );
   },

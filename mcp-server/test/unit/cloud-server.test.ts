@@ -167,6 +167,9 @@ describe("cloud HTTP server", () => {
     expect(await status.json()).toMatchObject({
       stateRoot: dir, partitions: [],
       version: SERVER_INFO.version, contactUids: [],
+      // The one write-path fact that lives only in this process, so an attached
+      // session can derive cloud_status's sessionHeldOpen gauge.
+      writesHeldOpen: [],
     });
 
     const gone = await fetch(`http://${handle.host}:${handle.port}/v1/pull`, {

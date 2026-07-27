@@ -19,6 +19,11 @@ export const TaskSummaryShape = {
   Flag: z.string().optional(),
   Places: z.array(z.string()).describe("Contexts, e.g. @Office"),
   parentPath: z.string().describe("Captions of ancestors joined with ' > '"),
+  pending: z
+    .literal(true)
+    .optional()
+    .describe("This task reflects an accepted write MLO has not applied yet (read-your-own-writes)"),
+  writeId: z.string().optional().describe("The accept receipt behind `pending` — pass it to write_status"),
 };
 
 export const TaskSummarySchema = z.object(TaskSummaryShape);
@@ -38,5 +43,7 @@ export function toSummary(t: TaskNode): TaskSummary {
     Flag: t.Flag,
     Places: t.Places,
     parentPath: t.Path.slice(0, -1).join(" > "),
+    ...(t.pending ? { pending: t.pending } : {}),
+    ...(t.writeId ? { writeId: t.writeId } : {}),
   };
 }

@@ -7,6 +7,7 @@ import { SightingStore, type UnboundSighting } from "./sightings.js";
 import { DeadLetterStore } from "./dead-letter.js";
 import { normalizeDataFileUid, PartitionRegistry, type PartitionStore, type PartitionLifecycle } from "./partition.js";
 import type { RowStore } from "./row-store.js";
+import type { InjectionQueue } from "./injection-queue.js";
 import type { VendorContact } from "./upstream.js";
 import { log } from "../log.js";
 
@@ -208,14 +209,18 @@ export class CloudGateway {
   }
 
   /**
-   * The bound partition's row store view for a session's identity service, or
-   * undefined when the profile is unbound (or the root unreadable) — under
-   * which every resolution honestly reads as unconfirmed. Resolved once at
-   * composition time; a binding that appears later reaches new sessions.
+   * The two bound-partition stores a session composes itself around: the row
+   * store identity and authoring read, and the injection queue the read path
+   * overlays. Both undefined when the profile is unbound (or the root
+   * unreadable) — every resolution then honestly reads as unconfirmed, every
+   * write refuses, and there is no queue to overlay because nothing could have
+   * been accepted. Resolved once at composition time; a binding that appears
+   * later reaches new sessions.
    */
-  async boundRowStore(profilePath: string): Promise<RowStore | undefined> {
+  async boundStores(profilePath: string): Promise<{ rows?: RowStore; queue?: InjectionQueue }> {
     const bound = await this.boundPartition(profilePath).catch(() => undefined);
-    return bound?.kind === "bound" ? bound.partition.rows : undefined;
+    if (bound?.kind !== "bound") return {};
+    return { rows: bound.partition.rows, queue: bound.partition.queue };
   }
 
   /**

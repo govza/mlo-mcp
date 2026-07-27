@@ -22,26 +22,40 @@ shapes. If they ever disagree on a shape, the catalog is right.
   identity, resolved by STRUCTURAL alignment of the fresh export outline
   against the bootstrapped cloud tree (`UID`/`ParentUID`/`ItemIndex`) — so
   duplicate sibling captions resolve by position; the binary `.ml` recovery
-  and the caption-path walk are cross-checks only. `add_task` takes a parent
-  **GUID** (`parentUid`, from `get_task`), not a path id.
+  and the caption-path walk are cross-checks only. Every tool input takes a
+  **Path id**; GUIDs appear in output only (a write's receipt names the `uid`
+  it addressed, and `get_task` reports one when it is recoverable).
 - **Writes never touch the data file.** Every write travels as a complete
-  sync delta ([mcp-cloud.md](mcp-cloud.md)): normally committed to the real
-  vendor Cloud in the endpoint's own sync session and delivered to MLO by the
-  triggered QuickSync; MLO's **own** merge logic applies it, and the app
-  keeps running.
-- **Verification is advisory.** Write results carry `verified: true` only when
-  a fresh post-QuickSync export confirms the change. `verified: false` does
-  not mean failure — the delta is durably queued and MLO applies it on the
-  next sync session.
-- **Batches are atomic.** Batch tools (`ids`/`updates` arrays) send the whole
-  batch as ONE delta; one bad entry and nothing is queued.
-- **A one-time bootstrap enables writes.** MLO merges a changed task as a
-  full 82-column record, and the XML export cannot supply one, so the edit
-  tools source rows from the bootstrapped baseline (`cloud_bootstrap` pulls
-  the vendor cloud's complete history) plus later deltas. Every pre-existing
-  task is editable after bootstrap; before it, mutation tools fail atomically
-  with a pointer to the bootstrap procedure. Back up the `.ml` profile before
-  the first bootstrap.
+  sync delta ([mcp-cloud.md](mcp-cloud.md)) that MLO's **own** merge logic
+  applies, with the app still running.
+- **Writes return at durable accept, and nothing waits.** A write tool answers
+  `{ uid, writeId, status: "accepted", expiresAt, message }` as soon as the rows
+  are fsync'd into the resident's injection queue. There is no `verified`
+  boolean and no post-write export diff: MLO applies the rows on its own next
+  sync (about 90 s, or immediately on `sync`), and an accepted write that has
+  not landed within its TTL (default 15 minutes) expires into the dead-letter
+  file rather than being retried forever.
+- **`write_status(writeId)` is where the outcome lives.** Five states:
+  `accepted | delivered | verified | expired | superseded`. `expired` means
+  nothing was applied; `superseded` means MLO applied its own conflicting
+  version of the same task, so this write's content is gone. Both carry a
+  remedy. Receipts age out of the resident's outcome ring.
+- **Reads show your own writes.** `list_tasks`/`search_tasks`/`get_task`
+  compose the pending queue onto the fresh export at read time: an add appears
+  as a phantom task, an update merged, a completion completed, a delete hidden.
+  A pending `move_task` shows the task under its new parent (last among its new
+  siblings — slot order is not recoverable against an export tree). Overlaid
+  tasks carry `pending: true` and the `writeId`. When a write leaves the queue,
+  or its TTL passes, the entry simply disappears — expiry and supersede are
+  announced by `write_status` and `cloud_status`, never by a read.
+- **Batches are atomic.** `add_tasks` sends the whole batch as ONE delta; one
+  bad entry and nothing is queued.
+- **Writes need a bound partition.** MLO merges a changed task as a full
+  82-column record, which the XML export cannot supply, so update/complete
+  author from the rows the endpoint captured for the bound `dataFileUID`. Until
+  one proxied MLO sync has bound the profile every write refuses
+  `partition-not-ready`; a task whose row the store has never seen refuses
+  `unknown-row`, whose remedy is a repull.
 - **A binding mismatch refuses writes.** If MLO starts syncing a different
   `dataFileUID` than the profile is bound to, deltas would queue into a
   partition the app never reads. Mutation tools refuse before queueing
@@ -61,44 +75,53 @@ shapes. If they ever disagree on a shape, the catalog is right.
   children, GUID when recoverable.
 - **`list_contexts`** — the profile's contexts (MLO Places, `@Office`-style)
   with usage counts.
-- **`cloud_status`** — binding (`dataFileUID`, mode), bootstrap lifecycle,
-  cursor and per-origin delta counts, last local stamp, endpoint-mismatch
-  count, partition inventory, mirror coverage/health, whether the resident sync
-  endpoint is reachable and at what build (`endpoint`), and whether MLO is
-  syncing a different `dataFileUID` than the bound one (`bindingMismatch`,
-  `unboundSightings` — see [mcp-cloud.md](mcp-cloud.md#when-the-app-syncs-a-uid-the-server-does-not-manage)).
+- **`write_status`** — where one accept receipt got to, by `writeId`: the five
+  states above, each with a detail sentence and, where anything ends the state,
+  a remedy.
+- **`cloud_status`** — binding (`dataFileUID`, mode), partition lifecycle and
+  inventory, whether the resident sync endpoint is reachable and at what build
+  (`endpoint`), whether MLO is syncing a different `dataFileUID` than the bound
+  one (`bindingMismatch`, `unboundSightings` — see
+  [mcp-cloud.md](mcp-cloud.md#when-the-app-syncs-a-uid-the-server-does-not-manage)),
+  and the write aggregate (`writes`): queue depth, the oldest queued write's
+  age, whether delivery is stalled on a session MLO is holding open over the
+  writes — in practice a conflict dialog awaiting the user (`sessionHeldOpen`) —
+  and the recent dead letters with uid, caption and reason. That last field is
+  the only surface for a write nobody was waiting on — a `writeId` receipt dies
+  with the MCP session that took it.
 
 ## Write tools
 
-All follow commit → QuickSync → verify. See [mcp-cloud.md](mcp-cloud.md) for
-the delta/envelope details behind each.
+All return at durable accept (see Shared semantics); none waits on MLO.
 
-- **`cloud_bootstrap`** — the one-time setup: after one ordinary MLO sync
-  through the proxy, pulls the vendor cloud's full history, validates and
-  materializes it, and binds the profile; reads and writes are live
-  afterwards. `rebind: true` starts a fresh partition explicitly.
-
-- **`add_task`** — one task per call, emitted as a full fresh row; parent by
-  GUID (`parentUid`) or top level when omitted. Supports Folder, Project,
-  Starred, visibility/sequential booleans, an existing Flag, and existing
-  contexts (`Places`), plus dependencies by stable GUID.
-- **`add_tasks`** — 1–50 new tasks in ONE atomic delta. Each entry has a local
-  `key`; `parentKey` creates arbitrary nested outlines and `dependsOnKeys`
-  creates dependencies within the new batch. `parentUid`/`dependsOnUids` link
-  to existing tasks.
-- **`update_task`** — batched field edits (caption, note, dates,
-  importance/effort/estimates, project status, goal), Folder/Project/Starred
-  and other task booleans, existing Flag assignment, complete context
-  replacement, complete dependency replacement (`dependsOnIds`), and
-  re-parenting moves over logged full rows. Date edits on recurring tasks are
-  refused (the series would desync).
+- **`capture_task`** — rapid entry: one line in, one task in MLO's `<Inbox>`
+  out (top level when the profile has none). Trailing `@context` tokens name
+  contexts and text after a blank line becomes the note; dates and importance
+  are NOT parsed — pass those through `add_task`.
+- **`add_task`** — one task, emitted as a full fresh row; parent by Path id
+  (`parentId`) or top level when omitted. Supports Folder, Project, Starred,
+  visibility/sequential booleans, an existing Flag, existing contexts
+  (`Places`), and dependencies on existing tasks.
+- **`add_tasks`** — 1–50 new tasks in ONE atomic delta. Each entry may carry a
+  batch-local `key`; `parentKey` builds arbitrary nested outlines and
+  `dependsOnKeys` links tasks that do not exist yet. `parentId`/`dependsOnIds`
+  link to tasks that do.
+- **`update_task`** — field edits on one task (caption, note, dates,
+  importance/effort/estimates, project status, goal), the Organize flags
+  (`IsProject`, `Folder`, `HideInToDo`, `CompleteSubTasksInOrder`), Starred, an
+  existing Flag, complete context replacement, and complete dependency
+  replacement (`dependsOnIds`). Only the fields passed change; `""` clears a
+  text field. Date edits on recurring tasks are refused (the series would
+  desync).
 - **`complete_task` / `uncomplete_task`** — set/clear `CompletionDateTime`
-  (projects also flip `ProjectStatus`) over logged full rows. Completing
-  recurring tasks is refused — completing them in MLO generates the next
-  occurrence, a full-row rewrite would not.
-- **`delete_task`** — tombstones each selected task *and its whole subtree*
-  (cascade behavior of a bare parent tombstone is unverified; extra
-  tombstones union-merge harmlessly). Every task in the subtree must resolve
-  to its stable UID, else nothing is queued.
-- **`sync`** — run MLO QuickSync on demand (every write triggers it
-  internally; this reruns it, e.g. to pick up a previously queued delta).
+  (projects also flip `ProjectStatus`). Completing a recurring task is refused:
+  in MLO that spawns the next occurrence, and a full-row rewrite would silently
+  end the series instead.
+- **`move_task`** — re-parent one task with its whole subtree, optionally into a
+  slot among its new siblings. Moving a task into its own subtree is refused.
+- **`delete_task`** — tombstones the task *and its whole subtree*; every task in
+  the branch must resolve to its stable UID, else nothing is queued. MLO's own
+  recycle bin is the only undo.
+- **`sync`** — run MLO QuickSync on demand. Every write already fires one
+  best-effort; this reruns it. Never load-bearing — MLO's own sync cadence is
+  what delivers a write.

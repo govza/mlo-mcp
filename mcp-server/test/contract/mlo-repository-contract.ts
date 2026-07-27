@@ -35,10 +35,14 @@ export function describeMloRepositoryContract(
       expect(pending.expiresAt).toBeTruthy();
     });
 
-    it("a just-accepted write reads back as accepted", async () => {
+    it("a just-accepted write reads back as accepted, under its own receipt", async () => {
       const { repo, sampleRow } = await makeHarness();
       const { writeId } = expectOk(await repo.write([sampleRow()]));
-      expect(expectOk(await repo.status(writeId))).toBe("accepted");
+      const state = expectOk(await repo.status(writeId));
+      expect(state.status).toBe("accepted");
+      expect(state.writeId).toBe(writeId);
+      // Still queued, so the caller can still be told when it gives up.
+      expect(state.expiresAt).toBeTruthy();
     });
 
     it("every accept gets its own writeId — two queued writes can share one uid", async () => {

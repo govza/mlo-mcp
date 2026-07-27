@@ -50,6 +50,21 @@ export function buildTaskTree(doc: MloDocument): TaskNode[] {
   return (rootNode(doc).TaskNode ?? []).map((c, i) => toModel(c, String(i + 1), [], 0));
 }
 
+/**
+ * A copy of the tree with the positional fields (`id`, `Path`, `Depth`)
+ * re-derived from where each task now sits. The pending-write overlay inserts
+ * phantom tasks, re-parents moved ones and hides deleted ones, and a path id
+ * that no longer matches its position would resolve the next call onto the
+ * wrong task. Pure, like the rest of this tier: the input tree is left alone.
+ */
+export function renumbered(tasks: readonly TaskNode[], parentPath: string[] = [], depth = 0, parentId = ""): TaskNode[] {
+  return tasks.map((task, index) => {
+    const id = parentId ? `${parentId}.${index + 1}` : String(index + 1);
+    const Path = [...parentPath, task.Caption];
+    return { ...task, id, Path, Depth: depth, Children: renumbered(task.Children, Path, depth + 1, id) };
+  });
+}
+
 export function flatten(tasks: TaskNode[]): TaskNode[] {
   const out: TaskNode[] = [];
   const walk = (list: TaskNode[]) => {
@@ -144,6 +159,9 @@ export function searchTasks(tasks: TaskNode[], f: SearchFilters): TaskNode[] {
 export function renderLine(t: TaskNode): string {
   const marks: string[] = [];
   if (looksLikeInbox(t)) marks.push("[inbox]");
+  // Named first among the states: everything else on the line is export truth,
+  // and this one says the line is a write MLO has not applied yet.
+  if (t.pending) marks.push("[pending]");
   if (t.CompletionDateTime) marks.push("[done]");
   if (t.IsProject) marks.push("[project]");
   if (t.Starred) marks.push("[*]");

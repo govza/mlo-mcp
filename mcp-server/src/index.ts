@@ -27,8 +27,12 @@ async function main(): Promise<void> {
   // write instead of requiring a client restart.
   const spawn = residentSpawner(fileURLToPath(import.meta.url));
   const resident = new HttpResidentClient({ host: config.cloudHost, port: config.cloudPort, spawn });
-  const repo = new LocalMloRepository(config, new SystemMloCli(config), resident);
   const cloud = new CloudGateway({ stateRoot: config.cloudStateRoot });
+  // The bound partition's stores, resolved once: the queue makes the repository's
+  // reads show this session's own accepted writes, the row store is what writes
+  // are authored from.
+  const { rows, queue } = await cloud.boundStores(config.dataFile);
+  const repo = new LocalMloRepository(config, new SystemMloCli(config), resident, queue);
   // Never a listener of its own: MLO's proxy points at this port permanently,
   // so a session that owned it would take the app's sync down when it closed.
   // Attach to the resident process, starting it if nothing answers.
@@ -37,7 +41,7 @@ async function main(): Promise<void> {
     port: config.cloudPort,
     spawn,
   });
-  const ctx = createToolContext(config, repo, cloud, endpoint, await cloud.boundRowStore(config.dataFile));
+  const ctx = createToolContext(config, repo, cloud, endpoint, rows);
 
   const server = createMcpServer(ctx);
   await server.connect(new StdioServerTransport());

@@ -62,6 +62,14 @@ export const SUPERSEDE_VOLATILE_COLUMNS: ReadonlySet<string> = new Set(["LastMod
  */
 const IN_FLIGHT_TTL_MS = 10 * 60_000;
 
+/**
+ * How long an injected write may ride an unresolved session before the gauge
+ * calls it stalled (spec section 6, "a Get without a following Apply beyond
+ * ~N s"). MLO applies a delivered row within about a second, so anything this
+ * old is waiting on something — in practice the conflict dialog.
+ */
+const SESSION_HELD_OPEN_MS = 30_000;
+
 /** The stamp a Get presents: ride the vendor's own advance, else bump past MLO's stored cursor. */
 export function presentedGetVersion(vendorMax: bigint, newerThan: bigint): bigint {
   return vendorMax > newerThan ? vendorMax : newerThan + 1n;
@@ -276,6 +284,30 @@ export class WritePath {
       }
       return false;
     });
+  }
+
+  /**
+   * The session-held-open gauge (spec section 6): writes injected into a Get
+   * that no Apply has resolved for longer than `SESSION_HELD_OPEN_MS`. That is
+   * the endpoint's only cross-process view of a pending conflict dialog — MLO
+   * normally applies within a second, so a pin this old means delivery is
+   * stalled, most likely on a human.
+   *
+   * A young pin is not reported: a healthy exchange in flight is not a stall.
+   * Pins past the in-flight TTL are not either — that session is written off
+   * and the row is deliverable again. In-memory and process-local by nature (a
+   * pin is a fact about a live exchange), which is why an attached session can
+   * only learn it by asking: it rides `/v1/status`, not the state root. A pure
+   * query: the sweep that drops released pins belongs to `deliverable()`.
+   */
+  writesHeldOpen(): WriteId[] {
+    const nowMs = this.now().getTime();
+    return [...this.inFlight]
+      .filter(([, pin]) => {
+        const age = nowMs - pin.atMs;
+        return age >= SESSION_HELD_OPEN_MS && age < this.inFlightTtlMs;
+      })
+      .map(([writeId]) => writeId);
   }
 
   /** Durable accept: resolves `accepted` only after the queue write is fsync'd. */

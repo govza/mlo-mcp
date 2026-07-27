@@ -372,6 +372,11 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
           // has seen sync traffic for.
           version: SERVER_INFO.version,
           contactUids: gateway.vendorContactUids(),
+          // The one write-path fact that lives nowhere but this process: which
+          // injected writes an MLO sync session has held unresolved long enough
+          // to read as stalled. Everything else about a write is in the state
+          // root, which sessions read for themselves.
+          writesHeldOpen: writePath.writesHeldOpen(),
         });
         return;
       }
