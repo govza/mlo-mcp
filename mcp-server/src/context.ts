@@ -3,6 +3,7 @@ import type { CloudGateway } from "./cloud/gateway.js";
 import type { ResidentEndpoint } from "./cloud/endpoint.js";
 import type { MloRepository } from "./repo/mlo-repository.js";
 import { OutlineService } from "./services/outline.js";
+import { EMPTY_ROW_STORE_VIEW, IdentityService } from "./services/identity.js";
 import { NextActionsService } from "./services/next-actions.js";
 import { ReviewService } from "./services/review.js";
 import { AdminService } from "./services/admin.js";
@@ -20,8 +21,11 @@ export function createToolContext(
   cloud: CloudGateway,
   endpoint: ResidentEndpoint
 ): ToolContext {
+  // The row store arrives with PartitionStore (ticket 05); until then every
+  // resolution reads as unconfirmed, which is the truth.
+  const identity = new IdentityService(EMPTY_ROW_STORE_VIEW);
   return {
-    outline: new OutlineService(repo),
+    outline: new OutlineService(repo, identity),
     nextActions: new NextActionsService(),
     review: new ReviewService(),
     admin: new AdminService(config, repo, cloud, endpoint),

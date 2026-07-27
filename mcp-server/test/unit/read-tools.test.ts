@@ -4,6 +4,7 @@ import { listTasksTool } from "../../src/tools/list-tasks.js";
 import { searchTasksTool } from "../../src/tools/search-tasks.js";
 import type { ToolContext } from "../../src/tools/contract.js";
 import { OutlineService } from "../../src/services/outline.js";
+import { EMPTY_ROW_STORE_VIEW, IdentityService } from "../../src/services/identity.js";
 import { FakeMloRepository } from "../fakes/fake-mlo-repository.js";
 import type { TaskNode } from "../../src/types.js";
 
@@ -34,7 +35,8 @@ function fixture(): TaskNode[] {
 function fakeCtx(tasks: TaskNode[]): ToolContext {
   const repo = new FakeMloRepository();
   repo.tasks = tasks;
-  return { config: {}, outline: new OutlineService(repo) } as unknown as ToolContext;
+  const outline = new OutlineService(repo, new IdentityService(EMPTY_ROW_STORE_VIEW));
+  return { config: {}, outline } as unknown as ToolContext;
 }
 
 describe("collectVisible", () => {

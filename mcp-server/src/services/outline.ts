@@ -1,6 +1,7 @@
 import type { TaskNode } from "../types.js";
 import { collectVisible, findById, flatten, searchTasks, type SearchFilters, type VisibleTask } from "../task-tree.js";
 import type { MloRepository } from "../repo/mlo-repository.js";
+import type { IdentityService } from "./identity.js";
 
 export interface OutlineListing {
   entries: VisibleTask[];
@@ -36,7 +37,10 @@ interface RawTaskPlace {
  * itself, not GTD-intent queries.
  */
 export class OutlineService {
-  constructor(private readonly repo: MloRepository) {}
+  constructor(
+    private readonly repo: MloRepository,
+    private readonly identity: IdentityService
+  ) {}
 
   /** Visible outline entries under `parentId` (or the root); undefined when the parent id resolves to nothing. */
   async list(opts: {
@@ -65,22 +69,15 @@ export class OutlineService {
     const snap = await this.repo.snapshot();
     const task = findById(snap.tasks, id);
     if (!task) return undefined;
-    // GUIDs come from the binary annotation on the export snapshot; the
-    // projection-backed fallback died with the delta log (ADR-0005). Identity
-    // gets one owner again in the identity service (ticket 04).
-    const all = flatten(snap.tasks);
+    const resolver = this.identity.resolverFor(snap);
     const resolvedUid = task.Guid?.toUpperCase();
-    const byGuid = new Map<string, TaskNode>();
-    for (const t of all) {
-      if (t.Guid) byGuid.set(t.Guid.toUpperCase(), t);
-    }
     const dependsOn = task.DependsOn.map((uid) => {
-      const dep = byGuid.get(uid.toUpperCase());
+      const dep = resolver.taskFor(uid);
       return { id: dep?.id, Caption: dep?.Caption, uid };
     });
-    const dependedOnBy = all
-      .filter((x) => resolvedUid && x.DependsOn.map((uid) => uid.toUpperCase()).includes(resolvedUid))
-      .map((x) => ({ id: x.id, Caption: x.Caption }));
+    const dependedOnBy = resolvedUid
+      ? resolver.dependentsOf(resolvedUid).map((x) => ({ id: x.id, Caption: x.Caption }))
+      : [];
     return { task, uid: resolvedUid, dependsOn, dependedOnBy };
   }
 
