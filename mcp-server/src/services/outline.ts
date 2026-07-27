@@ -70,7 +70,8 @@ export class OutlineService {
     const task = findById(snap.tasks, id);
     if (!task) return undefined;
     const resolver = this.identity.resolverFor(snap);
-    const resolvedUid = task.Guid?.toUpperCase();
+    const resolution = resolver.uidFor(id);
+    const resolvedUid = resolution.kind === "resolved" ? resolution.uid : undefined;
     const dependsOn = task.DependsOn.map((uid) => {
       const dep = resolver.taskFor(uid);
       return { id: dep?.id, Caption: dep?.Caption, uid };
