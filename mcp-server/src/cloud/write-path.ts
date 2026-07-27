@@ -4,12 +4,9 @@ import type { CloudGateway } from "./gateway.js";
 import type { PartitionStore } from "./partition.js";
 import type { QueuedWrite, WriteVerb } from "./injection-queue.js";
 import type { Problem } from "./problem.js";
-import {
-  documentFromDeltaRows,
-  mergeDeltas,
-  normalizeGuid,
-  TODO_ITEMS_HEADER,
-} from "./delta.js";
+import { mergeDeltas } from "./delta-merge.js";
+import { normalizeGuid } from "./guid.js";
+import { documentFromDeltaRows, TODO_ITEMS_HEADER } from "./mlo-schema.js";
 import { harvestTaskRows } from "./row-store.js";
 import { packEnvelope, unpackEnvelope } from "./envelope.js";
 import { decodeForwardBody, type ForwardResult } from "./upstream.js";

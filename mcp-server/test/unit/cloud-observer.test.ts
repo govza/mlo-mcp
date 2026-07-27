@@ -112,11 +112,14 @@ describe("proxy sync observation", () => {
     });
 
     const summaries = await readSummaries(dir, 3);
-    expect(summaries.map((entry) => entry.kind)).toEqual(["http", "soap", "connect"]);
-    expect(summaries[0]).toMatchObject({
+    // Kinds, not order: a summary lands once its exchange finishes observing, so
+    // the CONNECT line can beat the SOAP one it was issued after.
+    expect(summaries.map((entry) => entry.kind).sort()).toEqual(["connect", "http", "soap"]);
+    const byKind = (kind: string) => summaries.find((entry) => entry.kind === kind);
+    expect(byKind("http")).toMatchObject({
       kind: "http", method: "GET", path: "/mlo/MLOInetSync.asmx", queryKeys: ["WSDL"], status: 200,
     });
-    expect(summaries[1]).toMatchObject({
+    expect(byKind("soap")).toMatchObject({
       kind: "soap",
       operation: "GetChanges",
       soapAction: "http://mlo.example/GetChanges",
@@ -125,7 +128,7 @@ describe("proxy sync observation", () => {
       responseOperation: "GetChangesResponse",
       responseFields: ["GetChangesResult", "serverVersion", "<sensitive-field>"],
     });
-    expect(summaries[2]).toMatchObject({ kind: "connect", target: `127.0.0.1:${upstreamPort}` });
+    expect(byKind("connect")).toMatchObject({ kind: "connect", target: `127.0.0.1:${upstreamPort}` });
     const raw = await fs.readFile(path.join(dir, SUMMARY_FILE), "utf8");
     expect(raw).not.toContain("zipbytes");
     expect(raw).not.toContain("secret");

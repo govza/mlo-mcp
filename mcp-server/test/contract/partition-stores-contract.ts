@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTaskAddDelta, buildTaskDeleteDelta } from "../../src/cloud/delta.js";
+import { buildTaskAddDelta, buildTaskDeleteDelta } from "../../src/cloud/mlo-schema.js";
 import { findSection } from "../../src/cloud/csv.js";
 import type { CaptureJournal } from "../../src/cloud/capture-journal.js";
 import type { InjectionQueue, QueuedWrite } from "../../src/cloud/injection-queue.js";

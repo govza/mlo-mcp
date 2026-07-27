@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { overlayPendingWrites, type PendingRows } from "../../src/repo/pending-overlay.js";
-import { TODO_ITEMS_HEADER, normalizeGuid } from "../../src/cloud/delta.js";
+import { normalizeGuid } from "../../src/cloud/guid.js";
+import { TODO_ITEMS_HEADER } from "../../src/cloud/mlo-schema.js";
 import { flatten } from "../../src/task-tree.js";
 import type { TaskNode } from "../../src/types.js";
 

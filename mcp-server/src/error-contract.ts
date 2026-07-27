@@ -259,10 +259,6 @@ export const ERROR_CONTRACT = {
 
 export type ContractKind = keyof typeof ERROR_CONTRACT;
 
-export function contractFor(kind: ContractKind): KindContract {
-  return ERROR_CONTRACT[kind];
-}
-
 /**
  * The one failure builder every boundary uses. Producers supply the detail —
  * what happened, in this call's terms — and the table supplies everything the

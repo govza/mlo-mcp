@@ -9,6 +9,7 @@ MCP server (this project):
 | [tools.md](tools.md) | The MCP tool surface: what each tool is for, its guarantees and coverage limits (schemas: `pnpm tools`) |
 | [server-architecture.md](server-architecture.md) | How the MCP server is built: locking, reads, the queue→QuickSync→verify write loop, tool design |
 | [mcp-cloud.md](mcp-cloud.md) | The local cloud-sync endpoint: wire contract, delta log, merge rules, how the app gets wired to it via MLO's proxy setting |
+| [testing-conflict-runbook.md](testing-conflict-runbook.md) | Manual runbook for the sync-conflict rounds — the one write-path leg that needs a human in front of the app (everything else is automated behind `MLO_LIVE=1`) |
 | [agents/](agents/) | Conventions for AI agent skills: issue tracker, triage labels, domain-doc consumer rules (glossary/entry point: [/CONTEXT.md](../CONTEXT.md)) |
 | [adr/](adr/) | Architecture decision records — decisions made since this index was written ([ADR-0001](adr/0001-distribution-surfaces.md): distribution surfaces; [ADR-0002](adr/0002-report-binding-mismatch-never-repair-it.md): report a binding mismatch, never repair it; [ADR-0003](adr/0003-resident-endpoint.md): the endpoint is a resident process; [ADR-0004](adr/0004-ground-truth-the-open-profile.md): ground-truth the open profile against the running app) |
 

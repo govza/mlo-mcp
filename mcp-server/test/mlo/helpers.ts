@@ -57,6 +57,11 @@ export function makeTestEnv(): TestEnv {
       dataFile,
       exportDir: path.join(dir, "exports"),
       cacheStaleMs: 30_000,
+      cloudHost: "127.0.0.1",
+      // The suites that spawn a resident reserve their own port and state root;
+      // this is the shape a config must have, not a live endpoint.
+      cloudPort: 0,
+      cloudStateRoot: path.join(dir, "cloud-state"),
     },
     cleanup: () => rmSync(dir, { recursive: true, force: true }),
   };

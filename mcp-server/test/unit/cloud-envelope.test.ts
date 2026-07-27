@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { zipSync } from "fflate";
-import { createDeltaSkeleton } from "../../src/cloud/delta.js";
+import { createDeltaSkeleton } from "../../src/cloud/mlo-schema.js";
 import { emitSectionedCsv } from "../../src/cloud/csv.js";
 import { packEnvelope, unpackEnvelope } from "../../src/cloud/envelope.js";
 

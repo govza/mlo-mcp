@@ -18,7 +18,7 @@ import {
   deltaRowsFromDocument,
   documentFromDeltaRows,
   TODO_ITEMS_HEADER,
-} from "../../src/cloud/delta.js";
+} from "../../src/cloud/mlo-schema.js";
 import { packEnvelope, unpackEnvelope } from "../../src/cloud/envelope.js";
 import { peekSoapResponseFields, soapFieldText } from "../../src/cloud/soap.js";
 import { harvestTaskRows } from "../../src/cloud/row-store.js";

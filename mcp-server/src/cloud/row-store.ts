@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { atomicWrite, WriteChain } from "./atomic-file.js";
 import { findSection, type SectionedCsv } from "./csv.js";
-import { normalizeGuid } from "./delta.js";
+import { normalizeGuid } from "./guid.js";
 
 /**
  * UID -> the latest full TodoItems row seen in any captured payload.

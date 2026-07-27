@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { startCloudServer, type CloudServerHandle } from "../../src/cloud/server.js";
 import { CloudGateway } from "../../src/cloud/gateway.js";
 import { PartitionStore } from "../../src/cloud/partition.js";
-import { buildTaskAddDelta, deltaRowsFromDocument } from "../../src/cloud/delta.js";
+import { buildTaskAddDelta, deltaRowsFromDocument } from "../../src/cloud/mlo-schema.js";
 import { packEnvelope, unpackEnvelope } from "../../src/cloud/envelope.js";
 import { harvestTaskRows } from "../../src/cloud/row-store.js";
 import { peekSoapResponseFields, soapFieldText } from "../../src/cloud/soap.js";

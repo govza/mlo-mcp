@@ -1,6 +1,7 @@
 import type { TaskNode } from "../types.js";
 import { renumbered } from "../task-tree.js";
-import { normalizeGuid, TODO_ITEMS_HEADER } from "../cloud/delta.js";
+import { normalizeGuid } from "../cloud/guid.js";
+import { TODO_ITEMS_HEADER } from "../cloud/mlo-schema.js";
 import type { DeltaRow, WriteId } from "./mlo-repository.js";
 
 /**

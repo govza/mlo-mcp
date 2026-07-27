@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { CloudGateway } from "../../src/cloud/gateway.js";
 import { captureTlsConnectSeen, captureVendorSession } from "../../src/cloud/capture.js";
 import { packEnvelope } from "../../src/cloud/envelope.js";
-import { buildTaskAddDelta, buildTaskDeleteDelta, mergeDeltas } from "../../src/cloud/delta.js";
+import { mergeDeltas } from "../../src/cloud/delta-merge.js";
+import { buildTaskAddDelta, buildTaskDeleteDelta } from "../../src/cloud/mlo-schema.js";
 import type { ForwardResult } from "../../src/cloud/upstream.js";
 
 const dirs: string[] = [];

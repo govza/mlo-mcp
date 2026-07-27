@@ -69,7 +69,7 @@ function writeField(value: string): string {
   return /[",\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
 }
 
-export function writeCsvRow(fields: readonly string[]): string {
+function writeCsvRow(fields: readonly string[]): string {
   return fields.map(writeField).join(",");
 }
 

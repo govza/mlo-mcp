@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTaskAddDelta, deltaRowsFromDocument } from "../../src/cloud/delta.js";
+import { buildTaskAddDelta, deltaRowsFromDocument } from "../../src/cloud/mlo-schema.js";
 import type { DeltaRow } from "../../src/repo/mlo-repository.js";
 import type { ResidentClient } from "../../src/repo/resident-client.js";
 

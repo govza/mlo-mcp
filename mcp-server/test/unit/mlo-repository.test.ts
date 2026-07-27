@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { LocalMloRepository } from "../../src/repo/local-mlo-repository.js";
 import type { MloCli } from "../../src/repo/mlo-cli.js";
 import type { MloConfig } from "../../src/types.js";
-import { TODO_ITEMS_HEADER } from "../../src/cloud/delta.js";
+import { TODO_ITEMS_HEADER } from "../../src/cloud/mlo-schema.js";
 import { FakeMloRepository } from "../fakes/fake-mlo-repository.js";
 import { describeMloRepositoryContract } from "../contract/mlo-repository-contract.js";
 import { expectOk } from "../expect-result.js";

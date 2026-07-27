@@ -9,7 +9,7 @@ import {
   type PulledHistory,
 } from "../../src/cloud/auto-init.js";
 import { CloudGateway } from "../../src/cloud/gateway.js";
-import { buildTaskAddDelta } from "../../src/cloud/delta.js";
+import { buildTaskAddDelta } from "../../src/cloud/mlo-schema.js";
 import { packEnvelope } from "../../src/cloud/envelope.js";
 import type { VendorContact } from "../../src/cloud/upstream.js";
 

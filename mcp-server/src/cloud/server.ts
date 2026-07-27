@@ -475,7 +475,3 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
   log(`cloud server listening on http://${host}:${port}`);
   return { server, gateway, writePath, host, port, stop: stopSelf };
 }
-
-export function stopCloudServer(handle: CloudServerHandle): Promise<void> {
-  return handle.stop();
-}

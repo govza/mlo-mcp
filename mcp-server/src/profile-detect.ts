@@ -221,8 +221,7 @@ export function probeProfileSync(mloExePath: string): ProfileObservation | undef
   return result.stdout ? parseObservation(result.stdout) : undefined;
 }
 
-/** Non-blocking variant for the periodic profile-switch watcher in index.ts. */
-export function probeProfile(mloExePath: string): Promise<ProfileObservation | undefined> {
+function probeProfile(mloExePath: string): Promise<ProfileObservation | undefined> {
   if (process.platform !== "win32") return Promise.resolve(undefined);
   return new Promise((resolve) => {
     execFile(
@@ -234,6 +233,7 @@ export function probeProfile(mloExePath: string): Promise<ProfileObservation | u
   });
 }
 
+/** Non-blocking variant for the periodic profile-switch watcher in index.ts. */
 export function detectProfileSync(mloExePath: string): ProfileVerdict {
   return judgeProfile(probeProfileSync(mloExePath));
 }

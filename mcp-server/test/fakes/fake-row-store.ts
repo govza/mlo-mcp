@@ -1,5 +1,5 @@
 import type { SectionedCsv } from "../../src/cloud/csv.js";
-import { normalizeGuid } from "../../src/cloud/delta.js";
+import { normalizeGuid } from "../../src/cloud/guid.js";
 import {
   applyCatalog,
   harvestTaskRows,

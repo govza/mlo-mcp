@@ -8,7 +8,8 @@ import {
   completionPatch,
   reopenPatch,
 } from "../../src/services/outline-authoring.js";
-import { documentFromDeltaRows, normalizeGuid, TODO_ITEMS_HEADER } from "../../src/cloud/delta.js";
+import { normalizeGuid } from "../../src/cloud/guid.js";
+import { documentFromDeltaRows, TODO_ITEMS_HEADER } from "../../src/cloud/mlo-schema.js";
 import { findSection, type SectionedCsv } from "../../src/cloud/csv.js";
 import { repoFailure, type DeltaRow } from "../../src/repo/mlo-repository.js";
 import { failed } from "../../src/result.js";

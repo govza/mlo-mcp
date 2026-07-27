@@ -4,12 +4,15 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { mloInstalled, assertGuiClosed, makeTestEnv, reserveFreePort, stopResidentEndpoint, type TestEnv } from "./helpers.js";
 import { SERVER_INFO } from "../../src/version.js";
+import { allTools } from "../../src/tools/registry.js";
 
 const SERVER_ROOT = path.resolve(__dirname, "..", "..");
 
-// Write tools queue deltas and trigger QuickSync, which needs the app's sync
-// proxy wired to the local endpoint — not available in this headless test env,
-// so E2E covers the transport, the surface, and the read tools only.
+// Every tool is registered unconditionally now (ToolContext is required
+// services only), but a write's delivery needs the app's sync proxy wired to
+// the endpoint — not available in this headless env, so E2E covers the
+// transport, the surface, and the read tools only. The live write legs are
+// `test/mlo/live-write.test.ts` behind MLO_LIVE=1.
 describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
   let env: TestEnv;
   let client: Client;
@@ -49,9 +52,9 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
   it("lists the expected tools with annotations", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
-    expect(names).toEqual(
-      ["cloud_status", "get_task", "list_contexts", "list_tasks", "search_tasks", "sync"]
-    );
+    // The shipped catalog, over a real connection — the registry's own list is
+    // asserted in `unit`; this is the same set surviving the stdio hop.
+    expect(names).toEqual([...allTools.map((tool) => tool.name)].sort());
     const list = tools.find((t) => t.name === "list_tasks")!;
     expect(list.annotations?.readOnlyHint).toBe(true);
     expect(list.outputSchema).toBeDefined();

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { buildTaskAddDelta, buildTaskDeleteDelta, buildTaskUpdatesDelta, createDeltaSkeleton, mergeDeltas, TODO_ITEMS_HEADER } from "../../src/cloud/delta.js";
+import { mergeDeltas } from "../../src/cloud/delta-merge.js";
+import {
+  buildTaskAddDelta,
+  buildTaskDeleteDelta,
+  buildTaskUpdatesDelta,
+  createDeltaSkeleton,
+  TODO_ITEMS_HEADER,
+} from "../../src/cloud/mlo-schema.js";
 import { findSection } from "../../src/cloud/csv.js";
 
 const uid = "{12345678-1234-1234-1234-123456789abc}";

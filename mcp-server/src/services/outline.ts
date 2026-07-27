@@ -20,15 +20,14 @@ import type { IdentityService, SnapshotResolver } from "./identity.js";
 import type { CapturedRow, RowCatalog, RowStore } from "../cloud/row-store.js";
 import type { SectionedCsv } from "../cloud/csv.js";
 import { readPlaces } from "../places.js";
+import { mergeDeltas } from "../cloud/delta-merge.js";
+import { generateGuid, normalizeGuid } from "../cloud/guid.js";
 import {
   buildTaskAddDelta,
   buildTaskDeleteDelta,
   buildTaskUpdatesDelta,
   deltaRowsFromDocument,
-  generateGuid,
-  mergeDeltas,
-  normalizeGuid,
-} from "../cloud/delta.js";
+} from "../cloud/mlo-schema.js";
 import {
   completionPatch,
   csvTruthy,
