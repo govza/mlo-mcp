@@ -6,7 +6,7 @@ import { BindingStore, type ProfileBinding } from "./binding.js";
 import { SightingStore, type UnboundSighting } from "./sightings.js";
 import { DeadLetterStore } from "./dead-letter.js";
 import { normalizeDataFileUid, PartitionRegistry, type PartitionStore, type PartitionLifecycle } from "./partition.js";
-import type { RowStoreView } from "./row-store.js";
+import type { RowStore } from "./row-store.js";
 import type { VendorContact } from "./upstream.js";
 import { log } from "../log.js";
 
@@ -213,9 +213,9 @@ export class CloudGateway {
    * which every resolution honestly reads as unconfirmed. Resolved once at
    * composition time; a binding that appears later reaches new sessions.
    */
-  async boundRowStoreView(profilePath: string): Promise<RowStoreView | undefined> {
+  async boundRowStore(profilePath: string): Promise<RowStore | undefined> {
     const bound = await this.boundPartition(profilePath).catch(() => undefined);
-    return bound?.kind === "bound" ? bound.partition.rows.view() : undefined;
+    return bound?.kind === "bound" ? bound.partition.rows : undefined;
   }
 
   /**

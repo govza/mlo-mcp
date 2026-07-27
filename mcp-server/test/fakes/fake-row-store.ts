@@ -1,9 +1,12 @@
 import type { SectionedCsv } from "../../src/cloud/csv.js";
 import { normalizeGuid } from "../../src/cloud/delta.js";
 import {
+  applyCatalog,
   harvestTaskRows,
+  maxStarredOrderIndex,
   unknownRowRefusal,
   type CapturedRow,
+  type RowCatalog,
   type RowLookup,
   type RowSource,
   type RowStore,
@@ -17,27 +20,55 @@ import {
  */
 export class FakeRowStore implements RowStore {
   private readonly rows = new Map<string, CapturedRow>();
+  private readonly places = new Map<string, string>();
+  private readonly flags = new Map<string, string>();
 
   /** Seed one row directly — the minimal header a caption lookup needs. */
   set(uid: string, caption: string): void {
     this.setRow(uid, ["UID", "Caption"], [normalizeGuid(uid), caption]);
   }
 
-  setRow(uid: string, header: string[], cells: string[]): void {
+  setRow(
+    uid: string,
+    header: string[],
+    cells: string[],
+    relations: { placeUids?: string[]; dependencyUids?: string[]; starredOrderIndex?: string } = {},
+  ): void {
     this.rows.set(normalizeGuid(uid), {
       header,
       cells,
       capturedAt: new Date().toISOString(),
       source: "vendor-get",
+      placeUids: relations.placeUids ?? [],
+      dependencyUids: relations.dependencyUids ?? [],
+      ...(relations.starredOrderIndex !== undefined ? { starredOrderIndex: relations.starredOrderIndex } : {}),
     });
+  }
+
+  /** Seed a named context or flag the catalog can resolve a caption against. */
+  setPlace(uid: string, caption: string): void {
+    this.places.set(normalizeGuid(uid), caption);
+  }
+
+  setFlag(uid: string, caption: string): void {
+    this.flags.set(normalizeGuid(uid), caption);
   }
 
   async ingest(document: SectionedCsv, source: RowSource): Promise<{ upserts: number; tombstones: number }> {
     const harvested = harvestTaskRows(document);
     const capturedAt = new Date().toISOString();
-    for (const { uid, header, cells } of harvested.rows) {
-      this.rows.set(uid, { header: [...header], cells, capturedAt, source });
+    for (const { uid, header, cells, placeUids, dependencyUids, starredOrderIndex } of harvested.rows) {
+      this.rows.set(uid, {
+        header: [...header],
+        cells,
+        capturedAt,
+        source,
+        placeUids,
+        dependencyUids,
+        ...(starredOrderIndex !== undefined ? { starredOrderIndex } : {}),
+      });
     }
+    applyCatalog({ places: this.places, flags: this.flags }, harvested);
     let tombstones = 0;
     for (const uid of harvested.tombstones) {
       if (this.rows.delete(uid)) tombstones += 1;
@@ -45,8 +76,18 @@ export class FakeRowStore implements RowStore {
     return { upserts: harvested.rows.length, tombstones };
   }
 
+  async catalog(): Promise<RowCatalog> {
+    return {
+      places: [...this.places].map(([uid, caption]) => ({ uid, caption })),
+      flags: [...this.flags].map(([uid, caption]) => ({ uid, caption })),
+      maxStarredOrderIndex: maxStarredOrderIndex([...this.rows.values()].map((row) => row.starredOrderIndex)),
+    };
+  }
+
   async replaceAll(document: SectionedCsv, source: RowSource): Promise<{ upserts: number }> {
     this.rows.clear();
+    this.places.clear();
+    this.flags.clear();
     const { upserts } = await this.ingest(document, source);
     return { upserts };
   }

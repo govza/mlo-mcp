@@ -37,7 +37,7 @@ async function main(): Promise<void> {
     port: config.cloudPort,
     spawn,
   });
-  const ctx = createToolContext(config, repo, cloud, endpoint, await cloud.boundRowStoreView(config.dataFile));
+  const ctx = createToolContext(config, repo, cloud, endpoint, await cloud.boundRowStore(config.dataFile));
 
   const server = createMcpServer(ctx);
   await server.connect(new StdioServerTransport());

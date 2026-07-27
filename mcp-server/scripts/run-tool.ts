@@ -51,7 +51,7 @@ const ctx = createToolContext(
   ),
   cloud,
   endpoint,
-  await cloud.boundRowStoreView(config.dataFile),
+  await cloud.boundRowStore(config.dataFile),
 );
 const args = z.object(tool.inputSchema).parse(JSON.parse(json ?? "{}"));
 

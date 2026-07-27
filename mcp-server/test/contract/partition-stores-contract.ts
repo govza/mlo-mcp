@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildTaskAddDelta, buildTaskDeleteDelta } from "../../src/cloud/delta.js";
+import { findSection } from "../../src/cloud/csv.js";
 import type { CaptureJournal } from "../../src/cloud/capture-journal.js";
 import type { InjectionQueue, QueuedWrite } from "../../src/cloud/injection-queue.js";
 import type { RowStore } from "../../src/cloud/row-store.js";
@@ -14,6 +15,8 @@ import type { BindingStoreApi, DeadLetterStoreApi, SightingStoreApi } from "../f
 
 const UID_A = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}";
 const UID_B = "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}";
+const PLACE_UID = "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}";
+const FLAG_UID = "{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}";
 
 export function addDocument(uid: string, caption: string) {
   return buildTaskAddDelta({
@@ -71,6 +74,45 @@ export function describeRowStoreContract(name: string, makeStore: () => RowStore
       expect(upserts).toBe(1);
       expect((await store.latest(UID_A)).kind).toBe("unknown-row");
       expect((await store.latest(UID_B)).kind).toBe("row");
+    });
+
+    it("carries each row's relation sets, replacing them per capture", async () => {
+      const store = await makeStore();
+      const withRelations = buildTaskAddDelta({
+        uid: UID_A,
+        caption: "with contexts",
+        createdDate: "2026-07-27T10:00:00",
+        lastModified: "2026-07-27T10:00:00",
+        placeUids: [PLACE_UID],
+        dependencyUids: [UID_B],
+      });
+      await store.ingest(withRelations, "vendor-get");
+      let lookup = await store.latest(UID_A);
+      expect(lookup.kind).toBe("row");
+      if (lookup.kind !== "row") return;
+      expect(lookup.placeUids).toEqual([PLACE_UID]);
+      expect(lookup.dependencyUids).toEqual([UID_B]);
+      // No relation rows beside an emitted task means "none", not "unchanged".
+      await store.ingest(addDocument(UID_A, "contexts cleared"), "mlo-apply");
+      lookup = await store.latest(UID_A);
+      if (lookup.kind !== "row") throw new Error("expected a row");
+      expect(lookup.placeUids).toEqual([]);
+      expect(lookup.dependencyUids).toEqual([]);
+    });
+
+    it("accumulates the context/flag catalog and the starred-order high-water mark", async () => {
+      const store = await makeStore();
+      const document = addDocument(UID_A, "starred");
+      findSection(document, "Places")!.rows.push([PLACE_UID, "@Home", "", "", "", "", "", "", "", "", "", ""]);
+      findSection(document, "Flags")!.rows.push([FLAG_UID, "Hot", "", "", "", ""]);
+      findSection(document, "TodoView.ManualOrdering.Starred")!.rows.push([UID_A, "1500"]);
+      await store.ingest(document, "vendor-get");
+      // A later capture that mentions neither keeps both: catalogs accumulate.
+      await store.ingest(addDocument(UID_B, "plain"), "vendor-get");
+      const catalog = await store.catalog();
+      expect(catalog.places).toEqual([{ uid: PLACE_UID, caption: "@Home" }]);
+      expect(catalog.flags).toEqual([{ uid: FLAG_UID, caption: "Hot" }]);
+      expect(catalog.maxStarredOrderIndex).toBe(1500);
     });
 
     it("view answers captions synchronously for captured rows only", async () => {
