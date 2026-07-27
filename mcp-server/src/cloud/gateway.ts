@@ -94,6 +94,12 @@ export class CloudGateway {
    * Everything the endpoint can attribute forwards to the vendor; only
    * requests it cannot route at all are rejected. The decision is pinned per
    * sessionID so a binding change can never switch authorities mid-session.
+   *
+   * The forward path reads nothing that can refuse (the non-interference
+   * invariant, spec section 6): this is the one read it makes, so an
+   * unreadable binding store or state root fails OPEN to a plain forward
+   * rather than becoming a failure MLO can observe. Only the deliberate
+   * refusals below reject.
    */
   async decideAuthority(fields: Record<string, unknown>): Promise<SoapAuthority> {
     const sessionId = typeof fields.sessionID === "string" && fields.sessionID.length ? fields.sessionID : undefined;
@@ -106,7 +112,10 @@ export class CloudGateway {
       }
       this.sessionAuthorities.delete(sessionId);
     }
-    const authority = await this.computeAuthority(fields);
+    const authority: SoapAuthority = await this.computeAuthority(fields).catch((error) => {
+      log(`authority decision failed, forwarding to the vendor: ${error instanceof Error ? error.message : String(error)}`);
+      return { kind: "upstream" };
+    });
     if (sessionId) {
       for (const [key, value] of this.sessionAuthorities) if (value.expires <= now) this.sessionAuthorities.delete(key);
       this.sessionAuthorities.set(sessionId, { authority, expires: now + SESSION_PIN_TTL_MS });

@@ -26,6 +26,13 @@ const BODY_LIMIT = 32 * 1024 * 1024;
 /** Long enough for the shutdown response to reach the session waiting on it. */
 const SHUTDOWN_GRACE_MS = 50;
 
+/**
+ * How long composing may hold a forwarded exchange. Generous next to the local
+ * file reads and in-memory merge it covers, and far inside MLO's own sync
+ * timeout: only a hung subsystem reaches it.
+ */
+const DEFAULT_INJECTION_BUDGET_MS = 2_000;
+
 export interface CloudServerOptions {
   host?: string;
   port?: number;
@@ -48,6 +55,13 @@ export interface CloudServerOptions {
   autoInit?: AutoInitializer;
   /** Where mlo.exe lives, for the auto-init profile probe. */
   mloExePath?: string;
+  /**
+   * How long a forwarded exchange may wait on the best-effort composing step
+   * before it is abandoned and the vendor's payload forwarded verbatim (spec
+   * section 6: no subsystem may block or DELAY a forwarded exchange). Tests
+   * shorten it to make the overrun deterministic.
+   */
+  injectionBudgetMs?: number;
 }
 
 export interface CloudServerHandle {
@@ -94,6 +108,37 @@ function problemJson(response: ServerResponse, status: number, problem: Problem)
   response.end(problemBody(problem));
 }
 
+/**
+ * A best-effort transform the forward path awaits, bounded. The invariant
+ * (spec section 6) forbids a subsystem BLOCKING or DELAYING a forwarded
+ * exchange as much as it forbids failing it, and a store that hangs is not a
+ * store that throws — so a transform that overruns its budget is abandoned and
+ * the vendor's payload goes out verbatim. The work is caught before the race:
+ * the loser must never become an unhandled rejection.
+ */
+async function withinBudget(
+  work: Promise<Uint8Array | undefined>,
+  budgetMs: number,
+  label: string,
+): Promise<Uint8Array | undefined> {
+  const guarded = work.catch((error) => {
+    log(`${label} skipped (forward path unaffected): ${error instanceof Error ? error.message : String(error)}`);
+    return undefined;
+  });
+  let timer: NodeJS.Timeout | undefined;
+  const budget = new Promise<undefined>((resolve) => {
+    timer = setTimeout(() => {
+      log(`${label} abandoned after ${budgetMs} ms (forward path unaffected)`);
+      resolve(undefined);
+    }, budgetMs);
+  });
+  try {
+    return await Promise.race([guarded, budget]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function interceptVendorSoap(
   request: IncomingMessage,
   response: ServerResponse,
@@ -101,6 +146,7 @@ async function interceptVendorSoap(
   observer: SyncObserver,
   writePath: WritePath,
   autoInit: AutoInitializer | undefined,
+  injectionBudgetMs: number,
 ): Promise<boolean> {
   if (request.method !== "POST") return false;
   let target: URL;
@@ -129,12 +175,14 @@ async function interceptVendorSoap(
     let headers: IncomingMessage["headers"] = result.headers;
     if (operation === "GetModificationsBytesEx") {
       // Injection is a best-effort transform whose mandatory fallback is the
-      // vendor's original payload (spec section 6): any failure in here
-      // forwards verbatim, and MLO never learns the difference.
-      const enriched = await writePath.enrichGetResponse(fields, result).catch((error) => {
-        log(`injection skipped (forward path unaffected): ${error instanceof Error ? error.message : String(error)}`);
-        return undefined;
-      });
+      // vendor's original payload (spec section 6): any failure — or any
+      // overrun — in here forwards verbatim, and MLO never learns the
+      // difference.
+      const enriched = await withinBudget(
+        writePath.enrichGetResponse(fields, result),
+        injectionBudgetMs,
+        "injection",
+      );
       if (enriched) {
         body = Buffer.from(enriched);
         // Fresh headers: the rebuilt body is neither compressed nor the
@@ -148,19 +196,27 @@ async function interceptVendorSoap(
     response.end(body);
     // After the response is on its way, never before: capture and Apply
     // observation are contained taps (spec section 6) and must not add a
-    // millisecond to MLO's session.
-    void captureVendorSession(gateway, operation, fields, result);
-    if (operation === "ApplyModificationsBytesEx") {
-      void writePath.observeApply(fields, result).catch((error) =>
-        log(`apply observation failed (forward path unaffected): ${error instanceof Error ? error.message : String(error)}`));
-    }
-    if (operation === "ReleaseSyncSessionBytes") {
-      writePath.observeRelease(fields);
-      // The session is over, so this is the moment the endpoint is allowed to
-      // talk to the vendor itself (spec section 5): bind if the guards pass,
-      // and service a human's outstanding repull. Fire-and-forget, like every
-      // other tap — a proxied sync must never wait on the cloud plane.
-      void autoInit?.serviceAfterSession(soapFieldText(fields, "dataFileUID"));
+    // millisecond to MLO's session. Their own try, so a tap that throws
+    // SYNCHRONOUSLY cannot fall into the 502 arm below and try to answer an
+    // already-answered request. Each awaited-nowhere promise carries its own
+    // catch, because a rejection escapes this try.
+    try {
+      void captureVendorSession(gateway, operation, fields, result);
+      if (operation === "ApplyModificationsBytesEx") {
+        void writePath.observeApply(fields, result).catch((error) =>
+          log(`apply observation failed (forward path unaffected): ${error instanceof Error ? error.message : String(error)}`));
+      }
+      if (operation === "ReleaseSyncSessionBytes") {
+        writePath.observeRelease(fields);
+        // The session is over, so this is the moment the endpoint is allowed to
+        // talk to the vendor itself (spec section 5): bind if the guards pass,
+        // and service a human's outstanding repull. Fire-and-forget, like every
+        // other tap — a proxied sync must never wait on the cloud plane.
+        void autoInit?.serviceAfterSession(soapFieldText(fields, "dataFileUID"))
+          ?.catch((error) => log(`post-session cloud-plane service failed: ${error instanceof Error ? error.message : String(error)}`));
+      }
+    } catch (error) {
+      log(`post-response tap failed (MLO's answer already sent): ${error instanceof Error ? error.message : String(error)}`);
     }
   } catch (error) {
     const message = `vendor forward failed: ${error instanceof Error ? error.message : String(error)}`;
@@ -180,6 +236,7 @@ async function interceptGetFileTs(
   response: ServerResponse,
   observer: SyncObserver,
   writePath: WritePath,
+  injectionBudgetMs: number,
 ): Promise<boolean> {
   if (request.method !== "POST") return false;
   let target: URL;
@@ -196,10 +253,7 @@ async function interceptGetFileTs(
     const result = await forwardBuffered(target, "POST", request.headers, requestBytes);
     let body = result.body;
     let headers: IncomingMessage["headers"] = result.headers;
-    const nudged = await writePath.nudgeFileTs(fields, result).catch((error) => {
-      log(`GetFileTS nudge skipped (forward path unaffected): ${error instanceof Error ? error.message : String(error)}`);
-      return undefined;
-    });
+    const nudged = await withinBudget(writePath.nudgeFileTs(fields, result), injectionBudgetMs, "GetFileTS nudge");
     if (nudged) {
       body = Buffer.from(nudged);
       headers = { "content-type": "text/xml; charset=utf-8", "content-length": String(body.byteLength) };
@@ -306,12 +360,13 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
     ...(options.now ? { now: options.now } : {}),
     ...(autoInit ? { autoInit } : {}),
   });
+  const injectionBudgetMs = options.injectionBudgetMs ?? DEFAULT_INJECTION_BUDGET_MS;
   let stopped: Promise<void> | undefined;
   const server = http.createServer(async (request, response) => {
     try {
       if (isAbsoluteRequestTarget(request.url ?? "")) {
-        if (await interceptVendorSoap(request, response, gateway, observer, writePath, autoInit)) return;
-        if (await interceptGetFileTs(request, response, observer, writePath)) return;
+        if (await interceptVendorSoap(request, response, gateway, observer, writePath, autoInit, injectionBudgetMs)) return;
+        if (await interceptGetFileTs(request, response, observer, writePath, injectionBudgetMs)) return;
         forwardRequest(request, response, observer);
         return;
       }
