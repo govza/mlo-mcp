@@ -40,6 +40,12 @@ npx caches the GitHub install; pin a tag (`github:govza/mlo-mcp#v0.3.0`) for rep
 claude mcp add mlo -- npx -y github:govza/mlo-mcp
 ```
 
+or once for every project, at user scope:
+
+```powershell
+claude mcp add -s user mlo -- npx -y github:govza/mlo-mcp
+```
+
 or install as a plugin (updates via `/plugin update`):
 
 ```
