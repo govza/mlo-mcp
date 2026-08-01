@@ -223,6 +223,22 @@ export class PartitionRegistry {
     return this.open(uid);
   }
 
+  /**
+   * Delete a partition and everything in it — the effecting half of drift
+   * recovery ([ADR-0007](../../../docs/adr/0007-recover-from-sync-drift-automatically.md)).
+   *
+   * Destructive by design: the queue inside it is discarded with the rest,
+   * because a queue whose row store described a data file that no longer exists
+   * is exactly what recovery exists to throw away. The cached handle goes first
+   * so no live reference can recreate the directory behind the removal.
+   */
+  async discard(rawUid: string): Promise<void> {
+    const uid = normalizeDataFileUid(rawUid);
+    const key = partitionKey(uid);
+    this.handles.delete(key);
+    await fs.rm(path.join(this.partitionsDir(), key), { recursive: true, force: true });
+  }
+
   async list(): Promise<PartitionSummary[]> {
     let keys: string[];
     try {

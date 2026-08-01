@@ -190,8 +190,15 @@ applied while MLO's own sync keeps reporting success. `cloud_status` reports
 `bindingMismatch` alongside the bound `dataFileUID` and the `unboundSightings`
 list. Reads are unaffected.
 
-Nothing is repaired automatically ([ADR-0002](adr/0002-report-binding-mismatch-never-repair-it.md)):
-rebinding changes which sync history the profile follows and cannot be undone.
+A mismatch is now **repaired automatically** on the next proxied sync
+([ADR-0007](adr/0007-recover-from-sync-drift-automatically.md)): the abandoned
+partition and every write queued in it are discarded, the binding is released,
+and the identity MLO actually presents is adopted. Nothing is dead-lettered and
+nothing says what was dropped. This reverses
+[ADR-0002](adr/0002-report-binding-mismatch-never-repair-it.md), which refused
+instead on the grounds that rebinding cannot be undone — a hazard that is now
+accepted rather than avoided, and whose one known failure mode (two copies of a
+profile syncing through the same proxy) is written down there.
 A profile with **no** binding is first-run setup, not a mismatch — the sighting
 is the initialization candidate. The sightings file keeps only the most recent
 few with their first/last-seen stamps — a diagnostic marker to read against the

@@ -1,6 +1,6 @@
 {
   "name": "mlo",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "MyLifeOrganized for Claude Code — manage the MLO Windows desktop app's task tree from AI sessions.",
   "author": {
     "name": "govza"

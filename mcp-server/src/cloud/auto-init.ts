@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import { findSection } from "./csv.js";
+import { chooseDriftCandidate, recoverFromDrift, type DriftRecovery } from "./drift-recovery.js";
 import type { CloudGateway } from "./gateway.js";
 import { normalizeDataFileUid, type PartitionStore } from "./partition.js";
 import type { AutoInitRefusalKind, Problem } from "./problem.js";
@@ -14,24 +15,34 @@ import { log } from "../log.js";
  * place in the server that initiates a vendor call.
  *
  * Bootstrap is no longer a tool the user runs: after a proxied sync the
- * resident asks itself whether it may bind, and binds if it may. Three guards
- * stand between an observed sync and a binding:
+ * resident asks itself whether it may bind, and binds if it may. What used to
+ * be three blocking guards is now one guard and two recoveries
+ * ([ADR-0007](../../../docs/adr/0007-recover-from-sync-drift-automatically.md)):
  *
- * 1. no binding exists for the running app's open profile (rebinding stays
- *    explicit, `AdminService.rebind`);
- * 2. exactly one candidate `dataFileUID` has synced through the proxy;
- * 3. the candidate ground-truths against that open data file — the pulled
- *    history and the `.ml` on disk must be describing the same tasks.
+ * 1. an existing binding for the running app's open profile no longer blocks —
+ *    a bound profile with an unclaimed candidate syncing IS the drift fault, so
+ *    the abandoned partition is discarded and the binding released
+ *    (`recoverFromDrift`);
+ * 2. more than one candidate `dataFileUID` no longer blocks either — the most
+ *    recently seen is adopted (`chooseDriftCandidate`). Only ZERO candidates
+ *    still refuses, because there is nothing to bind to;
+ * 3. ground-truthing the candidate against the open data file still runs, and
+ *    is still the only check that can catch an adopted-the-wrong-file mistake,
+ *    but a refutation now warns instead of refusing.
  *
- * Guard 3 is what kills the foreign-profile hazard: another profile syncing
- * through the same endpoint is a lone candidate too, and nothing before the
- * pull can tell the two apart.
+ * That is a deliberate trade of safety for liveness, argued in ADR-0007: the
+ * foreign-profile hazard guards 1 and 2 existed to prevent is now real, and two
+ * copies of one profile syncing through the same proxy is the way it bites.
  *
- * Ordering is the other half of the contract: **the binding is written last**.
- * Pull, parse-verify, ground-truth and the row-store materialization all
- * happen first, so every partial failure leaves no binding behind and the next
- * proxied sync simply tries again. A failed guard is a typed refusal naming
- * it, which is also what a write refuses with while the profile is unbound.
+ * Ordering is the other half of the contract, and it is unchanged — it is also
+ * what keeps the trade above survivable: **the binding is written last**. Pull,
+ * parse-verify, ground-truth and the row-store materialization all happen
+ * first, so every partial failure leaves no binding behind and the next proxied
+ * sync simply tries again. Recovery follows the same rule: the abandoned
+ * partition goes before the pointer moves, so a crash mid-recovery reads as an
+ * unbound profile and re-recovers, rather than leaving a stale partition to be
+ * adopted a second time. The refusals that remain are typed, and are what a
+ * write refuses with while the profile is unbound.
  */
 
 export interface AutoInitRefusal extends Problem {
@@ -39,7 +50,15 @@ export interface AutoInitRefusal extends Problem {
 }
 
 export type AutoInitResult =
-  | { kind: "bound"; profilePath: string; dataFileUID: string; tasks: number; version: string }
+  | {
+      kind: "bound";
+      profilePath: string;
+      dataFileUID: string;
+      tasks: number;
+      version: string;
+      /** Present when this bind replaced a drifted one (ADR-0007). */
+      recovered?: DriftRecovery;
+    }
   /** Nothing to do: every cloud file seen syncing is already bound to a profile. */
   | { kind: "already-bound"; dataFileUID?: string }
   | { kind: "refused"; problem: AutoInitRefusal };
@@ -139,26 +158,14 @@ export class AutoInitializer {
       });
     }
 
-    // Guard 1. A bound profile is never re-bound behind the user's back: a
-    // rebind changes which history owns the profile, so it stays a human act.
-    const existing = await this.gateway.bindings.forProfile(profilePath);
-    if (existing?.dataFileUID) {
-      // Reached only with an unclaimed candidate in hand (the pre-check above),
-      // so this profile is bound to one cloud file while another is syncing —
-      // the binding-mismatch fault, never a healthy steady state.
-      return refuse({
-        kind: "binding-conflict",
-        title:
-          `this profile is bound to ${existing.dataFileUID}, but the sync traffic seen through the proxy is for ` +
-          `${seen.join(", ")} — auto-initialization never moves an existing binding`,
-        retryable: "after-user-action",
-        remedy: "rebind explicitly (the current binding is backed up first) if the new cloud file is the right one",
-        extensions: { boundDataFileUID: existing.dataFileUID, observedDataFileUIDs: seen },
-      });
-    }
-
-    // Guard 2. Exactly one candidate: a UID whose sync traffic this process has
-    // seen and that no other profile has claimed (resolved above).
+    // Guard 2 first, and it is the one guard ADR-0007 keeps: a UID whose sync
+    // traffic this process has seen and that no other profile has claimed.
+    //
+    // Order matters here, and getting it wrong is destructive. Recovery below
+    // must never run without a candidate in hand — an endpoint that has seen no
+    // traffic at all (MLO closed, or just restarted) reaches this point with a
+    // perfectly good binding, and discarding it then would delete a healthy
+    // partition for no reason and with nothing to adopt in its place.
     if (!candidates.length) {
       return refuse({
         kind: "no-bootstrap-candidate",
@@ -169,16 +176,28 @@ export class AutoInitializer {
           "sees the cloud file",
       });
     }
+    // Ambiguity used to refuse here (`ambiguous-bootstrap-candidate`, still
+    // declared in the error contract). ADR-0007 has it choose instead: the most
+    // recently seen candidate, checked by ground-truthing below rather than by
+    // asking the user which of two identical-looking cloud files is theirs.
+    const chosen = chooseDriftCandidate(candidates, await this.gateway.sightings.all().catch(() => []));
     if (candidates.length > 1) {
-      return refuse({
-        kind: "ambiguous-bootstrap-candidate",
-        title: `${candidates.length} unbound cloud files have synced through this proxy (${candidates.join(", ")})`,
-        retryable: "after-user-action",
-        remedy: "sync only the target profile, restart the sync endpoint, and sync once more",
-        extensions: { candidates },
-      });
+      log(`${candidates.length} unbound cloud files have synced through this proxy (${candidates.join(", ")}); ` +
+        `adopting the most recently seen, ${chosen}`);
     }
-    const uid = normalizeDataFileUid(candidates[0]!);
+    const uid = normalizeDataFileUid(chosen!);
+
+    // Guard 1, now a recovery — and deliberately AFTER a candidate exists. A
+    // bound profile with an unclaimed candidate syncing IS the drift fault,
+    // never a healthy steady state, so ADR-0007 repairs it here rather than
+    // refusing: the abandoned partition and everything queued in it are
+    // discarded and the binding released, so the bind below can adopt the
+    // identity MLO actually presents.
+    const existing = await this.gateway.bindings.forProfile(profilePath);
+    let recovered: DriftRecovery | undefined;
+    if (existing?.dataFileUID && existing.dataFileUID !== uid) {
+      recovered = await recoverFromDrift(this.gateway, profilePath, existing.dataFileUID);
+    }
 
     // The pull and everything derived from it run BEFORE the binding moves.
     let materialized;
@@ -188,15 +207,13 @@ export class AutoInitializer {
       return refuse(pullFailure(uid, error));
     }
     const verdict = groundTruthVerdict(await this.localGuids(profilePath), materialized.uids);
+    // ADR-0007: a refuted ground-truth no longer refuses. It is the one check
+    // that can catch an adopted-the-wrong-file mistake, so it is still run and
+    // still recorded — as the loudest thing the journal carries — but the bind
+    // proceeds. The alternative is the state ADR-0007 exists to end: a profile
+    // that cannot be written to until a human edits JSON.
     if (!verdict.ok) {
-      return refuse({
-        kind: "candidate-not-ground-truthed",
-        title: `${uid} did not ground-truth against ${profilePath}: ${verdict.detail}`,
-        retryable: "after-user-action",
-        remedy:
-          "make sure the profile MLO has open is the one whose cloud file synced through this proxy, then sync again",
-        extensions: { dataFileUID: uid, profilePath },
-      });
+      log(`WARNING: adopting ${uid} for ${profilePath} despite a refuted ground-truth: ${verdict.detail}`);
     }
 
     const partition = await this.gateway.registry.open(uid, "upstream");
@@ -215,8 +232,13 @@ export class AutoInitializer {
       });
     }
     await partition.journal.record(
-      "ok",
-      `auto-init: full history at version ${materialized.version} (${materialized.uids.length} tasks)`,
+      verdict.ok ? "ok" : "failed",
+      `auto-init: full history at version ${materialized.version} (${materialized.uids.length} tasks)` +
+        (recovered
+          ? `; recovered from drift — discarded ${recovered.discardedDataFileUID} ` +
+            `and ${recovered.discardedWrites} queued write(s)`
+          : "") +
+        (verdict.ok ? "" : `; GROUND-TRUTH REFUTED, adopted anyway (ADR-0007): ${verdict.detail}`),
     );
 
     // Last, and only now, and in one write: a binding is the claim that
@@ -230,6 +252,7 @@ export class AutoInitializer {
       dataFileUID: uid,
       tasks: materialized.uids.length,
       version: materialized.version,
+      ...(recovered ? { recovered } : {}),
     };
   }
 

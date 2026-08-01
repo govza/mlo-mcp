@@ -1,6 +1,15 @@
 # ADR-0002: A binding mismatch is reported and refused, never repaired automatically
 
-Status: accepted (2026-07-25)
+Status: **reversed (2026-08-01) by
+[ADR-0007](0007-recover-from-sync-drift-automatically.md)** — accepted 2026-07-25
+
+The fault this record describes is real and its diagnosis still applies; what
+changed is the response. ADR-0007 recovers from a mismatch automatically —
+discarding the abandoned partition and adopting the identity MLO presents —
+instead of refusing and waiting for a human. The write gate specified below was
+never built, so the "fails loudly, nothing is queued" consequence never shipped.
+The sighting marker, the `bindingMismatch` field, and this record's account of
+how the fault hides itself all remain accurate.
 
 ## Context
 

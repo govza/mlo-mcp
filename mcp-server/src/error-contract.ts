@@ -198,10 +198,10 @@ export const ERROR_CONTRACT = {
   "binding-mismatch": {
     tier: "write-gate",
     retryable: "after-user-action",
-    // Declared but not yet produced as a refusal: today the mismatch is
-    // reported by `cloud_status` and nothing gates writes on it. The gate
-    // belongs with the mismatch ticket, not here — this row is what it will
-    // refuse with, kept beside the others so the tier stays complete.
+    // Declared and never produced. The gate ADR-0002 specified was never built,
+    // and ADR-0007 removed the need for one: drift is now recovered from
+    // automatically, so there is no standing mismatch left to refuse on. Kept
+    // beside the others so the tier table stays complete.
     meaning: "MLO is syncing a dataFileUID other than the bound one, so writes would land where the app never reads",
     endedBy: "an explicit rebind, then one proxied sync that binds the UID MLO actually presents",
   },
@@ -223,6 +223,9 @@ export const ERROR_CONTRACT = {
     meaning: "the endpoint has seen no cloud file sync that could be this profile",
     endedBy: "one proxied sync from MLO, which gives the endpoint its candidate",
   },
+  // Both declared and no longer produced: ADR-0007 has auto-initialization
+  // choose the most recently sighted candidate rather than refuse, and warn on a
+  // refuted ground-truth rather than refuse. Kept for the complete tier table.
   "ambiguous-bootstrap-candidate": {
     tier: "write-gate",
     retryable: "after-user-action",

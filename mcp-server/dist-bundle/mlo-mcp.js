@@ -15956,10 +15956,10 @@ var ERROR_CONTRACT = {
   "binding-mismatch": {
     tier: "write-gate",
     retryable: "after-user-action",
-    // Declared but not yet produced as a refusal: today the mismatch is
-    // reported by `cloud_status` and nothing gates writes on it. The gate
-    // belongs with the mismatch ticket, not here — this row is what it will
-    // refuse with, kept beside the others so the tier stays complete.
+    // Declared and never produced. The gate ADR-0002 specified was never built,
+    // and ADR-0007 removed the need for one: drift is now recovered from
+    // automatically, so there is no standing mismatch left to refuse on. Kept
+    // beside the others so the tier table stays complete.
     meaning: "MLO is syncing a dataFileUID other than the bound one, so writes would land where the app never reads",
     endedBy: "an explicit rebind, then one proxied sync that binds the UID MLO actually presents"
   },
@@ -15981,6 +15981,9 @@ var ERROR_CONTRACT = {
     meaning: "the endpoint has seen no cloud file sync that could be this profile",
     endedBy: "one proxied sync from MLO, which gives the endpoint its candidate"
   },
+  // Both declared and no longer produced: ADR-0007 has auto-initialization
+  // choose the most recently sighted candidate rather than refuse, and warn on a
+  // refuted ground-truth rather than refuse. Kept for the complete tier table.
   "ambiguous-bootstrap-candidate": {
     tier: "write-gate",
     retryable: "after-user-action",
@@ -27639,6 +27642,21 @@ var PartitionRegistry = class {
     }
     return this.open(uid);
   }
+  /**
+   * Delete a partition and everything in it — the effecting half of drift
+   * recovery ([ADR-0007](../../../docs/adr/0007-recover-from-sync-drift-automatically.md)).
+   *
+   * Destructive by design: the queue inside it is discarded with the rest,
+   * because a queue whose row store described a data file that no longer exists
+   * is exactly what recovery exists to throw away. The cached handle goes first
+   * so no live reference can recreate the directory behind the removal.
+   */
+  async discard(rawUid) {
+    const uid = normalizeDataFileUid(rawUid);
+    const key = partitionKey(uid);
+    this.handles.delete(key);
+    await fs8.rm(path8.join(this.partitionsDir(), key), { recursive: true, force: true });
+  }
   async list() {
     let keys;
     try {
@@ -28322,6 +28340,24 @@ var SyncObserver = class {
 
 // src/cloud/auto-init.ts
 import { promises as fs15 } from "node:fs";
+
+// src/cloud/drift-recovery.ts
+function chooseDriftCandidate(candidates, sightings) {
+  if (candidates.length <= 1) return candidates[0];
+  const lastSeen = new Map(sightings.map((sighting) => [sighting.dataFileUID, Date.parse(sighting.lastSeen)]));
+  return [...candidates].sort((a, b) => (lastSeen.get(b) ?? -Infinity) - (lastSeen.get(a) ?? -Infinity))[0];
+}
+async function recoverFromDrift(gateway, profilePath, boundRawUid) {
+  const boundUid = normalizeDataFileUid(boundRawUid);
+  const abandoned = await gateway.registry.resolveExisting(boundUid).catch(() => void 0);
+  const discardedWrites = abandoned ? (await abandoned.queue.pending().catch(() => [])).length : 0;
+  await gateway.registry.discard(boundUid);
+  await gateway.bindings.unbindUid(profilePath);
+  log(
+    `drift recovery: ${profilePath} was bound to ${boundUid}, which MLO no longer syncs \u2014 partition discarded (${discardedWrites} queued write(s) dropped), binding released`
+  );
+  return { profilePath, discardedDataFileUID: boundUid, discardedWrites };
+}
 
 // src/cloud/upstream.ts
 var import_fast_xml_parser3 = __toESM(require_fxp(), 1);
@@ -29710,16 +29746,6 @@ var AutoInitializer = class {
         remedy: "open your profile in MLO, then sync once through the proxy"
       });
     }
-    const existing = await this.gateway.bindings.forProfile(profilePath);
-    if (existing?.dataFileUID) {
-      return refuse2({
-        kind: "binding-conflict",
-        title: `this profile is bound to ${existing.dataFileUID}, but the sync traffic seen through the proxy is for ${seen.join(", ")} \u2014 auto-initialization never moves an existing binding`,
-        retryable: "after-user-action",
-        remedy: "rebind explicitly (the current binding is backed up first) if the new cloud file is the right one",
-        extensions: { boundDataFileUID: existing.dataFileUID, observedDataFileUIDs: seen }
-      });
-    }
     if (!candidates.length) {
       return refuse2({
         kind: "no-bootstrap-candidate",
@@ -29728,16 +29754,16 @@ var AutoInitializer = class {
         remedy: 'run one ordinary sync in MLO through this proxy ("Use secure connection" unchecked) so the endpoint sees the cloud file'
       });
     }
+    const chosen = chooseDriftCandidate(candidates, await this.gateway.sightings.all().catch(() => []));
     if (candidates.length > 1) {
-      return refuse2({
-        kind: "ambiguous-bootstrap-candidate",
-        title: `${candidates.length} unbound cloud files have synced through this proxy (${candidates.join(", ")})`,
-        retryable: "after-user-action",
-        remedy: "sync only the target profile, restart the sync endpoint, and sync once more",
-        extensions: { candidates }
-      });
+      log(`${candidates.length} unbound cloud files have synced through this proxy (${candidates.join(", ")}); adopting the most recently seen, ${chosen}`);
     }
-    const uid = normalizeDataFileUid(candidates[0]);
+    const uid = normalizeDataFileUid(chosen);
+    const existing = await this.gateway.bindings.forProfile(profilePath);
+    let recovered;
+    if (existing?.dataFileUID && existing.dataFileUID !== uid) {
+      recovered = await recoverFromDrift(this.gateway, profilePath, existing.dataFileUID);
+    }
     let materialized;
     try {
       materialized = await this.pullAndVerify(uid);
@@ -29746,13 +29772,7 @@ var AutoInitializer = class {
     }
     const verdict = groundTruthVerdict(await this.localGuids(profilePath), materialized.uids);
     if (!verdict.ok) {
-      return refuse2({
-        kind: "candidate-not-ground-truthed",
-        title: `${uid} did not ground-truth against ${profilePath}: ${verdict.detail}`,
-        retryable: "after-user-action",
-        remedy: "make sure the profile MLO has open is the one whose cloud file synced through this proxy, then sync again",
-        extensions: { dataFileUID: uid, profilePath }
-      });
+      log(`WARNING: adopting ${uid} for ${profilePath} despite a refuted ground-truth: ${verdict.detail}`);
     }
     const partition = await this.gateway.registry.open(uid, "upstream");
     try {
@@ -29768,8 +29788,8 @@ var AutoInitializer = class {
       });
     }
     await partition.journal.record(
-      "ok",
-      `auto-init: full history at version ${materialized.version} (${materialized.uids.length} tasks)`
+      verdict.ok ? "ok" : "failed",
+      `auto-init: full history at version ${materialized.version} (${materialized.uids.length} tasks)` + (recovered ? `; recovered from drift \u2014 discarded ${recovered.discardedDataFileUID} and ${recovered.discardedWrites} queued write(s)` : "") + (verdict.ok ? "" : `; GROUND-TRUTH REFUTED, adopted anyway (ADR-0007): ${verdict.detail}`)
     );
     await this.gateway.bindings.bind(profilePath, "upstream", uid);
     log(`auto-initialized ${profilePath} -> ${uid} at vendor version ${materialized.version} (${materialized.uids.length} tasks, ground-truth overlap ${verdict.overlap})`);
@@ -29778,7 +29798,8 @@ var AutoInitializer = class {
       profilePath,
       dataFileUID: uid,
       tasks: materialized.uids.length,
-      version: materialized.version
+      version: materialized.version,
+      ...recovered ? { recovered } : {}
     };
   }
   /**

@@ -8,7 +8,9 @@ import {
   type AutoInitPorts,
   type PulledHistory,
 } from "../../src/cloud/auto-init.js";
+import { chooseDriftCandidate, recoverFromDrift } from "../../src/cloud/drift-recovery.js";
 import { CloudGateway } from "../../src/cloud/gateway.js";
+import { partitionKey } from "../../src/cloud/partition.js";
 import { buildTaskAddDelta } from "../../src/cloud/mlo-schema.js";
 import { packEnvelope } from "../../src/cloud/envelope.js";
 import type { VendorContact } from "../../src/cloud/upstream.js";
@@ -130,15 +132,21 @@ describe("guarded auto-initialization", () => {
     expect(await boundUid(gateway)).toBeUndefined();
   });
 
-  it("refuses to move an existing binding when a different cloud file syncs", async () => {
+  it("recovers the binding when a different cloud file syncs, instead of refusing (ADR-0007)", async () => {
     const { gateway, autoInit } = await rig();
     await gateway.bindings.create(PROFILE, "upstream");
     await gateway.bindings.bindUid(PROFILE, OTHER_UID);
 
     const result = await autoInit.attempt();
 
-    expect(result).toMatchObject({ kind: "refused", problem: { kind: "binding-conflict" } });
-    expect(await boundUid(gateway)).toBe(OTHER_UID);
+    // The drift fault: bound to one identity, syncing another. ADR-0002 refused
+    // this and left the repair to a human; ADR-0007 adopts the live identity.
+    expect(result).toMatchObject({
+      kind: "bound",
+      dataFileUID: UID,
+      recovered: { discardedDataFileUID: OTHER_UID },
+    });
+    expect(await boundUid(gateway)).toBe(UID);
   });
 
   it("refuses with no candidate at all", async () => {
@@ -151,14 +159,16 @@ describe("guarded auto-initialization", () => {
     expect(await boundUid(gateway)).toBeUndefined();
   });
 
-  it("refuses when two unbound cloud files have synced through the proxy", async () => {
-    const { gateway, autoInit, calls } = await rig({}, { candidates: [UID, OTHER_UID] });
+  it("adopts the most recently seen candidate when two unbound cloud files have synced (ADR-0007)", async () => {
+    const { gateway, autoInit } = await rig({}, { candidates: [UID, OTHER_UID] });
+    // Sighting order, not contact order, is what decides: OTHER_UID is seen last.
+    await gateway.sightings.note(UID);
+    await gateway.sightings.note(OTHER_UID);
 
     const result = await autoInit.attempt();
 
-    expect(result).toMatchObject({ kind: "refused", problem: { kind: "ambiguous-bootstrap-candidate" } });
-    expect(calls.pulls).toEqual([]);
-    expect(await boundUid(gateway)).toBeUndefined();
+    expect(result).toMatchObject({ kind: "bound", dataFileUID: OTHER_UID });
+    expect(await boundUid(gateway)).toBe(OTHER_UID);
   });
 
   it("ignores a candidate another profile already claims", async () => {
@@ -193,13 +203,18 @@ describe("the auto-init pull, stage by stage", () => {
     expect(await boundUid(gateway)).toBeUndefined();
   });
 
-  it("writes no binding when the history ground-truths against a different profile", async () => {
+  it("binds anyway when the history ground-truths against a different profile, and records it (ADR-0007)", async () => {
     const { gateway, autoInit } = await rig({ localTaskGuids: async () => [FOREIGN_TASK] });
 
     const result = await autoInit.attempt();
 
-    expect(result).toMatchObject({ kind: "refused", problem: { kind: "candidate-not-ground-truthed" } });
-    expect(await boundUid(gateway)).toBeUndefined();
+    // This is the trade ADR-0007 makes with its eyes open: the one check that
+    // catches an adopted-the-wrong-file mistake now warns instead of refusing.
+    expect(result).toMatchObject({ kind: "bound", dataFileUID: UID });
+    expect(await boundUid(gateway)).toBe(UID);
+    const partition = await gateway.registry.open(UID, "upstream");
+    const journal = await partition.journal.entries();
+    expect(journal.some((entry) => /GROUND-TRUTH REFUTED/.test(entry.detail ?? ""))).toBe(true);
   });
 
   it("writes no binding when materializing the row store fails, and says so", async () => {
@@ -222,6 +237,95 @@ describe("the auto-init pull, stage by stage", () => {
 
     expect(await autoInit.attempt()).toMatchObject({ kind: "bound" });
     expect(await boundUid(gateway)).toBe(UID);
+  });
+});
+
+describe("drift recovery (ADR-0007)", () => {
+  /** A queued write in the partition recovery is about to throw away. */
+  async function queueWriteInto(gateway: CloudGateway, uid: string): Promise<void> {
+    const partition = await gateway.registry.open(uid, "upstream");
+    await partition.queue.enqueue({
+      writeId: "w-doomed",
+      uid: TASK,
+      verb: "add",
+      caption: "a folder the user asked for",
+      rows: [{ section: "TodoItems", values: [] }],
+      queuedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+    });
+  }
+
+  async function driftedRig(): Promise<Rig> {
+    const built = await rig();
+    await built.gateway.bindings.create(PROFILE, "upstream");
+    await built.gateway.bindings.bindUid(PROFILE, OTHER_UID);
+    await queueWriteInto(built.gateway, OTHER_UID);
+    return built;
+  }
+
+  it("chooses the most recently seen candidate, and needs no sighting to choose a lone one", () => {
+    const sightings = [
+      { dataFileUID: OTHER_UID, firstSeen: "2026-08-01T10:00:00Z", lastSeen: "2026-08-01T12:00:00Z", count: 2 },
+      { dataFileUID: UID, firstSeen: "2026-07-27T10:00:00Z", lastSeen: "2026-07-27T10:00:00Z", count: 1 },
+    ];
+    expect(chooseDriftCandidate([UID, OTHER_UID], sightings)).toBe(OTHER_UID);
+    expect(chooseDriftCandidate([UID], [])).toBe(UID);
+    expect(chooseDriftCandidate([], sightings)).toBeUndefined();
+  });
+
+  it("prefers a sighted candidate over one seen only as a vendor contact", () => {
+    const sightings = [{ dataFileUID: UID, firstSeen: "2026-08-01T10:00:00Z", lastSeen: "2026-08-01T10:00:00Z", count: 1 }];
+    expect(chooseDriftCandidate([OTHER_UID, UID], sightings)).toBe(UID);
+  });
+
+  it("deletes the abandoned partition and the writes queued in it", async () => {
+    const { gateway, root } = await driftedRig();
+    const abandonedKey = partitionKey(OTHER_UID);
+    expect((await gateway.registry.open(OTHER_UID).then((p) => p.queue.pending())).length).toBe(1);
+
+    const recovered = await recoverFromDrift(gateway, PROFILE, OTHER_UID);
+
+    // Discarded, not dead-lettered and not replayed: the row store those writes
+    // were authored from described a data file that no longer exists.
+    expect(recovered).toMatchObject({ discardedDataFileUID: OTHER_UID, discardedWrites: 1 });
+    await expect(fs.stat(path.join(root, "partitions", abandonedKey))).rejects.toThrow();
+    expect(await boundUid(gateway)).toBeUndefined();
+  });
+
+  it("survives a crash between the discard and the rebind by re-recovering", async () => {
+    const { gateway, autoInit } = await driftedRig();
+    // The half-recovered state: partition gone, pointer not yet moved.
+    await gateway.registry.discard(OTHER_UID);
+
+    const result = await autoInit.attempt();
+
+    expect(result).toMatchObject({ kind: "bound", dataFileUID: UID });
+    expect(await boundUid(gateway)).toBe(UID);
+  });
+
+  it("leaves a healthy binding alone — recovery only fires on drift", async () => {
+    const { gateway, autoInit, calls } = await rig();
+    await autoInit.attempt();
+    const pullsAfterBinding = calls.pulls.length;
+
+    expect(await autoInit.attempt()).toMatchObject({ kind: "already-bound" });
+    expect(await boundUid(gateway)).toBe(UID);
+    expect(calls.pulls.length).toBe(pullsAfterBinding);
+  });
+
+  it("still refuses when there is no candidate to recover onto", async () => {
+    const { gateway, autoInit } = await rig({}, { candidates: [] });
+    await gateway.bindings.create(PROFILE, "upstream");
+    await gateway.bindings.bindUid(PROFILE, OTHER_UID);
+
+    const result = await autoInit.attempt();
+
+    // Nothing is syncing, so there is no drift to see and nothing to adopt: the
+    // ordinary zero-candidate refusal stands. What matters is the last line —
+    // recovery must not fire here, or a working binding would be destroyed
+    // every time MLO happened to be closed.
+    expect(result).toMatchObject({ kind: "refused", problem: { kind: "no-bootstrap-candidate" } });
+    expect(await boundUid(gateway)).toBe(OTHER_UID);
   });
 });
 
