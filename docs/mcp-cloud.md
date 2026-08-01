@@ -279,12 +279,13 @@ listening afterwards.
 
 ## Configuration
 
-No configuration is needed: the data file is auto-detected from the profile MLO
-has open — the registry's `LastDBFile` proposes it and the running app confirms
-it ([ADR-0004](adr/0004-ground-truth-the-open-profile.md)) — it follows profile
-switches, and a session refuses to start when it cannot establish which profile
-the app has open. The resident deliberately does not inherit that refusal: it
-must come up before MLO has ever been opened.
+No configuration is needed: the data file is auto-detected by asking the running
+MLO which profile it has open, and nothing it saved for next time is read
+([ADR-0006](adr/0006-detect-the-open-profile-from-the-process-alone.md)). It
+follows profile switches, and a session refuses to start when it cannot
+establish which profile the app has open — including when MLO is not running,
+since then no profile is open. The resident deliberately does not inherit that
+refusal: it must come up before MLO has ever been opened.
 
 | Env var | Default | Meaning |
 |---|---|---|

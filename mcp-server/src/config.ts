@@ -37,12 +37,11 @@ export const DEFAULT_WRITE_TTL_MS = 15 * 60_000;
 
 // The app's open profile is the only one the server can fully operate on
 // (reads drive mlo.exe, writes ride that profile's sync), so there is no
-// profile setting: detect it or refuse to start. Detection grounds the
-// registry's candidate against the running app rather than trusting it — see
-// profile-detect.ts for why the registry value alone is not enough.
+// profile setting: detect it or refuse to start. Detection asks the running
+// app and nothing else — see profile-detect.ts for why nothing MLO saved for
+// next time may stand in for it.
 // `--data-file=` exists for the test harness alone — it runs mlo.exe on temp
-// copies with the GUI closed, where following the registry would hit the
-// developer's real profile.
+// copies with the GUI closed, where detection has no running app to ask.
 function resolveDataFile(mloExePath: string): { dataFile: string; autoDetected: boolean } {
   const pin = process.argv.find((a) => a.startsWith("--data-file="));
   if (pin) return { dataFile: pin.slice("--data-file=".length), autoDetected: false };
@@ -69,7 +68,7 @@ export interface CloudConfig {
   /**
    * The resident needs this too, and not to run anything: auto-initialization
    * asks the running app which profile it has open, and the probe finds the app
-   * by this executable's name.
+   * by this executable's name (and a portable install's log beside it).
    */
   mloExePath: string;
 }
@@ -91,8 +90,8 @@ export function loadCloudConfig(): CloudConfig {
     cloudPort,
     cloudStateRoot: resolveStateRoot(),
     // `||`, not `??`: a blank override would yield an empty process name, match
-    // nothing, and make detection report MLO as closed — which accepts the
-    // registry candidate unchecked.
+    // no process, and make detection report MLO as closed — which is now a
+    // refusal to start on a machine that has a profile plainly open.
     mloExePath: process.env.MLO_EXE_PATH || DEFAULT_EXE,
     writeTtlMs: Number.isFinite(ttlMinutes) && ttlMinutes > 0 ? ttlMinutes * 60_000 : DEFAULT_WRITE_TTL_MS,
   };

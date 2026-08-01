@@ -110,13 +110,15 @@ function watchOwnBuild(): void {
  * cleanly while idle so the client respawns on the next tool call. Never fires
  * when a --data-file test pin is in effect.
  *
- * A refusal is a reason to exit too: it means MLO no longer has our profile
- * open, and a session that stayed up would keep answering from the wrong one.
- * The respawn re-runs detection, which refuses in loadConfig() and exits with
- * the reason on stderr — the loud failure we want, though a startup failure
- * rather than a protocol error, since there is no connected session to fail.
- * Only "profile-switched" qualifies — a failed probe ("no-profile") is transient
- * and must not cycle a working session.
+ * A refusal is a reason to exit too: it means the running app no longer has our
+ * profile open — or is no longer running at all, which under process-only
+ * detection is the same thing (ADR-0006). A session that stayed up would keep
+ * answering from a profile nothing has open. The respawn re-runs detection,
+ * which refuses in loadConfig() and exits with the reason on stderr — the loud
+ * failure we want, though a startup failure rather than a protocol error, since
+ * there is no connected session to fail. Only the two *definite* refusals
+ * qualify; "profile-undetectable" means the probe could not tell (it failed, or
+ * MLO's log was unreadable) and must not cycle a working session.
  */
 function watchProfileSwitch(config: MloConfig): void {
   if (!config.dataFileAutoDetected) return;
@@ -131,8 +133,8 @@ function watchProfileSwitch(config: MloConfig): void {
       log(`MLO switched profiles (${config.dataFile} → ${verdict.dataFile}) — exiting so the client restarts against it`);
       process.exit(0);
     }
-    if (!verdict.ok && verdict.reason === "profile-switched") {
-      log(`MLO no longer has ${config.dataFile} open — exiting rather than serving it`);
+    if (!verdict.ok && verdict.reason !== "profile-undetectable") {
+      log(`MLO no longer has ${config.dataFile} open — exiting rather than serving it: ${verdict.message}`);
       process.exit(0);
     }
   }, 60_000);

@@ -1,6 +1,15 @@
 # ADR-0004: Ground-truth the open profile against the running app, and refuse when it disagrees
 
-Status: accepted (2026-07-25), implemented (2026-07-25)
+Status: superseded (2026-08-01) by
+[ADR-0006](0006-detect-the-open-profile-from-the-process-alone.md), which drops
+the registry candidate entirely and asks the running process alone. Accepted
+(2026-07-25), implemented (2026-07-25).
+
+> Kept for the fault it documents, which is still why detection refuses rather
+> than guesses. Two claims below are corrected by ADR-0006: a *missing*
+> `LastDBFile` cannot be ground-truthed at all (it refuses unconditionally,
+> which is what broke a default install), and there **is** an MLO-maintained
+> recent-profiles list on disk (`Settings\MRU`) — it was simply stale too.
 
 ## Context
 

@@ -237,17 +237,26 @@ export const ERROR_CONTRACT = {
   },
 
   // --- Startup verdict: refuse to start, exit 1 — before serving only ------
-  "no-profile": {
+  // The three detection refusals (ADR-0006). The first two are definite — the
+  // running app has no usable profile open, or not ours — and a live session
+  // exits on them. The third is "we could not tell", which never cycles one.
+  "profile-not-open": {
     tier: "startup-verdict",
     retryable: "after-user-action",
-    meaning: "no MLO profile could be detected to serve",
-    remedy: "open the profile in MLO, then start the server again",
+    meaning: "the app has no saved profile open to serve — it is not running, or its outline was never saved",
+    remedy: "open the profile in MLO (saving it first if it is new), then start the server again",
   },
-  "profile-switched": {
+  "profile-contradicted": {
     tier: "startup-verdict",
     retryable: "after-user-action",
-    meaning: "the app no longer has the served profile open",
-    remedy: "the client restarts the server, which re-detects whichever profile MLO now has open",
+    meaning: "the app's own signals disagree about which profile it has open, or two instances hold different ones",
+    remedy: "reopen the profile you want to work in from MLO, leaving one instance running",
+  },
+  "profile-undetectable": {
+    tier: "startup-verdict",
+    retryable: true,
+    meaning: "which profile the app has open could not be established — the probe failed or MLO's log was unreadable",
+    remedy: "re-enable MLO's logging if it was turned off, reopen the profile, and start the server again",
   },
   "port-conflict": {
     tier: "startup-verdict",

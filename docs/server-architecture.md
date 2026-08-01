@@ -47,20 +47,22 @@ src/
                     tools/registry.ts; separate from index.ts so a test can
                     connect a real client in memory
   config.ts         MloConfig + CloudConfig (data file: auto-detected via
-                    profile-detect.ts or refuse to start; --data-file= pins it
-                    for the test harness only; env: MLO_EXE_PATH,
+                    profile-detect.ts or refuse to start, so MLO must be
+                    running; --data-file= pins it for the test harness only,
+                    which runs with the GUI closed; env: MLO_EXE_PATH,
                     MLO_EXPORT_DIR, MLO_CACHE_STALE_MS, MLO_INBOX_CAPTION,
                     MLO_CLOUD_HOST/PORT/STATE_ROOT, MLO_WRITE_TTL_MINUTES)
   context.ts        ToolContext construction — the required-services struct
   error-contract.ts the four-tier failure table AS DATA, plus the per-boundary
                     unions derived from it (see below)
   result.ts         ServiceResult carrier: ok/failed, advisories
-  profile-detect.ts which profile MLO actually has open: the registry's
-                    LastDBFile proposes a candidate, the running app's window
-                    title and its hold on the file can refute it, and a refuted
-                    candidate is a refusal to start (ADR-0004). One PowerShell
-                    round trip gathers the observation; judgeProfile() is the
-                    pure policy over it
+  profile-detect.ts which profile MLO actually has open, asking the running
+                    process and nothing it saved for next time: each mlo.exe's
+                    own pid-tagged block in MLO's log names the profile that run
+                    opened, corroborated by the window title and by MLO's hold on
+                    the file, and a contradiction is a refusal to start
+                    (ADR-0006). One PowerShell round trip gathers the
+                    observation; judgeProfile() is the pure policy over it
   tools/*.ts        one declarative MloTool per file; contract.ts = defineTool /
                     registerTool / guard (controller infra); registry.ts = the
                     authoritative tool list
@@ -209,9 +211,10 @@ sync state inside the `.ml`.
   - the **auto-init suite** fault-injects each pull stage (pull, validate,
     ground-truth) and asserts no binding is written on any partial failure.
   One suite is the exception to "no live machine": `profile-detect`'s
-  probe-contract block runs the real PowerShell probe, because the seam it pins
-  (the script's JSON shape) has no other test. It is Windows-gated and read-only,
-  needs no mlo.exe, and so runs with the GUI open.
+  probe-contract block runs the real PowerShell probe, because the seams it pins
+  (the script's JSON shape, and the log lines it selects being lines the parser
+  understands) have no other test. It is Windows-gated and read-only, needs no
+  mlo.exe, and so runs with the GUI open.
 - **mlo** (serial, slow) — real `mlo.exe` against a temp copy of the test
   profile: export, exit codes, GUID recovery; plus the stdio E2E (tool
   listing/annotations, instructions, read tools, `cloud_status`). **GUI must be

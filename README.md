@@ -17,7 +17,7 @@ Installing is two steps. **Step 1 gets you reading** — tools that list, search
 
 ### Step 1 — Register the server with your MCP client
 
-There is no profile setting. The server operates on whatever profile MLO currently has open (auto-detected from MLO's own settings in the registry) and follows you across profile switches.
+There is no profile setting. The server operates on whatever profile MLO currently has open (auto-detected by asking the running app itself) and follows you across profile switches. Keep MLO running — it is the only thing that knows which profile is open.
 
 **Any MCP client** (via npx, straight from GitHub — no npm registry):
 

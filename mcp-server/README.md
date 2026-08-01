@@ -56,26 +56,34 @@ when it cannot establish one. This isn't just convenience — reads drive
 `mlo.exe` and writes ride the open profile's sync, so the app's current
 profile is the only one the server can fully operate on.
 
-Detection does not simply trust the registry. The `LastDBFile` value under
-`HKCU\Software\MyLifeOrganized.net\MyLife\Settings` supplies a *candidate*,
-which is then checked against the running MLO — because MLO writes that value
-when it **exits**, not when it opens a profile, so it goes stale the moment
-you switch profiles in the app. The running app is asked two questions the
-registry cannot answer: what its window title says it has open, and whether
-it is actually holding the candidate file open. If either answer contradicts
-the candidate, the server **refuses to start** and names both the stale path
-and what MLO really has open, rather than silently reading the wrong task
-tree and queueing writes against the wrong profile's sync
-([ADR-0004](../docs/adr/0004-ground-truth-the-open-profile.md)). Fix a
-refusal by switching back to that profile in MLO, or by closing and reopening
-MLO so it records the profile you are actually using.
+**Detection asks the running app and nothing else.** Nothing MLO saved for
+next time is read — not the registry's `LastDBFile`, not its recent-files
+list — because a saved value describes a session that has ended: `LastDBFile`
+is written when MLO **exits**, so it is stale after an in-app profile switch
+and empty on an install that has never exited cleanly (MLO's tray defaults
+mean closing the window doesn't exit it). Instead the running `mlo.exe` is
+asked directly. MLO writes one block per run in its own log, tagged with that
+run's pid, recording every profile the run opens; the last one it names is
+the open profile. Two further signals from the same process corroborate it —
+the window title, and the fact that MLO holds its open profile locked all
+session — and if either contradicts the answer, the server **refuses to
+start** and names the disagreement rather than silently reading the wrong
+task tree and queueing writes against the wrong profile's sync
+([ADR-0006](../docs/adr/0006-detect-the-open-profile-from-the-process-alone.md)).
+
+So **MLO must be running.** With no app there is no open profile, and the
+server will not invent one. Refusals name their own remedy: start MLO, save
+the new outline you have open, close the second instance, or re-enable MLO's
+logging if it was turned off.
 
 It also follows profile switches: a background check (every 60s) notices when
 MLO opens a different profile — or stops having this one open — and exits
 while idle, so the MCP client respawns the server against the current profile
-on the next tool call. (The test suite, which runs `mlo.exe` on temp copies
-with the GUI closed, pins its profile with an internal `--data-file=`
-argument; that bypasses these checks and disables the switch-following.)
+on the next tool call. A refusal that only means *we could not tell* (the
+probe failed, the log was unreadable) never cycles a running session. (The
+test suite, which runs `mlo.exe` on temp copies with the GUI closed, pins its
+profile with an internal `--data-file=` argument; that bypasses these checks
+and disables the switch-following.)
 
 ## Tools
 

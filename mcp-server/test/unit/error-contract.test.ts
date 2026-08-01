@@ -96,7 +96,7 @@ describe("error contract review gates", () => {
 
   it("post-startup nothing stops the server: only startup verdicts may exit", () => {
     const exiting = entries.filter(([, contract]) => contract.tier === "startup-verdict").map(([kind]) => kind);
-    expect(exiting.sort()).toEqual(["no-profile", "port-conflict", "profile-switched"]);
+    expect(exiting.sort()).toEqual(["port-conflict", "profile-contradicted", "profile-not-open", "profile-undetectable"]);
   });
 });
 

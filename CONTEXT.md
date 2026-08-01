@@ -6,9 +6,9 @@ Ubiquitous language for this repo. Terms are defined here in one or two lines; t
 
 - **MLO** — MyLifeOrganized, the Windows desktop outliner this server drives via `mlo.exe`'s command line ([docs/mlo/mlo-cli.md](docs/mlo/mlo-cli.md)).
 - **Profile / `.ml` data file** — MLO's single binary data file. Auto-detected, never configured; the server never rewrites it.
-- **Profile candidate** — the path the registry's `LastDBFile` proposes. A proposal only: MLO writes that value when it *exits*, so it goes stale on an in-app profile switch ([ADR-0004](docs/adr/0004-ground-truth-the-open-profile.md)).
-- **Refute (a candidate)** — what the running app's own evidence does to a stale candidate: a window title naming a different profile, or the candidate file being one MLO does not hold open. An *unavailable* signal never refutes.
-- **Profile verdict** — detection's answer: the accepted data file, or a refusal (`profile-switched` / `no-profile`). A refuted candidate refuses; it is never silently replaced with a guess.
+- **Session block** — the run of MLO's own log tagged with one `mlo.exe` pid. The only source detection reads: the profile it last records that run opening is the open profile. Nothing MLO saved for next time (`LastDBFile`, the `MRU` list) is consulted ([ADR-0006](docs/adr/0006-detect-the-open-profile-from-the-process-alone.md)).
+- **Corroborate** — what the running app's other two signals do to the answer its log gives: a window title naming the same file, and that file being held open. An *unavailable* signal never refutes; a contradicting one refuses.
+- **Profile verdict** — detection's answer: the accepted data file, or a refusal. Refusals split by what a live session must do: `no-open-profile` and `contradicted` are definite (exit), `undetectable` means we could not tell (stay up). Never a guess.
 - **Task tree** — one deep outline; deep nesting is idiomatic. The task model (computed-score priority, contexts, dependencies, visibility) is in [docs/mlo/mlo-task-model.md](docs/mlo/mlo-task-model.md).
 - **Context (MLO "Place")** — `@Office`-style GTD context attached to tasks. Hierarchical (a context *includes* narrower ones) and optionally open only during declared hours.
 - **To-Do list** — the flattened, ranked action list derived from the task tree; only tasks with no uncompleted children appear ([docs/mlo/mlo-task-model.md](docs/mlo/mlo-task-model.md) §1).

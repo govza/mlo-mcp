@@ -15120,65 +15120,151 @@ function openProfileNames(windowTitles) {
     return [path.win32.basename(named[1])];
   });
 }
-var NO_PROFILE_AT_ALL = "No MLO profile found: MLO's settings record no last-opened profile. Open your profile in MLO once so the server can detect it.";
+var LOG_LINE = /^\d\S*\s+\[(\d+)\]\s+\d[\d:.]*\s+(.*)$/;
+var SESSION_START = /^---\s*Log started\b/i;
+var OPENED_FILE = /^(?:Opening datafile|Save as):\s*(.+?)\s*$/i;
+var NEW_FILE = /^New data file created\b/i;
+function parseLogEvents(lines) {
+  return lines.flatMap((line) => {
+    const matched = LOG_LINE.exec(line);
+    if (!matched) return [];
+    const pid = Number(matched[1]);
+    const message = matched[2];
+    if (SESSION_START.test(message)) return [{ pid, kind: "started" }];
+    if (NEW_FILE.test(message)) return [{ pid, kind: "unsaved" }];
+    const opened = OPENED_FILE.exec(message);
+    return opened ? [{ pid, kind: "opened", file: opened[1] }] : [];
+  });
+}
+function resolveRun(pid, events) {
+  const mine = events.filter((event) => event.pid === pid);
+  const started = mine.map((event) => event.kind).lastIndexOf("started");
+  if (started < 0) return { kind: "unknown" };
+  let open;
+  let unsaved = false;
+  for (const event of mine.slice(started + 1)) {
+    if (event.kind === "opened" && event.file) {
+      open = event.file;
+      unsaved = false;
+    } else if (event.kind === "unsaved") {
+      open = void 0;
+      unsaved = true;
+    }
+  }
+  if (open) return { kind: "profile", dataFile: open };
+  return unsaved ? { kind: "unsaved" } : { kind: "unknown" };
+}
 var PROBE_FAILED = "Could not detect which profile MLO has open: the detection probe did not return a usable result. It needs Windows and powershell.exe. Check the server's stderr log for the probe's own output.";
-function switchedMessage(candidate, openNames) {
-  const actual = openNames.length ? openNames.map((n) => `"${n}"`).join(", ") : "another profile (it does not hold this file open)";
-  return `MLO has a different profile open than its own settings record.
-  settings (LastDBFile): ${candidate}
-  MLO actually has open: ${actual}
-MLO writes LastDBFile only when it exits, so the value goes stale after an in-app profile switch. Refusing to start rather than operating on a profile you are not using: reads would return the wrong task tree and writes would ride the wrong profile's sync.
-To fix, either switch back to that profile in MLO, or close and reopen MLO so it records the profile you are actually using.`;
+var NOT_RUNNING = "No MLO profile: MLO is not running. The running app is the only thing that knows which profile is open \u2014 nothing it saved for next time is used, because that describes a session that has ended. Start MLO (it reopens your profile itself), then retry.";
+var NO_LOG = "Could not detect which profile MLO has open: MLO's own log could not be read. That log is where a running MLO records the profile it opened, and it is enabled by default \u2014 re-enable logging in MLO's options if it was turned off, reopen your profile, then retry.";
+var NO_SESSION = "Could not detect which profile MLO has open: MLO's log carries no session for the running app. Its log had most likely rotated by the time this run opened its profile. Reopen the profile in MLO (File \u2192 Open Recent) so the running app records it, then retry.";
+var UNSAVED = "MLO has a new outline open that has never been saved, so there is no data file to operate on. Save it in MLO, then retry.";
+function ambiguousMessage(profiles) {
+  return `${profiles.length} MLO instances are running with different profiles open:
+` + profiles.map((p) => `  ${p}`).join("\n") + `
+"the profile MLO has open" has no single answer while that is true, and guessing one would read the wrong task tree and ride the wrong profile's sync. Close all but the instance you are working in, then retry.`;
+}
+function disagreementMessage(dataFile, detail) {
+  return `MLO's own signals disagree about which profile it has open.
+  its log says it opened: ${dataFile}
+  ${detail}
+Refusing to start rather than operating on a profile you may not be using: reads would return the wrong task tree and writes would ride the wrong profile's sync.
+Reopen the profile you want to work in from MLO, then retry.`;
+}
+function refuse(reason, message) {
+  return { ok: false, reason, message };
+}
+function stateOf(held, dataFile) {
+  const wanted = dataFile.toLowerCase();
+  return Object.entries(held).find(([file]) => file.toLowerCase() === wanted)?.[1];
 }
 function judgeProfile(observed) {
-  if (!observed) return { ok: false, reason: "no-profile", message: PROBE_FAILED };
-  const candidate = observed.lastDbFile;
-  if (!candidate) return { ok: false, reason: "no-profile", message: NO_PROFILE_AT_ALL };
-  if (!observed.lastDbFileExists) {
-    return {
-      ok: false,
-      reason: "no-profile",
-      message: `MLO's settings point at ${candidate}, which no longer exists. Open the profile you want to use in MLO so the server can detect it.`
-    };
+  if (!observed) return refuse("profile-undetectable", PROBE_FAILED);
+  if (!observed.apps.length) return refuse("profile-not-open", NOT_RUNNING);
+  if (!observed.logRead) return refuse("profile-undetectable", NO_LOG);
+  const events = parseLogEvents(observed.lines);
+  const runs = observed.apps.map((app) => resolveRun(app.pid, events));
+  const open = /* @__PURE__ */ new Map();
+  for (const run of runs) if (run.kind === "profile") open.set(run.dataFile.toLowerCase(), run.dataFile);
+  const profiles = [...open.values()];
+  if (profiles.length > 1) return refuse("profile-contradicted", ambiguousMessage(profiles));
+  if (!profiles.length) {
+    return runs.some((run) => run.kind === "unsaved") ? refuse("profile-not-open", UNSAVED) : refuse("profile-undetectable", NO_SESSION);
   }
-  if (!observed.appRunning) return { ok: true, dataFile: candidate };
-  const openNames = openProfileNames(observed.windowTitles);
-  const wanted = path.win32.basename(candidate).toLowerCase();
-  const titleRefutes = openNames.length > 0 && !openNames.some((n) => n.toLowerCase() === wanted);
-  const lockRefutes = observed.lastDbFileHeldByOther === false;
-  if (titleRefutes || lockRefutes) {
-    return { ok: false, reason: "profile-switched", message: switchedMessage(candidate, openNames) };
+  const dataFile = profiles[0];
+  const titles = openProfileNames(observed.apps.map((app) => app.windowTitle));
+  const wanted = path.win32.basename(dataFile).toLowerCase();
+  if (titles.length && !titles.some((name) => name.toLowerCase() === wanted)) {
+    const named = titles.map((name) => `"${name}"`).join(", ");
+    return refuse("profile-contradicted", disagreementMessage(dataFile, `its window titles name: ${named}`));
   }
-  return { ok: true, dataFile: candidate };
+  const state = stateOf(observed.held, dataFile);
+  if (state === "missing") {
+    return refuse("profile-contradicted", disagreementMessage(dataFile, "that file no longer exists on disk"));
+  }
+  if (state === "free") {
+    return refuse(
+      "profile-contradicted",
+      disagreementMessage(dataFile, "no process holds that file open, and MLO holds its open profile all session")
+    );
+  }
+  return { ok: true, dataFile };
 }
-function probeScript(processName) {
-  const name = processName.replaceAll("'", "''");
+var LOG_LEAF = "MyLifeOrganized\\Logs\\mlo_log.txt";
+var LOG_TAIL_BYTES = 4 * 1024 * 1024;
+function psQuote(value) {
+  return value.replaceAll("'", "''");
+}
+function probeScript(mloExePath) {
+  const name = psQuote(processNameFor(mloExePath));
+  const portableLog = psQuote(path.win32.join(path.win32.dirname(mloExePath), "Logs", "mlo_log.txt"));
   return [
     "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8",
     "$ErrorActionPreference='SilentlyContinue'",
-    "$last=(Get-ItemProperty 'HKCU:\\Software\\MyLifeOrganized.net\\MyLife\\Settings').LastDBFile",
-    "$exists=$false; $held=$null",
-    "if ($last) { $exists=[bool](Test-Path -LiteralPath $last -PathType Leaf)",
-    // FileAccess::Read so a read-only profile is not mistaken for a held one;
-    // FileShare::None so the open fails precisely when someone else holds it.
-    "  if ($exists) { try { $h=[System.IO.File]::Open($last,[System.IO.FileMode]::Open,[System.IO.FileAccess]::Read,[System.IO.FileShare]::None); $h.Close(); $held=$false }",
-    "    catch { $held=$true } } }",
     // Filtered enumeration, not -Name: -Name takes wildcards, and an exe named
     // with a bracket or star would silently match unrelated processes.
     `$procs=@(Get-Process | Where-Object { $_.ProcessName -ieq '${name}' })`,
-    "[pscustomobject]@{ lastDbFile=$last; lastDbFileExists=$exists; appRunning=($procs.Count -gt 0); windowTitles=@($procs | ForEach-Object { $_.MainWindowTitle }); lastDbFileHeldByOther=$held } | ConvertTo-Json -Compress"
+    "$apps=@($procs | ForEach-Object { [pscustomobject]@{ pid=$_.Id; windowTitle=$_.MainWindowTitle } })",
+    "$logRead=$false; $lines=@(); $held=@{}",
+    // No processes, no session block worth reading: the verdict is already fixed.
+    "if ($procs.Count -gt 0) {",
+    "  $paths=@()",
+    `  if ($env:LOCALAPPDATA) { $paths+=(Join-Path $env:LOCALAPPDATA '${psQuote(LOG_LEAF)}') }`,
+    `  $paths+='${portableLog}'`,
+    "  $log=@($paths | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })[0]",
+    "  if ($log) {",
+    // Shared read: MLO is appending to this file the whole time.
+    "    try {",
+    "      $fs=[System.IO.File]::Open($log,[System.IO.FileMode]::Open,[System.IO.FileAccess]::Read,[System.IO.FileShare]::ReadWrite)",
+    `      if ($fs.Length -gt ${LOG_TAIL_BYTES}) { [void]$fs.Seek(-${LOG_TAIL_BYTES},[System.IO.SeekOrigin]::End) }`,
+    "      $sr=New-Object System.IO.StreamReader($fs,[System.Text.Encoding]::UTF8)",
+    "      $text=$sr.ReadToEnd(); $sr.Dispose(); $fs.Dispose(); $logRead=$true",
+    // Narrowed to the live pids here so the lock test below never touches a file
+    // belonging to some long-finished run.
+    "      $mine='\\[0*(' + ((@($procs | ForEach-Object { $_.Id })) -join '|') + ')\\]'",
+    "      $marks='(--- Log started|Opening datafile:|Save as:|New data file created)'",
+    '      $lines=@($text -split "`r?`n" | Where-Object { $_ -match $mine -and $_ -match $marks } | Select-Object -Last 200)',
+    "      foreach ($p in @($lines | ForEach-Object { if ($_ -match '(?:Opening datafile|Save as):\\s*(.+?)\\s*$') { $Matches[1] } } | Select-Object -Unique)) {",
+    "        if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { $held[$p]='missing'; continue }",
+    // FileAccess::Read so a read-only profile is not mistaken for a held one;
+    // FileShare::None so the open fails precisely when someone else holds it.
+    "        try { $h=[System.IO.File]::Open($p,[System.IO.FileMode]::Open,[System.IO.FileAccess]::Read,[System.IO.FileShare]::None); $h.Close(); $held[$p]='free' } catch { $held[$p]='held' }",
+    "      }",
+    "    } catch { }",
+    "  }",
+    "}",
+    "[pscustomobject]@{ apps=$apps; logRead=$logRead; lines=$lines; held=$held } | ConvertTo-Json -Compress -Depth 5"
   ].join("\n");
 }
-function psArgs(processName) {
-  return ["-NoProfile", "-NonInteractive", "-Command", probeScript(processName)];
+function psArgs(mloExePath) {
+  return ["-NoProfile", "-NonInteractive", "-Command", probeScript(mloExePath)];
 }
-var PROBE_FIELDS = [
-  "lastDbFile",
-  "lastDbFileExists",
-  "appRunning",
-  "windowTitles",
-  "lastDbFileHeldByOther"
-];
+var PROBE_FIELDS = ["apps", "logRead", "lines", "held"];
+function asArray(value) {
+  if (Array.isArray(value)) return value;
+  return value === null || value === void 0 ? [] : [value];
+}
+var FILE_STATES = ["held", "free", "missing"];
 function parseObservation(stdout) {
   const text2 = stdout.replace(/^\uFEFF/, "").trim();
   if (!text2.startsWith("{")) return void 0;
@@ -15189,16 +15275,23 @@ function parseObservation(stdout) {
     return void 0;
   }
   if (!PROBE_FIELDS.every((field2) => field2 in raw)) return void 0;
-  const file = typeof raw.lastDbFile === "string" ? raw.lastDbFile.trim() : "";
-  const titles = raw.windowTitles;
+  const apps = asArray(raw.apps).flatMap((app) => {
+    if (typeof app !== "object" || app === null) return [];
+    const { pid, windowTitle } = app;
+    if (typeof pid !== "number" || !Number.isInteger(pid)) return [];
+    return [{ pid, windowTitle: typeof windowTitle === "string" ? windowTitle : "" }];
+  });
+  const held = {};
+  if (typeof raw.held === "object" && raw.held !== null) {
+    for (const [file, state] of Object.entries(raw.held)) {
+      if (typeof state === "string" && FILE_STATES.includes(state)) held[file] = state;
+    }
+  }
   return {
-    lastDbFile: file || void 0,
-    lastDbFileExists: raw.lastDbFileExists === true,
-    appRunning: raw.appRunning === true,
-    windowTitles: (Array.isArray(titles) ? titles : typeof titles === "string" ? [titles] : []).filter(
-      (t) => typeof t === "string"
-    ),
-    lastDbFileHeldByOther: typeof raw.lastDbFileHeldByOther === "boolean" ? raw.lastDbFileHeldByOther : void 0
+    apps,
+    logRead: raw.logRead === true,
+    lines: asArray(raw.lines).filter((line) => typeof line === "string"),
+    held
   };
 }
 function processNameFor(mloExePath) {
@@ -15207,10 +15300,13 @@ function processNameFor(mloExePath) {
 var PROBE_TIMEOUT_MS = 1e4;
 function probeProfileSync(mloExePath) {
   if (process.platform !== "win32") return void 0;
-  const result = spawnSync("powershell.exe", psArgs(processNameFor(mloExePath)), {
+  const result = spawnSync("powershell.exe", psArgs(mloExePath), {
     encoding: "utf8",
     windowsHide: true,
-    timeout: PROBE_TIMEOUT_MS
+    timeout: PROBE_TIMEOUT_MS,
+    // The log tail comes back as JSON; the default 1 MB pipe cap would truncate
+    // it into unparseable output on a busy install.
+    maxBuffer: 16 * 1024 * 1024
   });
   return result.stdout ? parseObservation(result.stdout) : void 0;
 }
@@ -15219,8 +15315,8 @@ function probeProfile(mloExePath) {
   return new Promise((resolve) => {
     execFile(
       "powershell.exe",
-      psArgs(processNameFor(mloExePath)),
-      { encoding: "utf8", windowsHide: true, timeout: PROBE_TIMEOUT_MS },
+      psArgs(mloExePath),
+      { encoding: "utf8", windowsHide: true, timeout: PROBE_TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024 },
       (_err, stdout) => resolve(stdout ? parseObservation(stdout) : void 0)
     );
   });
@@ -15267,8 +15363,8 @@ function loadCloudConfig() {
     cloudPort,
     cloudStateRoot: resolveStateRoot(),
     // `||`, not `??`: a blank override would yield an empty process name, match
-    // nothing, and make detection report MLO as closed — which accepts the
-    // registry candidate unchecked.
+    // no process, and make detection report MLO as closed — which is now a
+    // refusal to start on a machine that has a profile plainly open.
     mloExePath: process.env.MLO_EXE_PATH || DEFAULT_EXE,
     writeTtlMs: Number.isFinite(ttlMinutes) && ttlMinutes > 0 ? ttlMinutes * 6e4 : DEFAULT_WRITE_TTL_MS
   };
@@ -15898,17 +15994,26 @@ var ERROR_CONTRACT = {
     endedBy: "sync the profile MLO actually has open, so its own cloud file becomes the candidate"
   },
   // --- Startup verdict: refuse to start, exit 1 — before serving only ------
-  "no-profile": {
+  // The three detection refusals (ADR-0006). The first two are definite — the
+  // running app has no usable profile open, or not ours — and a live session
+  // exits on them. The third is "we could not tell", which never cycles one.
+  "profile-not-open": {
     tier: "startup-verdict",
     retryable: "after-user-action",
-    meaning: "no MLO profile could be detected to serve",
-    remedy: "open the profile in MLO, then start the server again"
+    meaning: "the app has no saved profile open to serve \u2014 it is not running, or its outline was never saved",
+    remedy: "open the profile in MLO (saving it first if it is new), then start the server again"
   },
-  "profile-switched": {
+  "profile-contradicted": {
     tier: "startup-verdict",
     retryable: "after-user-action",
-    meaning: "the app no longer has the served profile open",
-    remedy: "the client restarts the server, which re-detects whichever profile MLO now has open"
+    meaning: "the app's own signals disagree about which profile it has open, or two instances hold different ones",
+    remedy: "reopen the profile you want to work in from MLO, leaving one instance running"
+  },
+  "profile-undetectable": {
+    tier: "startup-verdict",
+    retryable: true,
+    meaning: "which profile the app has open could not be established \u2014 the probe failed or MLO's log was unreadable",
+    remedy: "re-enable MLO's logging if it was turned off, reopen the profile, and start the server again"
   },
   "port-conflict": {
     tier: "startup-verdict",
@@ -17407,17 +17512,18 @@ var OutlineService = class {
   async delete(id) {
     const opened = await this.authoring();
     if (opened.isErrored) return opened;
-    const { snapshot } = opened.value;
+    const { snapshot, resolver } = opened.value;
     const task = findById(snapshot.tasks, id);
     if (!task) return failed(unresolvable(id, `no task with id "${id}" in this snapshot`));
     const uids = [];
     for (const node of flatten([task])) {
-      if (!node.Guid) {
+      const resolution = resolver.uidFor(node.id);
+      if (resolution.kind !== "resolved") {
         return failed(
-          unresolvable(node.id, `no recoverable GUID for "${node.Caption}" in the branch under "${task.Caption}"`)
+          unresolvable(node.id, `${resolution.detail} (in the branch under "${task.Caption}")`)
         );
       }
-      uids.push(normalizeGuid(node.Guid));
+      uids.push(normalizeGuid(resolution.uid));
     }
     return this.commit(deltaRowsFromDocument(buildTaskDeleteDelta(uids)), uids);
   }
@@ -17563,12 +17669,14 @@ var OutlineService = class {
     const indices = [];
     let unknown2 = 0;
     for (const sibling of siblings) {
-      const lookup = sibling.Guid ? await rows.latest(sibling.Guid) : void 0;
+      const resolution = resolver.uidFor(sibling.id);
+      const siblingUid = resolution.kind === "resolved" ? resolution.uid : void 0;
+      const lookup = siblingUid ? await rows.latest(siblingUid) : void 0;
       if (lookup?.kind !== "row") {
         unknown2 += 1;
         continue;
       }
-      if (excludeUid && sibling.Guid.toUpperCase() === excludeUid.toUpperCase()) continue;
+      if (excludeUid && siblingUid.toUpperCase() === excludeUid.toUpperCase()) continue;
       const index2 = Number(rowValue(lookup, "ItemIndex"));
       if (Number.isFinite(index2)) indices.push(index2);
       else unknown2 += 1;
@@ -17629,6 +17737,66 @@ function validateAddGraph(keyed, byKey) {
   return void 0;
 }
 
+// src/services/structure-align.ts
+function buildCloudTree(rows) {
+  const nodes = /* @__PURE__ */ new Map();
+  for (const row of rows) {
+    nodes.set(row.uid, { uid: row.uid, caption: row.caption, itemIndex: row.itemIndex, children: [] });
+  }
+  const roots = [];
+  for (const row of rows) {
+    const node = nodes.get(row.uid);
+    const parentNode = row.parentUid ? nodes.get(row.parentUid) : void 0;
+    if (parentNode) parentNode.children.push(node);
+    else roots.push(node);
+  }
+  const sortSiblings = (siblings) => {
+    siblings.sort((a, b) => a.itemIndex - b.itemIndex);
+    for (const node of siblings) sortSiblings(node.children);
+  };
+  sortSiblings(roots);
+  return roots;
+}
+function alignSiblings(exportChildren, cloudChildren, identity) {
+  let pairs = [];
+  let positional = exportChildren.length === cloudChildren.length;
+  if (positional) {
+    for (let index2 = 0; index2 < exportChildren.length; index2++) {
+      if (exportChildren[index2].Caption !== cloudChildren[index2].caption) {
+        positional = false;
+        break;
+      }
+    }
+  }
+  if (positional) {
+    pairs = exportChildren.map((task, index2) => [task, cloudChildren[index2]]);
+  } else {
+    const countBy = (captions) => {
+      const counts = /* @__PURE__ */ new Map();
+      for (const caption of captions) counts.set(caption, (counts.get(caption) ?? 0) + 1);
+      return counts;
+    };
+    const exportCounts = countBy(exportChildren.map((task) => task.Caption));
+    const cloudCounts = countBy(cloudChildren.map((node) => node.caption));
+    const cloudByCaption = new Map(cloudChildren.map((node) => [node.caption, node]));
+    for (const task of exportChildren) {
+      if (exportCounts.get(task.Caption) === 1 && cloudCounts.get(task.Caption) === 1) {
+        pairs.push([task, cloudByCaption.get(task.Caption)]);
+      }
+    }
+  }
+  for (const [task, node] of pairs) {
+    identity.byPathId.set(task.id, node.uid);
+    identity.confidence.set(task.id, positional ? "positional" : "caption-unique");
+    alignSiblings(task.Children, node.children, identity);
+  }
+}
+function alignExportToRows(exportRoots, rows) {
+  const identity = { byPathId: /* @__PURE__ */ new Map(), confidence: /* @__PURE__ */ new Map() };
+  alignSiblings(exportRoots, buildCloudTree(rows), identity);
+  return identity;
+}
+
 // src/services/identity.ts
 var IdentityService = class {
   constructor(rows) {
@@ -17651,13 +17819,20 @@ var SnapshotResolver = class {
     this.tasks = tasks;
     this.rows = rows;
     this.all = flatten(tasks);
+    this.aligned = alignExportToRows(tasks, rows.alignmentRows());
     for (const task of this.all) {
-      if (task.Guid) this.byUid.set(task.Guid.toUpperCase(), task);
+      const structural = this.aligned.byPathId.get(task.id);
+      if (structural) this.byUid.set(structural.toUpperCase(), task);
+    }
+    for (const task of this.all) {
+      const binary = task.Guid?.toUpperCase();
+      if (binary && !this.byUid.has(binary)) this.byUid.set(binary, task);
     }
   }
   tasks;
   rows;
   byUid = /* @__PURE__ */ new Map();
+  aligned;
   all;
   /** Resolve a path id to the row UID a write would target — a typed refusal, never a guess. */
   uidFor(pathId) {
@@ -17665,16 +17840,25 @@ var SnapshotResolver = class {
     if (!task) {
       return { kind: "unresolvable", reason: "unknown-id", detail: `no task with id "${pathId}" in this snapshot` };
     }
-    if (!task.Guid) {
-      return {
-        kind: "unresolvable",
-        reason: "no-recoverable-guid",
-        detail: `"${task.Caption}" has no recoverable GUID \u2014 MLO has not re-serialized it yet`
-      };
+    const structural = this.aligned.byPathId.get(task.id);
+    const binary = task.Guid?.toUpperCase();
+    if (structural) {
+      if (binary && binary !== structural.toUpperCase()) {
+        log(
+          `GUID cross-check mismatch for [${task.id}] "${task.Caption}": binary ${binary} vs structural ${structural} \u2014 using structural`
+        );
+      }
+      return { kind: "resolved", uid: structural, confidence: "confirmed" };
     }
-    const uid = task.Guid.toUpperCase();
-    const confidence = this.rows.captionOf(uid) !== void 0 ? "confirmed" : "unconfirmed";
-    return { kind: "resolved", uid, confidence };
+    if (binary) {
+      const confidence = this.rows.captionOf(binary) !== void 0 ? "confirmed" : "unconfirmed";
+      return { kind: "resolved", uid: binary, confidence };
+    }
+    return {
+      kind: "unresolvable",
+      reason: "no-recoverable-guid",
+      detail: `"${task.Caption}" aligns to no captured row and has no recoverable GUID \u2014 sync so the endpoint captures it, then retry`
+    };
   }
   taskFor(uid) {
     return this.byUid.get(uid.toUpperCase());
@@ -17726,7 +17910,21 @@ function unknownRowRefusal(uid) {
     detail: `no captured row for ${uid} \u2014 the row store has a gap; repull refreshes it from the vendor history`
   };
 }
-var EMPTY_ROW_STORE_VIEW = { captionOf: () => void 0 };
+function alignmentRowOf(uid, header, cells) {
+  const cell2 = (column2) => {
+    const index3 = header.indexOf(column2);
+    return index3 >= 0 ? cells[index3] ?? "" : "";
+  };
+  const rawIndex = cell2("ItemIndex");
+  const index2 = Number(rawIndex);
+  return {
+    uid,
+    caption: cell2("Caption"),
+    parentUid: keyOf(cell2("ParentUID")) ?? "",
+    itemIndex: rawIndex !== "" && Number.isFinite(index2) ? index2 : Number.MAX_SAFE_INTEGER
+  };
+}
+var EMPTY_ROW_STORE_VIEW = { captionOf: () => void 0, alignmentRows: () => [] };
 function keyOf(uid) {
   try {
     return normalizeGuid(uid);
@@ -17976,6 +18174,10 @@ var FileRowStore = class {
         if (!stored) return void 0;
         const captionIndex = (this.headers[stored.h] ?? []).indexOf("Caption");
         return captionIndex >= 0 ? stored.cells[captionIndex] : void 0;
+      },
+      alignmentRows: () => {
+        void this.ensureFresh().catch(() => void 0);
+        return [...this.rows].map(([uid, stored]) => alignmentRowOf(uid, this.headers[stored.h] ?? [], stored.cells));
       }
     };
   }
@@ -29457,7 +29659,7 @@ function normalizeVendorHistory(bytes) {
 }
 
 // src/cloud/auto-init.ts
-function refuse(problem) {
+function refuse2(problem) {
   return { kind: "refused", problem };
 }
 function groundTruthVerdict(localGuids, pulledUids) {
@@ -29501,7 +29703,7 @@ var AutoInitializer = class {
     if (seen.length && !candidates.length) return { kind: "already-bound", dataFileUID: seen[0] };
     const profilePath = await this.ports.openProfile();
     if (!profilePath) {
-      return refuse({
+      return refuse2({
         kind: "no-open-profile",
         title: "cannot tell which profile MLO has open, so there is nothing to bind a cloud file to",
         retryable: "after-user-action",
@@ -29510,7 +29712,7 @@ var AutoInitializer = class {
     }
     const existing = await this.gateway.bindings.forProfile(profilePath);
     if (existing?.dataFileUID) {
-      return refuse({
+      return refuse2({
         kind: "binding-conflict",
         title: `this profile is bound to ${existing.dataFileUID}, but the sync traffic seen through the proxy is for ${seen.join(", ")} \u2014 auto-initialization never moves an existing binding`,
         retryable: "after-user-action",
@@ -29519,7 +29721,7 @@ var AutoInitializer = class {
       });
     }
     if (!candidates.length) {
-      return refuse({
+      return refuse2({
         kind: "no-bootstrap-candidate",
         title: "no vendor sync traffic has been observed since the sync endpoint started",
         retryable: "after-user-action",
@@ -29527,7 +29729,7 @@ var AutoInitializer = class {
       });
     }
     if (candidates.length > 1) {
-      return refuse({
+      return refuse2({
         kind: "ambiguous-bootstrap-candidate",
         title: `${candidates.length} unbound cloud files have synced through this proxy (${candidates.join(", ")})`,
         retryable: "after-user-action",
@@ -29540,11 +29742,11 @@ var AutoInitializer = class {
     try {
       materialized = await this.pullAndVerify(uid);
     } catch (error2) {
-      return refuse(pullFailure(uid, error2));
+      return refuse2(pullFailure(uid, error2));
     }
     const verdict = groundTruthVerdict(await this.localGuids(profilePath), materialized.uids);
     if (!verdict.ok) {
-      return refuse({
+      return refuse2({
         kind: "candidate-not-ground-truthed",
         title: `${uid} did not ground-truth against ${profilePath}: ${verdict.detail}`,
         retryable: "after-user-action",
@@ -29557,7 +29759,7 @@ var AutoInitializer = class {
       await partition.rows.replaceAll(materialized.document, "history-pull");
       await partition.setLifecycle("ready");
     } catch (error2) {
-      return refuse({
+      return refuse2({
         kind: "auto-init-materialize-failed",
         title: `the history for ${uid} pulled cleanly but could not be written to the row store: ${error2 instanceof Error ? error2.message : String(error2)}`,
         retryable: true,
@@ -30540,8 +30742,8 @@ function watchProfileSwitch(config2) {
       log(`MLO switched profiles (${config2.dataFile} \u2192 ${verdict.dataFile}) \u2014 exiting so the client restarts against it`);
       process.exit(0);
     }
-    if (!verdict.ok && verdict.reason === "profile-switched") {
-      log(`MLO no longer has ${config2.dataFile} open \u2014 exiting rather than serving it`);
+    if (!verdict.ok && verdict.reason !== "profile-undetectable") {
+      log(`MLO no longer has ${config2.dataFile} open \u2014 exiting rather than serving it: ${verdict.message}`);
       process.exit(0);
     }
   }, 6e4);

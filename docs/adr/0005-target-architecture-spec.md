@@ -261,7 +261,8 @@ Two mechanics this spec left open, settled while implementing it:
   the check refutes on exactly one observation: two non-empty identity sets
   with nothing in common, which is what a foreign profile's cloud file looks
   like. An empty side never refutes, the same per-signal permissiveness
-  [ADR-0004](0004-ground-truth-the-open-profile.md) applies to its own two.
+  [ADR-0006](0006-detect-the-open-profile-from-the-process-alone.md) applies to
+  detection's own corroborating signals.
 - **`rebind` and `repull` reach the resident through state, not a route.**
   Only the resident holds the captured contact and its HTTP surface is closed,
   so neither verb calls the vendor and neither asks the resident to: `repull`
