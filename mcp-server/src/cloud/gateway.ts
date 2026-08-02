@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { BindingStore, type ProfileBinding } from "./binding.js";
 import { SightingStore, type UnboundSighting } from "./sightings.js";
+import { AutoInitOutcomeStore } from "./auto-init-outcome.js";
 import { DeadLetterStore } from "./dead-letter.js";
 import { normalizeDataFileUid, PartitionRegistry, type PartitionStore, type PartitionLifecycle } from "./partition.js";
 import type { RowStore } from "./row-store.js";
@@ -45,6 +46,8 @@ export class CloudGateway {
   readonly registry: PartitionRegistry;
   readonly bindings: BindingStore;
   readonly sightings: SightingStore;
+  /** Why the resident's last decisive bind attempt went the way it did. */
+  readonly autoInitOutcome: AutoInitOutcomeStore;
   /** Shared, not per-call: its write chain is what serialises concurrent refusals. */
   readonly deadLetters: DeadLetterStore;
   readonly stateRoot: string;
@@ -63,6 +66,7 @@ export class CloudGateway {
     this.registry = new PartitionRegistry(options.stateRoot);
     this.bindings = new BindingStore(options.stateRoot);
     this.sightings = new SightingStore(options.stateRoot);
+    this.autoInitOutcome = new AutoInitOutcomeStore(options.stateRoot);
     this.deadLetters = new DeadLetterStore(options.stateRoot);
   }
 

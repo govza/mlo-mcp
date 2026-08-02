@@ -1,4 +1,5 @@
 import { promises as fs } from "node:fs";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadCloudConfig, loadConfig } from "./config.js";
@@ -8,7 +9,7 @@ import { isMloBusy, SystemMloCli } from "./repo/mlo-cli.js";
 import { LocalMloRepository } from "./repo/local-mlo-repository.js";
 import { HttpResidentClient } from "./repo/resident-client.js";
 import { createToolContext } from "./context.js";
-import { log } from "./log.js";
+import { log, mirrorLogToFile } from "./log.js";
 import { createMcpServer } from "./server.js";
 import { CloudGateway } from "./cloud/gateway.js";
 import { ensureEndpoint, residentSpawner, RESIDENT_FLAG } from "./cloud/endpoint.js";
@@ -63,6 +64,9 @@ async function main(): Promise<void> {
  */
 async function serveResidentEndpoint(): Promise<void> {
   const config = loadCloudConfig();
+  // The resident is spawned detached with its stdio discarded, so this file is
+  // the only place its log (auto-init refusals above all) survives.
+  mirrorLogToFile(path.join(config.cloudStateRoot, "resident.log"));
   const gateway = new CloudGateway({ stateRoot: config.cloudStateRoot });
   const handle = await startCloudServer({
     host: config.cloudHost,

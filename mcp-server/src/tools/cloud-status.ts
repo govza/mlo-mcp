@@ -67,6 +67,26 @@ export const cloudStatusTool = defineTool({
         "The write path's aggregate. A writeId receipt dies with the session that took it, so this is the only " +
           "place an outcome nobody waited for can be seen",
       ),
+    autoInit: z
+      .object({
+        kind: z.enum(["bound", "refused"]),
+        at: z.string(),
+        profilePath: z.string().optional(),
+        dataFileUID: z.string().optional(),
+        problem: z
+          .object({
+            kind: z.string(),
+            title: z.string(),
+            remedy: z.string().optional(),
+          })
+          .passthrough()
+          .optional(),
+      })
+      .optional()
+      .describe(
+        "The resident's last decisive auto-init attempt. When the profile is unbound, this is WHY the endpoint's " +
+          "last try to bind it declined",
+      ),
     stateRoot: z.string(),
     partitions: z.array(z.object({ key: z.string(), mode: z.string(), lifecycle: z.string() })),
   },
@@ -84,12 +104,20 @@ export const cloudStatusTool = defineTool({
       endpoint: status.endpoint,
       bindingMismatch: status.mismatch !== undefined,
       ...(status.unboundSightings.length ? { unboundSightings: status.unboundSightings } : {}),
+      ...(status.autoInit ? { autoInit: status.autoInit } : {}),
       writes: status.writes,
       stateRoot: status.stateRoot,
       partitions: status.partitions,
     };
+    // An unbound profile explains itself when it can: the resident's last
+    // declined bind attempt is the only surviving account of why.
+    const autoInitNote =
+      status.mode === "unbound" && status.autoInit?.kind === "refused"
+        ? ` — last bind attempt declined (${status.autoInit.problem.kind}): ${status.autoInit.problem.title}` +
+          `${status.autoInit.problem.remedy ? `; ${status.autoInit.problem.remedy}` : ""}`
+        : "";
     const bindingNote = status.mode === "unbound"
-      ? "no partition bound"
+      ? `no partition bound${autoInitNote}`
       : `${status.mode} partition, ${status.lifecycle ?? "n/a"}`;
     const bindingMismatchNote = status.mismatch
       ? `; BINDING MISMATCH: bound to ${status.mismatch.boundDataFileUID} but MLO is syncing ` +

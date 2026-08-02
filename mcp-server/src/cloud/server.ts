@@ -432,6 +432,13 @@ export async function startCloudServer(options: CloudServerOptions): Promise<Clo
           // to read as stalled. Everything else about a write is in the state
           // root, which sessions read for themselves.
           writesHeldOpen: writePath.writesHeldOpen(),
+          // The resident's last decisive bind attempt. Its stderr is discarded
+          // by design (detached spawn), so this is where a declined bind's
+          // reason survives for an attached session to read.
+          ...(await gateway.autoInitOutcome.last().then(
+            (outcome) => (outcome ? { autoInit: outcome } : {}),
+            () => ({}),
+          )),
         });
         return;
       }

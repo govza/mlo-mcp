@@ -132,8 +132,29 @@ export class AutoInitializer {
    * vendor exchanges.
    */
   attempt(): Promise<AutoInitResult> {
-    this.inFlight ??= this.run().finally(() => { this.inFlight = undefined; });
+    this.inFlight ??= this.run()
+      .then(async (result) => { await this.recordOutcome(result); return result; })
+      .finally(() => { this.inFlight = undefined; });
     return this.inFlight;
+  }
+
+  /**
+   * Leave the decisive result where an attached session can read it: the
+   * resident's own stderr is discarded by design (detached spawn), so this
+   * marker is the only surviving account of WHY a bind declined. Best-effort —
+   * an unwritable marker must not turn a successful bind into a failure.
+   * `already-bound` is the steady state and is not recorded; it would only
+   * overwrite the last entry that explained anything.
+   */
+  private async recordOutcome(result: AutoInitResult): Promise<void> {
+    if (result.kind === "already-bound") return;
+    const at = new Date().toISOString();
+    const outcome =
+      result.kind === "bound"
+        ? { kind: "bound" as const, at, profilePath: result.profilePath, dataFileUID: result.dataFileUID }
+        : { kind: "refused" as const, at, problem: result.problem };
+    await this.gateway.autoInitOutcome.record(outcome).catch((error) =>
+      log(`could not persist the auto-init outcome marker: ${error instanceof Error ? error.message : String(error)}`));
   }
 
   private async run(): Promise<AutoInitResult> {

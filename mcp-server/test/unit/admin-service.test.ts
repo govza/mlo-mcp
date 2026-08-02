@@ -133,6 +133,25 @@ describe("AdminService.status — the write aggregate", () => {
     expect(expectOk(await admin.status()).writes).toEqual({ pendingWrites: 0, recentDeadLetters: [] });
   });
 
+  it("carries the last auto-init outcome, so an unbound profile says WHY it is unbound", async () => {
+    const { admin, gateway } = await rig();
+    await gateway.autoInitOutcome.record({
+      kind: "refused",
+      at: "2026-08-02T18:00:00.000Z",
+      problem: { kind: "no-open-profile", title: "cannot tell which profile MLO has open", retryable: "after-user-action" },
+    });
+
+    expect(expectOk(await admin.status()).autoInit).toMatchObject({
+      kind: "refused",
+      problem: { kind: "no-open-profile" },
+    });
+  });
+
+  it("omits autoInit while no attempt has been recorded", async () => {
+    const { admin } = await rig();
+    expect(expectOk(await admin.status()).autoInit).toBeUndefined();
+  });
+
   it("counts the queue and ages the oldest write in it", async () => {
     const { admin, gateway, dataFile } = await rig();
     await bind(gateway, dataFile);

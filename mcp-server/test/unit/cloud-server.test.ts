@@ -172,6 +172,19 @@ describe("cloud HTTP server", () => {
       writesHeldOpen: [],
     });
 
+    // The last decisive auto-init attempt rides along once one is recorded —
+    // it is the resident's only surviving account of a declined bind.
+    const gateway = new CloudGateway({ stateRoot: dir });
+    await gateway.autoInitOutcome.record({
+      kind: "refused",
+      at: "2026-08-02T18:00:00.000Z",
+      problem: { kind: "no-bootstrap-candidate", title: "no vendor sync traffic observed", retryable: "after-user-action" },
+    });
+    const again = await fetch(`http://${handle.host}:${handle.port}/v1/status`);
+    expect(await again.json()).toMatchObject({
+      autoInit: { kind: "refused", problem: { kind: "no-bootstrap-candidate" } },
+    });
+
     const gone = await fetch(`http://${handle.host}:${handle.port}/v1/pull`, {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ client: "mlo-app", cursor: "0" }),

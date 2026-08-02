@@ -180,6 +180,46 @@ describe("guarded auto-initialization", () => {
   });
 });
 
+describe("the persisted last-attempt marker", () => {
+  // The resident's stderr is discarded by design (detached spawn), so this
+  // marker is the only place a declined bind leaves its reason where an
+  // attached session can read it.
+  it("records a refusal with its problem, readable from a fresh gateway", async () => {
+    const { root, autoInit } = await rig({ openProfile: async () => undefined });
+
+    await autoInit.attempt();
+
+    const fresh = new CloudGateway({ stateRoot: root });
+    const last = await fresh.autoInitOutcome.last();
+    expect(last).toMatchObject({
+      kind: "refused",
+      problem: { kind: "no-open-profile" },
+    });
+    expect(typeof last?.at).toBe("string");
+  });
+
+  it("replaces the refusal once a later attempt binds", async () => {
+    let profile: string | undefined;
+    const { gateway, autoInit } = await rig({ openProfile: async () => profile });
+    await autoInit.attempt();
+
+    profile = PROFILE;
+    await autoInit.attempt();
+
+    expect(await gateway.autoInitOutcome.last()).toMatchObject({ kind: "bound", dataFileUID: UID });
+  });
+
+  it("leaves the marker untouched in the already-bound steady state", async () => {
+    const { gateway, autoInit } = await rig();
+    await autoInit.attempt();
+    const afterBind = await gateway.autoInitOutcome.last();
+
+    await autoInit.attempt();
+
+    expect(await gateway.autoInitOutcome.last()).toEqual(afterBind);
+  });
+});
+
 describe("the auto-init pull, stage by stage", () => {
   it("writes no binding when the pull itself fails", async () => {
     const { gateway, autoInit } = await rig({

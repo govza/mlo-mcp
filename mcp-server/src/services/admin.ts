@@ -1,6 +1,7 @@
 import type { MloConfig } from "../types.js";
 import type { BindingMismatch, CloudGateway } from "../cloud/gateway.js";
 import type { UnboundSighting } from "../cloud/sightings.js";
+import type { AutoInitOutcome } from "../cloud/auto-init-outcome.js";
 import type { EndpointStatus, ResidentEndpoint } from "../cloud/endpoint.js";
 import type { PartitionStore } from "../cloud/partition.js";
 import type { MloRepository } from "../repo/mlo-repository.js";
@@ -67,6 +68,8 @@ export interface CloudPlaneStatus {
   /** A repull the resident has not serviced yet — outstanding, not failed. */
   repullRequestedAt?: string;
   unboundSightings: UnboundSighting[];
+  /** The resident's last decisive bind attempt — the WHY behind "unbound". */
+  autoInit?: AutoInitOutcome;
   /** Empty-but-present while unbound: there is no queue, so there is nothing pending. */
   writes: WriteAggregate;
   stateRoot: string;
@@ -257,9 +260,10 @@ export class AdminService {
     }));
     // Reported beside the bound UID, never instead of it: the binding is
     // what the server acts on, the sighting is what the app actually syncs.
-    const [unboundSightings, mismatch] = await Promise.all([
+    const [unboundSightings, mismatch, autoInit] = await Promise.all([
       this.gateway.unboundSightings(),
       this.gateway.bindingMismatch(this.config.dataFile),
+      this.gateway.autoInitOutcome.last(),
     ]);
 
     return {
@@ -272,6 +276,7 @@ export class AdminService {
       mismatch,
       ...(repullRequestedAt ? { repullRequestedAt } : {}),
       unboundSightings,
+      ...(autoInit ? { autoInit } : {}),
       writes,
       stateRoot: this.gateway.stateRoot,
       partitions,
