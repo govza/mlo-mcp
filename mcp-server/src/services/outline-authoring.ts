@@ -1,3 +1,4 @@
+import { encodeNoteCell } from "../cloud/mlo-schema.js";
 import type { CapturedRow } from "../cloud/row-store.js";
 
 /**
@@ -92,7 +93,7 @@ export function updatePatch(
   const columns: Record<string, string> = { LastModified: now };
   for (const column of STRING_COLUMNS) {
     const value = patch[column];
-    if (value !== undefined) columns[column] = value;
+    if (value !== undefined) columns[column] = column === "Note" ? encodeNoteCell(value) : value;
   }
   for (const [field, column] of NUMBER_COLUMNS) {
     const value = patch[field];

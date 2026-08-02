@@ -61,6 +61,21 @@ export function createDeltaSkeleton(): SectionedCsv {
   };
 }
 
+/**
+ * MLO encodes line breaks inside a Note cell as the literal four characters
+ * `\r\n` — never as embedded CSV newlines, which its importer corrupts the row
+ * on (docs/mlo/cloud-sync.md, "Captured Notes encoded line breaks as the
+ * literal four characters"). Every authored Note goes through this; the read
+ * overlay decodes with `decodeNoteCell`.
+ */
+export function encodeNoteCell(note: string): string {
+  return note.replace(/\r\n|\r|\n/g, "\\r\\n");
+}
+
+export function decodeNoteCell(cell: string): string {
+  return cell.replaceAll("\\r\\n", "\n");
+}
+
 export interface TaskAddDeltaInput {
   uid: string;
   parentUid?: string;
@@ -96,7 +111,7 @@ export function buildTaskAddDelta(input: TaskAddDeltaInput): SectionedCsv {
   if (input.dueDateTime || input.startDateTime) set("ScheduleType", "1");
   set("CreatedDate", input.createdDate);
   set("LastModified", input.lastModified);
-  set("Note", input.note);
+  set("Note", input.note === undefined ? undefined : encodeNoteCell(input.note));
   if (input.isProject !== undefined) set("IsProject", input.isProject ? "1" : "0");
   if (input.starred !== undefined) {
     set("Starred", input.starred ? "1" : "0");

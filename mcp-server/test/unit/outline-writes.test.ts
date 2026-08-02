@@ -108,6 +108,14 @@ describe("outline authoring (pure)", () => {
     expect(columns).toEqual({ Caption: "new", LastModified: "2026-07-27T12:00:00" });
   });
 
+  it("encodes note line breaks as literal \\r\\n in an update patch", () => {
+    const row = capturedRow(fullRow(UID_ROOT));
+    const columns = updatePatch({ Note: "first\nsecond" }, row, "now");
+    expect(columns.Note).toBe("first\\r\\nsecond");
+    // Clearing stays a clear, not an encoded empty string.
+    expect(updatePatch({ Note: "" }, row, "now").Note).toBe("");
+  });
+
   it("turns dates on and off with ScheduleType, and stamps a star toggle", () => {
     const row = capturedRow(fullRow(UID_ROOT, { Starred: "0", ScheduleType: "0", DueDateTime: "" }));
     expect(updatePatch({ DueDateTime: "2026-08-01T15:00:00" }, row, "now").ScheduleType).toBe("1");
@@ -164,6 +172,13 @@ describe("OutlineService.add", () => {
     // The defaults MLO itself emits for a new plain task, not blanks.
     expect(row.Importance).toBe("100");
     expect(row.Effort).toBe("50");
+  });
+
+  it("encodes note line breaks as literal \\r\\n — MLO's importer corrupts a row on embedded newlines", async () => {
+    const h = harness();
+    value(await h.outline.add({ caption: "with note", note: "Итог: строка.\n\nЧек-лист:\r\n- один" }));
+    const row = taskRow(h.written());
+    expect(row.Note).toBe("Итог: строка.\\r\\n\\r\\nЧек-лист:\\r\\n- один");
   });
 
   it("nests a batch by key and links dependencies within it", async () => {

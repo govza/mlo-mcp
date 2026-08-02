@@ -1,7 +1,7 @@
 import type { TaskNode } from "../types.js";
 import { renumbered } from "../task-tree.js";
 import { normalizeGuid } from "../cloud/guid.js";
-import { TODO_ITEMS_HEADER } from "../cloud/mlo-schema.js";
+import { decodeNoteCell, TODO_ITEMS_HEADER } from "../cloud/mlo-schema.js";
 import type { DeltaRow, WriteId } from "./mlo-repository.js";
 
 /**
@@ -103,7 +103,10 @@ function fieldsFrom(values: readonly string[]): Partial<TaskNode> {
   if (caption !== "") fields.Caption = caption;
   for (const [column, field] of STRINGS) {
     const raw = cell(values, column);
-    fields[field] = raw === "" ? undefined : raw;
+    // Note cells carry MLO's literal `\r\n` line-break encoding; the export
+    // the overlay imitates shows real line breaks.
+    const decoded = column === "Note" ? decodeNoteCell(raw) : raw;
+    fields[field] = decoded === "" ? undefined : decoded;
   }
   for (const [column, field] of NUMBERS) {
     const raw = cell(values, column);

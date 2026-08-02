@@ -68,6 +68,13 @@ describe("pending-write overlay", () => {
     expect(project.Children[0]!.id).toBe("3.1");
   });
 
+  it("decodes the row's literal \\r\\n note encoding back to line breaks", () => {
+    const overlaid = overlayPendingWrites(exported(), [
+      write("w1", todoRow({ UID: UID_NEW, Caption: "noted", Note: "first\\r\\nsecond" })),
+    ]);
+    expect(flatten(overlaid).find((t) => t.Caption === "noted")!.Note).toBe("first\nsecond");
+  });
+
   it("lands a phantom at the top level when its parent is nowhere to be found", () => {
     const overlaid = overlayPendingWrites(exported(), [
       write("w1", todoRow({ UID: UID_NEW, ParentUID: "{EEEEEEEE-0000-0000-0000-000000000009}", Caption: "orphan" })),
