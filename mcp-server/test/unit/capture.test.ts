@@ -105,6 +105,41 @@ describe("passive capture tap", () => {
     expect(await partition.rows.size()).toBe(0);
   });
 
+  it("journals skipped when the vendor honestly reports failure", async () => {
+    const gateway = await tempGateway();
+    const partition = await gateway.registry.open(UID);
+    await captureVendorSession(gateway, "GetModificationsBytesEx", { dataFileUID: UID }, getResponse(
+      `<GetModificationsBytesExResult>false</GetModificationsBytesExResult>`,
+    ));
+    const entries = await partition.journal.entries();
+    expect(entries[0]!.outcome).toBe("skipped");
+    expect(entries[0]!.detail).toContain("vendor reported failure");
+  });
+
+  it("journals failed, not skipped, when the vendor's 200 response is unparseable", async () => {
+    const gateway = await tempGateway();
+    const partition = await gateway.registry.open(UID);
+    await captureVendorSession(gateway, "GetModificationsBytesEx", { dataFileUID: UID }, {
+      status: 200,
+      headers: {},
+      body: Buffer.from("<html>gateway error page, not SOAP</html>", "utf8"),
+    });
+    const entries = await partition.journal.entries();
+    expect(entries[0]!.outcome).toBe("failed");
+    expect(entries[0]!.detail).toContain("malformed");
+    expect(entries[0]!.detail).not.toContain("vendor reported failure");
+  });
+
+  it("journals failed when a parseable response lacks the Result field — not an honest vendor failure", async () => {
+    const gateway = await tempGateway();
+    const partition = await gateway.registry.open(UID);
+    await captureVendorSession(gateway, "GetModificationsBytesEx", { dataFileUID: UID }, getResponse(""));
+    const entries = await partition.journal.entries();
+    expect(entries[0]!.outcome).toBe("failed");
+    expect(entries[0]!.detail).toContain("malformed");
+    expect(entries[0]!.detail).not.toContain("vendor reported failure");
+  });
+
   it("stays out of the way of a UID this server does not manage — no partition is ever created", async () => {
     const gateway = await tempGateway();
     await captureVendorSession(gateway, "GetModificationsBytesEx", { dataFileUID: UID }, getResponse(

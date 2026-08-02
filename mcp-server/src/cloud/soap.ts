@@ -74,18 +74,18 @@ export function peekSoapFields(xml: string, operation: string): Record<string, u
   }
 }
 
-/** Parsed `<operation>Response` fields; {} when the body is malformed. */
-export function peekSoapResponseFields(xml: string, operation: string): Record<string, unknown> {
+/** Parsed `<operation>Response` fields; undefined when the body is malformed or carries no such response. */
+export function peekSoapResponseFields(xml: string, operation: string): Record<string, unknown> | undefined {
   try {
     return parseFields(xml, `${operation}Response`);
   } catch {
-    return {};
+    return undefined;
   }
 }
 
 /** A peeked field as non-empty text, or undefined. */
-export function soapFieldText(fields: Record<string, unknown>, name: string): string | undefined {
-  const value = fields[name];
+export function soapFieldText(fields: Record<string, unknown> | undefined, name: string): string | undefined {
+  const value = fields?.[name];
   return typeof value === "string" && value.length ? value : undefined;
 }
 

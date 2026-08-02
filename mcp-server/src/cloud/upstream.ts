@@ -7,7 +7,7 @@ import { generateGuid } from "./guid.js";
 import { SECTION_HEADERS } from "./mlo-schema.js";
 import { findSection, parseSectionedCsv, type SectionedCsv } from "./csv.js";
 import { packEnvelope, unpackEnvelope } from "./envelope.js";
-import { soapFieldText, type SoapOperation } from "./soap.js";
+import { soapFieldText as text, type SoapOperation } from "./soap.js";
 import type { CloudGateway } from "./gateway.js";
 
 /**
@@ -111,10 +111,6 @@ function responseFields(xml: string, operation: SoapOperation): Record<string, u
   } catch {
     return undefined;
   }
-}
-
-function text(fields: Record<string, unknown> | undefined, name: string): string | undefined {
-  return fields ? soapFieldText(fields, name) : undefined;
 }
 
 /**

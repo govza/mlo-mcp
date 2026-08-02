@@ -51,7 +51,14 @@ async function capture(
       return;
     }
     const fields = peekSoapResponseFields(decodeForwardBody(result), operation);
-    if (text(fields, "GetModificationsBytesExResult") !== "true") {
+    const verdict = text(fields, "GetModificationsBytesExResult");
+    if (verdict === undefined) {
+      // unparseable body, or a parseable one without the Result field — either
+      // way not a vendor verdict, and the operator must be able to tell
+      await partition.journal.record("failed", "get: malformed vendor response — no parseable Result");
+      return;
+    }
+    if (verdict !== "true") {
       await partition.journal.record("skipped", "get: vendor reported failure — nothing to capture");
       return;
     }
