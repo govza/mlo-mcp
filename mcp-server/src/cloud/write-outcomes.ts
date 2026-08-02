@@ -1,9 +1,6 @@
-import { promises as fs } from "node:fs";
 import path from "node:path";
-import { atomicWrite, WriteChain } from "./atomic-file.js";
-import { log } from "../log.js";
-import type { WriteVerb } from "./injection-queue.js";
-import type { WriteId } from "../repo/mlo-repository.js";
+import { JsonDocument } from "./json-document.js";
+import type { WriteId, WriteVerb } from "../repo/mlo-repository.js";
 
 /**
  * The durable record of every write that LEFT the injection queue (spec
@@ -34,55 +31,38 @@ export interface WriteOutcomeStore {
   byId(writeId: WriteId): Promise<WriteOutcome | undefined>;
 }
 
-interface OutcomeFile {
-  outcomes: WriteOutcome[];
-  at: string;
-}
-
 const FILE_NAME = "write-outcomes.json";
 /** Bounded: a receipt older than the ring is one nobody is coming back for. */
 export const DEFAULT_OUTCOME_CAP = 200;
 
 export class FileWriteOutcomes implements WriteOutcomeStore {
-  private readonly writes = new WriteChain();
+  private readonly document: JsonDocument<WriteOutcome[]>;
 
-  constructor(
-    private readonly dir: string,
-    private readonly cap = DEFAULT_OUTCOME_CAP,
-  ) {}
-
-  private file(): string {
-    return path.join(this.dir, FILE_NAME);
-  }
-
-  private async load(): Promise<WriteOutcome[]> {
-    try {
-      const parsed = JSON.parse(await fs.readFile(this.file(), "utf8")) as Partial<OutcomeFile>;
-      return (parsed.outcomes ?? []).filter((outcome) => typeof outcome?.writeId === "string");
-    } catch (error) {
+  constructor(dir: string, private readonly cap = DEFAULT_OUTCOME_CAP) {
+    this.document = new JsonDocument(path.join(dir, FILE_NAME), {
+      unwrap: (parsed) =>
+        ((parsed as { outcomes?: WriteOutcome[] }).outcomes ?? []).filter((outcome) => typeof outcome?.writeId === "string"),
+      wrap: (outcomes) => ({ outcomes, at: outcomes.at(-1)?.at ?? new Date().toISOString() }),
+      empty: () => [],
       // Absent is the normal case. Corrupt is evidence lost, not a wedge.
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-        log(`could not read the write-outcome file (treated as empty): ${error instanceof Error ? error.message : String(error)}`);
-      }
-      return [];
-    }
-  }
-
-  record(outcome: WriteOutcome): Promise<void> {
-    return this.writes.run(async () => {
-      const outcomes = [...(await this.load()), outcome];
-      const value: OutcomeFile = { outcomes: outcomes.slice(-this.cap), at: outcome.at };
-      await atomicWrite(this.file(), `${JSON.stringify(value)}\n`);
+      onCorrupt: "empty",
     });
   }
 
+  record(outcome: WriteOutcome): Promise<void> {
+    return this.document.update((outcomes) => ({
+      value: [...outcomes, outcome].slice(-this.cap),
+      result: undefined,
+    }));
+  }
+
   all(): Promise<WriteOutcome[]> {
-    return this.load();
+    return this.document.read();
   }
 
   async byId(writeId: WriteId): Promise<WriteOutcome | undefined> {
     // Last match wins: writeIds are never reused, but if a record were ever
     // duplicated the newest reading is the honest one.
-    return (await this.load()).findLast((outcome) => outcome.writeId === writeId);
+    return (await this.document.read()).findLast((outcome) => outcome.writeId === writeId);
   }
 }

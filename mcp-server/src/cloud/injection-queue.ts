@@ -1,18 +1,17 @@
-import { promises as fs } from "node:fs";
 import path from "node:path";
-import { atomicWrite, WriteChain } from "./atomic-file.js";
-import type { DeltaRow, WriteId } from "../repo/mlo-repository.js";
+import { JsonDocument } from "./json-document.js";
+import type { DeltaRow, WriteId, WriteVerb } from "../repo/mlo-repository.js";
 
 /**
  * The durable store behind the write path's accept (spec section 2): rows are
  * fsync'd here before `accepted` is ever returned, so a kill after accept
  * preserves the write. The resident is the single writer (reached via
  * `POST /v1/write`); the delivery loop, TTL expiry, and Apply observation that
- * consume this queue arrive with the resident write path (migration step 6) —
- * this module owns only the durable state.
+ * consume this queue live on the PartitionStore handle — this module owns only
+ * the durable state.
  */
 
-export type WriteVerb = "add" | "update" | "complete" | "delete";
+export type { WriteVerb };
 
 export interface QueuedWrite {
   writeId: WriteId;
@@ -35,63 +34,43 @@ export interface InjectionQueue {
   remove(writeId: WriteId): Promise<QueuedWrite | undefined>;
 }
 
-interface QueueFile {
-  writes: QueuedWrite[];
-  at: string;
-}
-
 const FILE_NAME = "injection-queue.json";
 
 export class FileInjectionQueue implements InjectionQueue {
-  private readonly writes = new WriteChain();
+  private readonly document: JsonDocument<QueuedWrite[]>;
 
-  constructor(private readonly dir: string) {}
-
-  private file(): string {
-    return path.join(this.dir, FILE_NAME);
-  }
-
-  private async load(): Promise<QueuedWrite[]> {
-    try {
-      const parsed = JSON.parse(await fs.readFile(this.file(), "utf8")) as Partial<QueueFile>;
-      return (parsed.writes ?? []).filter((write) => typeof write?.writeId === "string");
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      return [];
-    }
-  }
-
-  /**
-   * Write-fsync-rename: the temp file is flushed to disk before it replaces
-   * the queue, so the rename either exposes a durable file or nothing.
-   */
-  private save(writes: QueuedWrite[]): Promise<void> {
-    const value: QueueFile = { writes, at: new Date().toISOString() };
-    return atomicWrite(this.file(), JSON.stringify(value), { fsync: true });
+  constructor(dir: string) {
+    this.document = new JsonDocument(path.join(dir, FILE_NAME), {
+      unwrap: (parsed) =>
+        ((parsed as { writes?: QueuedWrite[] }).writes ?? []).filter((write) => typeof write?.writeId === "string"),
+      wrap: (writes) => ({ writes, at: new Date().toISOString() }),
+      empty: () => [],
+      // Durable accepts, so the file is flushed before the rename, and a
+      // corrupt queue throws rather than silently dropping accepted writes.
+      fsync: true,
+    });
   }
 
   enqueue(write: QueuedWrite): Promise<void> {
-    return this.writes.run(async () => {
-      const writes = await this.load();
+    return this.document.update((writes) => {
       if (writes.some((queued) => queued.writeId === write.writeId)) {
         throw new Error(`writeId ${write.writeId} is already queued — writeIds are accept receipts, never reused`);
       }
-      await this.save([...writes, write]);
+      return { value: [...writes, write], result: undefined };
     });
   }
 
   pending(): Promise<QueuedWrite[]> {
-    return this.load();
+    return this.document.read();
   }
 
   remove(writeId: WriteId): Promise<QueuedWrite | undefined> {
-    return this.writes.run(async () => {
-      const writes = await this.load();
+    return this.document.update((writes) => {
       const index = writes.findIndex((write) => write.writeId === writeId);
-      if (index < 0) return undefined;
-      const [removed] = writes.splice(index, 1);
-      await this.save(writes);
-      return removed;
+      if (index < 0) return { value: writes, result: undefined };
+      const next = [...writes];
+      const [removed] = next.splice(index, 1);
+      return { value: next, result: removed };
     });
   }
 }

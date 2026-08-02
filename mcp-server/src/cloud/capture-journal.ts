@@ -1,7 +1,5 @@
-import { promises as fs } from "node:fs";
 import path from "node:path";
-import { atomicWrite, WriteChain } from "./atomic-file.js";
-import { log } from "../log.js";
+import { JsonDocument } from "./json-document.js";
 
 /**
  * Ring buffer of timestamped capture outcomes — the gauge source.
@@ -42,59 +40,46 @@ export interface CaptureJournal {
   gauge(windowMs?: number): Promise<CaptureGauge>;
 }
 
-interface JournalFile {
-  entries: CaptureEntry[];
-  at: string;
-}
-
 const FILE_NAME = "capture-journal.json";
 /** Bounded twice: the ring caps a persistent fault, the window ages out the rest. */
 export const DEFAULT_JOURNAL_CAP = 256;
 export const DEFAULT_GAUGE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export class FileCaptureJournal implements CaptureJournal {
-  private readonly writes = new WriteChain();
+  private readonly document: JsonDocument<CaptureEntry[]>;
 
   constructor(
-    private readonly dir: string,
+    dir: string,
     private readonly now: () => Date = () => new Date(),
     private readonly cap = DEFAULT_JOURNAL_CAP,
-  ) {}
-
-  private file(): string {
-    return path.join(this.dir, FILE_NAME);
-  }
-
-  private async load(): Promise<CaptureEntry[]> {
-    try {
-      const parsed = JSON.parse(await fs.readFile(this.file(), "utf8")) as Partial<JournalFile>;
-      return (parsed.entries ?? []).filter((entry) => typeof entry?.at === "string");
-    } catch (error) {
-      // Absent is the normal case. A corrupt journal is evidence lost, not a
-      // fault worth keeping: the next record overwrites it, so degrade to
-      // empty loudly rather than wedging every gauge until someone deletes it.
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-        log(`could not read the capture journal (treated as empty): ${error instanceof Error ? error.message : String(error)}`);
-      }
-      return [];
-    }
+  ) {
+    this.document = new JsonDocument(path.join(dir, FILE_NAME), {
+      unwrap: (parsed) =>
+        ((parsed as { entries?: CaptureEntry[] }).entries ?? []).filter((entry) => typeof entry?.at === "string"),
+      wrap: (entries) => ({ entries, at: entries.at(-1)?.at ?? this.now().toISOString() }),
+      empty: () => [],
+      // A corrupt journal is evidence lost, not a fault worth keeping: the
+      // next record overwrites it, so degrade to empty loudly rather than
+      // wedging every gauge until someone deletes it.
+      onCorrupt: "empty",
+      pretty: true,
+    });
   }
 
   record(outcome: CaptureOutcome, detail?: string): Promise<void> {
-    return this.writes.run(async () => {
+    return this.document.update((entries) => {
       const at = this.now().toISOString();
-      const entries = [...(await this.load()), { at, outcome, ...(detail ? { detail } : {}) }];
-      const value: JournalFile = { entries: entries.slice(-this.cap), at };
-      await atomicWrite(this.file(), `${JSON.stringify(value, null, 2)}\n`);
+      const next = [...entries, { at, outcome, ...(detail ? { detail } : {}) }];
+      return { value: next.slice(-this.cap), result: undefined };
     });
   }
 
   entries(): Promise<CaptureEntry[]> {
-    return this.load();
+    return this.document.read();
   }
 
   async gauge(windowMs: number = DEFAULT_GAUGE_WINDOW_MS): Promise<CaptureGauge> {
-    return deriveGauge(await this.load(), windowMs, this.now());
+    return deriveGauge(await this.document.read(), windowMs, this.now());
   }
 }
 
