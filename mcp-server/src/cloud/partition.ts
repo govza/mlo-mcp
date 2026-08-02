@@ -3,9 +3,10 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { atomicWrite } from "./atomic-file.js";
 import { FileCaptureJournal, type CaptureJournal } from "./capture-journal.js";
-import { FileInjectionQueue, type InjectionQueue } from "./injection-queue.js";
+import { FileInjectionQueue, type InjectionQueue, type QueuedWrite } from "./injection-queue.js";
 import { FileRowStore, type RowStore } from "./row-store.js";
-import { FileWriteOutcomes, type WriteOutcome, type WriteOutcomeStore } from "./write-outcomes.js";
+import { FileWriteOutcomes, type ResolvedWriteStatus, type WriteOutcome, type WriteOutcomeStore } from "./write-outcomes.js";
+import type { WriteId, WriteReceipt } from "../repo/mlo-repository.js";
 
 /**
  * Per-`dataFileUID` cloud state, reachable only through the PartitionStore
@@ -122,6 +123,79 @@ export class PartitionStore {
         .filter((outcome) => outcome.status === "expired" || outcome.status === "superseded")
         .slice(-tail)
         .reverse() as DeadLetteredWrite[],
+    };
+  }
+
+  /**
+   * Resolve one queued write: out of the queue and into the outcome ring as a
+   * single move, so no observer ever sees a write that is both still pending
+   * and already resolved. Returns what was removed; undefined means another
+   * resolution got there first (the pair is idempotent per writeId).
+   */
+  async resolveWrite(
+    writeId: WriteId,
+    status: ResolvedWriteStatus,
+    at: string,
+    detail?: string,
+  ): Promise<QueuedWrite | undefined> {
+    const removed = await this.queue.remove(writeId);
+    if (!removed) return undefined;
+    await this.outcomes.record({
+      writeId,
+      uid: removed.uid,
+      verb: removed.verb,
+      ...(removed.caption ? { caption: removed.caption } : {}),
+      status,
+      at,
+      ...(detail ? { detail } : {}),
+    });
+    return removed;
+  }
+
+  /**
+   * The lazy TTL sweep: every due write leaves the queue for good as an
+   * `expired` outcome. Returns what expired with the words recorded for it,
+   * so the caller can dead-letter and unpin — those live outside this handle.
+   */
+  async expireDue(now: Date): Promise<{ write: QueuedWrite; detail: string }[]> {
+    const expired: { write: QueuedWrite; detail: string }[] = [];
+    for (const write of await this.queue.pending()) {
+      const expiresAt = Date.parse(write.expiresAt);
+      if (Number.isNaN(expiresAt) ? true : expiresAt > now.getTime()) continue;
+      const detail = `write-expired: MLO did not apply the row before ${write.expiresAt}`;
+      const removed = await this.resolveWrite(write.writeId, "expired", now.toISOString(), detail);
+      if (removed) expired.push({ write: removed, detail });
+    }
+    return expired;
+  }
+
+  /**
+   * One receipt's five-state answer, from the queue (still `accepted`) or the
+   * outcome ring (resolved). Where a writeId lives inside a partition is this
+   * handle's knowledge, not a caller's.
+   */
+  async findWrite(writeId: WriteId): Promise<WriteReceipt | undefined> {
+    const queued = (await this.queue.pending()).find((write) => write.writeId === writeId);
+    if (queued) {
+      return {
+        writeId,
+        status: "accepted",
+        uid: queued.uid,
+        verb: queued.verb,
+        ...(queued.caption ? { caption: queued.caption } : {}),
+        expiresAt: queued.expiresAt,
+      };
+    }
+    const outcome = await this.outcomes.byId(writeId);
+    if (!outcome) return undefined;
+    return {
+      writeId,
+      status: outcome.status,
+      uid: outcome.uid,
+      verb: outcome.verb,
+      ...(outcome.caption ? { caption: outcome.caption } : {}),
+      at: outcome.at,
+      ...(outcome.detail ? { detail: outcome.detail } : {}),
     };
   }
 

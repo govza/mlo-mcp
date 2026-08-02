@@ -18,7 +18,7 @@ import {
   soapFieldText as text,
 } from "./soap.js";
 import { DEFAULT_WRITE_TTL_MS } from "../config.js";
-import type { DeltaRow, WriteId, WriteStatus } from "../repo/mlo-repository.js";
+import type { DeltaRow, WriteId, WriteReceipt } from "../repo/mlo-repository.js";
 import { log } from "../log.js";
 
 /**
@@ -147,19 +147,6 @@ export type AcceptOutcome =
   | { kind: "accepted"; writeId: WriteId; uid: string; verb: WriteVerb; caption?: string; expiresAt: string }
   | { kind: "refused"; httpStatus: number; problem: Problem };
 
-export interface WriteLookup {
-  writeId: WriteId;
-  uid: string;
-  verb: WriteVerb;
-  caption?: string;
-  status: WriteStatus;
-  /** Present while the write is still queued. */
-  expiresAt?: string;
-  /** Present once the write resolved. */
-  at?: string;
-  detail?: string;
-}
-
 export interface WritePathOptions {
   ttlMs?: number;
   now?: () => Date;
@@ -236,28 +223,14 @@ export class WritePath {
   }
 
   /**
-   * Lazy TTL sweep, run wherever the queue is consulted. An expired write
-   * leaves the queue for good: dead-letter file + `write-expired` outcome,
-   * never injected again.
+   * Lazy TTL sweep, run wherever the queue is consulted. The partition resolves
+   * its own expiries; what stays here is what lives outside the handle — the
+   * shared dead-letter file and the in-memory pins.
    */
   private async expireDue(partition: PartitionStore): Promise<void> {
     const now = this.now();
-    for (const write of await partition.queue.pending()) {
-      const expiresAt = Date.parse(write.expiresAt);
-      if (Number.isNaN(expiresAt) ? true : expiresAt > now.getTime()) continue;
-      const removed = await partition.queue.remove(write.writeId);
-      if (!removed) continue;
+    for (const { write, detail } of await partition.expireDue(now)) {
       this.inFlight.delete(write.writeId);
-      const detail = `write-expired: MLO did not apply the row before ${write.expiresAt}`;
-      await partition.outcomes.record({
-        writeId: write.writeId,
-        uid: write.uid,
-        verb: write.verb,
-        ...(write.caption ? { caption: write.caption } : {}),
-        status: "expired",
-        at: now.toISOString(),
-        detail,
-      });
       await this.gateway.deadLetters.record({
         at: now.toISOString(),
         tool: `write:${write.verb}`,
@@ -378,35 +351,14 @@ export class WritePath {
     };
   }
 
-  /** The five-state answer for one receipt, from the queue or the outcome ring. */
-  async status(writeId: WriteId): Promise<WriteLookup | undefined> {
+  /** The five-state answer for one receipt, from whichever partition holds it. */
+  async status(writeId: WriteId): Promise<WriteReceipt | undefined> {
     for (const summary of await this.gateway.registry.list()) {
       const partition = await this.gateway.registry.resolveExisting(summary.dataFileUID);
       if (!partition) continue;
       await this.expireDue(partition);
-      const queued = (await partition.queue.pending()).find((write) => write.writeId === writeId);
-      if (queued) {
-        return {
-          writeId,
-          uid: queued.uid,
-          verb: queued.verb,
-          ...(queued.caption ? { caption: queued.caption } : {}),
-          status: "accepted",
-          expiresAt: queued.expiresAt,
-        };
-      }
-      const outcome = await partition.outcomes.byId(writeId);
-      if (outcome) {
-        return {
-          writeId,
-          uid: outcome.uid,
-          verb: outcome.verb,
-          ...(outcome.caption ? { caption: outcome.caption } : {}),
-          status: outcome.status,
-          at: outcome.at,
-          ...(outcome.detail ? { detail: outcome.detail } : {}),
-        };
-      }
+      const receipt = await partition.findWrite(writeId);
+      if (receipt) return receipt;
     }
     return undefined;
   }
@@ -517,18 +469,9 @@ export class WritePath {
         }
       }
       if (!verdict) continue;
-      const removed = await partition.queue.remove(write.writeId);
+      const removed = await partition.resolveWrite(write.writeId, verdict, now, detail);
       if (!removed) continue;
       this.inFlight.delete(write.writeId);
-      await partition.outcomes.record({
-        writeId: write.writeId,
-        uid: write.uid,
-        verb: write.verb,
-        ...(write.caption ? { caption: write.caption } : {}),
-        status: verdict,
-        at: now,
-        ...(detail ? { detail } : {}),
-      });
       log(`write ${write.writeId} (${write.verb} ${write.uid}) ${verdict} via session ${session || "?"}`);
     }
   }
