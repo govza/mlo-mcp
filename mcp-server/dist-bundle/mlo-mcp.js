@@ -5320,8 +5320,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path15) {
-      let input = path15;
+    function removeDotSegments(path18) {
+      let input = path18;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -5573,8 +5573,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path15, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path15 && path15 !== "/" ? path15 : void 0;
+        const [path18, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path18 && path18 !== "/" ? path18 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -8967,12 +8967,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs15, exportName) {
+    function addFormats(ajv, list, fs16, exportName) {
       var _a2;
       var _b2;
       (_a2 = (_b2 = ajv.opts.code).formats) !== null && _a2 !== void 0 ? _a2 : _b2.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs15[f]);
+        ajv.addFormat(f, fs16[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -8981,7 +8981,8 @@ var require_dist = __commonJS({
 });
 
 // src/index.ts
-import { promises as fs14 } from "node:fs";
+import { promises as fs15 } from "node:fs";
+import path17 from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
@@ -9182,10 +9183,10 @@ function assignProp(target, prop, value) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path15) {
-  if (!path15)
+function getElementAtPath(obj, path18) {
+  if (!path18)
     return obj;
-  return path15.reduce((acc, key) => acc?.[key], obj);
+  return path18.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -9505,11 +9506,11 @@ function aborted(x2, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path15, issues) {
+function prefixIssues(path18, issues) {
   return issues.map((iss) => {
     var _a2;
     (_a2 = iss).path ?? (_a2.path = []);
-    iss.path.unshift(path15);
+    iss.path.unshift(path18);
     return iss;
   });
 }
@@ -15106,7 +15107,7 @@ var StdioServerTransport = class {
 };
 
 // src/config.ts
-import path2 from "node:path";
+import path3 from "node:path";
 import os from "node:os";
 
 // src/profile-detect.ts
@@ -15329,9 +15330,39 @@ async function detectProfile(mloExePath) {
 }
 
 // src/log.ts
+import fs from "node:fs";
+import path2 from "node:path";
+var mirrorFile;
+var mirrorBytes = 0;
+var MIRROR_ROTATE_BYTES = 2 * 1024 * 1024;
+function rotate(file) {
+  fs.rmSync(`${file}.old`, { force: true });
+  fs.renameSync(file, `${file}.old`);
+  mirrorBytes = 0;
+}
+function mirrorLogToFile(file) {
+  try {
+    fs.mkdirSync(path2.dirname(file), { recursive: true });
+    mirrorBytes = fs.existsSync(file) ? fs.statSync(file).size : 0;
+    if (mirrorBytes > MIRROR_ROTATE_BYTES) rotate(file);
+    mirrorFile = file;
+  } catch {
+    mirrorFile = void 0;
+  }
+}
 function log(message) {
   process.stderr.write(`[mlo-mcp] ${message}
 `);
+  if (mirrorFile) {
+    try {
+      const line = `${(/* @__PURE__ */ new Date()).toISOString()} ${message}
+`;
+      fs.appendFileSync(mirrorFile, line);
+      mirrorBytes += Buffer.byteLength(line);
+      if (mirrorBytes > MIRROR_ROTATE_BYTES) rotate(mirrorFile);
+    } catch {
+    }
+  }
 }
 
 // src/config.ts
@@ -15349,8 +15380,8 @@ function resolveDataFile(mloExePath) {
 }
 function resolveStateRoot() {
   if (process.env.MLO_CLOUD_STATE_ROOT) return process.env.MLO_CLOUD_STATE_ROOT;
-  if (process.env.LOCALAPPDATA) return path2.join(process.env.LOCALAPPDATA, "mlo-mcp", "cloud");
-  return path2.join(os.homedir(), ".mlo-mcp", "cloud");
+  if (process.env.LOCALAPPDATA) return path3.join(process.env.LOCALAPPDATA, "mlo-mcp", "cloud");
+  return path3.join(os.homedir(), ".mlo-mcp", "cloud");
 }
 function loadCloudConfig() {
   const cloudPort = Number(process.env.MLO_CLOUD_PORT ?? String(DEFAULT_CLOUD_PORT));
@@ -15375,7 +15406,7 @@ function loadConfig() {
   return {
     dataFile,
     dataFileAutoDetected: autoDetected,
-    exportDir: process.env.MLO_EXPORT_DIR ?? path2.join(os.tmpdir(), "mlo-mcp"),
+    exportDir: process.env.MLO_EXPORT_DIR ?? path3.join(os.tmpdir(), "mlo-mcp"),
     cacheStaleMs: Number(process.env.MLO_CACHE_STALE_MS) || 3e4,
     quickSyncDebounceMs: Number(process.env.MLO_QUICKSYNC_DEBOUNCE_MS) || 3e5,
     // Only needed when the capture inbox is NOT MLO's own <Inbox> node (e.g. a
@@ -15388,8 +15419,8 @@ function loadConfig() {
 
 // src/repo/mlo-cli.ts
 import { spawn } from "node:child_process";
-import { promises as fs } from "node:fs";
-import path3 from "node:path";
+import { promises as fs2 } from "node:fs";
+import path4 from "node:path";
 var EXIT_MESSAGES = {
   1: "invalid command-line argument",
   2: "target file already exists (mlo.exe -saveXML/-saveML never overwrite)",
@@ -15420,13 +15451,13 @@ async function withFileLock(config2, fn) {
   const deadline = Date.now() + 9e4;
   for (; ; ) {
     try {
-      await fs.mkdir(lockDir);
+      await fs2.mkdir(lockDir);
       break;
     } catch {
       try {
-        const st = await fs.stat(lockDir);
+        const st = await fs2.stat(lockDir);
         if (Date.now() - st.mtimeMs > 18e4) {
-          await fs.rm(lockDir, { recursive: true, force: true });
+          await fs2.rm(lockDir, { recursive: true, force: true });
           continue;
         }
       } catch {
@@ -15445,7 +15476,7 @@ async function withFileLock(config2, fn) {
     return await fn();
   } finally {
     fileLockHeld = false;
-    await fs.rm(lockDir, { recursive: true, force: true });
+    await fs2.rm(lockDir, { recursive: true, force: true });
   }
 }
 function withMloFileLock(config2, fn) {
@@ -15512,7 +15543,7 @@ var SystemMloCli = class {
   exec;
   async ensureDataFile() {
     try {
-      await fs.access(this.config.dataFile);
+      await fs2.access(this.config.dataFile);
     } catch {
       throw new MloError(`MLO data file not found at "${this.config.dataFile}"`);
     }
@@ -15520,14 +15551,14 @@ var SystemMloCli = class {
   exportXml() {
     return withMloFileLock(this.config, async () => {
       await this.ensureDataFile();
-      await fs.mkdir(this.config.exportDir, { recursive: true });
-      const target = path3.join(this.config.exportDir, `export-${process.pid}-${++exportCounter}.xml`);
-      await fs.rm(target, { force: true });
+      await fs2.mkdir(this.config.exportDir, { recursive: true });
+      const target = path4.join(this.config.exportDir, `export-${process.pid}-${++exportCounter}.xml`);
+      await fs2.rm(target, { force: true });
       try {
         await this.exec(this.config.mloExePath, mloArgs(this.config.dataFile, [`-saveXML=${target}`]), 3e4);
-        return await fs.readFile(target, "utf8");
+        return await fs2.readFile(target, "utf8");
       } finally {
-        await fs.rm(target, { force: true });
+        await fs2.rm(target, { force: true });
       }
     });
   }
@@ -15538,7 +15569,7 @@ var SystemMloCli = class {
     });
   }
   readDataFile() {
-    return fs.readFile(this.config.dataFile);
+    return fs2.readFile(this.config.dataFile);
   }
 };
 
@@ -15588,7 +15619,7 @@ function num(v) {
   return v === void 0 || v === "" ? void 0 : Number(v);
 }
 function toModel(raw, id, parentPath, depth) {
-  const path15 = [...parentPath, raw["@_Caption"]];
+  const path18 = [...parentPath, raw["@_Caption"]];
   const node = {
     id,
     Guid: raw.IDD,
@@ -15614,10 +15645,10 @@ function toModel(raw, id, parentPath, depth) {
     CompleteSubTasksInOrder: delphiBool(raw.CompleteSubTasksInOrder),
     DependsOn: raw.Dependency?.UID ?? [],
     Children: [],
-    Path: path15,
+    Path: path18,
     Depth: depth
   };
-  node.Children = (raw.TaskNode ?? []).map((c, i2) => toModel(c, `${id}.${i2 + 1}`, path15, depth + 1));
+  node.Children = (raw.TaskNode ?? []).map((c, i2) => toModel(c, `${id}.${i2 + 1}`, path18, depth + 1));
   return node;
 }
 function buildTaskTree(doc) {
@@ -17852,15 +17883,15 @@ var SnapshotResolver = class {
 };
 
 // src/cloud/row-store.ts
-import { promises as fs3 } from "node:fs";
-import path4 from "node:path";
+import { promises as fs4 } from "node:fs";
+import path5 from "node:path";
 
 // src/cloud/atomic-file.ts
-import { promises as fs2 } from "node:fs";
+import { promises as fs3 } from "node:fs";
 async function atomicWrite(target, text, options) {
   const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
   if (options?.fsync) {
-    const handle = await fs2.open(temporary, "w");
+    const handle = await fs3.open(temporary, "w");
     try {
       await handle.writeFile(text);
       await handle.sync();
@@ -17868,9 +17899,9 @@ async function atomicWrite(target, text, options) {
       await handle.close();
     }
   } else {
-    await fs2.writeFile(temporary, text);
+    await fs3.writeFile(temporary, text);
   }
-  await fs2.rename(temporary, target);
+  await fs3.rename(temporary, target);
 }
 var WriteChain = class {
   chain = Promise.resolve();
@@ -18026,19 +18057,19 @@ var FileRowStore = class {
   loaded = false;
   writes = new WriteChain();
   file() {
-    return path4.join(this.dir, FILE_NAME);
+    return path5.join(this.dir, FILE_NAME);
   }
   /** Re-read the file when it changed on disk (or was never loaded). */
   async ensureFresh() {
     let mtime;
     try {
-      mtime = (await fs3.stat(this.file())).mtimeMs;
+      mtime = (await fs4.stat(this.file())).mtimeMs;
     } catch {
       this.loaded = true;
       return;
     }
     if (this.loaded && mtime === this.loadedMtime) return;
-    const parsed = JSON.parse(await fs3.readFile(this.file(), "utf8"));
+    const parsed = JSON.parse(await fs4.readFile(this.file(), "utf8"));
     this.headers = parsed.headers ?? [];
     this.rows = new Map(Object.entries(parsed.rows ?? {}));
     this.places = new Map(Object.entries(parsed.places ?? {}));
@@ -18055,7 +18086,7 @@ var FileRowStore = class {
       flags: Object.fromEntries(this.flags)
     };
     await atomicWrite(this.file(), JSON.stringify(value));
-    this.loadedMtime = (await fs3.stat(this.file())).mtimeMs;
+    this.loadedMtime = (await fs4.stat(this.file())).mtimeMs;
   }
   headerIndex(header) {
     const existing = this.headers.findIndex(
@@ -18386,11 +18417,11 @@ var ReviewService = class {
 };
 
 // src/cloud/profile-backup.ts
-import { promises as fs4 } from "node:fs";
+import { promises as fs5 } from "node:fs";
 async function backupDataFile(dataFile, at = /* @__PURE__ */ new Date()) {
   const stamp = at.toISOString().replace(/[:.]/g, "-");
   const target = `${dataFile}.rebind-backup-${stamp}`;
-  await fs4.copyFile(dataFile, target, fs4.constants.COPYFILE_EXCL);
+  await fs5.copyFile(dataFile, target, fs5.constants.COPYFILE_EXCL);
   return target;
 }
 
@@ -18538,9 +18569,10 @@ var AdminService = class {
       mode: partition.mode,
       lifecycle: partition.lifecycle
     }));
-    const [unboundSightings, mismatch] = await Promise.all([
+    const [unboundSightings, mismatch, autoInit] = await Promise.all([
       this.gateway.unboundSightings(),
-      this.gateway.bindingMismatch(this.config.dataFile)
+      this.gateway.bindingMismatch(this.config.dataFile),
+      this.gateway.autoInitOutcome.last()
     ]);
     return {
       host: this.config.cloudHost,
@@ -18552,6 +18584,7 @@ var AdminService = class {
       mismatch,
       ...repullRequestedAt ? { repullRequestedAt } : {},
       unboundSightings,
+      ...autoInit ? { autoInit } : {},
       writes,
       stateRoot: this.gateway.stateRoot,
       partitions
@@ -19072,8 +19105,8 @@ function getErrorMap() {
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path15, errorMaps, issueData } = params;
-  const fullPath = [...path15, ...issueData.path || []];
+  const { data, path: path18, errorMaps, issueData } = params;
+  const fullPath = [...path18, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -19189,11 +19222,11 @@ var errorUtil;
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path15, key) {
+  constructor(parent, value, path18, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path15;
+    this._path = path18;
     this._key = key;
   }
   get path() {
@@ -27027,6 +27060,19 @@ var cloudStatusTool = defineTool({
     }).describe(
       "The write path's aggregate. A writeId receipt dies with the session that took it, so this is the only place an outcome nobody waited for can be seen"
     ),
+    autoInit: external_exports.object({
+      kind: external_exports.enum(["bound", "refused"]),
+      at: external_exports.string(),
+      profilePath: external_exports.string().optional(),
+      dataFileUID: external_exports.string().optional(),
+      problem: external_exports.object({
+        kind: external_exports.string(),
+        title: external_exports.string(),
+        remedy: external_exports.string().optional()
+      }).passthrough().optional()
+    }).optional().describe(
+      "The resident's last decisive auto-init attempt. When the profile is unbound, this is WHY the endpoint's last try to bind it declined"
+    ),
     stateRoot: external_exports.string(),
     partitions: external_exports.array(external_exports.object({ key: external_exports.string(), mode: external_exports.string(), lifecycle: external_exports.string() }))
   },
@@ -27044,11 +27090,13 @@ var cloudStatusTool = defineTool({
       endpoint: status.endpoint,
       bindingMismatch: status.mismatch !== void 0,
       ...status.unboundSightings.length ? { unboundSightings: status.unboundSightings } : {},
+      ...status.autoInit ? { autoInit: status.autoInit } : {},
       writes: status.writes,
       stateRoot: status.stateRoot,
       partitions: status.partitions
     };
-    const bindingNote = status.mode === "unbound" ? "no partition bound" : `${status.mode} partition, ${status.lifecycle ?? "n/a"}`;
+    const autoInitNote = status.mode === "unbound" && status.autoInit?.kind === "refused" ? ` \u2014 last bind attempt declined (${status.autoInit.problem.kind}): ${status.autoInit.problem.title}${status.autoInit.problem.remedy ? `; ${status.autoInit.problem.remedy}` : ""}` : "";
+    const bindingNote = status.mode === "unbound" ? `no partition bound${autoInitNote}` : `${status.mode} partition, ${status.lifecycle ?? "n/a"}`;
     const bindingMismatchNote = status.mismatch ? `; BINDING MISMATCH: bound to ${status.mismatch.boundDataFileUID} but MLO is syncing ${status.mismatch.observedDataFileUIDs.join(", ")}` : "";
     const endpointNote = status.endpoint.reachable ? `; endpoint reachable${status.endpoint.version ? ` (${status.endpoint.version})` : ""}` : `; ENDPOINT UNREACHABLE \u2014 MLO cannot sync through it. ${ENDPOINT_RECOVERY}`;
     const { pendingWrites, oldestPendingAgeMs, recentDeadLetters, sessionHeldOpen } = status.writes;
@@ -27379,24 +27427,24 @@ function createMcpServer(ctx) {
 
 // src/cloud/gateway.ts
 import { execFile as execFile2 } from "node:child_process";
-import { promises as fs11 } from "node:fs";
+import { promises as fs12 } from "node:fs";
 import os2 from "node:os";
-import path13 from "node:path";
+import path15 from "node:path";
 
 // src/cloud/binding.ts
-import { promises as fs8 } from "node:fs";
-import path10 from "node:path";
+import { promises as fs9 } from "node:fs";
+import path11 from "node:path";
 
 // src/cloud/partition.ts
 import { createHash } from "node:crypto";
-import { promises as fs6 } from "node:fs";
-import path8 from "node:path";
+import { promises as fs7 } from "node:fs";
+import path9 from "node:path";
 
 // src/cloud/capture-journal.ts
-import path5 from "node:path";
+import path6 from "node:path";
 
 // src/cloud/json-document.ts
-import { promises as fs5 } from "node:fs";
+import { promises as fs6 } from "node:fs";
 var JsonDocument = class {
   constructor(file, options) {
     this.file = file;
@@ -27408,7 +27456,7 @@ var JsonDocument = class {
   async read() {
     let raw;
     try {
-      raw = await fs5.readFile(this.file, "utf8");
+      raw = await fs6.readFile(this.file, "utf8");
     } catch (error2) {
       if (error2.code !== "ENOENT") throw error2;
       return this.options.empty();
@@ -27446,7 +27494,7 @@ var FileCaptureJournal = class {
   constructor(dir, now = () => /* @__PURE__ */ new Date(), cap = DEFAULT_JOURNAL_CAP) {
     this.now = now;
     this.cap = cap;
-    this.document = new JsonDocument(path5.join(dir, FILE_NAME2), {
+    this.document = new JsonDocument(path6.join(dir, FILE_NAME2), {
       unwrap: (parsed) => (parsed.entries ?? []).filter((entry) => typeof entry?.at === "string"),
       wrap: (entries) => ({ entries, at: entries.at(-1)?.at ?? this.now().toISOString() }),
       empty: () => [],
@@ -27497,12 +27545,12 @@ function deriveGauge(entries, windowMs, now) {
 }
 
 // src/cloud/injection-queue.ts
-import path6 from "node:path";
+import path7 from "node:path";
 var FILE_NAME3 = "injection-queue.json";
 var FileInjectionQueue = class {
   document;
   constructor(dir) {
-    this.document = new JsonDocument(path6.join(dir, FILE_NAME3), {
+    this.document = new JsonDocument(path7.join(dir, FILE_NAME3), {
       unwrap: (parsed) => (parsed.writes ?? []).filter((write) => typeof write?.writeId === "string"),
       wrap: (writes) => ({ writes, at: (/* @__PURE__ */ new Date()).toISOString() }),
       empty: () => [],
@@ -27534,13 +27582,13 @@ var FileInjectionQueue = class {
 };
 
 // src/cloud/write-outcomes.ts
-import path7 from "node:path";
+import path8 from "node:path";
 var FILE_NAME4 = "write-outcomes.json";
 var DEFAULT_OUTCOME_CAP = 200;
 var FileWriteOutcomes = class {
   constructor(dir, cap = DEFAULT_OUTCOME_CAP) {
     this.cap = cap;
-    this.document = new JsonDocument(path7.join(dir, FILE_NAME4), {
+    this.document = new JsonDocument(path8.join(dir, FILE_NAME4), {
       unwrap: (parsed) => (parsed.outcomes ?? []).filter((outcome) => typeof outcome?.writeId === "string"),
       wrap: (outcomes) => ({ outcomes, at: outcomes.at(-1)?.at ?? (/* @__PURE__ */ new Date()).toISOString() }),
       empty: () => [],
@@ -27681,10 +27729,10 @@ var PartitionStore = class {
     };
   }
   metaPath() {
-    return path8.join(this.dir, "meta.json");
+    return path9.join(this.dir, "meta.json");
   }
   async meta() {
-    const parsed = JSON.parse(await fs6.readFile(this.metaPath(), "utf8"));
+    const parsed = JSON.parse(await fs7.readFile(this.metaPath(), "utf8"));
     return parsed;
   }
   async mode() {
@@ -27720,7 +27768,7 @@ var PartitionRegistry = class {
   stateRoot;
   handles = /* @__PURE__ */ new Map();
   partitionsDir() {
-    return path8.join(this.stateRoot, "partitions");
+    return path9.join(this.stateRoot, "partitions");
   }
   /**
    * Open a partition, creating its directory and meta on first use.
@@ -27732,8 +27780,8 @@ var PartitionRegistry = class {
     const key = partitionKey(uid);
     const cached2 = this.handles.get(key);
     if (cached2) return cached2;
-    const dir = path8.join(this.partitionsDir(), key);
-    await fs6.mkdir(dir, { recursive: true });
+    const dir = path9.join(this.partitionsDir(), key);
+    await fs7.mkdir(dir, { recursive: true });
     const handle = new PartitionStore(uid, key, dir);
     try {
       const meta = await handle.meta();
@@ -27748,7 +27796,7 @@ var PartitionRegistry = class {
         lifecycle: "uninitialized",
         createdAt: (/* @__PURE__ */ new Date()).toISOString()
       };
-      await atomicWrite(path8.join(dir, "meta.json"), `${JSON.stringify(meta, null, 2)}
+      await atomicWrite(path9.join(dir, "meta.json"), `${JSON.stringify(meta, null, 2)}
 `);
     }
     this.handles.set(key, handle);
@@ -27760,9 +27808,9 @@ var PartitionRegistry = class {
     const key = partitionKey(uid);
     const cached2 = this.handles.get(key);
     if (cached2) return cached2;
-    const dir = path8.join(this.partitionsDir(), key);
+    const dir = path9.join(this.partitionsDir(), key);
     try {
-      await fs6.stat(path8.join(dir, "meta.json"));
+      await fs7.stat(path9.join(dir, "meta.json"));
     } catch {
       return void 0;
     }
@@ -27781,12 +27829,12 @@ var PartitionRegistry = class {
     const uid = normalizeDataFileUid(rawUid);
     const key = partitionKey(uid);
     this.handles.delete(key);
-    await fs6.rm(path8.join(this.partitionsDir(), key), { recursive: true, force: true });
+    await fs7.rm(path9.join(this.partitionsDir(), key), { recursive: true, force: true });
   }
   async list() {
     let keys;
     try {
-      keys = await fs6.readdir(this.partitionsDir());
+      keys = await fs7.readdir(this.partitionsDir());
     } catch {
       return [];
     }
@@ -27794,7 +27842,7 @@ var PartitionRegistry = class {
     for (const key of keys.sort()) {
       try {
         const meta = JSON.parse(
-          await fs6.readFile(path8.join(this.partitionsDir(), key, "meta.json"), "utf8")
+          await fs7.readFile(path9.join(this.partitionsDir(), key, "meta.json"), "utf8")
         );
         summaries.push({ key, ...meta });
       } catch {
@@ -27805,8 +27853,8 @@ var PartitionRegistry = class {
 };
 
 // src/cloud/state-lock.ts
-import { promises as fs7 } from "node:fs";
-import path9 from "node:path";
+import { promises as fs8 } from "node:fs";
+import path10 from "node:path";
 var StateRootLock = class {
   constructor(stateRoot, name) {
     this.stateRoot = stateRoot;
@@ -27816,19 +27864,19 @@ var StateRootLock = class {
   name;
   chain = Promise.resolve();
   async withLock(operation) {
-    const lockDir = path9.join(this.stateRoot, `.${this.name}-lock`);
+    const lockDir = path10.join(this.stateRoot, `.${this.name}-lock`);
     const deadline = Date.now() + 1e4;
-    await fs7.mkdir(this.stateRoot, { recursive: true });
+    await fs8.mkdir(this.stateRoot, { recursive: true });
     for (; ; ) {
       try {
-        await fs7.mkdir(lockDir);
+        await fs8.mkdir(lockDir);
         break;
       } catch (error2) {
         if (error2.code !== "EEXIST") throw error2;
         try {
-          const stat = await fs7.stat(lockDir);
+          const stat = await fs8.stat(lockDir);
           if (Date.now() - stat.mtimeMs > 3e4) {
-            await fs7.rm(lockDir, { recursive: true, force: true });
+            await fs8.rm(lockDir, { recursive: true, force: true });
             continue;
           }
         } catch {
@@ -27855,7 +27903,7 @@ var StateRootLock = class {
   async release(lockDir) {
     for (let attempt = 0; attempt < 10; attempt++) {
       try {
-        await fs7.rm(lockDir, { recursive: true, force: true });
+        await fs8.rm(lockDir, { recursive: true, force: true });
         return;
       } catch (error2) {
         if (error2.code !== "EBUSY") return;
@@ -27874,7 +27922,7 @@ var StateRootLock = class {
 
 // src/cloud/binding.ts
 function canonicalProfilePath(profilePath) {
-  return path10.resolve(profilePath).toLowerCase();
+  return path11.resolve(profilePath).toLowerCase();
 }
 var BindingStore = class {
   constructor(stateRoot) {
@@ -27884,14 +27932,14 @@ var BindingStore = class {
   stateRoot;
   lock;
   file() {
-    return path10.join(this.stateRoot, "bindings.json");
+    return path11.join(this.stateRoot, "bindings.json");
   }
   serialize(operation) {
     return this.lock.serialize(operation);
   }
   async load() {
     try {
-      const parsed = JSON.parse(await fs8.readFile(this.file(), "utf8"));
+      const parsed = JSON.parse(await fs9.readFile(this.file(), "utf8"));
       return parsed.bindings ?? [];
     } catch (error2) {
       if (error2.code !== "ENOENT") throw error2;
@@ -27901,9 +27949,9 @@ var BindingStore = class {
   async save(bindings) {
     const target = this.file();
     const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
-    await fs8.writeFile(temporary, `${JSON.stringify({ bindings }, null, 2)}
+    await fs9.writeFile(temporary, `${JSON.stringify({ bindings }, null, 2)}
 `);
-    await fs8.rename(temporary, target);
+    await fs9.rename(temporary, target);
   }
   async forProfile(profilePath) {
     const canonical = canonicalProfilePath(profilePath);
@@ -28025,8 +28073,8 @@ var BindingStore = class {
 };
 
 // src/cloud/sightings.ts
-import { promises as fs9 } from "node:fs";
-import path11 from "node:path";
+import { promises as fs10 } from "node:fs";
+import path12 from "node:path";
 var MAX_SIGHTINGS = 8;
 var SightingStore = class {
   constructor(stateRoot) {
@@ -28035,12 +28083,12 @@ var SightingStore = class {
   stateRoot;
   writes = Promise.resolve();
   file() {
-    return path11.join(this.stateRoot, "unbound-sightings.json");
+    return path12.join(this.stateRoot, "unbound-sightings.json");
   }
   /** Every recorded sighting, most recently seen first. */
   async all() {
     try {
-      const parsed = JSON.parse(await fs9.readFile(this.file(), "utf8"));
+      const parsed = JSON.parse(await fs10.readFile(this.file(), "utf8"));
       return (parsed.sightings ?? []).filter((sighting) => typeof sighting?.dataFileUID === "string");
     } catch (error2) {
       if (error2.code !== "ENOENT") {
@@ -28065,9 +28113,9 @@ var SightingStore = class {
       const value = { sightings: sightings.slice(0, MAX_SIGHTINGS), at: now };
       const target = this.file();
       const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
-      await fs9.writeFile(temporary, `${JSON.stringify(value, null, 2)}
+      await fs10.writeFile(temporary, `${JSON.stringify(value, null, 2)}
 `);
-      await fs9.rename(temporary, target);
+      await fs10.rename(temporary, target);
     };
     const next = this.writes.then(run, run);
     this.writes = next.catch(() => void 0);
@@ -28075,9 +28123,45 @@ var SightingStore = class {
   }
 };
 
+// src/cloud/auto-init-outcome.ts
+import path13 from "node:path";
+function unwrap(parsed) {
+  const value = parsed;
+  if (!value || typeof value.at !== "string") return void 0;
+  if (value.kind === "bound" && typeof value.dataFileUID === "string" && typeof value.profilePath === "string") {
+    return value;
+  }
+  if (value.kind === "refused" && typeof value.problem === "object" && value.problem !== null) {
+    return value;
+  }
+  return void 0;
+}
+var AutoInitOutcomeStore = class {
+  constructor(stateRoot) {
+    this.stateRoot = stateRoot;
+    this.document = new JsonDocument(path13.join(stateRoot, "auto-init-outcome.json"), {
+      unwrap,
+      wrap: (value) => value ?? null,
+      empty: () => void 0,
+      onCorrupt: "empty",
+      pretty: true
+    });
+  }
+  stateRoot;
+  document;
+  /** The last decisive attempt, or undefined when none has been recorded. */
+  last() {
+    return this.document.read();
+  }
+  /** Replace the marker. Best-effort by contract: callers never await a failure. */
+  record(outcome) {
+    return this.document.update(() => ({ value: outcome, result: void 0 }));
+  }
+};
+
 // src/cloud/dead-letter.ts
-import { promises as fs10 } from "node:fs";
-import path12 from "node:path";
+import { promises as fs11 } from "node:fs";
+import path14 from "node:path";
 var MAX_LETTERS = 50;
 var MAX_CONTENT = 4e3;
 function clamp(content) {
@@ -28092,12 +28176,12 @@ var DeadLetterStore = class {
   lock;
   /** The path a refusal names, so recovery does not require knowing the state root. */
   file() {
-    return path12.join(this.stateRoot, "dead-letters.json");
+    return path14.join(this.stateRoot, "dead-letters.json");
   }
   /** Every preserved write, oldest first. */
   async all() {
     try {
-      const parsed = JSON.parse(await fs10.readFile(this.file(), "utf8"));
+      const parsed = JSON.parse(await fs11.readFile(this.file(), "utf8"));
       return (parsed.refused ?? []).filter((letter) => typeof letter?.content === "string");
     } catch (error2) {
       if (error2.code !== "ENOENT") {
@@ -28113,9 +28197,9 @@ var DeadLetterStore = class {
       const value = { refused: refused.slice(-MAX_LETTERS), at: letter.at };
       const target = this.file();
       const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
-      await fs10.writeFile(temporary, `${JSON.stringify(value, null, 2)}
+      await fs11.writeFile(temporary, `${JSON.stringify(value, null, 2)}
 `);
-      await fs10.rename(temporary, target);
+      await fs11.rename(temporary, target);
     });
   }
 };
@@ -28127,6 +28211,8 @@ var CloudGateway = class {
   registry;
   bindings;
   sightings;
+  /** Why the resident's last decisive bind attempt went the way it did. */
+  autoInitOutcome;
   /** Shared, not per-call: its write chain is what serialises concurrent refusals. */
   deadLetters;
   stateRoot;
@@ -28144,6 +28230,7 @@ var CloudGateway = class {
     this.registry = new PartitionRegistry(options.stateRoot);
     this.bindings = new BindingStore(options.stateRoot);
     this.sightings = new SightingStore(options.stateRoot);
+    this.autoInitOutcome = new AutoInitOutcomeStore(options.stateRoot);
     this.deadLetters = new DeadLetterStore(options.stateRoot);
   }
   /** Where the sync observer writes its structural summaries. */
@@ -28163,7 +28250,7 @@ var CloudGateway = class {
       await this.prepareRoot();
       const line = `${JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), ...record2 })}
 `;
-      await fs11.appendFile(path13.join(this.stateRoot, VENDOR_CLIENT_FILE), line);
+      await fs12.appendFile(path15.join(this.stateRoot, VENDOR_CLIENT_FILE), line);
     } catch (error2) {
       log(`vendor exchange log write failed: ${error2 instanceof Error ? error2.message : String(error2)}`);
     }
@@ -28303,11 +28390,11 @@ var CloudGateway = class {
     this.rootPrepared = true;
     let created = false;
     try {
-      await fs11.mkdir(this.stateRoot, { recursive: false });
+      await fs12.mkdir(this.stateRoot, { recursive: false });
       created = true;
     } catch (error2) {
       if (error2.code !== "EEXIST") {
-        await fs11.mkdir(this.stateRoot, { recursive: true });
+        await fs12.mkdir(this.stateRoot, { recursive: true });
         created = true;
       }
     }
@@ -28330,8 +28417,8 @@ import https2 from "node:https";
 import net2 from "node:net";
 
 // src/cloud/sync-observer.ts
-import { promises as fs12 } from "node:fs";
-import path14 from "node:path";
+import { promises as fs13 } from "node:fs";
+import path16 from "node:path";
 import zlib from "node:zlib";
 var VENDOR_SYNC_HOST = "sync.mylifeorganized.net";
 var SUMMARY_FILE = "soap-summary.jsonl";
@@ -28460,12 +28547,12 @@ var SyncObserver = class {
   append(record2) {
     const line = `${JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), ...record2 })}
 `;
-    void fs12.mkdir(this.stateDir, { recursive: true }).then(() => fs12.appendFile(path14.join(this.stateDir, SUMMARY_FILE), line)).catch((error2) => log(`sync observer write failed: ${error2 instanceof Error ? error2.message : String(error2)}`));
+    void fs13.mkdir(this.stateDir, { recursive: true }).then(() => fs13.appendFile(path16.join(this.stateDir, SUMMARY_FILE), line)).catch((error2) => log(`sync observer write failed: ${error2 instanceof Error ? error2.message : String(error2)}`));
   }
 };
 
 // src/cloud/auto-init.ts
-import { promises as fs13 } from "node:fs";
+import { promises as fs14 } from "node:fs";
 
 // src/cloud/drift-recovery.ts
 function chooseDriftCandidate(candidates, sightings) {
@@ -29848,10 +29935,27 @@ var AutoInitializer = class {
    * vendor exchanges.
    */
   attempt() {
-    this.inFlight ??= this.run().finally(() => {
+    this.inFlight ??= this.run().then(async (result) => {
+      await this.recordOutcome(result);
+      return result;
+    }).finally(() => {
       this.inFlight = void 0;
     });
     return this.inFlight;
+  }
+  /**
+   * Leave the decisive result where an attached session can read it: the
+   * resident's own stderr is discarded by design (detached spawn), so this
+   * marker is the only surviving account of WHY a bind declined. Best-effort —
+   * an unwritable marker must not turn a successful bind into a failure.
+   * `already-bound` is the steady state and is not recorded; it would only
+   * overwrite the last entry that explained anything.
+   */
+  async recordOutcome(result) {
+    if (result.kind === "already-bound") return;
+    const at = (/* @__PURE__ */ new Date()).toISOString();
+    const outcome = result.kind === "bound" ? { kind: "bound", at, profilePath: result.profilePath, dataFileUID: result.dataFileUID } : { kind: "refused", at, problem: result.problem };
+    await this.gateway.autoInitOutcome.record(outcome).catch((error2) => log(`could not persist the auto-init outcome marker: ${error2 instanceof Error ? error2.message : String(error2)}`));
   }
   async run() {
     const seen = this.gateway.vendorContactUids();
@@ -30007,7 +30111,7 @@ function systemAutoInitPorts(gateway, mloExePath) {
       return verdict.ok ? verdict.dataFile : void 0;
     },
     async localTaskGuids(profilePath) {
-      return taskGuidsInDataFile(await fs13.readFile(profilePath));
+      return taskGuidsInDataFile(await fs14.readFile(profilePath));
     },
     async pullHistory(uid) {
       const contact = gateway.vendorContact(uid);
@@ -30741,7 +30845,14 @@ async function startCloudServer(options) {
           // injected writes an MLO sync session has held unresolved long enough
           // to read as stalled. Everything else about a write is in the state
           // root, which sessions read for themselves.
-          writesHeldOpen: writePath.writesHeldOpen()
+          writesHeldOpen: writePath.writesHeldOpen(),
+          // The resident's last decisive bind attempt. Its stderr is discarded
+          // by design (detached spawn), so this is where a declined bind's
+          // reason survives for an attached session to read.
+          ...await gateway.autoInitOutcome.last().then(
+            (outcome) => outcome ? { autoInit: outcome } : {},
+            () => ({})
+          )
         });
         return;
       }
@@ -30806,6 +30917,7 @@ async function main() {
 }
 async function serveResidentEndpoint() {
   const config2 = loadCloudConfig();
+  mirrorLogToFile(path17.join(config2.cloudStateRoot, "resident.log"));
   const gateway = new CloudGateway({ stateRoot: config2.cloudStateRoot });
   const handle = await startCloudServer({
     host: config2.cloudHost,
@@ -30826,7 +30938,7 @@ function watchOwnBuild() {
   let startMtime;
   const timer = setInterval(async () => {
     try {
-      const mtime = (await fs14.stat(entry)).mtimeMs;
+      const mtime = (await fs15.stat(entry)).mtimeMs;
       startMtime ??= mtime;
       if (mtime !== startMtime && !isMloBusy()) {
         log("server build changed on disk \u2014 exiting so the client restarts the new version");
