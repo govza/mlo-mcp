@@ -1,5 +1,31 @@
 import { z } from "zod";
+import type { WriteStatus } from "../repo/mlo-repository.js";
 import { defineTool, failureResult, textResult } from "./contract.js";
+
+/**
+ * One sentence per state, plus what ends it where anything can. The receipt
+ * itself travels verbatim from the write path; these words are added here, at
+ * the last boundary before a human, because "what does superseded mean for me"
+ * is a caller question no inner seam needs answered.
+ */
+const PROGRESS_WORDS: Record<WriteStatus, { detail: string; remedy?: string }> = {
+  accepted: {
+    detail: "durably queued — it lands the next time MLO syncs through the endpoint",
+    remedy: "nothing to do; MLO syncs on its own within about 90 seconds, or run `sync` to hurry it",
+  },
+  delivered: { detail: "MLO applied this write to the profile" },
+  verified: { detail: "MLO applied this write and a fresh export confirmed it" },
+  expired: {
+    detail: "MLO did not sync before the write's TTL ran out, so it was never applied — the rows are in the dead-letter file",
+    remedy: "check MLO is running and syncing through the endpoint (`cloud_status`), then make the change again",
+  },
+  superseded: {
+    detail:
+      "MLO applied a different version of this task instead — a conflict the app resolved in favour of its own copy, " +
+      "so this write's content is gone",
+    remedy: "read the task again and re-apply the change on top of what MLO kept",
+  },
+};
 
 /**
  * Where one accept receipt got to (spec section 2). Separate from the write
@@ -31,7 +57,19 @@ export const writeStatusTool = defineTool({
   async execute({ writeId }, ctx) {
     const answered = await ctx.outline.writeStatus(writeId);
     if (answered.isErrored) return failureResult(answered.failure);
-    const progress = answered.value;
+    const receipt = answered.value;
+    const words = PROGRESS_WORDS[receipt.status];
+    const progress = {
+      writeId: receipt.writeId,
+      status: receipt.status,
+      ...(receipt.uid ? { uid: receipt.uid } : {}),
+      ...(receipt.expiresAt ? { expiresAt: receipt.expiresAt } : {}),
+      ...(receipt.at ? { at: receipt.at } : {}),
+      // The write path's own words come first when it has any: they name the
+      // task and the session, which no generic sentence can.
+      detail: receipt.detail ? `${receipt.detail} — ${words.detail}` : words.detail,
+      ...(words.remedy ? { remedy: words.remedy } : {}),
+    };
     const lines = [
       `${progress.writeId}: ${progress.status} — ${progress.detail}`,
       progress.uid ? `task: ${progress.uid}` : undefined,

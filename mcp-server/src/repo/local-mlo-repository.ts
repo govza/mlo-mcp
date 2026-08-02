@@ -15,7 +15,7 @@ import {
   type Snapshot,
   type SnapshotFailure,
   type WriteId,
-  type WriteState,
+  type WriteReceipt,
 } from "./mlo-repository.js";
 import { overlayPendingWrites, type PendingReader, type PendingRows } from "./pending-overlay.js";
 import { failed, ok, type ServiceResult } from "../result.js";
@@ -150,18 +150,12 @@ export class LocalMloRepository implements MloRepository {
     return ok({ writeId: result.value.writeId, expiresAt: result.value.expiresAt });
   }
 
-  async status(id: WriteId): Promise<RepoResult<WriteState>> {
+  async status(id: WriteId): Promise<RepoResult<WriteReceipt>> {
     const result = await this.requireResident().writeStatus(id);
     if (!result.ok) return failed(repoFailureFromProblem(result.refusal));
-    const state = result.value;
-    return ok({
-      writeId: state.writeId,
-      status: state.status,
-      ...(state.uid ? { uid: state.uid } : {}),
-      ...(state.expiresAt ? { expiresAt: state.expiresAt } : {}),
-      ...(state.at ? { at: state.at } : {}),
-      ...(state.detail ? { detail: state.detail } : {}),
-    });
+    // The receipt is one shape end-to-end: the resident's answer travels
+    // verbatim, nothing here re-maps its fields.
+    return ok(result.value);
   }
 
   async quickSync(): Promise<RepoResult<void>> {

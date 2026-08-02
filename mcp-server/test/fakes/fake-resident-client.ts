@@ -2,14 +2,13 @@ import { parseProblem, problemBody, type Problem } from "../../src/cloud/problem
 import { describeWriteRows } from "../../src/cloud/write-path.js";
 import type {
   AcceptedWrite,
-  QueueState,
   ResidentClient,
   ResidentResult,
   ResidentWrite,
 } from "../../src/repo/resident-client.js";
 import { endpointDownRefusal } from "../../src/repo/resident-client.js";
 import type { EndpointStatus } from "../../src/cloud/endpoint.js";
-import type { WriteId, WriteStatus } from "../../src/repo/mlo-repository.js";
+import type { WriteId, WriteReceipt, WriteStatus } from "../../src/repo/mlo-repository.js";
 
 /**
  * In-memory ResidentClient (spec section 8): accepts writes with hand-driven
@@ -23,7 +22,7 @@ export class FakeResidentClient implements ResidentClient {
   /** Every write this fake durably accepted, in order. */
   readonly accepted: (ResidentWrite & AcceptedWrite)[] = [];
 
-  private readonly states = new Map<WriteId, QueueState>();
+  private readonly states = new Map<WriteId, WriteReceipt>();
   private nextWriteId = 1;
   private scripted: { httpStatus: number; body: string }[] = [];
   private down = false;
@@ -87,8 +86,8 @@ export class FakeResidentClient implements ResidentClient {
     return { ok: true, value };
   }
 
-  async writeStatus(id: WriteId): Promise<ResidentResult<QueueState>> {
-    const refused = this.refusal<QueueState>();
+  async writeStatus(id: WriteId): Promise<ResidentResult<WriteReceipt>> {
+    const refused = this.refusal<WriteReceipt>();
     if (refused) return refused;
     const state = this.states.get(id);
     if (!state) {

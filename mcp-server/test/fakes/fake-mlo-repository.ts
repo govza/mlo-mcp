@@ -9,7 +9,7 @@ import {
   type Snapshot,
   type SnapshotFailure,
   type WriteId,
-  type WriteState,
+  type WriteReceipt,
   type WriteStatus,
 } from "../../src/repo/mlo-repository.js";
 import { overlayPendingWrites } from "../../src/repo/pending-overlay.js";
@@ -58,7 +58,7 @@ export class FakeMloRepository implements MloRepository {
     return ok({ writeId, expiresAt });
   }
 
-  async status(id: WriteId): Promise<RepoResult<WriteState>> {
+  async status(id: WriteId): Promise<RepoResult<WriteReceipt>> {
     const entry = this.writes.get(id);
     if (!entry) return failed(repoFailure("unknown-write", `unknown writeId "${id}"`));
     return ok({

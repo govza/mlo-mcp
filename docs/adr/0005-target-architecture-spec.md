@@ -199,7 +199,7 @@ interface MloCli {                          // wraps mlo-cli.ts; its three modul
 }
 interface ResidentClient {                  // the HTTP hop; lazy attach-and-spawn
   postWrite(rows: DeltaRow[]): Accepted
-  writeStatus(id: WriteId): QueueState
+  writeStatus(id: WriteId): WriteReceipt   // the one receipt shape, verbatim at every hop
   probe(): EndpointStatus
 }
 ```

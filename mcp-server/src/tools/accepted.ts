@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import type { OutlineWrite, WriteReceipt } from "../services/outline.js";
+import type { AcceptReceipt, OutlineWrite } from "../services/outline.js";
 import { failureResult, textResult } from "./contract.js";
 
 /**
@@ -34,7 +34,7 @@ function clockTime(expiresAt: string): string {
     : `${String(parsed.getHours()).padStart(2, "0")}:${String(parsed.getMinutes()).padStart(2, "0")}`;
 }
 
-function accepted(receipt: WriteReceipt, what: string): CallToolResult {
+function accepted(receipt: AcceptReceipt, what: string): CallToolResult {
   const message =
     `accepted - ${what} lands on MLO's next sync; expires at ${clockTime(receipt.expiresAt)} if MLO doesn't sync. ` +
     `Reads already show it, flagged pending.`;

@@ -41,16 +41,24 @@ export interface PendingWrite {
 /** Five-state write outcome keyed by writeId (spec section 2). */
 export type WriteStatus = "accepted" | "delivered" | "verified" | "expired" | "superseded";
 
+/** Best-effort verb label the write path derives from a write's own rows. */
+export type WriteVerb = "add" | "update" | "complete" | "delete";
+
 /**
- * Everything known about one accept receipt. Carries the producer's own words
- * (`detail`) rather than a status alone: what makes an `expired` actionable is
- * which task it was and when it gave up, and only the write path knows that.
+ * Everything known about one accept receipt — THE receipt shape, declared once
+ * at this seam and carried verbatim across every hop (write path, resident
+ * wire, repository, tool). Carries the producer's own words (`detail`) rather
+ * than a status alone: what makes an `expired` actionable is which task it was
+ * and when it gave up, and only the write path knows that.
  */
-export interface WriteState {
+export interface WriteReceipt {
   writeId: WriteId;
   status: WriteStatus;
   /** The task the write addressed. */
   uid?: string;
+  verb?: WriteVerb;
+  /** The task's caption at accept time, when the rows carried one. */
+  caption?: string;
   /** Present while the write is still queued. */
   expiresAt?: string;
   /** When the write resolved, for every state past `accepted`. */
@@ -126,7 +134,7 @@ export interface MloRepository {
   snapshot(fresh?: boolean): Promise<ServiceResult<Snapshot, SnapshotFailure>>;
   /** Durably accept authored rows; resolves only once the rows are safe. */
   write(rows: DeltaRow[]): Promise<RepoResult<PendingWrite>>;
-  status(id: WriteId): Promise<RepoResult<WriteState>>;
+  status(id: WriteId): Promise<RepoResult<WriteReceipt>>;
   /**
    * Best-effort sync accelerator, never load-bearing (spec section 2.5). On
    * the interface only because the `sync` tool surfaces it; it may fold away

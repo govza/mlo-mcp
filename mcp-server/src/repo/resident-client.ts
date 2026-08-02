@@ -1,7 +1,7 @@
 import { ensureEndpoint, type EndpointSpawner, type EndpointStatus } from "../cloud/endpoint.js";
 import { parseProblem, type RehydratedProblem } from "../cloud/problem.js";
 import { log } from "../log.js";
-import type { DeltaRow, WriteId, WriteStatus } from "./mlo-repository.js";
+import type { DeltaRow, WriteId, WriteReceipt } from "./mlo-repository.js";
 
 /**
  * The HTTP hop to the resident write path — a named internal seam of the
@@ -31,16 +31,6 @@ export interface AcceptedWrite {
   expiresAt: string;
 }
 
-/** One receipt's state as the resident answers it. */
-export interface QueueState {
-  writeId: WriteId;
-  status: WriteStatus;
-  uid?: string;
-  expiresAt?: string;
-  at?: string;
-  detail?: string;
-}
-
 export type ResidentRefusal = RehydratedProblem;
 
 export type ResidentResult<T> =
@@ -50,7 +40,8 @@ export type ResidentResult<T> =
 export interface ResidentClient {
   /** Durable accept: resolves only once the resident has fsync'd the rows. */
   postWrite(write: ResidentWrite): Promise<ResidentResult<AcceptedWrite>>;
-  writeStatus(id: WriteId): Promise<ResidentResult<QueueState>>;
+  /** One receipt's state, exactly as the resident's write path answers it. */
+  writeStatus(id: WriteId): Promise<ResidentResult<WriteReceipt>>;
   /** Re-probe the resident; undefined means nothing answers right now. */
   probe(): Promise<EndpointStatus | undefined>;
 }
@@ -91,8 +82,8 @@ export class HttpResidentClient implements ResidentClient {
     });
   }
 
-  writeStatus(id: WriteId): Promise<ResidentResult<QueueState>> {
-    return this.request<QueueState>(`/v1/write/${encodeURIComponent(id)}`, { method: "GET" });
+  writeStatus(id: WriteId): Promise<ResidentResult<WriteReceipt>> {
+    return this.request<WriteReceipt>(`/v1/write/${encodeURIComponent(id)}`, { method: "GET" });
   }
 
   async probe(): Promise<EndpointStatus | undefined> {
