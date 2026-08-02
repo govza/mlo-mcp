@@ -1,9 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { LocalMloRepository } from "../../src/repo/local-mlo-repository.js";
 import type { MloCli } from "../../src/repo/mlo-cli.js";
 import type { MloConfig } from "../../src/types.js";
 import { TODO_ITEMS_HEADER } from "../../src/cloud/mlo-schema.js";
 import { FakeMloRepository } from "../fakes/fake-mlo-repository.js";
+import { FakeResidentClient } from "../fakes/fake-resident-client.js";
 import { describeMloRepositoryContract } from "../contract/mlo-repository-contract.js";
 import { expectOk } from "../expect-result.js";
 
@@ -61,7 +62,7 @@ class ScriptedMloCli implements MloCli {
   }
 }
 
-const config = { cacheStaleMs: 60_000 } as MloConfig;
+const config = { cacheStaleMs: 60_000, quickSyncDebounceMs: 300_000 } as MloConfig;
 
 describe("LocalMloRepository snapshot coalescing", () => {
   it("coalesces concurrent stale reads onto one export", async () => {
@@ -151,6 +152,50 @@ describe("LocalMloRepository pending-write overlay", () => {
       pending: () => Promise.reject(new Error("state root gone")),
     });
     expect(expectOk(await repo.snapshot()).tasks.map((t) => t.Caption)).toEqual(["exported"]);
+  });
+});
+
+describe("LocalMloRepository QuickSync nudge debounce", () => {
+  const acceptingResident = new FakeResidentClient();
+  const row = {
+    section: "TodoItems",
+    values: TODO_ITEMS_HEADER.map((column) =>
+      column === "UID" ? "{11111111-0000-0000-0000-000000000001}" : column === "Caption" ? "nudged" : "",
+    ),
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("a burst of 10 writes fires at most one QuickSync", async () => {
+    const cli = new ScriptedMloCli();
+    const repo = new LocalMloRepository(config, cli, acceptingResident);
+    for (let i = 0; i < 10; i++) {
+      expectOk(await repo.write([row]));
+      vi.advanceTimersByTime(6_000); // one minute total — well inside the window
+    }
+    expect(cli.quickSyncs).toBe(1);
+  });
+
+  it("nudges again once the debounce window has elapsed", async () => {
+    const cli = new ScriptedMloCli();
+    const repo = new LocalMloRepository(config, cli, acceptingResident);
+    expectOk(await repo.write([row]));
+    vi.advanceTimersByTime(config.quickSyncDebounceMs);
+    expectOk(await repo.write([row]));
+    expect(cli.quickSyncs).toBe(2);
+  });
+
+  it("an explicit quickSync opens the window, so the next write does not re-nudge", async () => {
+    const cli = new ScriptedMloCli();
+    const repo = new LocalMloRepository(config, cli, acceptingResident);
+    expectOk(await repo.quickSync());
+    expectOk(await repo.write([row]));
+    expect(cli.quickSyncs).toBe(1);
   });
 });
 

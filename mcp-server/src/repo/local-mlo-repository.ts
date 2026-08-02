@@ -31,6 +31,8 @@ import { failed, ok, type ServiceResult } from "../result.js";
 export class LocalMloRepository implements MloRepository {
   private snap?: Snapshot;
   private pending?: Promise<Snapshot>;
+  /** When the last QuickSync fired — write nudges within the debounce window ride MLO's own poll instead. */
+  private lastQuickSyncAt = 0;
 
   constructor(
     private readonly config: MloConfig,
@@ -133,12 +135,18 @@ export class LocalMloRepository implements MloRepository {
     if (!result.ok) return failed(repoFailureFromProblem(result.refusal));
     // Best-effort accelerator, never load-bearing (spec section 2 mechanic 5):
     // fire-and-forget so the accept receipt returns now, and a QuickSync that
-    // fails or no-ops just leaves delivery to MLO's own cadence.
-    void this.quickSync().then((nudge) => {
-      if (nudge.isErrored) {
-        log(`QuickSync nudge after accept failed (delivery rides MLO's own cadence): ${nudge.failure.detail}`);
-      }
-    });
+    // fails or no-ops just leaves delivery to MLO's own cadence. Debounced
+    // because MLO throttles the deprecated -QuickSync switch with a modal
+    // ("sync no more than once per several minutes"); within-window writes
+    // sit in the queue and ride MLO's background GetFileTS poll, which
+    // delivers all pending writes in one session.
+    if (Date.now() - this.lastQuickSyncAt >= this.config.quickSyncDebounceMs) {
+      void this.quickSync().then((nudge) => {
+        if (nudge.isErrored) {
+          log(`QuickSync nudge after accept failed (delivery rides MLO's own cadence): ${nudge.failure.detail}`);
+        }
+      });
+    }
     return ok({ writeId: result.value.writeId, expiresAt: result.value.expiresAt });
   }
 
@@ -157,6 +165,10 @@ export class LocalMloRepository implements MloRepository {
   }
 
   async quickSync(): Promise<RepoResult<void>> {
+    // Stamped for every invocation, explicit or nudge, even one that fails:
+    // MLO's throttle counts invocation attempts, and an explicit sync also
+    // opens the debounce window, so a write right after it does not re-fire.
+    this.lastQuickSyncAt = Date.now();
     try {
       await this.cli.quickSync();
     } catch (error) {

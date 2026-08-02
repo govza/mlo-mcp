@@ -45,6 +45,13 @@ export interface MloConfig {
   dataFileAutoDetected?: boolean;
   exportDir: string;
   cacheStaleMs: number;
+  /**
+   * Minimum gap between `-QuickSync` nudges after accepted writes. MLO's own
+   * client-side throttle pops a modal ("sync no more than once per several
+   * minutes") when the deprecated switch fires too often; within-window writes
+   * ride MLO's background GetFileTS poll instead.
+   */
+  quickSyncDebounceMs: number;
   /** Caption of the top-level task acting as the capture inbox, overriding <Inbox>/Inbox detection. */
   inboxCaption?: string;
   cloudHost: string;
