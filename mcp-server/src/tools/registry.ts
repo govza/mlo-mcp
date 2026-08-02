@@ -1,6 +1,7 @@
 import type { MloTool } from "./contract.js";
 import { listTasksTool } from "./list-tasks.js";
 import { searchTasksTool } from "./search-tasks.js";
+import { listNextActionsTool } from "./list-next-actions.js";
 import { getTaskTool } from "./get-task.js";
 import { listContextsTool } from "./list-contexts.js";
 import { syncTool } from "./sync.js";
@@ -22,6 +23,7 @@ import { writeStatusTool } from "./write-status.js";
 export const allTools: MloTool[] = [
   listTasksTool,
   searchTasksTool,
+  listNextActionsTool,
   getTaskTool,
   listContextsTool,
   captureTaskTool,

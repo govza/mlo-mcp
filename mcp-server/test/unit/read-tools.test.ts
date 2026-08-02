@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { collectVisible, searchTasks } from "../../src/task-tree.js";
 import { listTasksTool } from "../../src/tools/list-tasks.js";
 import { searchTasksTool } from "../../src/tools/search-tasks.js";
+import { listNextActionsTool } from "../../src/tools/list-next-actions.js";
+import { NextActionsService } from "../../src/services/next-actions.js";
 import type { ToolContext } from "../../src/tools/contract.js";
 import { OutlineService } from "../../src/services/outline.js";
 import { IdentityService } from "../../src/services/identity.js";
@@ -37,7 +39,8 @@ function fakeCtx(tasks: TaskNode[]): ToolContext {
   const repo = new FakeMloRepository();
   repo.tasks = tasks;
   const outline = new OutlineService(repo, new IdentityService(EMPTY_ROW_STORE_VIEW));
-  return { config: {}, outline } as unknown as ToolContext;
+  const nextActions = new NextActionsService(repo);
+  return { config: {}, outline, nextActions } as unknown as ToolContext;
 }
 
 describe("collectVisible", () => {
@@ -125,6 +128,50 @@ describe("search_tasks", () => {
     expect(structured.tasks).toHaveLength(1);
     expect(structured.total).toBe(3); // child a, grandchild, child b
     expect((res.content[0] as { text: string }).text).toContain("showing 1 of 3 matches");
+  });
+});
+
+describe("list_next_actions", () => {
+  /** A sequential project, a hidden branch, an overdue leaf and a future-start leaf. */
+  function actionsFixture(): TaskNode[] {
+    const first = task("1.1", "first in order", { Path: ["project"] });
+    const second = task("1.2", "second in order", { Path: ["project"] });
+    const project = task("1", "project", { IsProject: true, CompleteSubTasksInOrder: true, Children: [first, second] });
+    const buried = task("2.1", "buried", { Path: ["archive"] });
+    const archive = task("2", "archive", { HideInToDo: true, Children: [buried] });
+    const overdue = task("3", "overdue errand", { DueDateTime: "2000-01-01T09:00:00" });
+    const later = task("4", "starts later", { StartDateTime: "2099-01-01T09:00:00" });
+    return [project, archive, overdue, later];
+  }
+
+  it("returns only available leaves by default: in-order head and overdue, never hidden or deferred", async () => {
+    const res = await listNextActionsTool.execute({}, fakeCtx(actionsFixture()));
+    const structured = res.structuredContent as { actions: { Caption: string; score: number; blocks?: unknown }[]; total: number };
+    expect(structured.actions.map((a) => a.Caption)).toEqual(
+      expect.arrayContaining(["first in order", "overdue errand"]),
+    );
+    expect(structured.actions.map((a) => a.Caption)).not.toEqual(
+      expect.arrayContaining(["second in order", "buried", "starts later", "project"]),
+    );
+    expect(structured.actions.every((a) => a.blocks === undefined)).toBe(true);
+    expect(structured.actions.every((a) => typeof a.score === "number")).toBe(true);
+  });
+
+  it("availableOnly: false adds deferred actions with their blocks, in text and structured output", async () => {
+    const res = await listNextActionsTool.execute({ availableOnly: false }, fakeCtx(actionsFixture()));
+    const structured = res.structuredContent as { actions: { Caption: string; blocks?: { kind: string }[] }[] };
+    const later = structured.actions.find((a) => a.Caption === "starts later");
+    expect(later?.blocks?.map((b) => b.kind)).toEqual(["starts-later"]);
+    expect(structured.actions.map((a) => a.Caption)).not.toContain("buried");
+    expect((res.content[0] as { text: string }).text).toContain("deferred: starts 2099-01-01T09:00:00");
+  });
+
+  it("caps at limit and reports the full total", async () => {
+    const res = await listNextActionsTool.execute({ limit: 1 }, fakeCtx(actionsFixture()));
+    const structured = res.structuredContent as { actions: unknown[]; total: number };
+    expect(structured.actions).toHaveLength(1);
+    expect(structured.total).toBeGreaterThan(1);
+    expect((res.content[0] as { text: string }).text).toContain("showing 1 of");
   });
 });
 
