@@ -1588,7 +1588,7 @@ var require_node2json = __commonJS({
       return compress(node, options);
     }
     function compress(arr, options, jPath) {
-      let text2;
+      let text;
       const compressedObj = {};
       for (let i2 = 0; i2 < arr.length; i2++) {
         const tagObj = arr[i2];
@@ -1597,8 +1597,8 @@ var require_node2json = __commonJS({
         if (jPath === void 0) newJpath = property;
         else newJpath = jPath + "." + property;
         if (property === options.textNodeName) {
-          if (text2 === void 0) text2 = tagObj[property];
-          else text2 += "" + tagObj[property];
+          if (text === void 0) text = tagObj[property];
+          else text += "" + tagObj[property];
         } else if (property === void 0) {
           continue;
         } else if (tagObj[property]) {
@@ -1626,9 +1626,9 @@ var require_node2json = __commonJS({
           }
         }
       }
-      if (typeof text2 === "string") {
-        if (text2.length > 0) compressedObj[options.textNodeName] = text2;
-      } else if (text2 !== void 0) compressedObj[options.textNodeName] = text2;
+      if (typeof text === "string") {
+        if (text.length > 0) compressedObj[options.textNodeName] = text;
+      } else if (text !== void 0) compressedObj[options.textNodeName] = text;
       return compressedObj;
     }
     function propName(obj) {
@@ -1741,9 +1741,9 @@ var require_orderedJs2Xml = __commonJS({
       let isPreviousElementTag = false;
       if (!Array.isArray(arr)) {
         if (arr !== void 0 && arr !== null) {
-          let text2 = arr.toString();
-          text2 = replaceEntitiesValue(text2, options);
-          return text2;
+          let text = arr.toString();
+          text = replaceEntitiesValue(text, options);
+          return text;
         }
         return "";
       }
@@ -6406,7 +6406,7 @@ var require_core = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text2, msg) => text2 + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text, msg) => text + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -8967,12 +8967,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs17, exportName) {
+    function addFormats(ajv, list, fs15, exportName) {
       var _a2;
       var _b2;
       (_a2 = (_b2 = ajv.opts.code).formats) !== null && _a2 !== void 0 ? _a2 : _b2.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs17[f]);
+        ajv.addFormat(f, fs15[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -8981,7 +8981,7 @@ var require_dist = __commonJS({
 });
 
 // src/index.ts
-import { promises as fs16 } from "node:fs";
+import { promises as fs14 } from "node:fs";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
@@ -15266,11 +15266,11 @@ function asArray(value) {
 }
 var FILE_STATES = ["held", "free", "missing"];
 function parseObservation(stdout) {
-  const text2 = stdout.replace(/^\uFEFF/, "").trim();
-  if (!text2.startsWith("{")) return void 0;
+  const text = stdout.replace(/^\uFEFF/, "").trim();
+  if (!text.startsWith("{")) return void 0;
   let raw;
   try {
-    raw = JSON.parse(text2);
+    raw = JSON.parse(text);
   } catch {
     return void 0;
   }
@@ -15377,6 +15377,7 @@ function loadConfig() {
     dataFileAutoDetected: autoDetected,
     exportDir: process.env.MLO_EXPORT_DIR ?? path2.join(os.tmpdir(), "mlo-mcp"),
     cacheStaleMs: Number(process.env.MLO_CACHE_STALE_MS) || 3e4,
+    quickSyncDebounceMs: Number(process.env.MLO_QUICKSYNC_DEBOUNCE_MS) || 3e5,
     // Only needed when the capture inbox is NOT MLO's own <Inbox> node (e.g. a
     // hand-made "Входящие" folder). MLO itself hardcodes the caption "<Inbox>"
     // in every UI language, so most profiles need no override.
@@ -16143,9 +16144,9 @@ function parseRecords(input) {
   return records;
 }
 function parseSectionedCsv(input) {
-  const text2 = typeof input === "string" ? input : new TextDecoder("utf-8", { fatal: true }).decode(input);
-  if (text2.charCodeAt(0) === 65279) throw new Error("data.csv must not contain a UTF-8 BOM");
-  const records = parseRecords(text2);
+  const text = typeof input === "string" ? input : new TextDecoder("utf-8", { fatal: true }).decode(input);
+  if (text.charCodeAt(0) === 65279) throw new Error("data.csv must not contain a UTF-8 BOM");
+  const records = parseRecords(text);
   const sections = [];
   let current;
   for (const record2 of records) {
@@ -16159,7 +16160,7 @@ function parseSectionedCsv(input) {
     else current.rows.push(record2);
   }
   for (const section of sections) if (!section.header.length) throw new Error(`section [${section.name}] has no header`);
-  return { sections, source: text2 };
+  return { sections, source: text };
 }
 function writeField(value) {
   return /[",\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
@@ -16229,6 +16230,12 @@ function createDeltaSkeleton() {
     }))
   };
 }
+function encodeNoteCell(note) {
+  return note.replace(/\r\n|\r|\n/g, "\\r\\n");
+}
+function decodeNoteCell(cell2) {
+  return cell2.replaceAll("\\r\\n", "\n");
+}
 function buildTaskAddDelta(input) {
   const document = createDeltaSkeleton();
   const row = Array(TODO_ITEMS_HEADER.length).fill("");
@@ -16245,7 +16252,7 @@ function buildTaskAddDelta(input) {
   if (input.dueDateTime || input.startDateTime) set("ScheduleType", "1");
   set("CreatedDate", input.createdDate);
   set("LastModified", input.lastModified);
-  set("Note", input.note);
+  set("Note", input.note === void 0 ? void 0 : encodeNoteCell(input.note));
   if (input.isProject !== void 0) set("IsProject", input.isProject ? "1" : "0");
   if (input.starred !== void 0) {
     set("Starred", input.starred ? "1" : "0");
@@ -16386,7 +16393,8 @@ function fieldsFrom(values) {
   if (caption !== "") fields.Caption = caption;
   for (const [column2, field2] of STRINGS) {
     const raw = cell(values, column2);
-    fields[field2] = raw === "" ? void 0 : raw;
+    const decoded = column2 === "Note" ? decodeNoteCell(raw) : raw;
+    fields[field2] = decoded === "" ? void 0 : decoded;
   }
   for (const [column2, field2] of NUMBERS) {
     const raw = cell(values, column2);
@@ -16505,6 +16513,8 @@ var LocalMloRepository = class {
   queue;
   snap;
   pending;
+  /** When the last QuickSync fired — write nudges within the debounce window ride MLO's own poll instead. */
+  lastQuickSyncAt = 0;
   async snapshot(fresh = false) {
     try {
       const snapshot = await this.exported(fresh);
@@ -16575,27 +16585,22 @@ var LocalMloRepository = class {
   async write(rows) {
     const result = await this.requireResident().postWrite({ profile: this.config.dataFile, rows });
     if (!result.ok) return failed(repoFailureFromProblem(result.refusal));
-    void this.quickSync().then((nudge) => {
-      if (nudge.isErrored) {
-        log(`QuickSync nudge after accept failed (delivery rides MLO's own cadence): ${nudge.failure.detail}`);
-      }
-    });
+    if (Date.now() - this.lastQuickSyncAt >= this.config.quickSyncDebounceMs) {
+      void this.quickSync().then((nudge) => {
+        if (nudge.isErrored) {
+          log(`QuickSync nudge after accept failed (delivery rides MLO's own cadence): ${nudge.failure.detail}`);
+        }
+      });
+    }
     return ok({ writeId: result.value.writeId, expiresAt: result.value.expiresAt });
   }
   async status(id) {
     const result = await this.requireResident().writeStatus(id);
     if (!result.ok) return failed(repoFailureFromProblem(result.refusal));
-    const state = result.value;
-    return ok({
-      writeId: state.writeId,
-      status: state.status,
-      ...state.uid ? { uid: state.uid } : {},
-      ...state.expiresAt ? { expiresAt: state.expiresAt } : {},
-      ...state.at ? { at: state.at } : {},
-      ...state.detail ? { detail: state.detail } : {}
-    });
+    return ok(result.value);
   }
   async quickSync() {
+    this.lastQuickSyncAt = Date.now();
     try {
       await this.cli.quickSync();
     } catch (error2) {
@@ -17162,7 +17167,7 @@ function updatePatch(patch, row, now, move, flagUid) {
   const columns = { LastModified: now };
   for (const column2 of STRING_COLUMNS) {
     const value = patch[column2];
-    if (value !== void 0) columns[column2] = value;
+    if (value !== void 0) columns[column2] = column2 === "Note" ? encodeNoteCell(value) : value;
   }
   for (const [field2, column2] of NUMBER_COLUMNS) {
     const value = patch[field2];
@@ -17231,22 +17236,6 @@ function unresolvable(id, detail) {
 }
 
 // src/services/outline.ts
-var PROGRESS_WORDS = {
-  accepted: {
-    detail: "durably queued \u2014 it lands the next time MLO syncs through the endpoint",
-    remedy: "nothing to do; MLO syncs on its own within about 90 seconds, or run `sync` to hurry it"
-  },
-  delivered: { detail: "MLO applied this write to the profile" },
-  verified: { detail: "MLO applied this write and a fresh export confirmed it" },
-  expired: {
-    detail: "MLO did not sync before the write's TTL ran out, so it was never applied \u2014 the rows are in the dead-letter file",
-    remedy: "check MLO is running and syncing through the endpoint (`cloud_status`), then make the change again"
-  },
-  superseded: {
-    detail: "MLO applied a different version of this task instead \u2014 a conflict the app resolved in favour of its own copy, so this write's content is gone",
-    remedy: "read the task again and re-apply the change on top of what MLO kept"
-  }
-};
 function refusal(kind, detail, remedy) {
   return failureFor(kind, detail, remedy);
 }
@@ -17533,23 +17522,12 @@ var OutlineService = class {
   /**
    * Where an accept receipt stands. The one read on this service that is about
    * a write rather than the outline: a receipt outlives the call that returned
-   * it, and the caller that holds one has nowhere else to ask.
+   * it, and the caller that holds one has nowhere else to ask. The receipt
+   * travels verbatim; the per-state words live at the `write_status` tool, the
+   * last boundary before a human.
    */
-  async writeStatus(writeId) {
-    const state = await this.repo.status(writeId);
-    if (state.isErrored) return failed(state.failure);
-    const { detail, remedy } = PROGRESS_WORDS[state.value.status];
-    return ok({
-      writeId: state.value.writeId,
-      status: state.value.status,
-      ...state.value.uid ? { uid: state.value.uid } : {},
-      ...state.value.expiresAt ? { expiresAt: state.value.expiresAt } : {},
-      ...state.value.at ? { at: state.value.at } : {},
-      // The write path's own words come first when it has any: they name the
-      // task and the session, which no generic sentence can.
-      detail: state.value.detail ? `${state.value.detail} \u2014 ${detail}` : detail,
-      ...remedy ? { remedy } : {}
-    });
+  writeStatus(writeId) {
+    return this.repo.status(writeId);
   }
   // -------------------------------------------------------- Organize verbs
   /** Promote a task to a project (Organize). */
@@ -17879,18 +17857,18 @@ import path4 from "node:path";
 
 // src/cloud/atomic-file.ts
 import { promises as fs2 } from "node:fs";
-async function atomicWrite(target, text2, options) {
+async function atomicWrite(target, text, options) {
   const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
   if (options?.fsync) {
     const handle = await fs2.open(temporary, "w");
     try {
-      await handle.writeFile(text2);
+      await handle.writeFile(text);
       await handle.sync();
     } finally {
       await handle.close();
     }
   } else {
-    await fs2.writeFile(temporary, text2);
+    await fs2.writeFile(temporary, text);
   }
   await fs2.rename(temporary, target);
 }
@@ -26764,8 +26742,8 @@ function registerTool(server, tool, ctx) {
 var DEFAULT_RESULT_LIMIT = 200;
 var PATH_ID_CAVEAT = "ids shift when the tree changes";
 var NOTE_DESCRIPTION = "Free-form text on the task \u2014 context that does not fit in the caption, such as where a captured idea came from";
-function textResult(text2, structuredContent) {
-  return { content: [{ type: "text", text: text2 }], ...structuredContent ? { structuredContent } : {} };
+function textResult(text, structuredContent) {
+  return { content: [{ type: "text", text }], ...structuredContent ? { structuredContent } : {} };
 }
 function errorResult(message) {
   return { isError: true, content: [{ type: "text", text: message }] };
@@ -26807,12 +26785,12 @@ var listTasksTool = defineTool({
     if (result.isErrored) return failureResult(result.failure);
     const listing = result.value;
     const shown = listing.entries.slice(0, limit ?? DEFAULT_RESULT_LIMIT);
-    let text2 = renderVisible(shown, format);
+    let text = renderVisible(shown, format);
     if (shown.length < listing.total) {
-      text2 += `
+      text += `
 \u2026 showing ${shown.length} of ${listing.total} tasks \u2014 narrow with parentId/maxDepth or raise limit`;
     }
-    return textResult(text2, { tasks: shown.map((e) => toSummary(e.task)), total: listing.total });
+    return textResult(text, { tasks: shown.map((e) => toSummary(e.task)), total: listing.total });
   }
 });
 
@@ -26843,12 +26821,12 @@ var searchTasksTool = defineTool({
     if (result.isErrored) return failureResult(result.failure);
     const matches = result.value;
     const shown = matches.slice(0, limit ?? DEFAULT_RESULT_LIMIT);
-    let text2 = shown.length ? shown.map((t) => `${renderLine(t)}  (${t.Path.slice(0, -1).join(" > ") || "top level"})`).join("\n") : "no matching tasks";
+    let text = shown.length ? shown.map((t) => `${renderLine(t)}  (${t.Path.slice(0, -1).join(" > ") || "top level"})`).join("\n") : "no matching tasks";
     if (shown.length < matches.length) {
-      text2 += `
+      text += `
 \u2026 showing ${shown.length} of ${matches.length} matches \u2014 narrow the filters or raise limit`;
     }
-    return textResult(text2, { tasks: shown.map(toSummary), total: matches.length });
+    return textResult(text, { tasks: shown.map(toSummary), total: matches.length });
   }
 });
 
@@ -26933,8 +26911,8 @@ var listContextsTool = defineTool({
     const result = await ctx.outline.contexts();
     if (result.isErrored) return failureResult(result.failure);
     const contexts = result.value;
-    const text2 = contexts.length ? contexts.map((c) => `${c.Caption}  (${c.tasksUsing} task${c.tasksUsing === 1 ? "" : "s"}${c.defined ? "" : ", not in places list"})`).join("\n") : "(no contexts defined)";
-    return textResult(text2, { contexts });
+    const text = contexts.length ? contexts.map((c) => `${c.Caption}  (${c.tasksUsing} task${c.tasksUsing === 1 ? "" : "s"}${c.defined ? "" : ", not in places list"})`).join("\n") : "(no contexts defined)";
+    return textResult(text, { contexts });
   }
 });
 
@@ -27230,6 +27208,22 @@ var deleteTaskTool = defineTool({
 });
 
 // src/tools/write-status.ts
+var PROGRESS_WORDS = {
+  accepted: {
+    detail: "durably queued \u2014 it lands the next time MLO syncs through the endpoint",
+    remedy: "nothing to do; MLO syncs on its own within about 90 seconds, or run `sync` to hurry it"
+  },
+  delivered: { detail: "MLO applied this write to the profile" },
+  verified: { detail: "MLO applied this write and a fresh export confirmed it" },
+  expired: {
+    detail: "MLO did not sync before the write's TTL ran out, so it was never applied \u2014 the rows are in the dead-letter file",
+    remedy: "check MLO is running and syncing through the endpoint (`cloud_status`), then make the change again"
+  },
+  superseded: {
+    detail: "MLO applied a different version of this task instead \u2014 a conflict the app resolved in favour of its own copy, so this write's content is gone",
+    remedy: "read the task again and re-apply the change on top of what MLO kept"
+  }
+};
 var writeStatusTool = defineTool({
   name: "write_status",
   title: "Write status",
@@ -27250,7 +27244,19 @@ var writeStatusTool = defineTool({
   async execute({ writeId }, ctx) {
     const answered = await ctx.outline.writeStatus(writeId);
     if (answered.isErrored) return failureResult(answered.failure);
-    const progress = answered.value;
+    const receipt = answered.value;
+    const words = PROGRESS_WORDS[receipt.status];
+    const progress = {
+      writeId: receipt.writeId,
+      status: receipt.status,
+      ...receipt.uid ? { uid: receipt.uid } : {},
+      ...receipt.expiresAt ? { expiresAt: receipt.expiresAt } : {},
+      ...receipt.at ? { at: receipt.at } : {},
+      // The write path's own words come first when it has any: they name the
+      // task and the session, which no generic sentence can.
+      detail: receipt.detail ? `${receipt.detail} \u2014 ${words.detail}` : words.detail,
+      ...words.remedy ? { remedy: words.remedy } : {}
+    };
     const lines = [
       `${progress.writeId}: ${progress.status} \u2014 ${progress.detail}`,
       progress.uid ? `task: ${progress.uid}` : void 0,
@@ -27325,63 +27331,99 @@ function createMcpServer(ctx) {
 
 // src/cloud/gateway.ts
 import { execFile as execFile2 } from "node:child_process";
-import { promises as fs13 } from "node:fs";
+import { promises as fs11 } from "node:fs";
 import os2 from "node:os";
 import path13 from "node:path";
 
 // src/cloud/binding.ts
-import { promises as fs10 } from "node:fs";
+import { promises as fs8 } from "node:fs";
 import path10 from "node:path";
 
 // src/cloud/partition.ts
 import { createHash } from "node:crypto";
-import { promises as fs8 } from "node:fs";
+import { promises as fs6 } from "node:fs";
 import path8 from "node:path";
 
 // src/cloud/capture-journal.ts
-import { promises as fs5 } from "node:fs";
 import path5 from "node:path";
+
+// src/cloud/json-document.ts
+import { promises as fs5 } from "node:fs";
+var JsonDocument = class {
+  constructor(file, options) {
+    this.file = file;
+    this.options = options;
+  }
+  file;
+  options;
+  writes = new WriteChain();
+  async read() {
+    let raw;
+    try {
+      raw = await fs5.readFile(this.file, "utf8");
+    } catch (error2) {
+      if (error2.code !== "ENOENT") throw error2;
+      return this.options.empty();
+    }
+    try {
+      return this.options.unwrap(JSON.parse(raw));
+    } catch (error2) {
+      if (this.options.onCorrupt !== "empty") throw error2;
+      log(`could not read ${this.file} (treated as empty): ${error2 instanceof Error ? error2.message : String(error2)}`);
+      return this.options.empty();
+    }
+  }
+  /**
+   * Serialized read-modify-write: `mutate` sees the current value and returns
+   * the next one plus the caller's answer; the save resolves before the answer
+   * does, so with `fsync` the answer is only ever given about durable state.
+   */
+  update(mutate) {
+    return this.writes.run(async () => {
+      const { value, result } = await mutate(await this.read());
+      const body = this.options.wrap(value);
+      const text = this.options.pretty ? `${JSON.stringify(body, null, 2)}
+` : JSON.stringify(body);
+      await atomicWrite(this.file, text, this.options.fsync ? { fsync: true } : void 0);
+      return result;
+    });
+  }
+};
+
+// src/cloud/capture-journal.ts
 var FILE_NAME2 = "capture-journal.json";
 var DEFAULT_JOURNAL_CAP = 256;
 var DEFAULT_GAUGE_WINDOW_MS = 24 * 60 * 60 * 1e3;
 var FileCaptureJournal = class {
   constructor(dir, now = () => /* @__PURE__ */ new Date(), cap = DEFAULT_JOURNAL_CAP) {
-    this.dir = dir;
     this.now = now;
     this.cap = cap;
+    this.document = new JsonDocument(path5.join(dir, FILE_NAME2), {
+      unwrap: (parsed) => (parsed.entries ?? []).filter((entry) => typeof entry?.at === "string"),
+      wrap: (entries) => ({ entries, at: entries.at(-1)?.at ?? this.now().toISOString() }),
+      empty: () => [],
+      // A corrupt journal is evidence lost, not a fault worth keeping: the
+      // next record overwrites it, so degrade to empty loudly rather than
+      // wedging every gauge until someone deletes it.
+      onCorrupt: "empty",
+      pretty: true
+    });
   }
-  dir;
   now;
   cap;
-  writes = new WriteChain();
-  file() {
-    return path5.join(this.dir, FILE_NAME2);
-  }
-  async load() {
-    try {
-      const parsed = JSON.parse(await fs5.readFile(this.file(), "utf8"));
-      return (parsed.entries ?? []).filter((entry) => typeof entry?.at === "string");
-    } catch (error2) {
-      if (error2.code !== "ENOENT") {
-        log(`could not read the capture journal (treated as empty): ${error2 instanceof Error ? error2.message : String(error2)}`);
-      }
-      return [];
-    }
-  }
+  document;
   record(outcome, detail) {
-    return this.writes.run(async () => {
+    return this.document.update((entries) => {
       const at = this.now().toISOString();
-      const entries = [...await this.load(), { at, outcome, ...detail ? { detail } : {} }];
-      const value = { entries: entries.slice(-this.cap), at };
-      await atomicWrite(this.file(), `${JSON.stringify(value, null, 2)}
-`);
+      const next = [...entries, { at, outcome, ...detail ? { detail } : {} }];
+      return { value: next.slice(-this.cap), result: void 0 };
     });
   }
   entries() {
-    return this.load();
+    return this.document.read();
   }
   async gauge(windowMs = DEFAULT_GAUGE_WINDOW_MS) {
-    return deriveGauge(await this.load(), windowMs, this.now());
+    return deriveGauge(await this.document.read(), windowMs, this.now());
   }
 };
 function deriveGauge(entries, windowMs, now) {
@@ -27407,99 +27449,70 @@ function deriveGauge(entries, windowMs, now) {
 }
 
 // src/cloud/injection-queue.ts
-import { promises as fs6 } from "node:fs";
 import path6 from "node:path";
 var FILE_NAME3 = "injection-queue.json";
 var FileInjectionQueue = class {
+  document;
   constructor(dir) {
-    this.dir = dir;
-  }
-  dir;
-  writes = new WriteChain();
-  file() {
-    return path6.join(this.dir, FILE_NAME3);
-  }
-  async load() {
-    try {
-      const parsed = JSON.parse(await fs6.readFile(this.file(), "utf8"));
-      return (parsed.writes ?? []).filter((write) => typeof write?.writeId === "string");
-    } catch (error2) {
-      if (error2.code !== "ENOENT") throw error2;
-      return [];
-    }
-  }
-  /**
-   * Write-fsync-rename: the temp file is flushed to disk before it replaces
-   * the queue, so the rename either exposes a durable file or nothing.
-   */
-  save(writes) {
-    const value = { writes, at: (/* @__PURE__ */ new Date()).toISOString() };
-    return atomicWrite(this.file(), JSON.stringify(value), { fsync: true });
+    this.document = new JsonDocument(path6.join(dir, FILE_NAME3), {
+      unwrap: (parsed) => (parsed.writes ?? []).filter((write) => typeof write?.writeId === "string"),
+      wrap: (writes) => ({ writes, at: (/* @__PURE__ */ new Date()).toISOString() }),
+      empty: () => [],
+      // Durable accepts, so the file is flushed before the rename, and a
+      // corrupt queue throws rather than silently dropping accepted writes.
+      fsync: true
+    });
   }
   enqueue(write) {
-    return this.writes.run(async () => {
-      const writes = await this.load();
+    return this.document.update((writes) => {
       if (writes.some((queued) => queued.writeId === write.writeId)) {
         throw new Error(`writeId ${write.writeId} is already queued \u2014 writeIds are accept receipts, never reused`);
       }
-      await this.save([...writes, write]);
+      return { value: [...writes, write], result: void 0 };
     });
   }
   pending() {
-    return this.load();
+    return this.document.read();
   }
   remove(writeId) {
-    return this.writes.run(async () => {
-      const writes = await this.load();
+    return this.document.update((writes) => {
       const index2 = writes.findIndex((write) => write.writeId === writeId);
-      if (index2 < 0) return void 0;
-      const [removed] = writes.splice(index2, 1);
-      await this.save(writes);
-      return removed;
+      if (index2 < 0) return { value: writes, result: void 0 };
+      const next = [...writes];
+      const [removed] = next.splice(index2, 1);
+      return { value: next, result: removed };
     });
   }
 };
 
 // src/cloud/write-outcomes.ts
-import { promises as fs7 } from "node:fs";
 import path7 from "node:path";
 var FILE_NAME4 = "write-outcomes.json";
 var DEFAULT_OUTCOME_CAP = 200;
 var FileWriteOutcomes = class {
   constructor(dir, cap = DEFAULT_OUTCOME_CAP) {
-    this.dir = dir;
     this.cap = cap;
-  }
-  dir;
-  cap;
-  writes = new WriteChain();
-  file() {
-    return path7.join(this.dir, FILE_NAME4);
-  }
-  async load() {
-    try {
-      const parsed = JSON.parse(await fs7.readFile(this.file(), "utf8"));
-      return (parsed.outcomes ?? []).filter((outcome) => typeof outcome?.writeId === "string");
-    } catch (error2) {
-      if (error2.code !== "ENOENT") {
-        log(`could not read the write-outcome file (treated as empty): ${error2 instanceof Error ? error2.message : String(error2)}`);
-      }
-      return [];
-    }
-  }
-  record(outcome) {
-    return this.writes.run(async () => {
-      const outcomes = [...await this.load(), outcome];
-      const value = { outcomes: outcomes.slice(-this.cap), at: outcome.at };
-      await atomicWrite(this.file(), `${JSON.stringify(value)}
-`);
+    this.document = new JsonDocument(path7.join(dir, FILE_NAME4), {
+      unwrap: (parsed) => (parsed.outcomes ?? []).filter((outcome) => typeof outcome?.writeId === "string"),
+      wrap: (outcomes) => ({ outcomes, at: outcomes.at(-1)?.at ?? (/* @__PURE__ */ new Date()).toISOString() }),
+      empty: () => [],
+      // Absent is the normal case. Corrupt is evidence lost, not a wedge.
+      onCorrupt: "empty"
     });
   }
+  cap;
+  document;
+  record(outcome) {
+    return this.document.update((outcomes) => ({
+      value: [...outcomes, outcome].slice(-this.cap),
+      result: void 0
+    }));
+  }
   all() {
-    return this.load();
+    return this.document.read();
   }
   async byId(writeId) {
-    return (await this.load()).findLast((outcome) => outcome.writeId === writeId);
+    return (await this.document.read()).findLast((outcome) => outcome.writeId === writeId);
   }
 };
 
@@ -27554,11 +27567,76 @@ var PartitionStore = class {
       deadLetters: outcomes.filter((outcome) => outcome.status === "expired" || outcome.status === "superseded").slice(-tail).reverse()
     };
   }
+  /**
+   * Resolve one queued write: out of the queue and into the outcome ring as a
+   * single move, so no observer ever sees a write that is both still pending
+   * and already resolved. Returns what was removed; undefined means another
+   * resolution got there first (the pair is idempotent per writeId).
+   */
+  async resolveWrite(writeId, status, at, detail) {
+    const removed = await this.queue.remove(writeId);
+    if (!removed) return void 0;
+    await this.outcomes.record({
+      writeId,
+      uid: removed.uid,
+      verb: removed.verb,
+      ...removed.caption ? { caption: removed.caption } : {},
+      status,
+      at,
+      ...detail ? { detail } : {}
+    });
+    return removed;
+  }
+  /**
+   * The lazy TTL sweep: every due write leaves the queue for good as an
+   * `expired` outcome. Returns what expired with the words recorded for it,
+   * so the caller can dead-letter and unpin — those live outside this handle.
+   */
+  async expireDue(now) {
+    const expired = [];
+    for (const write of await this.queue.pending()) {
+      const expiresAt = Date.parse(write.expiresAt);
+      if (Number.isNaN(expiresAt) ? true : expiresAt > now.getTime()) continue;
+      const detail = `write-expired: MLO did not apply the row before ${write.expiresAt}`;
+      const removed = await this.resolveWrite(write.writeId, "expired", now.toISOString(), detail);
+      if (removed) expired.push({ write: removed, detail });
+    }
+    return expired;
+  }
+  /**
+   * One receipt's five-state answer, from the queue (still `accepted`) or the
+   * outcome ring (resolved). Where a writeId lives inside a partition is this
+   * handle's knowledge, not a caller's.
+   */
+  async findWrite(writeId) {
+    const queued = (await this.queue.pending()).find((write) => write.writeId === writeId);
+    if (queued) {
+      return {
+        writeId,
+        status: "accepted",
+        uid: queued.uid,
+        verb: queued.verb,
+        ...queued.caption ? { caption: queued.caption } : {},
+        expiresAt: queued.expiresAt
+      };
+    }
+    const outcome = await this.outcomes.byId(writeId);
+    if (!outcome) return void 0;
+    return {
+      writeId,
+      status: outcome.status,
+      uid: outcome.uid,
+      verb: outcome.verb,
+      ...outcome.caption ? { caption: outcome.caption } : {},
+      at: outcome.at,
+      ...outcome.detail ? { detail: outcome.detail } : {}
+    };
+  }
   metaPath() {
     return path8.join(this.dir, "meta.json");
   }
   async meta() {
-    const parsed = JSON.parse(await fs8.readFile(this.metaPath(), "utf8"));
+    const parsed = JSON.parse(await fs6.readFile(this.metaPath(), "utf8"));
     return parsed;
   }
   async mode() {
@@ -27607,7 +27685,7 @@ var PartitionRegistry = class {
     const cached2 = this.handles.get(key);
     if (cached2) return cached2;
     const dir = path8.join(this.partitionsDir(), key);
-    await fs8.mkdir(dir, { recursive: true });
+    await fs6.mkdir(dir, { recursive: true });
     const handle = new PartitionStore(uid, key, dir);
     try {
       const meta = await handle.meta();
@@ -27636,7 +27714,7 @@ var PartitionRegistry = class {
     if (cached2) return cached2;
     const dir = path8.join(this.partitionsDir(), key);
     try {
-      await fs8.stat(path8.join(dir, "meta.json"));
+      await fs6.stat(path8.join(dir, "meta.json"));
     } catch {
       return void 0;
     }
@@ -27655,12 +27733,12 @@ var PartitionRegistry = class {
     const uid = normalizeDataFileUid(rawUid);
     const key = partitionKey(uid);
     this.handles.delete(key);
-    await fs8.rm(path8.join(this.partitionsDir(), key), { recursive: true, force: true });
+    await fs6.rm(path8.join(this.partitionsDir(), key), { recursive: true, force: true });
   }
   async list() {
     let keys;
     try {
-      keys = await fs8.readdir(this.partitionsDir());
+      keys = await fs6.readdir(this.partitionsDir());
     } catch {
       return [];
     }
@@ -27668,7 +27746,7 @@ var PartitionRegistry = class {
     for (const key of keys.sort()) {
       try {
         const meta = JSON.parse(
-          await fs8.readFile(path8.join(this.partitionsDir(), key, "meta.json"), "utf8")
+          await fs6.readFile(path8.join(this.partitionsDir(), key, "meta.json"), "utf8")
         );
         summaries.push({ key, ...meta });
       } catch {
@@ -27679,7 +27757,7 @@ var PartitionRegistry = class {
 };
 
 // src/cloud/state-lock.ts
-import { promises as fs9 } from "node:fs";
+import { promises as fs7 } from "node:fs";
 import path9 from "node:path";
 var StateRootLock = class {
   constructor(stateRoot, name) {
@@ -27692,17 +27770,17 @@ var StateRootLock = class {
   async withLock(operation) {
     const lockDir = path9.join(this.stateRoot, `.${this.name}-lock`);
     const deadline = Date.now() + 1e4;
-    await fs9.mkdir(this.stateRoot, { recursive: true });
+    await fs7.mkdir(this.stateRoot, { recursive: true });
     for (; ; ) {
       try {
-        await fs9.mkdir(lockDir);
+        await fs7.mkdir(lockDir);
         break;
       } catch (error2) {
         if (error2.code !== "EEXIST") throw error2;
         try {
-          const stat = await fs9.stat(lockDir);
+          const stat = await fs7.stat(lockDir);
           if (Date.now() - stat.mtimeMs > 3e4) {
-            await fs9.rm(lockDir, { recursive: true, force: true });
+            await fs7.rm(lockDir, { recursive: true, force: true });
             continue;
           }
         } catch {
@@ -27729,7 +27807,7 @@ var StateRootLock = class {
   async release(lockDir) {
     for (let attempt = 0; attempt < 10; attempt++) {
       try {
-        await fs9.rm(lockDir, { recursive: true, force: true });
+        await fs7.rm(lockDir, { recursive: true, force: true });
         return;
       } catch (error2) {
         if (error2.code !== "EBUSY") return;
@@ -27765,7 +27843,7 @@ var BindingStore = class {
   }
   async load() {
     try {
-      const parsed = JSON.parse(await fs10.readFile(this.file(), "utf8"));
+      const parsed = JSON.parse(await fs8.readFile(this.file(), "utf8"));
       return parsed.bindings ?? [];
     } catch (error2) {
       if (error2.code !== "ENOENT") throw error2;
@@ -27775,9 +27853,9 @@ var BindingStore = class {
   async save(bindings) {
     const target = this.file();
     const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
-    await fs10.writeFile(temporary, `${JSON.stringify({ bindings }, null, 2)}
+    await fs8.writeFile(temporary, `${JSON.stringify({ bindings }, null, 2)}
 `);
-    await fs10.rename(temporary, target);
+    await fs8.rename(temporary, target);
   }
   async forProfile(profilePath) {
     const canonical = canonicalProfilePath(profilePath);
@@ -27899,7 +27977,7 @@ var BindingStore = class {
 };
 
 // src/cloud/sightings.ts
-import { promises as fs11 } from "node:fs";
+import { promises as fs9 } from "node:fs";
 import path11 from "node:path";
 var MAX_SIGHTINGS = 8;
 var SightingStore = class {
@@ -27914,7 +27992,7 @@ var SightingStore = class {
   /** Every recorded sighting, most recently seen first. */
   async all() {
     try {
-      const parsed = JSON.parse(await fs11.readFile(this.file(), "utf8"));
+      const parsed = JSON.parse(await fs9.readFile(this.file(), "utf8"));
       return (parsed.sightings ?? []).filter((sighting) => typeof sighting?.dataFileUID === "string");
     } catch (error2) {
       if (error2.code !== "ENOENT") {
@@ -27939,9 +28017,9 @@ var SightingStore = class {
       const value = { sightings: sightings.slice(0, MAX_SIGHTINGS), at: now };
       const target = this.file();
       const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
-      await fs11.writeFile(temporary, `${JSON.stringify(value, null, 2)}
+      await fs9.writeFile(temporary, `${JSON.stringify(value, null, 2)}
 `);
-      await fs11.rename(temporary, target);
+      await fs9.rename(temporary, target);
     };
     const next = this.writes.then(run, run);
     this.writes = next.catch(() => void 0);
@@ -27950,7 +28028,7 @@ var SightingStore = class {
 };
 
 // src/cloud/dead-letter.ts
-import { promises as fs12 } from "node:fs";
+import { promises as fs10 } from "node:fs";
 import path12 from "node:path";
 var MAX_LETTERS = 50;
 var MAX_CONTENT = 4e3;
@@ -27971,7 +28049,7 @@ var DeadLetterStore = class {
   /** Every preserved write, oldest first. */
   async all() {
     try {
-      const parsed = JSON.parse(await fs12.readFile(this.file(), "utf8"));
+      const parsed = JSON.parse(await fs10.readFile(this.file(), "utf8"));
       return (parsed.refused ?? []).filter((letter) => typeof letter?.content === "string");
     } catch (error2) {
       if (error2.code !== "ENOENT") {
@@ -27987,9 +28065,9 @@ var DeadLetterStore = class {
       const value = { refused: refused.slice(-MAX_LETTERS), at: letter.at };
       const target = this.file();
       const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
-      await fs12.writeFile(temporary, `${JSON.stringify(value, null, 2)}
+      await fs10.writeFile(temporary, `${JSON.stringify(value, null, 2)}
 `);
-      await fs12.rename(temporary, target);
+      await fs10.rename(temporary, target);
     });
   }
 };
@@ -28037,7 +28115,7 @@ var CloudGateway = class {
       await this.prepareRoot();
       const line = `${JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), ...record2 })}
 `;
-      await fs13.appendFile(path13.join(this.stateRoot, VENDOR_CLIENT_FILE), line);
+      await fs11.appendFile(path13.join(this.stateRoot, VENDOR_CLIENT_FILE), line);
     } catch (error2) {
       log(`vendor exchange log write failed: ${error2 instanceof Error ? error2.message : String(error2)}`);
     }
@@ -28177,11 +28255,11 @@ var CloudGateway = class {
     this.rootPrepared = true;
     let created = false;
     try {
-      await fs13.mkdir(this.stateRoot, { recursive: false });
+      await fs11.mkdir(this.stateRoot, { recursive: false });
       created = true;
     } catch (error2) {
       if (error2.code !== "EEXIST") {
-        await fs13.mkdir(this.stateRoot, { recursive: true });
+        await fs11.mkdir(this.stateRoot, { recursive: true });
         created = true;
       }
     }
@@ -28204,7 +28282,7 @@ import https2 from "node:https";
 import net2 from "node:net";
 
 // src/cloud/sync-observer.ts
-import { promises as fs14 } from "node:fs";
+import { promises as fs12 } from "node:fs";
 import path14 from "node:path";
 import zlib from "node:zlib";
 var VENDOR_SYNC_HOST = "sync.mylifeorganized.net";
@@ -28213,8 +28291,8 @@ var SENSITIVE = /pass|credential|token|secret|session|cookie|email|user|login/i;
 var BODY = /<(?:[\w.-]+:)?Body(?:\s[^>]*)?>([\s\S]*?)<\/(?:[\w.-]+:)?Body\s*>/i;
 var TAG = /<(?!\/)(?:[\w.-]+:)?([\w.-]+)(?:\s[^>]*)?>/gi;
 var CAPTURE_LIMIT = 4 * 1024 * 1024;
-function escapeRegExp(text2) {
-  return text2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 function operationShape(xml2) {
   const body = BODY.exec(xml2)?.[1] ?? "";
@@ -28334,12 +28412,12 @@ var SyncObserver = class {
   append(record2) {
     const line = `${JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), ...record2 })}
 `;
-    void fs14.mkdir(this.stateDir, { recursive: true }).then(() => fs14.appendFile(path14.join(this.stateDir, SUMMARY_FILE), line)).catch((error2) => log(`sync observer write failed: ${error2 instanceof Error ? error2.message : String(error2)}`));
+    void fs12.mkdir(this.stateDir, { recursive: true }).then(() => fs12.appendFile(path14.join(this.stateDir, SUMMARY_FILE), line)).catch((error2) => log(`sync observer write failed: ${error2 instanceof Error ? error2.message : String(error2)}`));
   }
 };
 
 // src/cloud/auto-init.ts
-import { promises as fs15 } from "node:fs";
+import { promises as fs13 } from "node:fs";
 
 // src/cloud/drift-recovery.ts
 function chooseDriftCandidate(candidates, sightings) {
@@ -29432,11 +29510,11 @@ function peekSoapResponseFields(xml2, operation) {
   try {
     return parseFields(xml2, `${operation}Response`);
   } catch {
-    return {};
+    return void 0;
   }
 }
 function soapFieldText(fields, name) {
-  const value = fields[name];
+  const value = fields?.[name];
   return typeof value === "string" && value.length ? value : void 0;
 }
 function soapOperationFailure(operation, message) {
@@ -29531,9 +29609,6 @@ function responseFields(xml2, operation) {
     return void 0;
   }
 }
-function text(fields, name) {
-  return fields ? soapFieldText(fields, name) : void 0;
-}
 async function forwardVendorSoap(gateway, target, requestHeaders, requestBytes, requestFields) {
   const rawUid = typeof requestFields.dataFileUID === "string" ? requestFields.dataFileUID : void 0;
   const contact = contactFromRequest(target, requestFields);
@@ -29582,8 +29657,8 @@ var VendorClient = class {
     const fields = result.status === 200 ? responseFields(decodeForwardBody(result), operation) : void 0;
     await this.note(operation, extra, result.status, fields);
     if (result.status !== 200) throw new Error(`vendor ${operation} failed with HTTP ${result.status}`);
-    if (text(fields, `${operation}Result`) !== "true") {
-      const message = text(fields, "errorMessage") ?? "vendor reported failure";
+    if (soapFieldText(fields, `${operation}Result`) !== "true") {
+      const message = soapFieldText(fields, "errorMessage") ?? "vendor reported failure";
       throw new Error(`vendor ${operation} rejected: ${message}`);
     }
     return fields;
@@ -29596,7 +29671,7 @@ var VendorClient = class {
       else request[name] = value;
     }
     const optional2 = (name, key = name) => {
-      const value = text(fields, name);
+      const value = soapFieldText(fields, name);
       return value ? { [key]: value } : {};
     };
     try {
@@ -29606,11 +29681,11 @@ var VendorClient = class {
         request,
         status,
         ...fields ? {
-          result: text(fields, `${operation}Result`) ?? "<absent>",
+          result: soapFieldText(fields, `${operation}Result`) ?? "<absent>",
           ...optional2("errorMessage"),
           ...optional2("newServerTimeStamp"),
           ...optional2("maxVersion"),
-          ...text(fields, "data") ? { responseDataBytes: text(fields, "data").length } : {}
+          ...soapFieldText(fields, "data") ? { responseDataBytes: soapFieldText(fields, "data").length } : {}
         } : {}
       });
     } catch {
@@ -29622,8 +29697,8 @@ var VendorClient = class {
       ["sessionID", sessionId],
       ["newerThan", cursorToDecimalString(newerThan)]
     ]);
-    const maxVersion = parseCursor(text(fields, "maxVersion") ?? "0");
-    const data = text(fields, "data");
+    const maxVersion = parseCursor(soapFieldText(fields, "maxVersion") ?? "0");
+    const data = soapFieldText(fields, "data");
     return { maxVersion, ...data ? { data: Buffer.from(data.replace(/\s+/g, ""), "base64") } : {} };
   }
   /** Upload one envelope; the vendor assigns and returns the new remote version. */
@@ -29635,7 +29710,7 @@ var VendorClient = class {
       ["lastSyncTimestamp", "0"],
       ["data", Buffer.from(envelope2).toString("base64")]
     ]);
-    const stamp = text(fields, "newServerTimeStamp");
+    const stamp = soapFieldText(fields, "newServerTimeStamp");
     if (!stamp) {
       throw new Error(
         "vendor ApplyModificationsBytesEx answered success without a newServerTimeStamp \u2014 a malformed response, so the upload cannot be trusted as stored"
@@ -29884,7 +29959,7 @@ function systemAutoInitPorts(gateway, mloExePath) {
       return verdict.ok ? verdict.dataFile : void 0;
     },
     async localTaskGuids(profilePath) {
-      return taskGuidsInDataFile(await fs15.readFile(profilePath));
+      return taskGuidsInDataFile(await fs13.readFile(profilePath));
     },
     async pullHistory(uid) {
       const contact = gateway.vendorContact(uid);
@@ -29919,7 +29994,12 @@ async function capture(gateway, operation, requestFields, result) {
       return;
     }
     const fields = peekSoapResponseFields(decodeForwardBody(result), operation);
-    if (soapFieldText(fields, "GetModificationsBytesExResult") !== "true") {
+    const verdict = soapFieldText(fields, "GetModificationsBytesExResult");
+    if (verdict === void 0) {
+      await partition.journal.record("failed", "get: malformed vendor response \u2014 no parseable Result");
+      return;
+    }
+    if (verdict !== "true") {
       await partition.journal.record("skipped", "get: vendor reported failure \u2014 nothing to capture");
       return;
     }
@@ -30075,28 +30155,14 @@ var WritePath = class {
     return this.gateway.registry.open(binding.dataFileUID, binding.mode);
   }
   /**
-   * Lazy TTL sweep, run wherever the queue is consulted. An expired write
-   * leaves the queue for good: dead-letter file + `write-expired` outcome,
-   * never injected again.
+   * Lazy TTL sweep, run wherever the queue is consulted. The partition resolves
+   * its own expiries; what stays here is what lives outside the handle — the
+   * shared dead-letter file and the in-memory pins.
    */
   async expireDue(partition) {
     const now = this.now();
-    for (const write of await partition.queue.pending()) {
-      const expiresAt = Date.parse(write.expiresAt);
-      if (Number.isNaN(expiresAt) ? true : expiresAt > now.getTime()) continue;
-      const removed = await partition.queue.remove(write.writeId);
-      if (!removed) continue;
+    for (const { write, detail } of await partition.expireDue(now)) {
       this.inFlight.delete(write.writeId);
-      const detail = `write-expired: MLO did not apply the row before ${write.expiresAt}`;
-      await partition.outcomes.record({
-        writeId: write.writeId,
-        uid: write.uid,
-        verb: write.verb,
-        ...write.caption ? { caption: write.caption } : {},
-        status: "expired",
-        at: now.toISOString(),
-        detail
-      });
       await this.gateway.deadLetters.record({
         at: now.toISOString(),
         tool: `write:${write.verb}`,
@@ -30209,35 +30275,14 @@ var WritePath = class {
       expiresAt: write.expiresAt
     };
   }
-  /** The five-state answer for one receipt, from the queue or the outcome ring. */
+  /** The five-state answer for one receipt, from whichever partition holds it. */
   async status(writeId) {
     for (const summary of await this.gateway.registry.list()) {
       const partition = await this.gateway.registry.resolveExisting(summary.dataFileUID);
       if (!partition) continue;
       await this.expireDue(partition);
-      const queued = (await partition.queue.pending()).find((write) => write.writeId === writeId);
-      if (queued) {
-        return {
-          writeId,
-          uid: queued.uid,
-          verb: queued.verb,
-          ...queued.caption ? { caption: queued.caption } : {},
-          status: "accepted",
-          expiresAt: queued.expiresAt
-        };
-      }
-      const outcome = await partition.outcomes.byId(writeId);
-      if (outcome) {
-        return {
-          writeId,
-          uid: outcome.uid,
-          verb: outcome.verb,
-          ...outcome.caption ? { caption: outcome.caption } : {},
-          status: outcome.status,
-          at: outcome.at,
-          ...outcome.detail ? { detail: outcome.detail } : {}
-        };
-      }
+      const receipt = await partition.findWrite(writeId);
+      if (receipt) return receipt;
     }
     return void 0;
   }
@@ -30327,18 +30372,9 @@ var WritePath = class {
         }
       }
       if (!verdict) continue;
-      const removed = await partition.queue.remove(write.writeId);
+      const removed = await partition.resolveWrite(write.writeId, verdict, now, detail);
       if (!removed) continue;
       this.inFlight.delete(write.writeId);
-      await partition.outcomes.record({
-        writeId: write.writeId,
-        uid: write.uid,
-        verb: write.verb,
-        ...write.caption ? { caption: write.caption } : {},
-        status: verdict,
-        at: now,
-        ...detail ? { detail } : {}
-      });
       log(`write ${write.writeId} (${write.verb} ${write.uid}) ${verdict} via session ${session || "?"}`);
     }
   }
@@ -30742,7 +30778,7 @@ function watchOwnBuild() {
   let startMtime;
   const timer = setInterval(async () => {
     try {
-      const mtime = (await fs16.stat(entry)).mtimeMs;
+      const mtime = (await fs14.stat(entry)).mtimeMs;
       startMtime ??= mtime;
       if (mtime !== startMtime && !isMloBusy()) {
         log("server build changed on disk \u2014 exiting so the client restarts the new version");
