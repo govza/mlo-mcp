@@ -105,7 +105,9 @@ describe("no automatic retries anywhere", () => {
     const offenders: string[] = [];
     for (const file of await sourceFiles()) {
       if (!/setInterval\s*\(/.test(await fs.readFile(file, "utf8"))) continue;
-      if (path.basename(file) === "index.ts") continue; // the build/profile-switch watchers
+      // The lifecycle watchers: build/profile-switch (index.ts) and the
+      // binding watcher a session that composed unbound arms (binding-watch.ts).
+      if (["index.ts", "binding-watch.ts"].includes(path.basename(file))) continue;
       offenders.push(path.relative(SRC, file));
     }
     expect(offenders, "a periodic timer outside the lifecycle watchers is a retry loop in disguise").toEqual([]);

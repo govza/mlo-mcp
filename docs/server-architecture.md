@@ -40,8 +40,9 @@ src/
   index.ts          composition root: wires drivers -> repositories -> services,
                     connects the stdio transport, and re-invokes itself with
                     --serve-cloud as the resident endpoint. Idle-exit watchers
-                    (rebuilt bundle, profile switch) make the client respawn a
-                    current server on the next tool call
+                    (rebuilt bundle, profile switch, binding appeared for a
+                    session that composed unbound — binding-watch.ts) make the
+                    client respawn a current server on the next tool call
   server.ts         the protocol surface — identity (version.ts), the
                     connection-time instructions string, tool registration from
                     tools/registry.ts; separate from index.ts so a test can

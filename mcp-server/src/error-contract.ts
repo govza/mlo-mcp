@@ -193,7 +193,9 @@ export const ERROR_CONTRACT = {
     tier: "write-gate",
     retryable: "after-user-action",
     meaning: "this profile has no bound cloud partition, so there is nowhere to author against",
-    endedBy: "one proxied sync from MLO through the endpoint, which is what guarded auto-initialization waits for",
+    endedBy:
+      "one proxied sync from MLO through the endpoint, which is what guarded auto-initialization waits for; " +
+      "a session that started unbound notices the binding and respawns bound by itself",
   },
   "binding-mismatch": {
     tier: "write-gate",

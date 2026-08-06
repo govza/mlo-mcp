@@ -15983,7 +15983,7 @@ var ERROR_CONTRACT = {
     tier: "write-gate",
     retryable: "after-user-action",
     meaning: "this profile has no bound cloud partition, so there is nowhere to author against",
-    endedBy: "one proxied sync from MLO through the endpoint, which is what guarded auto-initialization waits for"
+    endedBy: "one proxied sync from MLO through the endpoint, which is what guarded auto-initialization waits for; a session that started unbound notices the binding and respawns bound by itself"
   },
   "binding-mismatch": {
     tier: "write-gate",
@@ -18625,6 +18625,27 @@ function createToolContext(config2, repo, cloud, endpoint, rows) {
     config: config2,
     log
   };
+}
+
+// src/binding-watch.ts
+function watchBindingAppeared(deps) {
+  const { probe: probe2, isBusy, exit, intervalMs = 15e3, log: log2 = log } = deps;
+  let inFlight = false;
+  const timer = setInterval(async () => {
+    if (inFlight) return;
+    inFlight = true;
+    try {
+      if (!await probe2() || isBusy()) return;
+      clearInterval(timer);
+      log2("binding appeared \u2014 exiting so the client respawns a session that composes bound");
+      exit();
+    } catch {
+    } finally {
+      inFlight = false;
+    }
+  }, intervalMs);
+  timer.unref?.();
+  return { stop: () => clearInterval(timer) };
 }
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/external.js
@@ -30914,6 +30935,13 @@ async function main() {
   log(`ready \u2014 data file: ${config2.dataFile}`);
   watchOwnBuild();
   watchProfileSwitch(config2);
+  if (!rows) {
+    watchBindingAppeared({
+      probe: async () => (await cloud.boundPartition(config2.dataFile)).kind === "bound",
+      isBusy: isMloBusy,
+      exit: () => process.exit(0)
+    });
+  }
 }
 async function serveResidentEndpoint() {
   const config2 = loadCloudConfig();

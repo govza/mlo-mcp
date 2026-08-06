@@ -9,6 +9,7 @@ import { isMloBusy, SystemMloCli } from "./repo/mlo-cli.js";
 import { LocalMloRepository } from "./repo/local-mlo-repository.js";
 import { HttpResidentClient } from "./repo/resident-client.js";
 import { createToolContext } from "./context.js";
+import { watchBindingAppeared } from "./binding-watch.js";
 import { log, mirrorLogToFile } from "./log.js";
 import { createMcpServer } from "./server.js";
 import { CloudGateway } from "./cloud/gateway.js";
@@ -49,6 +50,16 @@ async function main(): Promise<void> {
   log(`ready — data file: ${config.dataFile}`);
   watchOwnBuild();
   watchProfileSwitch(config);
+  // A session that composed unbound would refuse `partition-not-ready` forever,
+  // even after the proxied sync the refusal asks for binds the profile — the
+  // stores above were resolved once. Watch for the binding and respawn bound.
+  if (!rows) {
+    watchBindingAppeared({
+      probe: async () => (await cloud.boundPartition(config.dataFile)).kind === "bound",
+      isBusy: isMloBusy,
+      exit: () => process.exit(0),
+    });
+  }
 }
 
 /**
