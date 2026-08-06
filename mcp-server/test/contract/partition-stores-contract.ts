@@ -141,6 +141,18 @@ export function describeRowStoreContract(name: string, makeStore: () => RowStore
       expect(store.view().alignmentRows().map((row) => row.uid)).toContain(UID_B);
     });
 
+    it("discards injected-never-applied rows on demand, never a vendor-observed one", async () => {
+      const store = await makeStore();
+      await store.ingest(addDocument(UID_A, "vendor task"), "vendor-get");
+      await store.ingest(addDocument(UID_A, "edited"), "injected");
+      await store.ingest(addDocument(UID_B, "queued add"), "injected");
+      // The vendor-observed row survives (MLO holds the task; only this
+      // write's version of it died) — the never-applied add goes.
+      expect(await store.discardNeverApplied([UID_A, UID_B])).toBe(1);
+      expect((await store.latest(UID_A)).kind).toBe("row");
+      expect((await store.latest(UID_B)).kind).toBe("unknown-row");
+    });
+
     it("view serves every row's alignment columns", async () => {
       const store = await makeStore();
       await store.ingest(addDocument(UID_A, "parent"), "vendor-get");

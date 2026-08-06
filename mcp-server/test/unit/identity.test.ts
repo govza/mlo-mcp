@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { IdentityService, stampIdentity } from "../../src/services/identity.js";
+import { IdentityService } from "../../src/services/identity.js";
+import { stampIdentity } from "../../src/structure-align.js";
 import type { Snapshot } from "../../src/repo/mlo-repository.js";
 import type { TaskNode } from "../../src/types.js";
 import type { MloDocument } from "../../src/xml.js";

@@ -1,5 +1,6 @@
-import type { AlignmentRow } from "../cloud/row-store.js";
-import type { TaskNode } from "../types.js";
+import type { AlignmentRow, RowStoreView } from "./cloud/row-store.js";
+import type { TaskNode } from "./types.js";
+import { flatten } from "./task-tree.js";
 
 /**
  * Task identity by STRUCTURAL alignment (spec section 3: "identity aligns the
@@ -102,4 +103,33 @@ export function alignExportToRows(
   const identity: AlignedIdentity = { byPathId: new Map(), confidence: new Map() };
   alignSiblings(exportRoots, buildCloudTree(rows), identity);
   return identity;
+}
+
+/**
+ * Stamp the identity ladder's answer onto a raw export: structural alignment
+ * against the row store first, the binary-recovered annotation as fallback,
+ * written into each task's `Guid`. Run where the snapshot is built, BEFORE the
+ * pending overlay composes — so the overlay's row-to-task pairing, the read
+ * tools' `Guid` fields, and the write resolver all answer identity from the
+ * same authority instead of each picking their own source.
+ *
+ * Returns cross-check notes (binary annotation contradicting the structural
+ * answer) for the caller to log — this tier stays side-effect free.
+ */
+export function stampIdentity(tasks: TaskNode[], rows: RowStoreView): string[] {
+  const aligned = alignExportToRows(tasks, rows.alignmentRows());
+  const notes: string[] = [];
+  for (const task of flatten(tasks)) {
+    const structural = aligned.byPathId.get(task.id);
+    if (!structural) continue;
+    const binary = task.Guid?.toUpperCase();
+    if (binary && binary !== structural.toUpperCase()) {
+      notes.push(
+        `GUID cross-check mismatch for [${task.id}] "${task.Caption}": ` +
+          `binary ${binary} vs structural ${structural} — stamping structural`,
+      );
+    }
+    task.Guid = structural;
+  }
+  return notes;
 }

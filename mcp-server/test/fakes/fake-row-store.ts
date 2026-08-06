@@ -114,6 +114,17 @@ export class FakeRowStore implements RowStore {
     return row ? { kind: "row", ...row } : unknownRowRefusal(uid);
   }
 
+  async discardNeverApplied(uids: readonly string[]): Promise<number> {
+    let discarded = 0;
+    for (const raw of uids) {
+      let key: string;
+      try { key = normalizeGuid(raw); } catch { continue; }
+      const row = this.rows.get(key);
+      if (row && row.source === "injected" && !this.vendorObserved.has(key) && this.rows.delete(key)) discarded += 1;
+    }
+    return discarded;
+  }
+
   async size(): Promise<number> {
     return this.rows.size;
   }

@@ -24,15 +24,20 @@ shapes. If they ever disagree on a shape, the catalog is right.
   the binary `.ml` GUID recovery as the cross-check. A task the row store has
   seen resolves `confirmed` and can be authored against; one recovered only
   from the binary resolves `unconfirmed`, and a write against it refuses with
-  the `repull` remedy. Every tool input takes a
-  **Path id**; GUIDs appear in output only (a write's receipt names the `uid`
-  it addressed, and `get_task` reports one when it is recoverable).
+  the `repull` remedy. Read tool inputs take a **Path id**; write targets
+  (update/move/complete/uncomplete/delete, and `move_task`'s `newParentId`)
+  also accept the stable GUID in brace form — a GUID names its task however
+  the tree has shifted, and is never reinterpreted as a path id
+  ([ADR-0008](adr/0008-guid-write-targets-one-identity-authority.md)). Reads
+  and write receipts return GUIDs (`get_task` reports one when recoverable).
 - **Writes never touch the data file.** Every write travels as a complete
   sync delta ([mcp-cloud.md](mcp-cloud.md)) that MLO's **own** merge logic
   applies, with the app still running.
 - **Writes return at durable accept, and nothing waits.** A write tool answers
-  `{ uid, writeId, status: "accepted", expiresAt, message }` as soon as the rows
-  are fsync'd into the resident's injection queue. There is no `verified`
+  `{ uid, caption, writeId, status: "accepted", expiresAt, message }` as soon as
+  the rows are fsync'd into the resident's injection queue — `caption` names the
+  task the target resolved to, the tell that catches a stale path id landing on
+  the wrong task. There is no `verified`
   boolean and no post-write export diff: MLO applies the rows on its own next
   sync (about 90 s, or immediately on `sync`), and an accepted write that has
   not landed within its TTL (default 15 minutes) expires into the dead-letter

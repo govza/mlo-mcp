@@ -237,6 +237,17 @@ export class WritePath {
         reason: detail,
         content: write.caption ?? write.uid,
       });
+      // The accept-captured rows of a task MLO never held die with the write:
+      // left behind, their GUIDs would keep resolving as writable targets.
+      // Vendor-observed rows survive inside discardNeverApplied. Best-effort,
+      // like every store touch on this path.
+      try {
+        await partition.rows.discardNeverApplied(
+          harvestTaskRows(documentFromDeltaRows(write.rows)).rows.map((row) => row.uid),
+        );
+      } catch (error) {
+        log(`discard of expired write ${write.writeId}'s rows failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
       log(`write ${write.writeId} (${write.verb} ${write.uid}) expired into the dead-letter file`);
     }
   }

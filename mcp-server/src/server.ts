@@ -33,8 +33,8 @@ After your own queued structural write (add/move/delete), never compute a destin
 id yourself: the queued change has not applied yet, so a computed id is accepted against
 whatever task sits at that path today. Re-run search/list and target the row carrying the
 expected GUID.
-Check the uid and caption echoed in every write accept name the task you meant before
-treating the write as correct.
+Check that the uid and caption echoed in every write accept name the task you meant
+before treating the write as correct.
 
 ### Field conventions
 - \`note\`: ${NOTE_DESCRIPTION}.

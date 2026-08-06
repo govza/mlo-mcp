@@ -19,7 +19,11 @@ import { normalizeGuid } from "./guid.js";
  * Attached MCP sessions only read, re-loading when the file changes on disk.
  */
 
-/** Where a captured row came from — evidence, not behaviour. */
+/**
+ * Where a captured row came from. Mostly evidence, with one behavioural cut:
+ * `injected` (this proxy's own authored rows) is the family `alignsFromStore`
+ * gates out of structural alignment until MLO is seen holding the task.
+ */
 export type RowSource = "vendor-get" | "mlo-apply" | "injected" | "history-pull";
 
 /**
@@ -149,6 +153,14 @@ export interface RowStore {
   replaceAll(document: SectionedCsv, source: RowSource): Promise<{ upserts: number }>;
   /** The latest captured row, or the typed `unknown-row` refusal carrying `repull`. */
   latest(uid: string): Promise<RowLookup>;
+  /**
+   * Drop rows whose only provenance is injection (never observed from a
+   * non-injected source), returning how many went. The expiry sweep calls
+   * this with a dead write's UIDs: a task MLO never held must stop resolving
+   * as a writable target. Vendor-observed rows are kept — only this write's
+   * version of them died, not the task.
+   */
+  discardNeverApplied(uids: readonly string[]): Promise<number>;
   /** The accumulated context/flag catalog a write resolves captions against. */
   catalog(): Promise<RowCatalog>;
   size(): Promise<number>;
@@ -471,6 +483,20 @@ export class FileRowStore implements RowStore {
       }
     }
     return unknownRowRefusal(uid);
+  }
+
+  discardNeverApplied(uids: readonly string[]): Promise<number> {
+    return this.writes.run(async () => {
+      await this.ensureFresh();
+      let discarded = 0;
+      for (const raw of uids) {
+        const key = keyOf(raw);
+        const stored = key ? this.rows.get(key) : undefined;
+        if (stored && stored.source === "injected" && stored.v !== 1 && this.rows.delete(key!)) discarded += 1;
+      }
+      if (discarded) await this.save();
+      return discarded;
+    });
   }
 
   async catalog(): Promise<RowCatalog> {

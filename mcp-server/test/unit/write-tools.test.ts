@@ -171,10 +171,12 @@ describe("fresh-add writability: the incident flow, no sync anywhere", () => {
     );
     expect(added.uid).toBeTruthy();
 
-    // The fresh read shows the pending task; both its path id and the uid are live targets.
+    // The fresh read shows the pending task exactly once; both its path id
+    // and the uid are live targets.
     const listed = await captions(ctx);
-    const fresh = listed.find((t) => t.Caption.startsWith("Book doctor"))!;
-    expect(fresh.pending).toBe(true);
+    const fresh = listed.filter((t) => t.Caption.startsWith("Book doctor"));
+    expect(fresh).toHaveLength(1);
+    expect(fresh[0]!.pending).toBe(true);
 
     const moved = await moveTaskTool.execute({ id: added.uid, newParentId: "1" }, ctx);
     expect(moved.isError).toBeUndefined();

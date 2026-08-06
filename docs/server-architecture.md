@@ -124,21 +124,29 @@ on every path.
 ## Reads
 
 `LocalMloRepository.snapshot()` is the one read: XML export → parsed doc →
-`TaskNode` tree → GUIDs annotated from the `.ml` binary, cached for
-`MLO_CACHE_STALE_MS` (default 30 s) and composed with the pending-write overlay
-at read time (`repo/pending-overlay.ts`). Every service sees the same picture,
-so read-your-own-writes needs no per-tool opt-in: an add appears as a phantom
-row, an update merged, a completion completed, a delete hidden, each carrying
-`pending: true` and its `writeId`. The overlay is derived, never stored — it
-self-empties as the queue drains, and an expired or superseded entry simply
-disappears (the loudness lives in `write_status` / `cloud_status`).
+`TaskNode` tree → GUIDs annotated from the `.ml` binary → the identity ladder
+**stamped** onto each task's `Guid` (`stampIdentity`, domain-tier
+`structure-align.ts`: structural alignment against the row store first, the
+binary annotation as fallback), cached for `MLO_CACHE_STALE_MS` (default 30 s)
+and composed with the pending-write overlay at read time
+(`repo/pending-overlay.ts`), which pairs queued rows to export tasks by that
+stamp. Every service sees the same picture, so read-your-own-writes needs no
+per-tool opt-in: an add appears as a phantom row, an update merged in place, a
+completion completed, a delete hidden, each carrying `pending: true` and its
+`writeId`. The overlay is derived, never stored — it self-empties as the queue
+drains, and an expired or superseded entry simply disappears (the loudness
+lives in `write_status` / `cloud_status`).
 
 Ids are path-based (`1.2.3` = position, root excluded) and shift when the tree
-changes — tools tell agents to re-list before mutating. `IdentityService` is the
-one owner of "which row is this id": one resolver per snapshot, aligning the
-export and its binary-recovered GUIDs against the **row store**, reporting
-`confirmed` when the store holds that UID's full row and `unconfirmed` when only
-the binary recovered it.
+changes — tools tell agents to re-list before mutating, or to target by the
+stable brace-form GUID, which every write input accepts
+([ADR-0008](adr/0008-guid-write-targets-one-identity-authority.md)).
+`IdentityService` is the one owner of "which row is this id": one resolver per
+snapshot over the stamped tree, reporting `confirmed` when the store holds that
+UID's full row and `unconfirmed` when only the binary recovered it. Rows whose
+only provenance is this proxy's own injection are excluded from alignment until
+MLO applies them (`alignsFromStore`), and die with their write when it expires
+(`discardNeverApplied`).
 
 Read services on top: `NextActionsService` (Engage — the To-Do list MLO would
 show), `ReviewService` (Reflect — review-due, stalled projects, waiting-for,

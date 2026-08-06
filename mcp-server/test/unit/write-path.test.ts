@@ -409,6 +409,20 @@ describe("TTL expiry", () => {
     expect(await partition.queue.pending()).toHaveLength(0);
   });
 
+  it("expiry discards the accept-captured rows of a task MLO never held", async () => {
+    const rig = await boundRig({ ttlMs: 60_000 });
+    const accepted = await rig.writePath.accept(PROFILE, addRows(TASK, "never lands"));
+    if (accepted.kind !== "accepted") throw new Error("accept failed");
+    const partition = await rig.gateway.registry.open(UID);
+    expect((await partition.rows.latest(TASK)).kind).toBe("row");
+
+    rig.clock.now = new Date(rig.clock.now.getTime() + 61_000);
+    expect((await rig.writePath.status(accepted.writeId))?.status).toBe("expired");
+    // The ghost row goes with the write: its GUID must stop resolving as a
+    // writable target for a task MLO will never hold.
+    expect((await partition.rows.latest(TASK)).kind).toBe("unknown-row");
+  });
+
   it("status() alone sweeps expiry — no traffic needed to learn a write expired", async () => {
     const rig = await boundRig({ ttlMs: 60_000 });
     const accepted = await rig.writePath.accept(PROFILE, addRows());

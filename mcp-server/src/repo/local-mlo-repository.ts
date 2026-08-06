@@ -18,7 +18,7 @@ import {
   type WriteReceipt,
 } from "./mlo-repository.js";
 import { overlayPendingWrites, type PendingReader, type PendingRows } from "./pending-overlay.js";
-import { stampIdentity } from "../services/identity.js";
+import { stampIdentity } from "../structure-align.js";
 import type { RowStoreView } from "../cloud/row-store.js";
 import { failed, ok, type ServiceResult } from "../result.js";
 
@@ -125,7 +125,7 @@ export class LocalMloRepository implements MloRepository {
     }
     // The one identity authority: alignment first, the annotation above as
     // fallback, stamped before any overlay or read sees the tree.
-    if (this.identity) stampIdentity(tasks, this.identity);
+    if (this.identity) for (const note of stampIdentity(tasks, this.identity)) log(note);
     return { doc, tasks, at: Date.now() };
   }
 
