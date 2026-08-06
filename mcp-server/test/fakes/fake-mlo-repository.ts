@@ -13,6 +13,8 @@ import {
   type WriteStatus,
 } from "../../src/repo/mlo-repository.js";
 import { overlayPendingWrites } from "../../src/repo/pending-overlay.js";
+import { documentFromDeltaRows } from "../../src/cloud/mlo-schema.js";
+import type { RowStore } from "../../src/cloud/row-store.js";
 import type { RepoFailureKind } from "../../src/error-contract.js";
 import { failed, ok, type ServiceResult } from "../../src/result.js";
 
@@ -30,6 +32,12 @@ export class FakeMloRepository implements MloRepository {
   doc: MloDocument = EMPTY_DOC;
   writeTtlMs = 15 * 60_000;
   quickSyncs = 0;
+  /**
+   * Mirrors the resident's capture-at-accept: when set, every accepted write's
+   * rows are ingested with the injected-family source, exactly as
+   * `WritePath.accept` does — what makes a fresh add immediately writable.
+   */
+  rowStore?: RowStore;
 
   private readonly writes = new Map<WriteId, { rows: DeltaRow[]; status: WriteStatus; expiresAt: string }>();
   private nextWriteId = 1;
@@ -55,6 +63,7 @@ export class FakeMloRepository implements MloRepository {
     const writeId: WriteId = `w${this.nextWriteId++}`;
     const expiresAt = new Date(Date.now() + this.writeTtlMs).toISOString();
     this.writes.set(writeId, { rows, status: "accepted", expiresAt });
+    await this.rowStore?.ingest(documentFromDeltaRows(rows), "injected");
     return ok({ writeId, expiresAt });
   }
 

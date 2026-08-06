@@ -125,6 +125,27 @@ describe("write routes", () => {
     expect(await status.json()).toMatchObject({ writeId: receipt.writeId, status: "accepted" });
   });
 
+  it("captures the authored rows at durable accept, so a fresh add is immediately writable", async () => {
+    const gateway = new CloudGateway({ stateRoot: await tempRoot() });
+    await gateway.bindings.create(PROFILE, "upstream");
+    await gateway.bindings.bindUid(PROFILE, UID);
+    const handle = await startCloudServer({ host: "127.0.0.1", port: 0, gateway, observeHost: "127.0.0.1" });
+    handles.push(handle);
+
+    const accepted = await postWrite(handle, { profile: PROFILE, rows: sampleRows("captured at accept") });
+    expect(accepted.status).toBe(200);
+    const { uid } = await accepted.json() as { uid: string };
+
+    const partition = await gateway.registry.open(UID, "upstream");
+    const lookup = await partition.rows.latest(uid);
+    expect(lookup.kind).toBe("row");
+    if (lookup.kind !== "row") return;
+    expect(lookup.source).toBe("injected");
+    expect(lookup.cells[lookup.header.indexOf("Caption")]).toBe("captured at accept");
+    // Never applied by MLO, so it must not join structural alignment (ticket 04's gate).
+    expect(partition.rows.view().alignmentRows().map((row) => row.uid)).not.toContain(uid);
+  });
+
   it("refusals are problem+json with typed kinds", async () => {
     const handle = await boundServer();
     const invalid = await postWrite(handle, { profile: PROFILE, rows: [] });

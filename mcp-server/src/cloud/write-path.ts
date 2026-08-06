@@ -341,6 +341,14 @@ export class WritePath {
       expiresAt: new Date(now.getTime() + this.ttlMs).toISOString(),
     };
     await bound.partition.queue.enqueue(write);
+    // Capture at accept: the authored rows are complete rows already, and
+    // entering the store now is what makes a freshly added task writable in
+    // the same flow (add-then-move, no sync round trip). The injected-family
+    // source keeps them out of structural alignment until MLO applies; the
+    // injection-time ingest stays as the idempotent catch-up for a failure
+    // here. Best-effort: the accept stands either way.
+    await bound.partition.rows.ingest(documentFromDeltaRows(rows), "injected").catch((error) =>
+      log(`row-store ingest at accept failed (delivery unaffected): ${error instanceof Error ? error.message : String(error)}`));
     return {
       kind: "accepted",
       writeId: write.writeId,

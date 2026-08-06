@@ -41,6 +41,7 @@ function fullRow(uid: string, caption: string): string[] {
 interface Rig {
   ctx: ToolContext;
   repo: FakeMloRepository;
+  rows: FakeRowStore;
 }
 
 function rig(): Rig {
@@ -51,8 +52,10 @@ function rig(): Rig {
   const rows = new FakeRowStore();
   rows.setRow(UID_ROOT, [...TODO_ITEMS_HEADER], fullRow(UID_ROOT, "root"));
   rows.setRow(UID_CHILD, [...TODO_ITEMS_HEADER], fullRow(UID_CHILD, "child"));
+  // The resident captures authored rows at durable accept; the fake mirrors it.
+  repo.rowStore = rows;
   const outline = new OutlineService(repo, new IdentityService(rows.view()), rows);
-  return { ctx: { config: {}, outline } as unknown as ToolContext, repo };
+  return { ctx: { config: {}, outline } as unknown as ToolContext, repo, rows };
 }
 
 function structured<T = Record<string, unknown>>(result: { structuredContent?: unknown }): T {
@@ -157,6 +160,60 @@ describe("GUID write targets and the caption echo", () => {
     expect(branch.caption).toBe("root");
     expect(branch.message).toContain('"root"');
     expect(branch.message).toContain("+1 more");
+  });
+});
+
+describe("fresh-add writability: the incident flow, no sync anywhere", () => {
+  it("add, search, move under a parent, set dates — zero target-unresolvable errors", async () => {
+    const { ctx } = rig();
+    const added = structured<Accept>(
+      await addTaskTool.execute({ caption: "Book doctor appointment - request thoracic spine MRI" }, ctx),
+    );
+    expect(added.uid).toBeTruthy();
+
+    // The fresh read shows the pending task; both its path id and the uid are live targets.
+    const listed = await captions(ctx);
+    const fresh = listed.find((t) => t.Caption.startsWith("Book doctor"))!;
+    expect(fresh.pending).toBe(true);
+
+    const moved = await moveTaskTool.execute({ id: added.uid, newParentId: "1" }, ctx);
+    expect(moved.isError).toBeUndefined();
+    expect(structured<Accept>(moved).uid).toBe(added.uid);
+
+    const dated = await updateTaskTool.execute(
+      { id: added.uid, StartDateTime: "2026-08-10T09:00:00", DueDateTime: "2026-08-12T17:00:00" },
+      ctx,
+    );
+    expect(dated.isError).toBeUndefined();
+    expect(structured<Accept>(dated).uid).toBe(added.uid);
+    expect(structured<Accept>(dated).caption).toBe("Book doctor appointment - request thoracic spine MRI");
+  });
+
+  it("every task of a batch is immediately writable, not just the head row", async () => {
+    const { ctx } = rig();
+    const { addTasksTool } = await import("../../src/tools/add-tasks.js");
+    const batch = structured<Accept>(
+      await addTasksTool.execute({ tasks: [{ caption: "head" }, { caption: "tail" }] }, ctx),
+    );
+    for (const uid of batch.uids!) {
+      const result = await updateTaskTool.execute({ id: uid, Note: "reachable" }, ctx);
+      expect(result.isError).toBeUndefined();
+    }
+  });
+
+  it("the stored row a follow-up update authors from is the row the add authored", async () => {
+    const { ctx, rows } = rig();
+    const added = structured<Accept>(
+      await addTaskTool.execute({ caption: "keeps fields", startDateTime: "2026-08-10T09:00:00" }, ctx),
+    );
+    const lookup = await rows.latest(added.uid);
+    expect(lookup.kind).toBe("row");
+    if (lookup.kind !== "row") return;
+    expect(lookup.cells[lookup.header.indexOf("Caption")]).toBe("keeps fields");
+    expect(lookup.cells[lookup.header.indexOf("StartDateTime")]).toContain("2026-08-10");
+    // The follow-up rewrite carries the add's fields forward, not blanks.
+    const dated = await updateTaskTool.execute({ id: added.uid, DueDateTime: "2026-08-12T17:00:00" }, ctx);
+    expect(dated.isError).toBeUndefined();
   });
 });
 
