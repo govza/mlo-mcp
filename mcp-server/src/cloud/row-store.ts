@@ -22,6 +22,19 @@ import { normalizeGuid } from "./guid.js";
 /** Where a captured row came from — evidence, not behaviour. */
 export type RowSource = "vendor-get" | "mlo-apply" | "injected" | "history-pull";
 
+/**
+ * Whether a stored row belongs in structural alignment's row set. A row whose
+ * only provenance is this proxy's own injection describes a task MLO may never
+ * apply; letting it inflate a sibling count breaks positional pairing for the
+ * whole slot and cascades `target-unresolvable` refusals onto unrelated
+ * siblings. It stays available to `latest()`/`captionOf` — authoring and
+ * confidence checks still need it. `vendorObserved` means the UID has been
+ * seen from a non-injected source at some point, i.e. MLO holds the task.
+ */
+export function alignsFromStore(source: RowSource, vendorObserved: boolean): boolean {
+  return source !== "injected" || vendorObserved;
+}
+
 export interface CapturedRow {
   header: readonly string[];
   cells: readonly string[];
@@ -286,6 +299,8 @@ interface StoredRow {
   deps?: string[];
   /** CapturedRow.starredOrderIndex */
   star?: string;
+  /** 1 = this UID has been observed from a non-injected source (MLO holds it). */
+  v?: 1;
 }
 
 interface RowStoreFile {
@@ -385,6 +400,7 @@ export class FileRowStore implements RowStore {
     const harvested = harvestTaskRows(document);
     const at = new Date().toISOString();
     for (const { uid, header, cells, placeUids, dependencyUids, starredOrderIndex } of harvested.rows) {
+      const vendorObserved = source !== "injected" || this.rows.get(uid)?.v === 1;
       this.rows.set(uid, {
         h: this.headerIndex(header),
         cells,
@@ -393,6 +409,7 @@ export class FileRowStore implements RowStore {
         places: placeUids,
         deps: dependencyUids,
         ...(starredOrderIndex !== undefined ? { star: starredOrderIndex } : {}),
+        ...(vendorObserved ? { v: 1 as const } : {}),
       });
     }
     const named = applyCatalog({ places: this.places, flags: this.flags }, harvested);
@@ -488,7 +505,9 @@ export class FileRowStore implements RowStore {
       },
       alignmentRows: (): AlignmentRow[] => {
         void this.ensureFresh().catch(() => undefined);
-        return [...this.rows].map(([uid, stored]) => alignmentRowOf(uid, this.headers[stored.h] ?? [], stored.cells));
+        return [...this.rows]
+          .filter(([, stored]) => alignsFromStore(stored.source, stored.v === 1))
+          .map(([uid, stored]) => alignmentRowOf(uid, this.headers[stored.h] ?? [], stored.cells));
       },
     };
   }

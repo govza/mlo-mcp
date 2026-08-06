@@ -2,6 +2,7 @@ import type { SectionedCsv } from "../../src/cloud/csv.js";
 import { normalizeGuid } from "../../src/cloud/guid.js";
 import {
   alignmentRowOf,
+  alignsFromStore,
   applyCatalog,
   harvestTaskRows,
   maxStarredOrderIndex,
@@ -24,6 +25,8 @@ export class FakeRowStore implements RowStore {
   private readonly rows = new Map<string, CapturedRow>();
   private readonly places = new Map<string, string>();
   private readonly flags = new Map<string, string>();
+  /** UIDs ever observed from a non-injected source — the alignment gate. */
+  private readonly vendorObserved = new Set<string>();
 
   /** Seed one row directly — the minimal header a caption lookup or alignment needs. */
   set(uid: string, caption: string, structure: { parentUid?: string; itemIndex?: number } = {}): void {
@@ -54,6 +57,7 @@ export class FakeRowStore implements RowStore {
       dependencyUids: relations.dependencyUids ?? [],
       ...(relations.starredOrderIndex !== undefined ? { starredOrderIndex: relations.starredOrderIndex } : {}),
     });
+    this.vendorObserved.add(normalizeGuid(uid));
   }
 
   /** Seed a named context or flag the catalog can resolve a caption against. */
@@ -78,6 +82,7 @@ export class FakeRowStore implements RowStore {
         dependencyUids,
         ...(starredOrderIndex !== undefined ? { starredOrderIndex } : {}),
       });
+      if (source !== "injected") this.vendorObserved.add(uid);
     }
     applyCatalog({ places: this.places, flags: this.flags }, harvested);
     let tombstones = 0;
@@ -99,6 +104,7 @@ export class FakeRowStore implements RowStore {
     this.rows.clear();
     this.places.clear();
     this.flags.clear();
+    this.vendorObserved.clear();
     const { upserts } = await this.ingest(document, source);
     return { upserts };
   }
@@ -121,7 +127,9 @@ export class FakeRowStore implements RowStore {
         return captionIndex >= 0 ? row.cells[captionIndex] : undefined;
       },
       alignmentRows: (): AlignmentRow[] =>
-        [...this.rows].map(([uid, row]) => alignmentRowOf(uid, row.header, row.cells)),
+        [...this.rows]
+          .filter(([uid, row]) => alignsFromStore(row.source, this.vendorObserved.has(uid)))
+          .map(([uid, row]) => alignmentRowOf(uid, row.header, row.cells)),
     };
   }
 

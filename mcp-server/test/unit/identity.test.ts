@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { IdentityService } from "../../src/services/identity.js";
+import { IdentityService, stampIdentity } from "../../src/services/identity.js";
 import type { Snapshot } from "../../src/repo/mlo-repository.js";
 import type { TaskNode } from "../../src/types.js";
 import type { MloDocument } from "../../src/xml.js";
@@ -59,6 +59,39 @@ describe("IdentityService", () => {
     const resolver = new IdentityService(new FakeRowStore().view()).resolverFor(snap);
     expect(resolver.taskFor(UID_B.toLowerCase())?.Caption).toBe("dependency target");
     expect(resolver.dependentsOf(UID_B).map((t) => t.id)).toEqual(["1"]);
+  });
+});
+
+describe("stampIdentity (one authority, stamped at snapshot build)", () => {
+  const UID_1 = "{11111111-0000-0000-0000-000000000001}";
+  const UID_2 = "{22222222-0000-0000-0000-000000000002}";
+
+  it("stamps structurally aligned uids onto annotation-less export tasks", () => {
+    const rows = new FakeRowStore();
+    rows.set(UID_1, "alpha", { itemIndex: 100 });
+    rows.set(UID_2, "beta", { itemIndex: 200 });
+    const tasks = [task("1", "alpha"), task("2", "beta")];
+    stampIdentity(tasks, rows.view());
+    expect(tasks[0]!.Guid).toBe(UID_1);
+    expect(tasks[1]!.Guid).toBe(UID_2);
+  });
+
+  it("keeps the binary annotation where alignment cannot place the node", () => {
+    const rows = new FakeRowStore();
+    rows.set(UID_1, "twin", { itemIndex: 100 });
+    rows.set(UID_2, "twin", { itemIndex: 200 });
+    // Drifted slot, duplicate captions: structurally unplaceable.
+    const tasks = [task("1", "twin", { Guid: UID_2 })];
+    stampIdentity(tasks, rows.view());
+    expect(tasks[0]!.Guid).toBe(UID_2);
+  });
+
+  it("replaces a contradicting binary annotation — structural wins", () => {
+    const rows = new FakeRowStore();
+    rows.set(UID_1, "aligned", { itemIndex: 100 });
+    const tasks = [task("1", "aligned", { Guid: UID_2 })];
+    stampIdentity(tasks, rows.view());
+    expect(tasks[0]!.Guid).toBe(UID_1);
   });
 });
 

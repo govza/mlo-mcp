@@ -34,7 +34,7 @@ async function main(): Promise<void> {
   // reads show this session's own accepted writes, the row store is what writes
   // are authored from.
   const { rows, queue } = await cloud.boundStores(config.dataFile);
-  const repo = new LocalMloRepository(config, new SystemMloCli(config), resident, queue);
+  const repo = new LocalMloRepository(config, new SystemMloCli(config), resident, queue, rows?.view());
   // Never a listener of its own: MLO's proxy points at this port permanently,
   // so a session that owned it would take the app's sync down when it closed.
   // Attach to the resident process, starting it if nothing answers.

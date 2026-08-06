@@ -125,6 +125,22 @@ export function describeRowStoreContract(name: string, makeStore: () => RowStore
       expect(view.captionOf("not-a-guid")).toBeUndefined();
     });
 
+    it("keeps injected-never-applied rows out of alignment while latest() still serves them", async () => {
+      const store = await makeStore();
+      await store.ingest(addDocument(UID_A, "vendor row"), "vendor-get");
+      await store.ingest(addDocument(UID_B, "queued add"), "injected");
+      // The queued add is authoring truth (latest) but not vendor truth: MLO
+      // has not applied it, so it must not inflate a sibling count.
+      expect(store.view().alignmentRows().map((row) => row.uid)).toEqual([UID_A]);
+      expect((await store.latest(UID_B)).kind).toBe("row");
+      // A vendor-known row re-authored by injection stays aligned — MLO holds it.
+      await store.ingest(addDocument(UID_A, "edited"), "injected");
+      expect(store.view().alignmentRows().map((row) => row.uid)).toContain(UID_A);
+      // Once MLO applies the add, the row is vendor truth and aligns.
+      await store.ingest(addDocument(UID_B, "applied"), "mlo-apply");
+      expect(store.view().alignmentRows().map((row) => row.uid)).toContain(UID_B);
+    });
+
     it("view serves every row's alignment columns", async () => {
       const store = await makeStore();
       await store.ingest(addDocument(UID_A, "parent"), "vendor-get");

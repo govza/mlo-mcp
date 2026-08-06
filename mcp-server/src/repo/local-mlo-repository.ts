@@ -18,6 +18,8 @@ import {
   type WriteReceipt,
 } from "./mlo-repository.js";
 import { overlayPendingWrites, type PendingReader, type PendingRows } from "./pending-overlay.js";
+import { stampIdentity } from "../services/identity.js";
+import type { RowStoreView } from "../cloud/row-store.js";
 import { failed, ok, type ServiceResult } from "../result.js";
 
 /**
@@ -45,6 +47,12 @@ export class LocalMloRepository implements MloRepository {
      * there is no queue to read, and no write could have been accepted either.
      */
     private readonly queue?: PendingReader,
+    /**
+     * The bound partition's row-store view, for stamping the identity ladder
+     * onto each fresh export before the overlay composes. Absent while
+     * unbound: exports then carry only the binary-recovered annotations.
+     */
+    private readonly identity?: RowStoreView,
   ) {}
 
   async snapshot(fresh = false): Promise<ServiceResult<Snapshot, SnapshotFailure>> {
@@ -115,6 +123,9 @@ export class LocalMloRepository implements MloRepository {
     } catch (e) {
       log(`GUID extraction failed (continuing without GUIDs): ${(e as Error).message}`);
     }
+    // The one identity authority: alignment first, the annotation above as
+    // fallback, stamped before any overlay or read sees the tree.
+    if (this.identity) stampIdentity(tasks, this.identity);
     return { doc, tasks, at: Date.now() };
   }
 

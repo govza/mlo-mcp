@@ -31,6 +31,30 @@ export type UidResolution =
   | { kind: "unresolvable"; reason: "unknown-id" | "no-recoverable-guid"; detail: string };
 
 /**
+ * Stamp the identity ladder's answer onto a raw export: structural alignment
+ * against the row store first, the binary-recovered annotation as fallback,
+ * written into each task's `Guid`. Run where the snapshot is built, BEFORE the
+ * pending overlay composes — so the overlay's row-to-task pairing, the read
+ * tools' `Guid` fields, and the write resolver all answer identity from the
+ * same authority instead of each picking their own source.
+ */
+export function stampIdentity(tasks: TaskNode[], rows: RowStoreView): void {
+  const aligned = alignExportToRows(tasks, rows.alignmentRows());
+  for (const task of flatten(tasks)) {
+    const structural = aligned.byPathId.get(task.id);
+    if (!structural) continue;
+    const binary = task.Guid?.toUpperCase();
+    if (binary && binary !== structural.toUpperCase()) {
+      log(
+        `GUID cross-check mismatch for [${task.id}] "${task.Caption}": ` +
+          `binary ${binary} vs structural ${structural} — stamping structural`,
+      );
+    }
+    task.Guid = structural;
+  }
+}
+
+/**
  * One owner for "which row is this id" (spec section 3): a resolver built once
  * per snapshot, aligning the export against the row store — structural
  * alignment (UID/ParentUID/ItemIndex vs the export tree) is the identity

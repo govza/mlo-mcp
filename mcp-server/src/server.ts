@@ -14,7 +14,9 @@ A write tool returns as soon as the change is DURABLY QUEUED - not when MLO has 
 The response carries a \`writeId\` and an \`expiresAt\`; nothing waits, and there is no
 "verified" flag to read. MLO picks the write up on its own sync (about 90 seconds, or
 immediately if you run sync), and reads show the change straight away, flagged
-\`pending: true\` with the writeId that made it.
+\`pending: true\` with the writeId that made it. One residual case: when a task's
+identity cannot be resolved against the captured rows, its queued change shows as a
+separate pending row instead of updating the task in place.
 
 Do not poll: report the change as made. If you want the outcome anyway, write_status(writeId)
 gives the five states - accepted, delivered, verified, expired (MLO never synced; nothing was

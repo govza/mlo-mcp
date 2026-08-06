@@ -4,6 +4,9 @@ import type { MloCli } from "../../src/repo/mlo-cli.js";
 import type { MloConfig } from "../../src/types.js";
 import { TODO_ITEMS_HEADER } from "../../src/cloud/mlo-schema.js";
 import { FakeMloRepository } from "../fakes/fake-mlo-repository.js";
+import { FakeRowStore } from "../fakes/fake-row-store.js";
+import { OutlineService } from "../../src/services/outline.js";
+import { IdentityService } from "../../src/services/identity.js";
 import { FakeResidentClient } from "../fakes/fake-resident-client.js";
 import { describeMloRepositoryContract } from "../contract/mlo-repository-contract.js";
 import { expectOk } from "../expect-result.js";
@@ -152,6 +155,66 @@ describe("LocalMloRepository pending-write overlay", () => {
       pending: () => Promise.reject(new Error("state root gone")),
     });
     expect(expectOk(await repo.snapshot()).tasks.map((t) => t.Caption)).toEqual(["exported"]);
+  });
+});
+
+describe("LocalMloRepository identity-aware overlay (one identity authority)", () => {
+  const UID_A = "{AAAAAAAA-0000-0000-0000-000000000001}";
+  const UID_B = "{BBBBBBBB-0000-0000-0000-000000000002}";
+
+  /** Two top-level tasks, no binary GUID annotations — the zero-footer profile. */
+  const xmlTwoTasks =
+    '<?xml version="1.0" encoding="UTF-8"?>\n<MyLifeOrganized-xml ver="1.2">' +
+    '<TaskTree><TaskNode Caption=""><TaskNode Caption="alpha"/><TaskNode Caption="beta"/></TaskNode></TaskTree>' +
+    "</MyLifeOrganized-xml>";
+
+  const row = (uid: string, values: Record<string, string>) => ({
+    section: "TodoItems",
+    values: TODO_ITEMS_HEADER.map((column) => (column === "UID" ? uid : values[column] ?? "")),
+  });
+
+  function alignedStore(): FakeRowStore {
+    const rows = new FakeRowStore();
+    rows.set(UID_A, "alpha", { itemIndex: 100 });
+    rows.set(UID_B, "beta", { itemIndex: 200 });
+    return rows;
+  }
+
+  it("pairs a queued update to an annotation-less export task in place — pending, never a phantom", async () => {
+    const cli = new ScriptedMloCli();
+    cli.queueExport(Promise.resolve(xmlTwoTasks));
+    const queue = { pending: async () => [{ writeId: "w1", rows: [row(UID_A, { Caption: "renamed" })] }] };
+    const repo = new LocalMloRepository(config, cli, undefined, queue, alignedStore().view());
+    const tasks = expectOk(await repo.snapshot()).tasks;
+    expect(tasks.map((t) => t.Caption)).toEqual(["renamed", "beta"]);
+    expect(tasks[0]!.pending).toBe(true);
+    expect(tasks[0]!.writeId).toBe("w1");
+  });
+
+  it("a queued move yields exactly one row for the task, under its new parent", async () => {
+    const cli = new ScriptedMloCli();
+    cli.queueExport(Promise.resolve(xmlTwoTasks));
+    const queue = {
+      pending: async () => [{ writeId: "w1", rows: [row(UID_A, { Caption: "alpha", ParentUID: UID_B })] }],
+    };
+    const repo = new LocalMloRepository(config, cli, undefined, queue, alignedStore().view());
+    const tasks = expectOk(await repo.snapshot()).tasks;
+    expect(tasks.map((t) => t.Caption)).toEqual(["beta"]);
+    expect(tasks[0]!.Children.map((t) => t.Caption)).toEqual(["alpha"]);
+    expect(tasks[0]!.Children[0]!.pending).toBe(true);
+  });
+
+  it("reads report the stamped Guid, so every read tool answers identity the same way", async () => {
+    const cli = new ScriptedMloCli();
+    cli.queueExport(Promise.resolve(xmlTwoTasks));
+    const store = alignedStore();
+    const repo = new LocalMloRepository(config, cli, undefined, undefined, store.view());
+    const tasks = expectOk(await repo.snapshot()).tasks;
+    expect(tasks.map((t) => t.Guid)).toEqual([UID_A, UID_B]);
+    // get_task's resolver answers from the same authority the summaries carry.
+    const outline = new OutlineService(repo, new IdentityService(store.view()), store);
+    const detail = expectOk(await outline.get("1"));
+    expect(detail.uid).toBe(tasks[0]!.Guid);
   });
 });
 
