@@ -16518,6 +16518,82 @@ function overlayPendingWrites(tasks, pending, now = Date.now()) {
   return renumbered(overlaid);
 }
 
+// src/structure-align.ts
+function buildCloudTree(rows) {
+  const nodes = /* @__PURE__ */ new Map();
+  for (const row of rows) {
+    nodes.set(row.uid, { uid: row.uid, caption: row.caption, itemIndex: row.itemIndex, children: [] });
+  }
+  const roots = [];
+  for (const row of rows) {
+    const node = nodes.get(row.uid);
+    const parentNode = row.parentUid ? nodes.get(row.parentUid) : void 0;
+    if (parentNode) parentNode.children.push(node);
+    else roots.push(node);
+  }
+  const sortSiblings = (siblings) => {
+    siblings.sort((a, b) => a.itemIndex - b.itemIndex);
+    for (const node of siblings) sortSiblings(node.children);
+  };
+  sortSiblings(roots);
+  return roots;
+}
+function alignSiblings(exportChildren, cloudChildren, identity) {
+  let pairs = [];
+  let positional = exportChildren.length === cloudChildren.length;
+  if (positional) {
+    for (let index2 = 0; index2 < exportChildren.length; index2++) {
+      if (exportChildren[index2].Caption !== cloudChildren[index2].caption) {
+        positional = false;
+        break;
+      }
+    }
+  }
+  if (positional) {
+    pairs = exportChildren.map((task, index2) => [task, cloudChildren[index2]]);
+  } else {
+    const countBy = (captions) => {
+      const counts = /* @__PURE__ */ new Map();
+      for (const caption of captions) counts.set(caption, (counts.get(caption) ?? 0) + 1);
+      return counts;
+    };
+    const exportCounts = countBy(exportChildren.map((task) => task.Caption));
+    const cloudCounts = countBy(cloudChildren.map((node) => node.caption));
+    const cloudByCaption = new Map(cloudChildren.map((node) => [node.caption, node]));
+    for (const task of exportChildren) {
+      if (exportCounts.get(task.Caption) === 1 && cloudCounts.get(task.Caption) === 1) {
+        pairs.push([task, cloudByCaption.get(task.Caption)]);
+      }
+    }
+  }
+  for (const [task, node] of pairs) {
+    identity.byPathId.set(task.id, node.uid);
+    identity.confidence.set(task.id, positional ? "positional" : "caption-unique");
+    alignSiblings(task.Children, node.children, identity);
+  }
+}
+function alignExportToRows(exportRoots, rows) {
+  const identity = { byPathId: /* @__PURE__ */ new Map(), confidence: /* @__PURE__ */ new Map() };
+  alignSiblings(exportRoots, buildCloudTree(rows), identity);
+  return identity;
+}
+function stampIdentity(tasks, rows) {
+  const aligned = alignExportToRows(tasks, rows.alignmentRows());
+  const notes = [];
+  for (const task of flatten(tasks)) {
+    const structural = aligned.byPathId.get(task.id);
+    if (!structural) continue;
+    const binary = task.Guid?.toUpperCase();
+    if (binary && binary !== structural.toUpperCase()) {
+      notes.push(
+        `GUID cross-check mismatch for [${task.id}] "${task.Caption}": binary ${binary} vs structural ${structural} \u2014 stamping structural`
+      );
+    }
+    task.Guid = structural;
+  }
+  return notes;
+}
+
 // src/result.ts
 function ok(value, advisories) {
   return advisories?.length ? { isErrored: false, value, advisories } : { isErrored: false, value };
@@ -16532,16 +16608,18 @@ function failureText(failure) {
 
 // src/repo/local-mlo-repository.ts
 var LocalMloRepository = class {
-  constructor(config2, cli, resident, queue) {
+  constructor(config2, cli, resident, queue, identity) {
     this.config = config2;
     this.cli = cli;
     this.resident = resident;
     this.queue = queue;
+    this.identity = identity;
   }
   config;
   cli;
   resident;
   queue;
+  identity;
   snap;
   pending;
   /** When the last QuickSync fired — write nudges within the debounce window ride MLO's own poll instead. */
@@ -16601,6 +16679,7 @@ var LocalMloRepository = class {
     } catch (e) {
       log(`GUID extraction failed (continuing without GUIDs): ${e.message}`);
     }
+    if (this.identity) for (const note of stampIdentity(tasks, this.identity)) log(note);
     return { doc, tasks, at: Date.now() };
   }
   invalidate() {
@@ -17018,6 +17097,118 @@ var HttpResidentClient = class {
   }
 };
 
+// src/services/identity.ts
+function isGuidTarget(target) {
+  return target.startsWith("{");
+}
+var IdentityService = class {
+  constructor(rows) {
+    this.rows = rows;
+  }
+  rows;
+  resolvers = /* @__PURE__ */ new WeakMap();
+  /** The single resolver construction site: one resolver per snapshot, cached by identity. */
+  resolverFor(snapshot) {
+    let resolver = this.resolvers.get(snapshot);
+    if (!resolver) {
+      resolver = new SnapshotResolver(snapshot.tasks, this.rows);
+      this.resolvers.set(snapshot, resolver);
+    }
+    return resolver;
+  }
+};
+var SnapshotResolver = class {
+  constructor(tasks, rows) {
+    this.tasks = tasks;
+    this.rows = rows;
+    this.all = flatten(tasks);
+    this.aligned = alignExportToRows(tasks, rows.alignmentRows());
+    for (const task of this.all) {
+      const structural = this.aligned.byPathId.get(task.id);
+      if (structural) this.byUid.set(structural.toUpperCase(), task);
+    }
+    for (const task of this.all) {
+      const binary = task.Guid?.toUpperCase();
+      if (binary && !this.byUid.has(binary)) this.byUid.set(binary, task);
+    }
+  }
+  tasks;
+  rows;
+  byUid = /* @__PURE__ */ new Map();
+  aligned;
+  all;
+  /**
+   * Resolve a write target — a path id, or a stable GUID in brace form — to
+   * the row UID a write would address. A typed refusal, never a guess; a
+   * brace-form target is never reinterpreted as a path id.
+   */
+  uidFor(target) {
+    if (isGuidTarget(target)) return this.uidForGuid(target);
+    return this.uidForPath(target);
+  }
+  /**
+   * A GUID names its task directly, however the tree has shifted since the
+   * caller read it. Known means the snapshot carries it (annotation or
+   * alignment) or the row store does; anything else refuses rather than
+   * accepting a write against a task nobody can name.
+   */
+  uidForGuid(target) {
+    let uid;
+    try {
+      uid = normalizeGuid(target);
+    } catch {
+      return {
+        kind: "unresolvable",
+        reason: "unknown-id",
+        detail: `"${target}" is neither a valid GUID ("{XXXXXXXX-...}") nor a path id`
+      };
+    }
+    const inSnapshot = this.byUid.has(uid.toUpperCase());
+    const inStore = this.rows.captionOf(uid) !== void 0;
+    if (!inSnapshot && !inStore) {
+      return {
+        kind: "unresolvable",
+        reason: "unknown-id",
+        detail: `no task with GUID ${uid} in this profile \u2014 GUIDs are never read as path ids`
+      };
+    }
+    return { kind: "resolved", uid, confidence: inStore ? "confirmed" : "unconfirmed" };
+  }
+  uidForPath(pathId) {
+    const task = findById(this.tasks, pathId);
+    if (!task) {
+      return { kind: "unresolvable", reason: "unknown-id", detail: `no task with id "${pathId}" in this snapshot` };
+    }
+    const structural = this.aligned.byPathId.get(task.id);
+    const binary = task.Guid?.toUpperCase();
+    if (structural) {
+      if (binary && binary !== structural.toUpperCase()) {
+        log(
+          `GUID cross-check mismatch for [${task.id}] "${task.Caption}": binary ${binary} vs structural ${structural} \u2014 using structural`
+        );
+      }
+      return { kind: "resolved", uid: structural, confidence: "confirmed" };
+    }
+    if (binary) {
+      const confidence = this.rows.captionOf(binary) !== void 0 ? "confirmed" : "unconfirmed";
+      return { kind: "resolved", uid: binary, confidence };
+    }
+    return {
+      kind: "unresolvable",
+      reason: "no-recoverable-guid",
+      detail: `"${task.Caption}" aligns to no captured row and has no recoverable GUID \u2014 sync so the endpoint captures it, then retry`
+    };
+  }
+  taskFor(uid) {
+    return this.byUid.get(uid.toUpperCase());
+  }
+  /** Tasks whose DependsOn names this UID. */
+  dependentsOf(uid) {
+    const needle = uid.toUpperCase();
+    return this.all.filter((t) => t.DependsOn.some((d) => d.toUpperCase() === needle));
+  }
+};
+
 // src/places.ts
 function many(value) {
   return value === void 0 ? [] : Array.isArray(value) ? value : [value];
@@ -17428,7 +17619,8 @@ var OutlineService = class {
     }
     return this.commit(
       deltaRowsFromDocument(mergeDeltas(documents)),
-      keyed.map(({ key }) => uids.get(key))
+      keyed.map(({ key }) => uids.get(key)),
+      keyed.map(({ spec }) => spec.caption)
     );
   }
   /**
@@ -17511,7 +17703,7 @@ var OutlineService = class {
     return this.rewrite(id, async (target) => {
       let parentUid = "";
       if (newParentId !== void 0 && newParentId !== "") {
-        const destination = findById(target.opened.snapshot.tasks, newParentId);
+        const destination = this.targetTask(target.opened.snapshot, target.resolver, newParentId);
         const task = target.resolver.taskFor(target.uid);
         if (destination && task && flatten([task]).includes(destination)) {
           return failed(
@@ -17536,9 +17728,10 @@ var OutlineService = class {
     const opened = await this.authoring();
     if (opened.isErrored) return opened;
     const { snapshot, resolver } = opened.value;
-    const task = findById(snapshot.tasks, id);
+    const task = this.targetTask(snapshot, resolver, id);
     if (!task) return failed(unresolvable(id, `no task with id "${id}" in this snapshot`));
     const uids = [];
+    const captions = [];
     for (const node of flatten([task])) {
       const resolution = resolver.uidFor(node.id);
       if (resolution.kind !== "resolved") {
@@ -17547,8 +17740,9 @@ var OutlineService = class {
         );
       }
       uids.push(normalizeGuid(resolution.uid));
+      captions.push(node.Caption);
     }
-    return this.commit(deltaRowsFromDocument(buildTaskDeleteDelta(uids)), uids);
+    return this.commit(deltaRowsFromDocument(buildTaskDeleteDelta(uids)), uids, captions);
   }
   /**
    * Where an accept receipt stands. The one read on this service that is about
@@ -17636,11 +17830,17 @@ var OutlineService = class {
         ...starredOrderIndex !== void 0 ? { starredOrderIndex } : {}
       }
     ]);
-    return this.commit(deltaRowsFromDocument(document), [uid]);
+    return this.commit(deltaRowsFromDocument(document), [uid], [caption]);
   }
   resolveTarget(resolver, id) {
     const resolution = resolver.uidFor(id);
     return resolution.kind === "resolved" ? ok(resolution.uid) : failed(unresolvable(id, resolution.detail));
+  }
+  /** The snapshot task a write target names — brace-form GUIDs never read as path ids. */
+  targetTask(snapshot, resolver, target) {
+    if (!isGuidTarget(target)) return findById(snapshot.tasks, target);
+    const resolution = resolver.uidFor(target);
+    return resolution.kind === "resolved" ? resolver.taskFor(resolution.uid) : void 0;
   }
   resolvePlaces(captions, catalog) {
     if (captions === void 0) return ok([]);
@@ -17697,10 +17897,10 @@ var OutlineService = class {
     return indices;
   }
   /** The one place a service touches the repository seam. */
-  async commit(rows, uids) {
+  async commit(rows, uids, captions) {
     const written = await this.repo.write(rows);
     if (written.isErrored) return failed(written.failure);
-    return ok({ uids, writeId: written.value.writeId, expiresAt: written.value.expiresAt });
+    return ok({ uids, captions, writeId: written.value.writeId, expiresAt: written.value.expiresAt });
   }
 };
 var STARRED_ORDER_STEP = 500;
@@ -17749,139 +17949,6 @@ function validateAddGraph(keyed, byKey) {
   return void 0;
 }
 
-// src/services/structure-align.ts
-function buildCloudTree(rows) {
-  const nodes = /* @__PURE__ */ new Map();
-  for (const row of rows) {
-    nodes.set(row.uid, { uid: row.uid, caption: row.caption, itemIndex: row.itemIndex, children: [] });
-  }
-  const roots = [];
-  for (const row of rows) {
-    const node = nodes.get(row.uid);
-    const parentNode = row.parentUid ? nodes.get(row.parentUid) : void 0;
-    if (parentNode) parentNode.children.push(node);
-    else roots.push(node);
-  }
-  const sortSiblings = (siblings) => {
-    siblings.sort((a, b) => a.itemIndex - b.itemIndex);
-    for (const node of siblings) sortSiblings(node.children);
-  };
-  sortSiblings(roots);
-  return roots;
-}
-function alignSiblings(exportChildren, cloudChildren, identity) {
-  let pairs = [];
-  let positional = exportChildren.length === cloudChildren.length;
-  if (positional) {
-    for (let index2 = 0; index2 < exportChildren.length; index2++) {
-      if (exportChildren[index2].Caption !== cloudChildren[index2].caption) {
-        positional = false;
-        break;
-      }
-    }
-  }
-  if (positional) {
-    pairs = exportChildren.map((task, index2) => [task, cloudChildren[index2]]);
-  } else {
-    const countBy = (captions) => {
-      const counts = /* @__PURE__ */ new Map();
-      for (const caption of captions) counts.set(caption, (counts.get(caption) ?? 0) + 1);
-      return counts;
-    };
-    const exportCounts = countBy(exportChildren.map((task) => task.Caption));
-    const cloudCounts = countBy(cloudChildren.map((node) => node.caption));
-    const cloudByCaption = new Map(cloudChildren.map((node) => [node.caption, node]));
-    for (const task of exportChildren) {
-      if (exportCounts.get(task.Caption) === 1 && cloudCounts.get(task.Caption) === 1) {
-        pairs.push([task, cloudByCaption.get(task.Caption)]);
-      }
-    }
-  }
-  for (const [task, node] of pairs) {
-    identity.byPathId.set(task.id, node.uid);
-    identity.confidence.set(task.id, positional ? "positional" : "caption-unique");
-    alignSiblings(task.Children, node.children, identity);
-  }
-}
-function alignExportToRows(exportRoots, rows) {
-  const identity = { byPathId: /* @__PURE__ */ new Map(), confidence: /* @__PURE__ */ new Map() };
-  alignSiblings(exportRoots, buildCloudTree(rows), identity);
-  return identity;
-}
-
-// src/services/identity.ts
-var IdentityService = class {
-  constructor(rows) {
-    this.rows = rows;
-  }
-  rows;
-  resolvers = /* @__PURE__ */ new WeakMap();
-  /** The single resolver construction site: one resolver per snapshot, cached by identity. */
-  resolverFor(snapshot) {
-    let resolver = this.resolvers.get(snapshot);
-    if (!resolver) {
-      resolver = new SnapshotResolver(snapshot.tasks, this.rows);
-      this.resolvers.set(snapshot, resolver);
-    }
-    return resolver;
-  }
-};
-var SnapshotResolver = class {
-  constructor(tasks, rows) {
-    this.tasks = tasks;
-    this.rows = rows;
-    this.all = flatten(tasks);
-    this.aligned = alignExportToRows(tasks, rows.alignmentRows());
-    for (const task of this.all) {
-      const structural = this.aligned.byPathId.get(task.id);
-      if (structural) this.byUid.set(structural.toUpperCase(), task);
-    }
-    for (const task of this.all) {
-      const binary = task.Guid?.toUpperCase();
-      if (binary && !this.byUid.has(binary)) this.byUid.set(binary, task);
-    }
-  }
-  tasks;
-  rows;
-  byUid = /* @__PURE__ */ new Map();
-  aligned;
-  all;
-  /** Resolve a path id to the row UID a write would target — a typed refusal, never a guess. */
-  uidFor(pathId) {
-    const task = findById(this.tasks, pathId);
-    if (!task) {
-      return { kind: "unresolvable", reason: "unknown-id", detail: `no task with id "${pathId}" in this snapshot` };
-    }
-    const structural = this.aligned.byPathId.get(task.id);
-    const binary = task.Guid?.toUpperCase();
-    if (structural) {
-      if (binary && binary !== structural.toUpperCase()) {
-        log(
-          `GUID cross-check mismatch for [${task.id}] "${task.Caption}": binary ${binary} vs structural ${structural} \u2014 using structural`
-        );
-      }
-      return { kind: "resolved", uid: structural, confidence: "confirmed" };
-    }
-    if (binary) {
-      const confidence = this.rows.captionOf(binary) !== void 0 ? "confirmed" : "unconfirmed";
-      return { kind: "resolved", uid: binary, confidence };
-    }
-    return {
-      kind: "unresolvable",
-      reason: "no-recoverable-guid",
-      detail: `"${task.Caption}" aligns to no captured row and has no recoverable GUID \u2014 sync so the endpoint captures it, then retry`
-    };
-  }
-  taskFor(uid) {
-    return this.byUid.get(uid.toUpperCase());
-  }
-  /** Tasks whose DependsOn names this UID. */
-  dependentsOf(uid) {
-    const needle = uid.toUpperCase();
-    return this.all.filter((t) => t.DependsOn.some((d) => d.toUpperCase() === needle));
-  }
-};
-
 // src/cloud/row-store.ts
 import { promises as fs4 } from "node:fs";
 import path5 from "node:path";
@@ -17913,6 +17980,9 @@ var WriteChain = class {
 };
 
 // src/cloud/row-store.ts
+function alignsFromStore(source, vendorObserved) {
+  return source !== "injected" || vendorObserved;
+}
 function unknownRowRefusal(uid) {
   return {
     kind: "unknown-row",
@@ -18100,6 +18170,7 @@ var FileRowStore = class {
     const harvested = harvestTaskRows(document);
     const at = (/* @__PURE__ */ new Date()).toISOString();
     for (const { uid, header, cells, placeUids, dependencyUids, starredOrderIndex } of harvested.rows) {
+      const vendorObserved = source !== "injected" || this.rows.get(uid)?.v === 1;
       this.rows.set(uid, {
         h: this.headerIndex(header),
         cells,
@@ -18107,7 +18178,8 @@ var FileRowStore = class {
         source,
         places: placeUids,
         deps: dependencyUids,
-        ...starredOrderIndex !== void 0 ? { star: starredOrderIndex } : {}
+        ...starredOrderIndex !== void 0 ? { star: starredOrderIndex } : {},
+        ...vendorObserved ? { v: 1 } : {}
       });
     }
     const named = applyCatalog({ places: this.places, flags: this.flags }, harvested);
@@ -18164,6 +18236,19 @@ var FileRowStore = class {
     }
     return unknownRowRefusal(uid);
   }
+  discardNeverApplied(uids) {
+    return this.writes.run(async () => {
+      await this.ensureFresh();
+      let discarded = 0;
+      for (const raw of uids) {
+        const key = keyOf(raw);
+        const stored = key ? this.rows.get(key) : void 0;
+        if (stored && stored.source === "injected" && stored.v !== 1 && this.rows.delete(key)) discarded += 1;
+      }
+      if (discarded) await this.save();
+      return discarded;
+    });
+  }
   async catalog() {
     await this.ensureFresh();
     return {
@@ -18189,7 +18274,7 @@ var FileRowStore = class {
       },
       alignmentRows: () => {
         void this.ensureFresh().catch(() => void 0);
-        return [...this.rows].map(([uid, stored]) => alignmentRowOf(uid, this.headers[stored.h] ?? [], stored.cells));
+        return [...this.rows].filter(([, stored]) => alignsFromStore(stored.source, stored.v === 1)).map(([uid, stored]) => alignmentRowOf(uid, this.headers[stored.h] ?? [], stored.cells));
       }
     };
   }
@@ -26794,7 +26879,7 @@ function registerTool(server, tool, ctx) {
   );
 }
 var DEFAULT_RESULT_LIMIT = 200;
-var PATH_ID_CAVEAT = "ids shift when the tree changes";
+var PATH_ID_CAVEAT = "ids shift when the tree changes \u2014 after a queued structural write (add/move/delete), never compute a path id yourself: re-run search/list, or target by the stable {GUID}";
 var NOTE_DESCRIPTION = "Free-form text on the task \u2014 context that does not fit in the caption, such as where a captured idea came from";
 function textResult(text, structuredContent) {
   return { content: [{ type: "text", text }], ...structuredContent ? { structuredContent } : {} };
@@ -27134,6 +27219,9 @@ var cloudStatusTool = defineTool({
 var WRITE_ACCEPT_OUTPUT = {
   uid: external_exports.string().describe("Stable GUID of the task the write addressed \u2014 the first one, for a batch"),
   uids: external_exports.array(external_exports.string()).optional().describe("Every GUID the write addressed, when it addressed more than one"),
+  caption: external_exports.string().describe(
+    "Caption of the task the write resolved to \u2014 the first one, for a batch. Check it names the task you meant: a stale path id is accepted against whatever task sits there now"
+  ),
   writeId: external_exports.string().describe("The accept receipt \u2014 pass it to write_status to see where the write got to"),
   status: external_exports.literal("accepted").describe("Durably queued. Never a claim that MLO has applied it"),
   expiresAt: external_exports.string().describe("Local ISO time this write gives up if MLO has not synced by then; it then becomes a dead letter"),
@@ -27146,10 +27234,13 @@ function clockTime(expiresAt) {
   return Number.isNaN(parsed.getTime()) ? expiresAt : `${String(parsed.getHours()).padStart(2, "0")}:${String(parsed.getMinutes()).padStart(2, "0")}`;
 }
 function accepted(receipt, what) {
-  const message = `accepted - ${what} lands on MLO's next sync; expires at ${clockTime(receipt.expiresAt)} if MLO doesn't sync. Reads already show it, flagged pending.`;
+  const caption = receipt.captions[0] ?? "";
+  const resolved = receipt.captions.length > 1 ? `"${caption}" +${receipt.captions.length - 1} more` : `"${caption}"`;
+  const message = `accepted - ${what} (${resolved}) lands on MLO's next sync; expires at ${clockTime(receipt.expiresAt)} if MLO doesn't sync. Reads already show it, flagged pending.`;
   return textResult(`${message} [writeId ${receipt.writeId}]`, {
     uid: receipt.uids[0] ?? "",
     ...receipt.uids.length > 1 ? { uids: receipt.uids } : {},
+    caption,
     writeId: receipt.writeId,
     status: "accepted",
     expiresAt: receipt.expiresAt,
@@ -27184,7 +27275,7 @@ var addTaskTool = defineTool({
   outputSchema: WRITE_ACCEPT_OUTPUT,
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   async execute(args, ctx) {
-    return acceptResult(await ctx.outline.add(args), `"${args.caption}"`);
+    return acceptResult(await ctx.outline.add(args), "the new task");
   }
 });
 
@@ -27236,7 +27327,9 @@ var updateTaskTool = defineTool({
   title: "Update a task",
   description: 'Change fields of one existing task. Only the fields you pass change; "" clears a text field, and Places / dependsOnIds are COMPLETE replacement sets ([] clears them). Covers the Organize flags too \u2014 IsProject, Folder, sequential subtasks, dependencies. Date edits on recurring tasks are refused: a full-row rewrite would end the series instead of rolling it forward. Returns at durable accept.',
   inputSchema: {
-    id: external_exports.string().describe(`Path-based id from list_tasks/search_tasks, e.g. "1.2.3"; ${PATH_ID_CAVEAT}`),
+    id: external_exports.string().describe(
+      `Path-based id from list_tasks/search_tasks ("1.2.3"), or the task's stable GUID in braces ("{XXXXXXXX-...}") from any read or write accept; ${PATH_ID_CAVEAT}`
+    ),
     Caption: external_exports.string().min(1).optional(),
     Note: external_exports.string().optional().describe(`${NOTE_DESCRIPTION}; "" clears`),
     Importance: external_exports.number().min(0).max(200).optional().describe("0\u2013200; 100 = normal"),
@@ -27267,7 +27360,7 @@ var updateTaskTool = defineTool({
 });
 
 // src/tools/complete-task.ts
-var ID = external_exports.string().describe(`Path-based id from list_tasks/search_tasks, e.g. "1.2.3"; ${PATH_ID_CAVEAT}`);
+var ID = external_exports.string().describe(`Path-based id from list_tasks/search_tasks ("1.2.3"), or the task's stable "{GUID}"; ${PATH_ID_CAVEAT}`);
 var completeTaskTool = defineTool({
   name: "complete_task",
   title: "Complete a task",
@@ -27297,8 +27390,10 @@ var moveTaskTool = defineTool({
   title: "Move a task",
   description: "Re-parent one task, taking its whole subtree with it, optionally into a specific slot among its new siblings. Moving a task into its own subtree is refused. Returns at durable accept.",
   inputSchema: {
-    id: external_exports.string().describe(`Path-based id of the task to move (${PATH_ID_CAVEAT})`),
-    newParentId: external_exports.string().optional().describe(`Path-based id of the new parent (${PATH_ID_CAVEAT}); "" or omitted moves it to the top level`),
+    id: external_exports.string().describe(`Path-based id or stable "{GUID}" of the task to move (${PATH_ID_CAVEAT})`),
+    newParentId: external_exports.string().optional().describe(
+      `Path-based id or stable "{GUID}" of the new parent (${PATH_ID_CAVEAT}); "" or omitted moves it to the top level`
+    ),
     position: external_exports.number().int().min(0).optional().describe("0-based slot among the new siblings (0 = first); omitted or past the end appends after them")
   },
   outputSchema: WRITE_ACCEPT_OUTPUT,
@@ -27314,7 +27409,9 @@ var deleteTaskTool = defineTool({
   title: "Delete a task",
   description: "Tombstone one task AND ITS WHOLE SUBTREE \u2014 a partial tombstone would orphan the children. Every task in the branch must resolve to its stable GUID, or nothing is queued. Returns at durable accept; reads hide the branch immediately. There is no undo through this server: MLO's own recycle bin is the only recovery.",
   inputSchema: {
-    id: external_exports.string().describe(`Path-based id of the task to delete (${PATH_ID_CAVEAT}) \u2014 re-read it first, ids shift`)
+    id: external_exports.string().describe(
+      `Path-based id or stable "{GUID}" of the task to delete (${PATH_ID_CAVEAT}) \u2014 prefer the GUID, and re-read before targeting by path id`
+    )
   },
   outputSchema: WRITE_ACCEPT_OUTPUT,
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
@@ -27415,7 +27512,9 @@ A write tool returns as soon as the change is DURABLY QUEUED - not when MLO has 
 The response carries a \`writeId\` and an \`expiresAt\`; nothing waits, and there is no
 "verified" flag to read. MLO picks the write up on its own sync (about 90 seconds, or
 immediately if you run sync), and reads show the change straight away, flagged
-\`pending: true\` with the writeId that made it.
+\`pending: true\` with the writeId that made it. One residual case: when a task's
+identity cannot be resolved against the captured rows, its queued change shows as a
+separate pending row instead of updating the task in place.
 
 Do not poll: report the change as made. If you want the outcome anyway, write_status(writeId)
 gives the five states - accepted, delivered, verified, expired (MLO never synced; nothing was
@@ -27426,7 +27525,14 @@ depth and the recent writes that never landed.
 Task ids are PATH-BASED ("1.2.3" = position in the tree) and shift whenever the tree changes.
 Treat them as valid only for immediate follow-up calls; if MLO was used interactively,
 re-run list_tasks/search_tasks before using ids again. Never store path ids.
-get_task also reports the task's stable GUID when it is recoverable.
+Write targets also accept the task's stable GUID in braces ("{XXXXXXXX-...}") - reads and
+write accepts return it, and it survives tree shifts; prefer it whenever you hold one.
+After your own queued structural write (add/move/delete), never compute a destination path
+id yourself: the queued change has not applied yet, so a computed id is accepted against
+whatever task sits at that path today. Re-run search/list and target the row carrying the
+expected GUID.
+Check that the uid and caption echoed in every write accept name the task you meant
+before treating the write as correct.
 
 ### Field conventions
 - \`note\`: ${NOTE_DESCRIPTION}.
@@ -30342,6 +30448,13 @@ var WritePath = class {
         reason: detail,
         content: write.caption ?? write.uid
       });
+      try {
+        await partition.rows.discardNeverApplied(
+          harvestTaskRows(documentFromDeltaRows(write.rows)).rows.map((row) => row.uid)
+        );
+      } catch (error2) {
+        log(`discard of expired write ${write.writeId}'s rows failed: ${error2 instanceof Error ? error2.message : String(error2)}`);
+      }
       log(`write ${write.writeId} (${write.verb} ${write.uid}) expired into the dead-letter file`);
     }
   }
@@ -30439,6 +30552,7 @@ var WritePath = class {
       expiresAt: new Date(now.getTime() + this.ttlMs).toISOString()
     };
     await bound.partition.queue.enqueue(write);
+    await bound.partition.rows.ingest(documentFromDeltaRows(rows), "injected").catch((error2) => log(`row-store ingest at accept failed (delivery unaffected): ${error2 instanceof Error ? error2.message : String(error2)}`));
     return {
       kind: "accepted",
       writeId: write.writeId,
@@ -30923,7 +31037,7 @@ async function main() {
   const resident = new HttpResidentClient({ host: config2.cloudHost, port: config2.cloudPort, spawn: spawn3 });
   const cloud = new CloudGateway({ stateRoot: config2.cloudStateRoot });
   const { rows, queue } = await cloud.boundStores(config2.dataFile);
-  const repo = new LocalMloRepository(config2, new SystemMloCli(config2), resident, queue);
+  const repo = new LocalMloRepository(config2, new SystemMloCli(config2), resident, queue, rows?.view());
   const endpoint = await ensureEndpoint({
     host: config2.cloudHost,
     port: config2.cloudPort,
