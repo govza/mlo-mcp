@@ -16,7 +16,7 @@ import {
   type WriteId,
   type WriteReceipt,
 } from "../repo/mlo-repository.js";
-import type { IdentityService, SnapshotResolver } from "./identity.js";
+import { isGuidTarget, type IdentityService, type SnapshotResolver } from "./identity.js";
 import type { CapturedRow, RowCatalog, RowStore } from "../cloud/row-store.js";
 import type { SectionedCsv } from "../cloud/csv.js";
 import { readPlaces } from "../places.js";
@@ -78,6 +78,12 @@ export type AuthoringRows = Pick<RowStore, "latest" | "catalog">;
 export interface AcceptReceipt {
   /** The UIDs this write addresses, in authoring order. */
   uids: string[];
+  /**
+   * The resolved tasks' captions, aligned with `uids`. Echoed so a write that
+   * re-resolved a stale path id to the wrong task is visible in the accept
+   * instead of silently corrupting whatever sat there.
+   */
+  captions: string[];
   writeId: WriteId;
   expiresAt: string;
 }
@@ -309,6 +315,7 @@ export class OutlineService {
     return this.commit(
       deltaRowsFromDocument(mergeDeltas(documents)),
       keyed.map(({ key }) => uids.get(key)!),
+      keyed.map(({ spec }) => spec.caption),
     );
   }
 
@@ -398,7 +405,7 @@ export class OutlineService {
     return this.rewrite(id, async (target) => {
       let parentUid = "";
       if (newParentId !== undefined && newParentId !== "") {
-        const destination = findById(target.opened.snapshot.tasks, newParentId);
+        const destination = this.targetTask(target.opened.snapshot, target.resolver, newParentId);
         const task = target.resolver.taskFor(target.uid);
         if (destination && task && flatten([task]).includes(destination)) {
           return failed(
@@ -424,9 +431,10 @@ export class OutlineService {
     const opened = await this.authoring();
     if (opened.isErrored) return opened;
     const { snapshot, resolver } = opened.value;
-    const task = findById(snapshot.tasks, id);
+    const task = this.targetTask(snapshot, resolver, id);
     if (!task) return failed(unresolvable(id, `no task with id "${id}" in this snapshot`));
     const uids: string[] = [];
+    const captions: string[] = [];
     for (const node of flatten([task])) {
       const resolution = resolver.uidFor(node.id);
       if (resolution.kind !== "resolved") {
@@ -435,8 +443,9 @@ export class OutlineService {
         );
       }
       uids.push(normalizeGuid(resolution.uid));
+      captions.push(node.Caption);
     }
-    return this.commit(deltaRowsFromDocument(buildTaskDeleteDelta(uids)), uids);
+    return this.commit(deltaRowsFromDocument(buildTaskDeleteDelta(uids)), uids, captions);
   }
 
   /**
@@ -536,12 +545,19 @@ export class OutlineService {
         ...(starredOrderIndex !== undefined ? { starredOrderIndex } : {}),
       },
     ]);
-    return this.commit(deltaRowsFromDocument(document), [uid]);
+    return this.commit(deltaRowsFromDocument(document), [uid], [caption]);
   }
 
   private resolveTarget(resolver: SnapshotResolver, id: string): ServiceResult<string, OutlineFailure> {
     const resolution = resolver.uidFor(id);
     return resolution.kind === "resolved" ? ok(resolution.uid) : failed(unresolvable(id, resolution.detail));
+  }
+
+  /** The snapshot task a write target names — brace-form GUIDs never read as path ids. */
+  private targetTask(snapshot: Snapshot, resolver: SnapshotResolver, target: string): TaskNode | undefined {
+    if (!isGuidTarget(target)) return findById(snapshot.tasks, target);
+    const resolution = resolver.uidFor(target);
+    return resolution.kind === "resolved" ? resolver.taskFor(resolution.uid) : undefined;
   }
 
   private resolvePlaces(
@@ -619,10 +635,10 @@ export class OutlineService {
   }
 
   /** The one place a service touches the repository seam. */
-  private async commit(rows: DeltaRow[], uids: string[]): Promise<OutlineWrite> {
+  private async commit(rows: DeltaRow[], uids: string[], captions: string[]): Promise<OutlineWrite> {
     const written = await this.repo.write(rows);
     if (written.isErrored) return failed(written.failure);
-    return ok({ uids, writeId: written.value.writeId, expiresAt: written.value.expiresAt });
+    return ok({ uids, captions, writeId: written.value.writeId, expiresAt: written.value.expiresAt });
   }
 }
 

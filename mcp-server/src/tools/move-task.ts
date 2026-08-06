@@ -9,11 +9,15 @@ export const moveTaskTool = defineTool({
     "Re-parent one task, taking its whole subtree with it, optionally into a specific slot among its new " +
     "siblings. Moving a task into its own subtree is refused. Returns at durable accept.",
   inputSchema: {
-    id: z.string().describe(`Path-based id of the task to move (${PATH_ID_CAVEAT})`),
+    id: z
+      .string()
+      .describe(`Path-based id or stable "{GUID}" of the task to move (${PATH_ID_CAVEAT})`),
     newParentId: z
       .string()
       .optional()
-      .describe(`Path-based id of the new parent (${PATH_ID_CAVEAT}); "" or omitted moves it to the top level`),
+      .describe(
+        `Path-based id or stable "{GUID}" of the new parent (${PATH_ID_CAVEAT}); "" or omitted moves it to the top level`,
+      ),
     position: z
       .number()
       .int()

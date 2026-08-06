@@ -2,7 +2,9 @@ import { z } from "zod";
 import { WRITE_ACCEPT_OUTPUT, acceptResult } from "./accepted.js";
 import { defineTool, PATH_ID_CAVEAT } from "./contract.js";
 
-const ID = z.string().describe(`Path-based id from list_tasks/search_tasks, e.g. "1.2.3"; ${PATH_ID_CAVEAT}`);
+const ID = z
+  .string()
+  .describe(`Path-based id from list_tasks/search_tasks ("1.2.3"), or the task's stable "{GUID}"; ${PATH_ID_CAVEAT}`);
 
 export const completeTaskTool = defineTool({
   name: "complete_task",

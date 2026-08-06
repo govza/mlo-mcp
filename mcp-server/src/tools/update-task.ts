@@ -11,7 +11,12 @@ export const updateTaskTool = defineTool({
     "Folder, sequential subtasks, dependencies. Date edits on recurring tasks are refused: a full-row rewrite " +
     "would end the series instead of rolling it forward. Returns at durable accept.",
   inputSchema: {
-    id: z.string().describe(`Path-based id from list_tasks/search_tasks, e.g. "1.2.3"; ${PATH_ID_CAVEAT}`),
+    id: z
+      .string()
+      .describe(
+        `Path-based id from list_tasks/search_tasks ("1.2.3"), or the task's stable GUID in braces ` +
+          `("{XXXXXXXX-...}") from any read or write accept; ${PATH_ID_CAVEAT}`,
+      ),
     Caption: z.string().min(1).optional(),
     Note: z.string().optional().describe(`${NOTE_DESCRIPTION}; "" clears`),
     Importance: z.number().min(0).max(200).optional().describe("0–200; 100 = normal"),

@@ -16,6 +16,12 @@ import { failureResult, textResult } from "./contract.js";
 export const WRITE_ACCEPT_OUTPUT = {
   uid: z.string().describe("Stable GUID of the task the write addressed — the first one, for a batch"),
   uids: z.array(z.string()).optional().describe("Every GUID the write addressed, when it addressed more than one"),
+  caption: z
+    .string()
+    .describe(
+      "Caption of the task the write resolved to — the first one, for a batch. Check it names the task you " +
+        "meant: a stale path id is accepted against whatever task sits there now",
+    ),
   writeId: z.string().describe("The accept receipt — pass it to write_status to see where the write got to"),
   status: z.literal("accepted").describe("Durably queued. Never a claim that MLO has applied it"),
   expiresAt: z
@@ -35,12 +41,17 @@ function clockTime(expiresAt: string): string {
 }
 
 function accepted(receipt: AcceptReceipt, what: string): CallToolResult {
+  // The caption is the wrong-target tell: the uid echo is machine-checkable,
+  // but a human (or model) skimming the sentence recognizes a caption.
+  const caption = receipt.captions[0] ?? "";
+  const resolved = receipt.captions.length > 1 ? `"${caption}" +${receipt.captions.length - 1} more` : `"${caption}"`;
   const message =
-    `accepted - ${what} lands on MLO's next sync; expires at ${clockTime(receipt.expiresAt)} if MLO doesn't sync. ` +
-    `Reads already show it, flagged pending.`;
+    `accepted - ${what} (${resolved}) lands on MLO's next sync; ` +
+    `expires at ${clockTime(receipt.expiresAt)} if MLO doesn't sync. Reads already show it, flagged pending.`;
   return textResult(`${message} [writeId ${receipt.writeId}]`, {
     uid: receipt.uids[0] ?? "",
     ...(receipt.uids.length > 1 ? { uids: receipt.uids } : {}),
+    caption,
     writeId: receipt.writeId,
     status: "accepted",
     expiresAt: receipt.expiresAt,

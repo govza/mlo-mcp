@@ -25,7 +25,14 @@ depth and the recent writes that never landed.
 Task ids are PATH-BASED ("1.2.3" = position in the tree) and shift whenever the tree changes.
 Treat them as valid only for immediate follow-up calls; if MLO was used interactively,
 re-run list_tasks/search_tasks before using ids again. Never store path ids.
-get_task also reports the task's stable GUID when it is recoverable.
+Write targets also accept the task's stable GUID in braces ("{XXXXXXXX-...}") - reads and
+write accepts return it, and it survives tree shifts; prefer it whenever you hold one.
+After your own queued structural write (add/move/delete), never compute a destination path
+id yourself: the queued change has not applied yet, so a computed id is accepted against
+whatever task sits at that path today. Re-run search/list and target the row carrying the
+expected GUID.
+Check the uid and caption echoed in every write accept name the task you meant before
+treating the write as correct.
 
 ### Field conventions
 - \`note\`: ${NOTE_DESCRIPTION}.

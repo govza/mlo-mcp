@@ -88,7 +88,9 @@ export const DEFAULT_RESULT_LIMIT = 200;
  * one tool's schema never sees another's, and `instructions` is not guaranteed
  * to be surfaced at all. One constant so the copies cannot drift apart.
  */
-export const PATH_ID_CAVEAT = "ids shift when the tree changes";
+export const PATH_ID_CAVEAT =
+  "ids shift when the tree changes — after a queued structural write (add/move/delete), never compute a path id " +
+  "yourself: re-run search/list, or target by the stable {GUID}";
 
 /**
  * `note` is the one task field that can hold *why a task exists*, and it was

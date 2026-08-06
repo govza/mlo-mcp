@@ -3,6 +3,7 @@ import { addTaskTool } from "../../src/tools/add-task.js";
 import { updateTaskTool } from "../../src/tools/update-task.js";
 import { completeTaskTool } from "../../src/tools/complete-task.js";
 import { deleteTaskTool } from "../../src/tools/delete-task.js";
+import { moveTaskTool } from "../../src/tools/move-task.js";
 import { listTasksTool } from "../../src/tools/list-tasks.js";
 import { writeStatusTool } from "../../src/tools/write-status.js";
 import { cloudStatusTool } from "../../src/tools/cloud-status.js";
@@ -61,6 +62,7 @@ function structured<T = Record<string, unknown>>(result: { structuredContent?: u
 interface Accept {
   uid: string;
   uids?: string[];
+  caption: string;
   writeId: string;
   status: string;
   expiresAt: string;
@@ -109,6 +111,52 @@ describe("write tools answer at durable accept", () => {
     const result = await addTaskTool.execute({ caption: "nope" }, ctx);
     expect(result.isError).toBe(true);
     expect(JSON.stringify(result.content)).toContain("[endpoint-down]");
+  });
+});
+
+describe("GUID write targets and the caption echo", () => {
+  it("update_task accepts the task's stable GUID as the target", async () => {
+    const { ctx } = rig();
+    const result = await updateTaskTool.execute({ id: UID_CHILD, Caption: "renamed" }, ctx);
+    expect(result.isError).toBeUndefined();
+    expect(structured<Accept>(result).uid).toBe(normalizeGuid(UID_CHILD));
+  });
+
+  it("refuses a GUID matching no task with target-unresolvable, never a path interpretation", async () => {
+    const { ctx } = rig();
+    const result = await updateTaskTool.execute(
+      { id: "{99999999-0000-0000-0000-000000000099}", Caption: "nope" },
+      ctx,
+    );
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result.content)).toContain("[target-unresolvable]");
+  });
+
+  it("move_task accepts a GUID for both the task and the new parent", async () => {
+    const { ctx } = rig();
+    const result = await moveTaskTool.execute({ id: UID_CHILD, newParentId: UID_ROOT }, ctx);
+    expect(result.isError).toBeUndefined();
+    expect(structured<Accept>(result).uid).toBe(normalizeGuid(UID_CHILD));
+  });
+
+  it("every accept names the caption it resolved to, in the message and the structure", async () => {
+    const { ctx } = rig();
+    const edited = await updateTaskTool.execute({ id: "1.1", Note: "why" }, ctx);
+    const accept = structured<Accept>(edited);
+    expect(accept.caption).toBe("child");
+    expect(accept.message).toContain('"child"');
+
+    const added = structured<Accept>(await addTaskTool.execute({ caption: "fresh" }, ctx));
+    expect(added.caption).toBe("fresh");
+    expect(added.message).toContain('"fresh"');
+  });
+
+  it("a batch accept names the first task and how many more", async () => {
+    const { ctx } = rig();
+    const branch = structured<Accept>(await deleteTaskTool.execute({ id: "1" }, ctx));
+    expect(branch.caption).toBe("root");
+    expect(branch.message).toContain('"root"');
+    expect(branch.message).toContain("+1 more");
   });
 });
 

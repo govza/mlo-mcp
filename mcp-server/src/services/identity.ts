@@ -3,7 +3,17 @@ import type { Snapshot } from "../repo/mlo-repository.js";
 import type { RowStoreView } from "../cloud/row-store.js";
 import { alignExportToRows, type AlignedIdentity } from "./structure-align.js";
 import { findById, flatten } from "../task-tree.js";
+import { normalizeGuid } from "../cloud/guid.js";
 import { log } from "../log.js";
+
+/**
+ * A write target in brace form is a GUID, never a path id — the two shapes
+ * cannot collide (path ids are digits and dots), so no parameter is needed to
+ * pick the interpretation.
+ */
+export function isGuidTarget(target: string): boolean {
+  return target.startsWith("{");
+}
 
 export type UidResolution =
   | {
@@ -71,8 +81,46 @@ export class SnapshotResolver {
     }
   }
 
-  /** Resolve a path id to the row UID a write would target — a typed refusal, never a guess. */
-  uidFor(pathId: string): UidResolution {
+  /**
+   * Resolve a write target — a path id, or a stable GUID in brace form — to
+   * the row UID a write would address. A typed refusal, never a guess; a
+   * brace-form target is never reinterpreted as a path id.
+   */
+  uidFor(target: string): UidResolution {
+    if (isGuidTarget(target)) return this.uidForGuid(target);
+    return this.uidForPath(target);
+  }
+
+  /**
+   * A GUID names its task directly, however the tree has shifted since the
+   * caller read it. Known means the snapshot carries it (annotation or
+   * alignment) or the row store does; anything else refuses rather than
+   * accepting a write against a task nobody can name.
+   */
+  private uidForGuid(target: string): UidResolution {
+    let uid: string;
+    try {
+      uid = normalizeGuid(target);
+    } catch {
+      return {
+        kind: "unresolvable",
+        reason: "unknown-id",
+        detail: `"${target}" is neither a valid GUID ("{XXXXXXXX-...}") nor a path id`,
+      };
+    }
+    const inSnapshot = this.byUid.has(uid.toUpperCase());
+    const inStore = this.rows.captionOf(uid) !== undefined;
+    if (!inSnapshot && !inStore) {
+      return {
+        kind: "unresolvable",
+        reason: "unknown-id",
+        detail: `no task with GUID ${uid} in this profile — GUIDs are never read as path ids`,
+      };
+    }
+    return { kind: "resolved", uid, confidence: inStore ? "confirmed" : "unconfirmed" };
+  }
+
+  private uidForPath(pathId: string): UidResolution {
     const task = findById(this.tasks, pathId);
     if (!task) {
       return { kind: "unresolvable", reason: "unknown-id", detail: `no task with id "${pathId}" in this snapshot` };

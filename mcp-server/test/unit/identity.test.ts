@@ -62,6 +62,46 @@ describe("IdentityService", () => {
   });
 });
 
+describe("GUID write targets", () => {
+  const annotated = task("1", "annotated", { Guid: UID_A });
+  const snap = snapshotOf([annotated]);
+
+  it("resolves a brace-form GUID to that exact task, path interpretation never attempted", () => {
+    const rows = new FakeRowStore();
+    rows.set(UID_A, "annotated");
+    const resolver = new IdentityService(rows.view()).resolverFor(snap);
+    expect(resolver.uidFor(UID_A)).toEqual({ kind: "resolved", uid: UID_A, confidence: "confirmed" });
+    // Lower-case and unpadded case variants normalize to the same target.
+    expect(resolver.uidFor(UID_A.toLowerCase())).toMatchObject({ kind: "resolved", uid: UID_A });
+  });
+
+  it("resolves a store-known GUID even when no snapshot task carries it", () => {
+    const rows = new FakeRowStore();
+    rows.set(UID_B, "store only");
+    const resolver = new IdentityService(rows.view()).resolverFor(snap);
+    expect(resolver.uidFor(UID_B)).toEqual({ kind: "resolved", uid: UID_B, confidence: "confirmed" });
+  });
+
+  it("refuses a GUID nobody knows — never falls back to path ids", () => {
+    const resolver = new IdentityService(new FakeRowStore().view()).resolverFor(snap);
+    expect(resolver.uidFor("{99999999-0000-0000-0000-000000000099}")).toMatchObject({
+      kind: "unresolvable",
+      reason: "unknown-id",
+    });
+  });
+
+  it("refuses a malformed brace target as a GUID, not as a path id", () => {
+    const resolver = new IdentityService(new FakeRowStore().view()).resolverFor(snap);
+    const resolution = resolver.uidFor("{not-a-guid}");
+    expect(resolution).toMatchObject({ kind: "unresolvable", reason: "unknown-id" });
+  });
+
+  it("a snapshot-only GUID (no captured row) resolves unconfirmed", () => {
+    const resolver = new IdentityService(new FakeRowStore().view()).resolverFor(snap);
+    expect(resolver.uidFor(UID_A)).toEqual({ kind: "resolved", uid: UID_A, confidence: "unconfirmed" });
+  });
+});
+
 describe("structural alignment (the identity authority)", () => {
   const UID_1 = "{11111111-0000-0000-0000-000000000001}";
   const UID_2 = "{22222222-0000-0000-0000-000000000002}";

@@ -42,6 +42,6 @@ export const addTaskTool = defineTool({
   outputSchema: WRITE_ACCEPT_OUTPUT,
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   async execute(args, ctx) {
-    return acceptResult(await ctx.outline.add(args), `"${args.caption}"`);
+    return acceptResult(await ctx.outline.add(args), "the new task");
   },
 });
