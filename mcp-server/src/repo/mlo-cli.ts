@@ -31,6 +31,12 @@ export interface MloCli {
   exportXml(): Promise<string>;
   /** Trigger MLO's QuickSync (cloud/Wi-Fi sync as configured in the profile). */
   quickSync(): Promise<void>;
+  /**
+   * MLO's own throttle counter for the deprecated `-QuickSync` switch, read
+   * (never written) from its settings. `undefined` when it cannot be read —
+   * the caller then falls back to a time-based gate rather than guessing.
+   */
+  quickSyncCount(): Promise<number | undefined>;
   /** Read the raw .ml data file (for GUID extraction). */
   readDataFile(): Promise<Buffer>;
 }
@@ -183,6 +189,43 @@ const execMlo: MloExec = (exePath, args, timeoutMs) =>
     });
   });
 
+/**
+ * Where MLO keeps its own client-side guard on the deprecated `-QuickSync`
+ * switch: a counter of invocations in the current window, reset when the
+ * window elapses. Measured 2026-08-12 against 6.1.3 — the invocation that
+ * takes the counter to 5 pops the throttle modal, hangs the CLI and runs no
+ * sync session at all. Read-only here: the counter is MLO's state, and
+ * forging it would defeat a guard the vendor put there on purpose.
+ */
+const QUICKSYNC_COUNT_KEY = "HKCU\\Software\\MyLifeOrganized.net\\MyLife\\Settings";
+const QUICKSYNC_COUNT_VALUE = "QuickSyncCount";
+
+/**
+ * Best-effort: any failure (not Windows, key absent, `reg.exe` missing, output
+ * in a shape we do not recognise) answers `undefined`, never a throw. The
+ * nudge is an accelerator — it may never become a source of refusals.
+ */
+function readQuickSyncCount(): Promise<number | undefined> {
+  return new Promise((resolve) => {
+    let out = "";
+    const child = spawn("reg.exe", ["query", QUICKSYNC_COUNT_KEY, "/v", QUICKSYNC_COUNT_VALUE], {
+      timeout: 5_000,
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    child.stdout?.on("data", (chunk) => (out += chunk));
+    child.on("error", () => resolve(undefined));
+    child.on("exit", (code) => {
+      if (code !== 0) return resolve(undefined);
+      // "    QuickSyncCount    REG_DWORD    0x4"
+      const match = /QuickSyncCount\s+REG_DWORD\s+(0x[0-9a-f]+|\d+)/i.exec(out);
+      if (!match) return resolve(undefined);
+      const parsed = Number(match[1]);
+      resolve(Number.isFinite(parsed) ? parsed : undefined);
+    });
+  });
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 let exportCounter = 0;
@@ -220,8 +263,16 @@ export class SystemMloCli implements MloCli {
   quickSync(): Promise<void> {
     return withMloFileLock(this.config, async () => {
       await this.ensureDataFile();
-      await this.exec(this.config.mloExePath, mloArgs(this.config.dataFile, ["-QuickSync"]), 120_000);
+      // A healthy invocation forwards to the running app and exits in ~13 s
+      // (measured). The long tail is the throttle modal, which hangs the CLI
+      // outright — and this lock is process-wide, so every export waits behind
+      // it. Bound the hold: a nudge is never worth stalling reads for minutes.
+      await this.exec(this.config.mloExePath, mloArgs(this.config.dataFile, ["-QuickSync"]), 30_000);
     });
+  }
+
+  async quickSyncCount(): Promise<number | undefined> {
+    return readQuickSyncCount();
   }
 
   readDataFile(): Promise<Buffer> {

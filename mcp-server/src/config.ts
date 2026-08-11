@@ -109,6 +109,7 @@ export function loadConfig(): MloConfig {
     exportDir: process.env.MLO_EXPORT_DIR ?? path.join(os.tmpdir(), "mlo-mcp"),
     cacheStaleMs: Number(process.env.MLO_CACHE_STALE_MS) || 30_000,
     quickSyncDebounceMs: Number(process.env.MLO_QUICKSYNC_DEBOUNCE_MS) || 300_000,
+    quickSyncMaxPerWindow: Number(process.env.MLO_QUICKSYNC_MAX_PER_WINDOW) || 4,
     // Only needed when the capture inbox is NOT MLO's own <Inbox> node (e.g. a
     // hand-made "Входящие" folder). MLO itself hardcodes the caption "<Inbox>"
     // in every UI language, so most profiles need no override.

@@ -59,13 +59,24 @@ class ScriptedMloCli implements MloCli {
   }
   async quickSync(): Promise<void> {
     this.quickSyncs++;
+    // MLO counts every invocation against the window, as the real app does.
+    if (this.throttleCount !== undefined) this.throttleCount++;
+  }
+  /** MLO's throttle counter as this fake app reports it; `undefined` = unreadable. */
+  throttleCount: number | undefined = 0;
+  async quickSyncCount(): Promise<number | undefined> {
+    return this.throttleCount;
   }
   readDataFile(): Promise<Buffer> {
     return Promise.reject(new Error("no binary in this test"));
   }
 }
 
-const config = { cacheStaleMs: 60_000, quickSyncDebounceMs: 300_000 } as MloConfig;
+const config = {
+  cacheStaleMs: 60_000,
+  quickSyncDebounceMs: 300_000,
+  quickSyncMaxPerWindow: 4,
+} as MloConfig;
 
 describe("LocalMloRepository snapshot coalescing", () => {
   it("coalesces concurrent stale reads onto one export", async () => {
@@ -234,31 +245,52 @@ describe("LocalMloRepository QuickSync nudge debounce", () => {
     vi.useRealTimers();
   });
 
-  it("a burst of 10 writes fires at most one QuickSync", async () => {
+  it("spends MLO's throttle budget and stops one short of the modal", async () => {
     const cli = new ScriptedMloCli();
     const repo = new LocalMloRepository(config, cli, acceptingResident);
     for (let i = 0; i < 10; i++) {
       expectOk(await repo.write([row]));
-      vi.advanceTimersByTime(6_000); // one minute total — well inside the window
+      vi.advanceTimersByTime(6_000);
     }
+    // The invocation that takes MLO's counter to 5 pops the modal, hangs the
+    // CLI and syncs nothing — so the budget, not the clock, is the limit.
+    expect(cli.quickSyncs).toBe(4);
+    expect(cli.throttleCount).toBe(4);
+  });
+
+  it("nudges again once MLO's window has reset the counter", async () => {
+    const cli = new ScriptedMloCli();
+    const repo = new LocalMloRepository(config, cli, acceptingResident);
+    for (let i = 0; i < 5; i++) expectOk(await repo.write([row]));
+    expect(cli.quickSyncs).toBe(4);
+    cli.throttleCount = 0; // MLO's window elapsed
+    expectOk(await repo.write([row]));
+    expect(cli.quickSyncs).toBe(5);
+  });
+
+  it("an explicit quickSync spends from the same budget", async () => {
+    const cli = new ScriptedMloCli();
+    const repo = new LocalMloRepository(config, cli, acceptingResident);
+    cli.throttleCount = 3;
+    expectOk(await repo.quickSync());
+    expectOk(await repo.write([row]));
+    // the explicit call took the counter to 4: the write must not spend the
+    // fifth, which is the one that trips the modal
     expect(cli.quickSyncs).toBe(1);
   });
 
-  it("nudges again once the debounce window has elapsed", async () => {
+  it("falls back to the blind timer when MLO's counter cannot be read", async () => {
     const cli = new ScriptedMloCli();
+    cli.throttleCount = undefined;
     const repo = new LocalMloRepository(config, cli, acceptingResident);
-    expectOk(await repo.write([row]));
+    for (let i = 0; i < 10; i++) {
+      expectOk(await repo.write([row]));
+      vi.advanceTimersByTime(6_000);
+    }
+    expect(cli.quickSyncs).toBe(1);
     vi.advanceTimersByTime(config.quickSyncDebounceMs);
     expectOk(await repo.write([row]));
     expect(cli.quickSyncs).toBe(2);
-  });
-
-  it("an explicit quickSync opens the window, so the next write does not re-nudge", async () => {
-    const cli = new ScriptedMloCli();
-    const repo = new LocalMloRepository(config, cli, acceptingResident);
-    expectOk(await repo.quickSync());
-    expectOk(await repo.write([row]));
-    expect(cli.quickSyncs).toBe(1);
   });
 });
 

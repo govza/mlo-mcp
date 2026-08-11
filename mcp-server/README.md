@@ -33,7 +33,8 @@ claude mcp add mlo -- node D:\dev\projects\oml\mlo-mcp\mcp-server\dist\index.js
 | `MLO_EXE_PATH` | no | Program Files path above | mlo.exe location |
 | `MLO_EXPORT_DIR` | no | `%TEMP%\mlo-mcp` | Scratch dir for XML exports |
 | `MLO_CACHE_STALE_MS` | no | `30000` | Task-tree cache lifetime |
-| `MLO_QUICKSYNC_DEBOUNCE_MS` | no | `300000` | Minimum gap between after-write QuickSync nudges (MLO throttles the deprecated switch; queued writes ride MLO's own poll meanwhile) |
+| `MLO_QUICKSYNC_MAX_PER_WINDOW` | no | `4` | How much of MLO's own `-QuickSync` budget after-write nudges may spend. MLO counts invocations in its settings and the 5th trips a modal that hangs the CLI and syncs nothing; the server reads that counter and never writes it |
+| `MLO_QUICKSYNC_DEBOUNCE_MS` | no | `300000` | Fallback gap between nudges, used only when MLO's throttle counter cannot be read |
 | `MLO_CLOUD_HOST` | no | `127.0.0.1` | Local sync endpoint bind address (loopback only by design) |
 | `MLO_CLOUD_PORT` | no | `8181` installed, `8282` from source | Local sync endpoint port (`0` = random); MLO profiles configured against the old 8080 default need their sync URL/proxy updated |
 | `MLO_CLOUD_STATE_ROOT` | no | `%LOCALAPPDATA%\mlo-mcp\cloud` | Partitioned sync-state root (override for tests/unusual installs only) |

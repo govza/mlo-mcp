@@ -146,19 +146,41 @@ export class LocalMloRepository implements MloRepository {
     if (!result.ok) return failed(repoFailureFromProblem(result.refusal));
     // Best-effort accelerator, never load-bearing (spec section 2 mechanic 5):
     // fire-and-forget so the accept receipt returns now, and a QuickSync that
-    // fails or no-ops just leaves delivery to MLO's own cadence. Debounced
-    // because MLO throttles the deprecated -QuickSync switch with a modal
-    // ("sync no more than once per several minutes"); within-window writes
-    // sit in the queue and ride MLO's background GetFileTS poll, which
-    // delivers all pending writes in one session.
-    if (Date.now() - this.lastQuickSyncAt >= this.config.quickSyncDebounceMs) {
-      void this.quickSync().then((nudge) => {
-        if (nudge.isErrored) {
-          log(`QuickSync nudge after accept failed (delivery rides MLO's own cadence): ${nudge.failure.detail}`);
-        }
-      });
-    }
+    // fails or no-ops just leaves delivery to MLO's own cadence. Gated on
+    // MLO's own throttle budget rather than a blind timer — a suppressed nudge
+    // costs nothing (the write rides MLO's background GetFileTS poll), but a
+    // nudge that trips the throttle pops a modal, hangs the CLI and syncs
+    // nothing at all.
+    void this.nudge();
     return ok({ writeId: result.value.writeId, expiresAt: result.value.expiresAt });
+  }
+
+  /**
+   * The after-accept nudge, and the one place that decides whether firing
+   * `-QuickSync` is affordable.
+   *
+   * MLO guards the deprecated switch with a counter in its own settings: the
+   * invocation that takes it past the limit pops a modal, hangs the CLI for as
+   * long as we let it, and runs no session — strictly worse than not nudging.
+   * So we read MLO's budget and spend it only while it lasts. When the counter
+   * cannot be read (not Windows, key absent, a future MLO that moved it) we
+   * fall back to the old blind timer, which is safe by being slow.
+   */
+  private async nudge(): Promise<void> {
+    const count = await this.cli.quickSyncCount();
+    if (count === undefined) {
+      if (Date.now() - this.lastQuickSyncAt < this.config.quickSyncDebounceMs) return;
+    } else if (count >= this.config.quickSyncMaxPerWindow) {
+      log(
+        `QuickSync nudge skipped: MLO's throttle budget is spent (${count}/${this.config.quickSyncMaxPerWindow} ` +
+          `this window). The write is queued and rides MLO's own sync.`
+      );
+      return;
+    }
+    const nudged = await this.quickSync();
+    if (nudged.isErrored) {
+      log(`QuickSync nudge after accept failed (delivery rides MLO's own cadence): ${nudged.failure.detail}`);
+    }
   }
 
   async status(id: WriteId): Promise<RepoResult<WriteReceipt>> {

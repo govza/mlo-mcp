@@ -46,12 +46,18 @@ export interface MloConfig {
   exportDir: string;
   cacheStaleMs: number;
   /**
-   * Minimum gap between `-QuickSync` nudges after accepted writes. MLO's own
-   * client-side throttle pops a modal ("sync no more than once per several
-   * minutes") when the deprecated switch fires too often; within-window writes
-   * ride MLO's background GetFileTS poll instead.
+   * Fallback only: the minimum gap between `-QuickSync` nudges when MLO's own
+   * throttle counter cannot be read. The normal gate is
+   * `quickSyncMaxPerWindow` against that counter.
    */
   quickSyncDebounceMs: number;
+  /**
+   * How much of MLO's own `-QuickSync` budget a nudge may spend. MLO counts
+   * invocations per window in its settings and the one that reaches 5 pops the
+   * throttle modal, hangs the CLI and syncs nothing (measured against 6.1.3),
+   * so the default stops at 4 and leaves interactive `sync` calls the headroom.
+   */
+  quickSyncMaxPerWindow: number;
   /** Caption of the top-level task acting as the capture inbox, overriding <Inbox>/Inbox detection. */
   inboxCaption?: string;
   cloudHost: string;
