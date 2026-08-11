@@ -8,6 +8,7 @@ import { SECTION_HEADERS } from "./mlo-schema.js";
 import { findSection, parseSectionedCsv, type SectionedCsv } from "./csv.js";
 import { packEnvelope, unpackEnvelope } from "./envelope.js";
 import { soapFieldText as text, type SoapOperation } from "./soap.js";
+import { VENDOR_SYNC_HOST } from "./sync-observer.js";
 import type { CloudGateway } from "./gateway.js";
 
 /**
@@ -58,12 +59,34 @@ export function contactFromRequest(target: URL, fields: Record<string, unknown>)
   };
 }
 
+/**
+ * MLO must run with "Use secure connection" unchecked (a TLS tunnel is opaque
+ * to the endpoint), so the leg MLO → endpoint is plaintext loopback — fine. The
+ * leg endpoint → vendor crosses the internet, and carries `loginBytes`,
+ * `passwordBytes` and the whole task payload, so it is upgraded to TLS here.
+ * The vendor serves the identical SOAP service on https, verified against the
+ * live host. Only the real vendor host is upgraded: loopback fakes in tests and
+ * private endpoints keep whatever scheme they were given. `MLO_VENDOR_PLAINTEXT=1`
+ * turns the upgrade off for capture/debugging.
+ */
+export function secureVendorTarget(target: URL): URL {
+  if (process.env.MLO_VENDOR_PLAINTEXT === "1") return target;
+  if (target.protocol !== "http:") return target;
+  if (target.hostname.toLowerCase() !== VENDOR_SYNC_HOST) return target;
+  if (target.port && target.port !== "80") return target;
+  const secure = new URL(target.href);
+  secure.protocol = "https:";
+  secure.port = "";
+  return secure;
+}
+
 export async function forwardBuffered(
-  target: URL,
+  rawTarget: URL,
   method: string,
   headers: IncomingHttpHeaders,
   body: Buffer,
 ): Promise<ForwardResult> {
+  const target = secureVendorTarget(rawTarget);
   const transport = target.protocol === "https:" ? https : http;
   const outgoing: OutgoingHttpHeaders = { ...headers, host: target.host, "content-length": body.byteLength };
   delete outgoing["proxy-connection"];

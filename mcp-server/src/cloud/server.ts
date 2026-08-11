@@ -13,7 +13,7 @@ import {
   soapOperationFailure,
   soapOperationFromAction,
 } from "./soap.js";
-import { forwardBuffered, forwardVendorSoap } from "./upstream.js";
+import { forwardBuffered, forwardVendorSoap, secureVendorTarget } from "./upstream.js";
 import { captureTlsConnectSeen, captureVendorSession } from "./capture.js";
 import { WritePath } from "./write-path.js";
 import { PROBLEM_CONTENT_TYPE, problemBody, type Problem } from "./problem.js";
@@ -273,7 +273,9 @@ async function interceptGetFileTs(
 function forwardRequest(request: IncomingMessage, response: ServerResponse, observer: SyncObserver): void {
   let target: URL;
   try {
-    target = new URL(request.url ?? "");
+    // Same TLS upgrade as the buffered path: the control-plane calls that come
+    // through here (LoginBytes, GetUserFileListBytes, WSDL) carry credentials too.
+    target = secureVendorTarget(new URL(request.url ?? ""));
   } catch {
     json(response, 400, { error: "invalid proxy request target" });
     return;

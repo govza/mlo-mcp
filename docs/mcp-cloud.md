@@ -33,6 +33,13 @@ its contract is [the target-architecture spec](adr/0005-target-architecture-spec
    `CONNECT` as a `tls-connect-seen` capture outcome, which `cloud_status`
    surfaces. The setting is per sync profile; MLO's sync log prints "secure
    connection is OFF for this sync profile" when it is correct.
+   Unchecking it costs no transport security off-machine: only the loopback hop
+   MLO→endpoint is plaintext, and the endpoint upgrades the vendor leg back to
+   https (`secureVendorTarget` in `cloud/upstream.ts`, applied to both the
+   buffered SOAP forward and the streaming passthrough, so the control-plane
+   calls carrying `loginBytes`/`passwordBytes` are covered too). Set
+   `MLO_VENDOR_PLAINTEXT=1` to disable the upgrade when capturing the vendor
+   leg with mitmproxy.
 3. **Sync once.** That is the whole setup. The first proxied sync gives the
    endpoint the cloud file's identity and the account contact it needs, and
    initialization then runs by itself (next section). Until a binding exists,
