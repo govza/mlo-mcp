@@ -15409,6 +15409,7 @@ function loadConfig() {
     exportDir: process.env.MLO_EXPORT_DIR ?? path3.join(os.tmpdir(), "mlo-mcp"),
     cacheStaleMs: Number(process.env.MLO_CACHE_STALE_MS) || 3e4,
     quickSyncDebounceMs: Number(process.env.MLO_QUICKSYNC_DEBOUNCE_MS) || 3e5,
+    quickSyncMaxPerWindow: Number(process.env.MLO_QUICKSYNC_MAX_PER_WINDOW) || 4,
     // Only needed when the capture inbox is NOT MLO's own <Inbox> node (e.g. a
     // hand-made "Входящие" folder). MLO itself hardcodes the caption "<Inbox>"
     // in every UI language, so most profiles need no override.
@@ -15532,12 +15533,33 @@ var execMlo = (exePath, args, timeoutMs) => new Promise((resolve, reject) => {
     }
   });
 });
+var QUICKSYNC_COUNT_KEY = "HKCU\\Software\\MyLifeOrganized.net\\MyLife\\Settings";
+var QUICKSYNC_COUNT_VALUE = "QuickSyncCount";
+function readQuickSyncCount() {
+  return new Promise((resolve) => {
+    let out = "";
+    const child = spawn("reg.exe", ["query", QUICKSYNC_COUNT_KEY, "/v", QUICKSYNC_COUNT_VALUE], {
+      timeout: 5e3,
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "ignore"]
+    });
+    child.stdout?.on("data", (chunk) => out += chunk);
+    child.on("error", () => resolve(void 0));
+    child.on("exit", (code) => {
+      if (code !== 0) return resolve(void 0);
+      const match = /QuickSyncCount\s+REG_DWORD\s+(0x[0-9a-f]+|\d+)/i.exec(out);
+      if (!match) return resolve(void 0);
+      const parsed = Number(match[1]);
+      resolve(Number.isFinite(parsed) ? parsed : void 0);
+    });
+  });
+}
 var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 var exportCounter = 0;
 var SystemMloCli = class {
-  constructor(config2, exec = execMlo) {
+  constructor(config2, exec2 = execMlo) {
     this.config = config2;
-    this.exec = exec;
+    this.exec = exec2;
   }
   config;
   exec;
@@ -15565,8 +15587,11 @@ var SystemMloCli = class {
   quickSync() {
     return withMloFileLock(this.config, async () => {
       await this.ensureDataFile();
-      await this.exec(this.config.mloExePath, mloArgs(this.config.dataFile, ["-QuickSync"]), 12e4);
+      await this.exec(this.config.mloExePath, mloArgs(this.config.dataFile, ["-QuickSync"]), 3e4);
     });
+  }
+  async quickSyncCount() {
+    return readQuickSyncCount();
   }
   readDataFile() {
     return fs2.readFile(this.config.dataFile);
@@ -16695,14 +16720,34 @@ var LocalMloRepository = class {
   async write(rows) {
     const result = await this.requireResident().postWrite({ profile: this.config.dataFile, rows });
     if (!result.ok) return failed(repoFailureFromProblem(result.refusal));
-    if (Date.now() - this.lastQuickSyncAt >= this.config.quickSyncDebounceMs) {
-      void this.quickSync().then((nudge) => {
-        if (nudge.isErrored) {
-          log(`QuickSync nudge after accept failed (delivery rides MLO's own cadence): ${nudge.failure.detail}`);
-        }
-      });
-    }
+    void this.nudge();
     return ok({ writeId: result.value.writeId, expiresAt: result.value.expiresAt });
+  }
+  /**
+   * The after-accept nudge, and the one place that decides whether firing
+   * `-QuickSync` is affordable.
+   *
+   * MLO guards the deprecated switch with a counter in its own settings: the
+   * invocation that takes it past the limit pops a modal, hangs the CLI for as
+   * long as we let it, and runs no session — strictly worse than not nudging.
+   * So we read MLO's budget and spend it only while it lasts. When the counter
+   * cannot be read (not Windows, key absent, a future MLO that moved it) we
+   * fall back to the old blind timer, which is safe by being slow.
+   */
+  async nudge() {
+    const count = await this.cli.quickSyncCount();
+    if (count === void 0) {
+      if (Date.now() - this.lastQuickSyncAt < this.config.quickSyncDebounceMs) return;
+    } else if (count >= this.config.quickSyncMaxPerWindow) {
+      log(
+        `QuickSync nudge skipped: MLO's throttle budget is spent (${count}/${this.config.quickSyncMaxPerWindow} this window). The write is queued and rides MLO's own sync.`
+      );
+      return;
+    }
+    const nudged = await this.quickSync();
+    if (nudged.isErrored) {
+      log(`QuickSync nudge after accept failed (delivery rides MLO's own cadence): ${nudged.failure.detail}`);
+    }
   }
   async status(id) {
     const result = await this.requireResident().writeStatus(id);
@@ -29827,7 +29872,18 @@ function contactFromRequest(target, fields) {
     seenAt: Date.now()
   };
 }
-async function forwardBuffered(target, method, headers, body) {
+function secureVendorTarget(target) {
+  if (process.env.MLO_VENDOR_PLAINTEXT === "1") return target;
+  if (target.protocol !== "http:") return target;
+  if (target.hostname.toLowerCase() !== VENDOR_SYNC_HOST) return target;
+  if (target.port && target.port !== "80") return target;
+  const secure = new URL(target.href);
+  secure.protocol = "https:";
+  secure.port = "";
+  return secure;
+}
+async function forwardBuffered(rawTarget, method, headers, body) {
+  const target = secureVendorTarget(rawTarget);
   const transport = target.protocol === "https:" ? https : http;
   const outgoing = { ...headers, host: target.host, "content-length": body.byteLength };
   delete outgoing["proxy-connection"];
@@ -30376,15 +30432,16 @@ function describeWriteRows(rows) {
   }
   return void 0;
 }
-function rowsMatch(injected, applied) {
+function rowDiff(injected, applied) {
   const columns = /* @__PURE__ */ new Set([...injected.header, ...applied.header]);
+  const diffs = [];
   for (const name of columns) {
     if (SUPERSEDE_VOLATILE_COLUMNS.has(name)) continue;
     const left = injected.cells[injected.header.indexOf(name)] ?? "";
     const right = applied.cells[applied.header.indexOf(name)] ?? "";
-    if (left !== right) return false;
+    if (left !== right) diffs.push({ column: name, injected: left, applied: right });
   }
-  return true;
+  return diffs;
 }
 function refusal2(httpStatus, problem) {
   return { kind: "refused", httpStatus, problem };
@@ -30650,9 +30707,14 @@ var WritePath = class {
         const appliedRow = appliedByUid.get(write.uid);
         if (appliedRow) {
           const injected = write.rows.find((row) => row.section === "TodoItems");
-          const match = injected !== void 0 && rowsMatch({ header: TODO_ITEMS_HEADER, cells: injected.values }, appliedRow);
+          const diffs = injected === void 0 ? void 0 : rowDiff({ header: TODO_ITEMS_HEADER, cells: injected.values }, appliedRow);
+          const match = diffs !== void 0 && diffs.length === 0;
           verdict = match ? "delivered" : "superseded";
-          if (!match) detail = "MLO uploaded a different row for this UID \u2014 a conflict resolved local-wins supersedes the write";
+          if (!match) {
+            const clip = (value) => value.length > 40 ? `${value.slice(0, 40)}\u2026` : value;
+            const differing = diffs?.map((diff) => `${diff.column}: injected "${clip(diff.injected)}" vs applied "${clip(diff.applied)}"`).join("; ");
+            detail = "MLO uploaded a different row for this UID \u2014 a conflict resolved local-wins supersedes the write" + (differing ? ` (${differing})` : "");
+          }
         } else if (tombstoned.has(write.uid)) {
           verdict = "superseded";
           detail = "MLO tombstoned the UID this write updated \u2014 the user's deletion won";
@@ -30662,7 +30724,7 @@ var WritePath = class {
       const removed = await partition.resolveWrite(write.writeId, verdict, now, detail);
       if (!removed) continue;
       this.inFlight.delete(write.writeId);
-      log(`write ${write.writeId} (${write.verb} ${write.uid}) ${verdict} via session ${session || "?"}`);
+      log(`write ${write.writeId} (${write.verb} ${write.uid}) ${verdict} via session ${session || "?"}${detail ? ` \u2014 ${detail}` : ""}`);
     }
   }
   /**
@@ -30845,7 +30907,7 @@ async function interceptGetFileTs(request, response, observer, writePath, inject
 function forwardRequest(request, response, observer) {
   let target;
   try {
-    target = new URL(request.url ?? "");
+    target = secureVendorTarget(new URL(request.url ?? ""));
   } catch {
     json(response, 400, { error: "invalid proxy request target" });
     return;
@@ -31029,9 +31091,104 @@ async function startCloudServer(options) {
   return { server, gateway, writePath, host, port, stop: stopSelf };
 }
 
+// src/preflight.ts
+import { execFile as execFile3 } from "node:child_process";
+import { promisify } from "node:util";
+var exec = promisify(execFile3);
+async function runPreflight(entry) {
+  const say = (line) => process.stdout.write(`${line}
+`);
+  const cloud = loadCloudConfig();
+  const verdict = await detectProfile(cloud.mloExePath);
+  if (verdict.ok) say(`profile: ${verdict.dataFile} (open in MLO)`);
+  else say(`PROBLEM: no open MLO profile detected (${verdict.message}) \u2014 reads and writes will refuse until MLO is running with a profile open`);
+  await ensureHealthyEndpoint(cloud.cloudHost, cloud.cloudPort, cloud.cloudStateRoot, residentSpawner(entry), say);
+  if (!verdict.ok) return;
+  await reportBindingAndQueue(verdict.dataFile, cloud.cloudStateRoot, say);
+}
+async function ensureHealthyEndpoint(host, port, stateRoot, spawn3, say) {
+  const found = await probe(host, port);
+  if (found.kind === "foreign") {
+    const pid = await pidListeningOn(port);
+    if (pid === void 0) {
+      say(`PROBLEM: port ${port} is held by something that is not an mlo-mcp endpoint (${found.detail}) and its process could not be identified \u2014 free the port by hand`);
+      return;
+    }
+    try {
+      process.kill(pid);
+      say(`fixed: killed pid ${pid} \u2014 it held port ${port} without being an mlo-mcp endpoint (${found.detail})`);
+    } catch (error2) {
+      say(`PROBLEM: could not kill pid ${pid} holding port ${port}: ${error2 instanceof Error ? error2.message : String(error2)}`);
+      return;
+    }
+  }
+  if (found.kind === "endpoint" && found.status.stateRoot && found.status.stateRoot !== stateRoot) {
+    say(
+      `PROBLEM: the resident on port ${port} serves state root ${found.status.stateRoot}, this environment uses ${stateRoot} \u2014 two environments share one port; set MLO_CLOUD_STATE_ROOT/MLO_CLOUD_PORT apart or expect crossed bindings`
+    );
+  }
+  const endpoint = await ensureEndpoint({ host, port, spawn: spawn3 });
+  if (endpoint.reachable) say(`endpoint: ${endpoint.url} reachable (${endpoint.version ?? "version unknown"})`);
+  else say(`PROBLEM: no resident endpoint came up on ${endpoint.url} \u2014 MLO's sync has nowhere to connect and writes will refuse`);
+}
+async function reportBindingAndQueue(dataFile, stateRoot, say) {
+  const gateway = new CloudGateway({ stateRoot });
+  const bound = await gateway.boundPartition(dataFile);
+  if (bound.kind !== "bound") {
+    const last = await gateway.autoInitOutcome.last();
+    const why = last?.kind === "refused" ? ` (last bind attempt: ${last.problem.title})` : "";
+    say(`PROBLEM: profile is not bound to a cloud file${why} \u2014 run one sync in MLO through the proxy so auto-initialization binds it, then writes deliver`);
+    return;
+  }
+  say(`binding: ${bound.binding.dataFileUID} (${bound.binding.mode}, ${bound.lifecycle})`);
+  const mismatch = await gateway.bindingMismatch(dataFile);
+  if (mismatch) {
+    say(`PROBLEM: binding mismatch \u2014 bound to ${mismatch.boundDataFileUID} but MLO last synced ${mismatch.observedDataFileUIDs.join(", ")}; the next proxied sync should recover it`);
+  }
+  const gauge = await bound.partition.writeGauge(5);
+  if (gauge.deadLetters.length) {
+    say(`PROBLEM: ${gauge.deadLetters.length} recent write(s) never landed: ${gauge.deadLetters.map((d) => `${d.caption ?? d.uid} (${d.status})`).join(", ")}`);
+  }
+  if (gauge.pendingWrites === 0) {
+    say("queue: empty");
+    return;
+  }
+  const age = gauge.oldestPendingAgeMs !== void 0 ? `, oldest ${Math.round(gauge.oldestPendingAgeMs / 1e3)}s` : "";
+  say(`queue: ${gauge.pendingWrites} pending write(s)${age} \u2014 nudging MLO to sync them now`);
+  await drainQueue(say);
+}
+async function drainQueue(say) {
+  const config2 = loadConfig();
+  const cli = new SystemMloCli(config2);
+  const count = await cli.quickSyncCount();
+  if (count !== void 0 && count >= config2.quickSyncMaxPerWindow) {
+    say(`queue: QuickSync budget spent (${count} this window) \u2014 pending writes ride MLO's own ~90s sync`);
+    return;
+  }
+  try {
+    await cli.quickSync();
+    say("fixed: QuickSync fired \u2014 pending writes deliver on the session it opens");
+  } catch (error2) {
+    say(`PROBLEM: QuickSync failed (${error2 instanceof Error ? error2.message : String(error2)}) \u2014 pending writes ride MLO's own ~90s sync`);
+  }
+}
+async function pidListeningOn(port) {
+  if (process.platform !== "win32") return void 0;
+  try {
+    const { stdout } = await exec("netstat.exe", ["-ano", "-p", "tcp"]);
+    for (const line of stdout.split(/\r?\n/)) {
+      const match = /^\s*TCP\s+\S+:(\d+)\s+\S+\s+LISTENING\s+(\d+)\s*$/.exec(line);
+      if (match && Number(match[1]) === port) return Number(match[2]);
+    }
+  } catch {
+  }
+  return void 0;
+}
+
 // src/index.ts
 async function main() {
   if (process.argv.includes(RESIDENT_FLAG)) return serveResidentEndpoint();
+  if (process.argv.includes("--preflight")) return runPreflight(fileURLToPath2(import.meta.url));
   const config2 = loadConfig();
   const spawn3 = residentSpawner(fileURLToPath2(import.meta.url));
   const resident = new HttpResidentClient({ host: config2.cloudHost, port: config2.cloudPort, spawn: spawn3 });
