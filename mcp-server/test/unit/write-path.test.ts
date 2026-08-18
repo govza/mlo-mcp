@@ -197,6 +197,29 @@ describe("durable accept", () => {
     expect(pending[0]!.rows).toEqual(addRows());
   });
 
+  it("a write restating a vendor-observed row resolves delivered at accept, nothing queued for injection", async () => {
+    const rig = await boundRig();
+    const partition = await new PartitionRegistry(rig.root).open(UID);
+    await partition.rows.ingest(documentFromDeltaRows(addRows()), "mlo-apply");
+
+    const outcome = await rig.writePath.accept(PROFILE, addRows());
+    expect(outcome.kind).toBe("accepted");
+    if (outcome.kind !== "accepted") return;
+    expect(await partition.queue.pending()).toEqual([]);
+    expect(await rig.writePath.status(outcome.writeId)).toMatchObject({ status: "delivered" });
+  });
+
+  it("a match against another pending write's own capture is no proof — the write still queues", async () => {
+    const rig = await boundRig();
+    const first = await rig.writePath.accept(PROFILE, addRows());
+    const second = await rig.writePath.accept(PROFILE, addRows());
+    expect(first.kind).toBe("accepted");
+    expect(second.kind).toBe("accepted");
+
+    const partition = await new PartitionRegistry(rig.root).open(UID);
+    expect((await partition.queue.pending()).length).toBe(2);
+  });
+
   it("refuses malformed rows and unbound profiles with typed problems", async () => {
     const rig = await boundRig();
     const empty = await rig.writePath.accept(PROFILE, []);

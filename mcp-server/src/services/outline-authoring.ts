@@ -123,8 +123,12 @@ export function updatePatch(
 }
 
 export function completionPatch(row: CapturedRow, now: string): Record<string, string> {
+  // Idempotent: an already-completed task keeps its completion time, so
+  // re-completing authors the row MLO already holds and the write can resolve
+  // as a no-op instead of shifting history.
+  const completedAt = rowValue(row, "CompletionDateTime");
   return {
-    CompletionDateTime: now,
+    CompletionDateTime: completedAt || now,
     LastModified: now,
     ...(csvTruthy(rowValue(row, "IsProject")) ? { ProjectStatus: "3" } : {}),
   };

@@ -133,14 +133,24 @@ interface NamedRow {
  * own row won a conflict dialog and the write was superseded, not delivered.
  */
 export function rowsMatch(injected: NamedRow, applied: NamedRow): boolean {
+  return rowDiff(injected, applied).length === 0;
+}
+
+/**
+ * The columns that decide a supersede verdict, with both values — the only
+ * evidence that can distinguish a real local-wins from a column this compare
+ * should have treated as volatile.
+ */
+export function rowDiff(injected: NamedRow, applied: NamedRow): { column: string; injected: string; applied: string }[] {
   const columns = new Set([...injected.header, ...applied.header]);
+  const diffs: { column: string; injected: string; applied: string }[] = [];
   for (const name of columns) {
     if (SUPERSEDE_VOLATILE_COLUMNS.has(name)) continue;
     const left = injected.cells[injected.header.indexOf(name)] ?? "";
     const right = applied.cells[applied.header.indexOf(name)] ?? "";
-    if (left !== right) return false;
+    if (left !== right) diffs.push({ column: name, injected: left, applied: right });
   }
-  return true;
+  return diffs;
 }
 
 export type AcceptOutcome =
@@ -342,6 +352,38 @@ export class WritePath {
     }
     await this.expireDue(bound.partition);
     const now = this.now();
+    // A write that changes nothing can never resolve through the Apply watch:
+    // MLO applies the identical row, nothing becomes dirty, its Apply echoes
+    // nothing back, and the write re-injects every session until it expires as
+    // a false dead letter. Judged against vendor-observed rows only — a match
+    // with another pending write's own capture proves nothing about MLO.
+    if (await this.isNoop(bound.partition, described, rows)) {
+      const write: QueuedWrite = {
+        writeId: `w-${randomUUID()}`,
+        uid: described.uid,
+        verb: described.verb,
+        ...(described.caption ? { caption: described.caption } : {}),
+        rows,
+        queuedAt: now.toISOString(),
+        expiresAt: new Date(now.getTime() + this.ttlMs).toISOString(),
+      };
+      await bound.partition.queue.enqueue(write);
+      await bound.partition.resolveWrite(
+        write.writeId,
+        "delivered",
+        now.toISOString(),
+        "no-op: the profile already reads exactly this way, nothing needed to sync",
+      );
+      log(`write ${write.writeId} (${write.verb} ${write.uid}) delivered at accept — a no-op against the captured row`);
+      return {
+        kind: "accepted",
+        writeId: write.writeId,
+        uid: write.uid,
+        verb: write.verb,
+        ...(write.caption ? { caption: write.caption } : {}),
+        expiresAt: write.expiresAt,
+      };
+    }
     const write: QueuedWrite = {
       writeId: `w-${randomUUID()}`,
       uid: described.uid,
@@ -368,6 +410,33 @@ export class WritePath {
       ...(write.caption ? { caption: write.caption } : {}),
       expiresAt: write.expiresAt,
     };
+  }
+
+  /**
+   * Whether this write restates what MLO already holds, judged against the
+   * latest VENDOR-OBSERVED row — never against another pending write's own
+   * accept capture, which proves nothing about the profile. Best-effort and
+   * conservative: any doubt (a store miss, extra sections, declared entities)
+   * means "not a no-op" and the write takes the normal queue.
+   */
+  private async isNoop(partition: PartitionStore, described: DescribedWrite, rows: DeltaRow[]): Promise<boolean> {
+    if (described.verb === "delete") return false;
+    try {
+      const harvest = harvestTaskRows(documentFromDeltaRows(rows));
+      if (harvest.rows.length !== 1 || harvest.tombstones.length) return false;
+      if (harvest.places.length || harvest.flags.length || harvest.deletedPlaces.length || harvest.deletedFlags.length) return false;
+      const authored = harvest.rows[0]!;
+      const stored = await partition.rows.latest(described.uid);
+      if (stored.kind !== "row" || stored.source === "injected") return false;
+      const sameSet = (left: readonly string[], right: readonly string[]) =>
+        left.length === right.length && [...left].sort().join("|") === [...right].sort().join("|");
+      return rowsMatch(authored, stored) &&
+        sameSet(authored.placeUids, stored.placeUids) &&
+        sameSet(authored.dependencyUids, stored.dependencyUids) &&
+        (authored.starredOrderIndex ?? "") === (stored.starredOrderIndex ?? "");
+    } catch {
+      return false;
+    }
   }
 
   /** The five-state answer for one receipt, from whichever partition holds it. */
@@ -478,10 +547,20 @@ export class WritePath {
         const appliedRow = appliedByUid.get(write.uid);
         if (appliedRow) {
           const injected = write.rows.find((row) => row.section === "TodoItems");
-          const match = injected !== undefined &&
-            rowsMatch({ header: TODO_ITEMS_HEADER, cells: injected.values }, appliedRow);
+          const diffs = injected === undefined
+            ? undefined
+            : rowDiff({ header: TODO_ITEMS_HEADER, cells: injected.values }, appliedRow);
+          const match = diffs !== undefined && diffs.length === 0;
           verdict = match ? "delivered" : "superseded";
-          if (!match) detail = "MLO uploaded a different row for this UID — a conflict resolved local-wins supersedes the write";
+          if (!match) {
+            const clip = (value: string) => (value.length > 40 ? `${value.slice(0, 40)}…` : value);
+            const differing = diffs
+              ?.map((diff) => `${diff.column}: injected "${clip(diff.injected)}" vs applied "${clip(diff.applied)}"`)
+              .join("; ");
+            detail =
+              "MLO uploaded a different row for this UID — a conflict resolved local-wins supersedes the write" +
+              (differing ? ` (${differing})` : "");
+          }
         } else if (tombstoned.has(write.uid)) {
           verdict = "superseded";
           detail = "MLO tombstoned the UID this write updated — the user's deletion won";
@@ -491,7 +570,7 @@ export class WritePath {
       const removed = await partition.resolveWrite(write.writeId, verdict, now, detail);
       if (!removed) continue;
       this.inFlight.delete(write.writeId);
-      log(`write ${write.writeId} (${write.verb} ${write.uid}) ${verdict} via session ${session || "?"}`);
+      log(`write ${write.writeId} (${write.verb} ${write.uid}) ${verdict} via session ${session || "?"}${detail ? ` — ${detail}` : ""}`);
     }
   }
 
