@@ -95,7 +95,7 @@ function portIsTaken(host: string, port: number, timeoutMs: number): Promise<boo
   });
 }
 
-type Answer =
+export type Answer =
   | { kind: "endpoint"; status: EndpointStatus }
   /**
    * Holds the port without identifying itself as one of ours — a wrong HTTP
@@ -146,9 +146,9 @@ async function readStatus(host: string, port: number): Promise<EndpointStatus | 
   return answer.kind === "endpoint" ? answer.status : undefined;
 }
 
-type Probe = { kind: "free" } | Answer;
+export type Probe = { kind: "free" } | Answer;
 
-async function probe(host: string, port: number): Promise<Probe> {
+export async function probe(host: string, port: number): Promise<Probe> {
   if (!(await portIsTaken(host, port, PROBE_TIMEOUT_MS))) return { kind: "free" };
   // A reachable HTTP server that is not ours is a configuration fault the user
   // must resolve; a listener that says nothing at all might be ours mid-start,

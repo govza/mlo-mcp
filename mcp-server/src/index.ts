@@ -15,12 +15,14 @@ import { createMcpServer } from "./server.js";
 import { CloudGateway } from "./cloud/gateway.js";
 import { ensureEndpoint, residentSpawner, RESIDENT_FLAG } from "./cloud/endpoint.js";
 import { startCloudServer } from "./cloud/server.js";
+import { runPreflight } from "./preflight.js";
 
 async function main(): Promise<void> {
   // Same file, two jobs. The resident endpoint has to be reachable from every
   // install layout (dist/, dist-bundle/, tsx over src/), and re-invoking this
   // entry point is the only way to spawn it that needs no path discovery.
   if (process.argv.includes(RESIDENT_FLAG)) return serveResidentEndpoint();
+  if (process.argv.includes("--preflight")) return runPreflight(fileURLToPath(import.meta.url));
 
   const config = loadConfig();
   // The drivers are wired here and nowhere else — above the repository they do

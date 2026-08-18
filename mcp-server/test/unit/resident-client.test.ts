@@ -170,6 +170,7 @@ describe("problem+json rehydration", () => {
 const unusedCli: MloCli = {
   exportXml: () => Promise.reject(new Error("no reads in this test")),
   quickSync: () => Promise.resolve(),
+  quickSyncCount: () => Promise.resolve(undefined),
   readDataFile: () => Promise.reject(new Error("no binary in this test")),
 };
 
