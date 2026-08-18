@@ -197,6 +197,36 @@ describe("durable accept", () => {
     expect(pending[0]!.rows).toEqual(addRows());
   });
 
+  it("an update for a UID this partition has never captured refuses unknown-row — the stale-identity duplicate guard", async () => {
+    const rig = await boundRig();
+    const update = deltaRowsFromDocument(buildTaskAddDelta({
+      uid: TASK,
+      caption: "authored from a dead partition's capture",
+      createdDate: "2026-07-27T09:00:00",
+      lastModified: "2026-07-27T09:30:00",
+    }));
+    const outcome = await rig.writePath.accept(PROFILE, update);
+    expect(outcome).toMatchObject({
+      kind: "refused",
+      httpStatus: 409,
+      problem: { kind: "unknown-row", retryable: "after-user-action" },
+    });
+    const partition = await new PartitionRegistry(rig.root).open(UID);
+    expect(await partition.queue.pending()).toEqual([]);
+  });
+
+  it("an update whose UID is known only through a pending add's own accept still queues — add-then-update needs no round trip", async () => {
+    const rig = await boundRig();
+    expect((await rig.writePath.accept(PROFILE, addRows())).kind).toBe("accepted");
+    const update = deltaRowsFromDocument(buildTaskAddDelta({
+      uid: TASK,
+      caption: "renamed before MLO ever synced",
+      createdDate: "2026-07-27T09:00:00",
+      lastModified: "2026-07-27T09:30:00",
+    }));
+    expect((await rig.writePath.accept(PROFILE, update)).kind).toBe("accepted");
+  });
+
   it("a write restating a vendor-observed row resolves delivered at accept, nothing queued for injection", async () => {
     const rig = await boundRig();
     const partition = await new PartitionRegistry(rig.root).open(UID);

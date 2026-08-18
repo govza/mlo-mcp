@@ -9,7 +9,7 @@ import { isMloBusy, SystemMloCli } from "./repo/mlo-cli.js";
 import { LocalMloRepository } from "./repo/local-mlo-repository.js";
 import { HttpResidentClient } from "./repo/resident-client.js";
 import { createToolContext } from "./context.js";
-import { watchBindingAppeared } from "./binding-watch.js";
+import { watchBindingAppeared, watchBindingChanged } from "./binding-watch.js";
 import { log, mirrorLogToFile } from "./log.js";
 import { createMcpServer } from "./server.js";
 import { CloudGateway } from "./cloud/gateway.js";
@@ -61,6 +61,19 @@ async function main(): Promise<void> {
       isBusy: isMloBusy,
       exit: () => process.exit(0),
     });
+  } else {
+    // The bound mirror image: a drift recovery that rebinds the profile
+    // mid-session would leave these once-resolved stores speaking a dead
+    // identity — the <Inbox>-duplicate factory. Exit and respawn instead.
+    const composed = await cloud.bindings.forProfile(config.dataFile);
+    if (composed?.dataFileUID) {
+      watchBindingChanged({
+        composedUid: composed.dataFileUID,
+        probe: async () => (await cloud.bindings.forProfile(config.dataFile))?.dataFileUID,
+        isBusy: isMloBusy,
+        exit: () => process.exit(0),
+      });
+    }
   }
 }
 

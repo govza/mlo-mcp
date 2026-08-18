@@ -45,3 +45,47 @@ export function watchBindingAppeared(deps: {
   timer.unref?.();
   return { stop: () => clearInterval(timer) };
 }
+
+/**
+ * The mirror watcher for a session that composed BOUND: its row store was
+ * resolved once, so a drift recovery that rebinds the profile mid-session
+ * (template-recreated profile, restored backup) leaves it speaking a dead
+ * identity — reads stamp UIDs MLO no longer holds, and writes authored from
+ * them import as <Inbox> duplicates. When the binding's dataFileUID moves
+ * away from the one this session composed with (or is released), exit cleanly
+ * while idle so the client respawns against the current partition.
+ */
+export function watchBindingChanged(deps: {
+  /** The dataFileUID the session's stores were resolved against. */
+  composedUid: string;
+  /** The binding's current dataFileUID, read fresh off disk. */
+  probe: () => Promise<string | undefined>;
+  /** Never exit mid-export or mid-write; re-checked every tick. */
+  isBusy: () => boolean;
+  exit: () => void;
+  intervalMs?: number;
+  log?: (line: string) => void;
+}): { stop: () => void } {
+  const { composedUid, probe, isBusy, exit, intervalMs = 15_000, log = sharedLog } = deps;
+  let inFlight = false;
+  const timer = setInterval(async () => {
+    if (inFlight) return;
+    inFlight = true;
+    try {
+      const current = await probe();
+      if (current === composedUid || isBusy()) return;
+      clearInterval(timer);
+      log(
+        `the profile's binding moved (${composedUid} → ${current ?? "released"}) — this session's identity ` +
+          "snapshot is stale; exiting so the client respawns against the current partition",
+      );
+      exit();
+    } catch {
+      /* transient probe failure (state root mid-write) — retry next tick */
+    } finally {
+      inFlight = false;
+    }
+  }, intervalMs);
+  timer.unref?.();
+  return { stop: () => clearInterval(timer) };
+}

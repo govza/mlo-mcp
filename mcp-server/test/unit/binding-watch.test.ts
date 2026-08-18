@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { watchBindingAppeared } from "../../src/binding-watch.js";
+import { watchBindingAppeared, watchBindingChanged } from "../../src/binding-watch.js";
 
 /**
  * A session that composed unbound refuses every write `partition-not-ready`
@@ -81,6 +81,49 @@ describe("the binding watcher", () => {
     await settle();
     watcher.stop();
 
+    expect(exit).not.toHaveBeenCalled();
+  });
+});
+
+describe("the rebind watcher", () => {
+  function changedHarness(probe: () => Promise<string | undefined>, isBusy?: () => boolean) {
+    const exit = vi.fn();
+    const lines: string[] = [];
+    const watcher = watchBindingChanged({
+      composedUid: "{AAAA}",
+      probe,
+      isBusy: isBusy ?? (() => false),
+      exit,
+      intervalMs: 5,
+      log: (line) => lines.push(line),
+    });
+    return { exit, lines, watcher };
+  }
+
+  it("exits once when the binding moves to another dataFileUID", async () => {
+    const answers: (string | undefined)[] = ["{AAAA}", "{AAAA}", "{BBBB}"];
+    const { exit, lines, watcher } = changedHarness(async () => (answers.length ? answers.shift() : "{BBBB}"));
+
+    await vi.waitFor(() => expect(exit).toHaveBeenCalled());
+    await settle();
+    watcher.stop();
+
+    expect(exit).toHaveBeenCalledTimes(1);
+    expect(lines.join("\n")).toContain("{AAAA}");
+    expect(lines.join("\n")).toContain("{BBBB}");
+  });
+
+  it("a released binding (drift recovery mid-flight) is a move too", async () => {
+    const { exit, lines, watcher } = changedHarness(async () => undefined);
+    await vi.waitFor(() => expect(exit).toHaveBeenCalledTimes(1));
+    watcher.stop();
+    expect(lines.join("\n")).toContain("released");
+  });
+
+  it("never exits while the binding stays the composed one", async () => {
+    const { exit, watcher } = changedHarness(async () => "{AAAA}");
+    await settle();
+    watcher.stop();
     expect(exit).not.toHaveBeenCalled();
   });
 });

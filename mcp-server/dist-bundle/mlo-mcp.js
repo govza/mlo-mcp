@@ -17461,8 +17461,9 @@ function updatePatch(patch, row, now, move, flagUid) {
   return columns;
 }
 function completionPatch(row, now) {
+  const completedAt = rowValue(row, "CompletionDateTime");
   return {
-    CompletionDateTime: now,
+    CompletionDateTime: completedAt || now,
     LastModified: now,
     ...csvTruthy(rowValue(row, "IsProject")) ? { ProjectStatus: "3" } : {}
   };
@@ -18768,6 +18769,28 @@ function watchBindingAppeared(deps) {
       if (!await probe2() || isBusy()) return;
       clearInterval(timer);
       log2("binding appeared \u2014 exiting so the client respawns a session that composes bound");
+      exit();
+    } catch {
+    } finally {
+      inFlight = false;
+    }
+  }, intervalMs);
+  timer.unref?.();
+  return { stop: () => clearInterval(timer) };
+}
+function watchBindingChanged(deps) {
+  const { composedUid, probe: probe2, isBusy, exit, intervalMs = 15e3, log: log2 = log } = deps;
+  let inFlight = false;
+  const timer = setInterval(async () => {
+    if (inFlight) return;
+    inFlight = true;
+    try {
+      const current = await probe2();
+      if (current === composedUid || isBusy()) return;
+      clearInterval(timer);
+      log2(
+        `the profile's binding moved (${composedUid} \u2192 ${current ?? "released"}) \u2014 this session's identity snapshot is stale; exiting so the client respawns against the current partition`
+      );
       exit();
     } catch {
     } finally {
@@ -30432,6 +30455,9 @@ function describeWriteRows(rows) {
   }
   return void 0;
 }
+function rowsMatch(injected, applied) {
+  return rowDiff(injected, applied).length === 0;
+}
 function rowDiff(injected, applied) {
   const columns = /* @__PURE__ */ new Set([...injected.header, ...applied.header]);
   const diffs = [];
@@ -30598,7 +30624,45 @@ var WritePath = class {
       });
     }
     await this.expireDue(bound.partition);
+    if (described.verb === "update" || described.verb === "complete") {
+      const stored = await bound.partition.rows.latest(described.uid);
+      if (stored.kind !== "row") {
+        return refusal2(409, {
+          kind: "unknown-row",
+          title: `this profile's cloud partition has never seen ${described.uid} \u2014 injecting it would create a duplicate under <Inbox>, not change the task`,
+          retryable: "after-user-action",
+          remedy: "the session's identity snapshot is stale (the profile was likely re-created and rebound) \u2014 restart the MCP client session and re-read the task before writing; repull if the row store has a gap"
+        });
+      }
+    }
     const now = this.now();
+    if (await this.isNoop(bound.partition, described, rows)) {
+      const write2 = {
+        writeId: `w-${randomUUID2()}`,
+        uid: described.uid,
+        verb: described.verb,
+        ...described.caption ? { caption: described.caption } : {},
+        rows,
+        queuedAt: now.toISOString(),
+        expiresAt: new Date(now.getTime() + this.ttlMs).toISOString()
+      };
+      await bound.partition.queue.enqueue(write2);
+      await bound.partition.resolveWrite(
+        write2.writeId,
+        "delivered",
+        now.toISOString(),
+        "no-op: the profile already reads exactly this way, nothing needed to sync"
+      );
+      log(`write ${write2.writeId} (${write2.verb} ${write2.uid}) delivered at accept \u2014 a no-op against the captured row`);
+      return {
+        kind: "accepted",
+        writeId: write2.writeId,
+        uid: write2.uid,
+        verb: write2.verb,
+        ...write2.caption ? { caption: write2.caption } : {},
+        expiresAt: write2.expiresAt
+      };
+    }
     const write = {
       writeId: `w-${randomUUID2()}`,
       uid: described.uid,
@@ -30618,6 +30682,28 @@ var WritePath = class {
       ...write.caption ? { caption: write.caption } : {},
       expiresAt: write.expiresAt
     };
+  }
+  /**
+   * Whether this write restates what MLO already holds, judged against the
+   * latest VENDOR-OBSERVED row — never against another pending write's own
+   * accept capture, which proves nothing about the profile. Best-effort and
+   * conservative: any doubt (a store miss, extra sections, declared entities)
+   * means "not a no-op" and the write takes the normal queue.
+   */
+  async isNoop(partition, described, rows) {
+    if (described.verb === "delete") return false;
+    try {
+      const harvest = harvestTaskRows(documentFromDeltaRows(rows));
+      if (harvest.rows.length !== 1 || harvest.tombstones.length) return false;
+      if (harvest.places.length || harvest.flags.length || harvest.deletedPlaces.length || harvest.deletedFlags.length) return false;
+      const authored = harvest.rows[0];
+      const stored = await partition.rows.latest(described.uid);
+      if (stored.kind !== "row" || stored.source === "injected") return false;
+      const sameSet = (left, right) => left.length === right.length && [...left].sort().join("|") === [...right].sort().join("|");
+      return rowsMatch(authored, stored) && sameSet(authored.placeUids, stored.placeUids) && sameSet(authored.dependencyUids, stored.dependencyUids) && (authored.starredOrderIndex ?? "") === (stored.starredOrderIndex ?? "");
+    } catch {
+      return false;
+    }
   }
   /** The five-state answer for one receipt, from whichever partition holds it. */
   async status(writeId) {
@@ -31212,6 +31298,16 @@ async function main() {
       isBusy: isMloBusy,
       exit: () => process.exit(0)
     });
+  } else {
+    const composed = await cloud.bindings.forProfile(config2.dataFile);
+    if (composed?.dataFileUID) {
+      watchBindingChanged({
+        composedUid: composed.dataFileUID,
+        probe: async () => (await cloud.bindings.forProfile(config2.dataFile))?.dataFileUID,
+        isBusy: isMloBusy,
+        exit: () => process.exit(0)
+      });
+    }
   }
 }
 async function serveResidentEndpoint() {

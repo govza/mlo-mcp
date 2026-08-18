@@ -94,8 +94,9 @@ function column(name: string): number {
 /**
  * The identity of a write, read off its rows: the seam carries bare rows
  * (spec section 4), so uid / verb / caption are derived here rather than
- * trusted from a second channel. The verb is best-effort labelling for
- * receipts and dead letters — nothing routes on add-vs-update.
+ * trusted from a second channel. The verb labels receipts and dead letters,
+ * and one thing routes on add-vs-update: the stale-identity gate in `accept`
+ * exempts adds, whose UIDs are new by design.
  */
 export function describeWriteRows(rows: readonly DeltaRow[]): DescribedWrite | undefined {
   const task = rows.find((row) => row.section === "TodoItems");
@@ -351,6 +352,29 @@ export class WritePath {
       });
     }
     await this.expireDue(bound.partition);
+    // The stale-identity gate (proven live on a template-recreated profile):
+    // a session that outlived a drift recovery authors rows with the DEAD
+    // partition's UIDs. MLO cannot match such a row and imports it as a new
+    // task under <Inbox> — a leaked duplicate, reported superseded. The bound
+    // partition's own capture is the arbiter: a UID it has never seen (from
+    // the vendor or a pending accept) is one no update may target. Adds are
+    // exempt — a new UID is their whole point — and so are deletes: an
+    // unknown tombstone is inert in MLO, never a duplicate.
+    if (described.verb === "update" || described.verb === "complete") {
+      const stored = await bound.partition.rows.latest(described.uid);
+      if (stored.kind !== "row") {
+        return refusal(409, {
+          kind: "unknown-row",
+          title:
+            `this profile's cloud partition has never seen ${described.uid} — injecting it would create a ` +
+            "duplicate under <Inbox>, not change the task",
+          retryable: "after-user-action",
+          remedy:
+            "the session's identity snapshot is stale (the profile was likely re-created and rebound) — restart " +
+            "the MCP client session and re-read the task before writing; repull if the row store has a gap",
+        });
+      }
+    }
     const now = this.now();
     // A write that changes nothing can never resolve through the Apply watch:
     // MLO applies the identical row, nothing becomes dirty, its Apply echoes
