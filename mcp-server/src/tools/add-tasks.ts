@@ -32,7 +32,7 @@ export const addTasksTool = defineTool({
   title: "Add several tasks",
   description:
     "Create 1–50 tasks as ONE write — a whole nested outline, in input order. Atomic: one bad entry and nothing " +
-    "is queued. Returns at durable accept; reads show the tasks immediately, flagged pending.",
+    "is queued. Returns once MLO applied it (or at durable accept if MLO could not sync inside the wait); reads show the tasks immediately, flagged pending.",
   inputSchema: {
     tasks: z.array(TaskEntry).min(1).max(50).describe("The tasks to create; input order is sibling order"),
   },

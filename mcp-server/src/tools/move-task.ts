@@ -7,7 +7,7 @@ export const moveTaskTool = defineTool({
   title: "Move a task",
   description:
     "Re-parent one task, taking its whole subtree with it, optionally into a specific slot among its new " +
-    "siblings. Moving a task into its own subtree is refused. Returns at durable accept.",
+    "siblings. Moving a task into its own subtree is refused. Returns once MLO applied it, or at durable accept if MLO could not sync inside the wait.",
   inputSchema: {
     id: z
       .string()

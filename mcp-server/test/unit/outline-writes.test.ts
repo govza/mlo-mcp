@@ -443,3 +443,49 @@ describe("OutlineService refusals from below", () => {
     expect(refused.remedy).toBeTruthy();
   });
 });
+
+describe("bounded delivery wait", () => {
+  function waitingOutline(writeWaitMs: number) {
+    const repo = new FakeMloRepository();
+    repo.doc = {} as MloDocument;
+    const rows = new FakeRowStore();
+    const outline = new OutlineService(repo, new IdentityService(rows.view()), rows, { writeWaitMs });
+    return { outline, repo };
+  }
+
+  it("answers with the delivered outcome when MLO applies inside the window", async () => {
+    const { outline, repo } = waitingOutline(3_000);
+    const status = repo.status.bind(repo);
+    repo.status = async (id) => {
+      repo.transition(id, "delivered");
+      return status(id);
+    };
+    const receipt = value(await outline.add({ caption: "landed while waiting" }));
+    expect(receipt.outcome).toBe("delivered");
+  });
+
+  it("falls back to the plain accept when the window closes first", async () => {
+    const { outline } = waitingOutline(1);
+    const receipt = value(await outline.add({ caption: "still queued" }));
+    expect(receipt.outcome).toBe("accepted");
+  });
+
+  it("does not wait at all when the wait is disabled", async () => {
+    const { outline, repo } = waitingOutline(0);
+    let polled = 0;
+    repo.status = async () => {
+      polled += 1;
+      return failed(repoFailure("unknown-write", "never asked"));
+    };
+    const receipt = value(await outline.add({ caption: "return at accept" }));
+    expect(receipt.outcome).toBe("accepted");
+    expect(polled).toBe(0);
+  });
+
+  it("ends the wait on a status refusal instead of failing the accepted write", async () => {
+    const { outline, repo } = waitingOutline(3_000);
+    repo.status = async () => failed(repoFailure("endpoint-down", "resident restarting"));
+    const receipt = value(await outline.add({ caption: "accept survives" }));
+    expect(receipt.outcome).toBe("accepted");
+  });
+});

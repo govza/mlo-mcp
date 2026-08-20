@@ -15400,6 +15400,11 @@ function loadCloudConfig() {
     writeTtlMs: Number.isFinite(ttlMinutes) && ttlMinutes > 0 ? ttlMinutes * 6e4 : DEFAULT_WRITE_TTL_MS
   };
 }
+var DEFAULT_WRITE_WAIT_MS = 2e4;
+function resolveWriteWaitMs() {
+  const overridden = Number(process.env.MLO_WRITE_WAIT_MS ?? "");
+  return Number.isFinite(overridden) && overridden >= 0 ? overridden : DEFAULT_WRITE_WAIT_MS;
+}
 function loadConfig() {
   const cloud = loadCloudConfig();
   const { dataFile, autoDetected } = resolveDataFile(cloud.mloExePath);
@@ -15410,6 +15415,7 @@ function loadConfig() {
     cacheStaleMs: Number(process.env.MLO_CACHE_STALE_MS) || 3e4,
     quickSyncDebounceMs: Number(process.env.MLO_QUICKSYNC_DEBOUNCE_MS) || 3e5,
     quickSyncMaxPerWindow: Number(process.env.MLO_QUICKSYNC_MAX_PER_WINDOW) || 4,
+    writeWaitMs: resolveWriteWaitMs(),
     // Only needed when the capture inbox is NOT MLO's own <Inbox> node (e.g. a
     // hand-made "Входящие" folder). MLO itself hardcodes the caption "<Inbox>"
     // in every UI language, so most profiles need no override.
@@ -17946,7 +17952,27 @@ var OutlineService = class {
   async commit(rows, uids, captions) {
     const written = await this.repo.write(rows);
     if (written.isErrored) return failed(written.failure);
-    return ok({ uids, captions, writeId: written.value.writeId, expiresAt: written.value.expiresAt });
+    const { writeId, expiresAt } = written.value;
+    return ok({ uids, captions, writeId, expiresAt, outcome: await this.awaitDelivery(writeId) });
+  }
+  /**
+   * Bounded wait for MLO to apply the write the accept just nudged it about,
+   * so an interactive change is visibly live in the app before the tool
+   * replies. Honesty over hope: the answer is whatever status the window
+   * closed on — "accepted" when MLO did not sync in time (delivery then rides
+   * its own cadence, unchanged), and a status poll that refuses ends the wait
+   * rather than failing a write that was already durably accepted.
+   */
+  async awaitDelivery(writeId) {
+    const deadline = Date.now() + (this.options.writeWaitMs ?? 0);
+    let status = "accepted";
+    while (status === "accepted" && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, Math.min(1e3, deadline - Date.now())));
+      const polled = await this.repo.status(writeId);
+      if (polled.isErrored) break;
+      status = polled.value.status;
+    }
+    return status;
   }
 };
 var STARRED_ORDER_STEP = 500;
@@ -18749,7 +18775,7 @@ var AdminService = class {
 function createToolContext(config2, repo, cloud, endpoint, rows) {
   const identity = new IdentityService(rows?.view() ?? EMPTY_ROW_STORE_VIEW);
   return {
-    outline: new OutlineService(repo, identity, rows, { inboxCaption: config2.inboxCaption }),
+    outline: new OutlineService(repo, identity, rows, { inboxCaption: config2.inboxCaption, writeWaitMs: config2.writeWaitMs }),
     nextActions: new NextActionsService(repo),
     review: new ReviewService(repo, { inboxCaption: config2.inboxCaption }),
     admin: new AdminService(config2, repo, cloud, endpoint),
@@ -27291,7 +27317,9 @@ var WRITE_ACCEPT_OUTPUT = {
     "Caption of the task the write resolved to \u2014 the first one, for a batch. Check it names the task you meant: a stale path id is accepted against whatever task sits there now"
   ),
   writeId: external_exports.string().describe("The accept receipt \u2014 pass it to write_status to see where the write got to"),
-  status: external_exports.literal("accepted").describe("Durably queued. Never a claim that MLO has applied it"),
+  status: external_exports.enum(["accepted", "delivered", "verified", "superseded", "expired"]).describe(
+    "Where the write stood when the delivery wait closed. delivered/verified: MLO applied it, visible in the app now. accepted: durably queued, MLO applies it on its own sync. superseded: MLO kept its own conflicting version \u2014 re-read and re-apply"
+  ),
   expiresAt: external_exports.string().describe("Local ISO time this write gives up if MLO has not synced by then; it then becomes a dead letter"),
   message: external_exports.string()
 };
@@ -27301,16 +27329,29 @@ function clockTime(expiresAt) {
   const parsed = new Date(expiresAt);
   return Number.isNaN(parsed.getTime()) ? expiresAt : `${String(parsed.getHours()).padStart(2, "0")}:${String(parsed.getMinutes()).padStart(2, "0")}`;
 }
+function outcomeMessage(receipt, what, resolved) {
+  switch (receipt.outcome) {
+    case "delivered":
+    case "verified":
+      return `delivered - ${what} (${resolved}) is applied and visible in MLO now.`;
+    case "superseded":
+      return `superseded - MLO kept its own conflicting version of (${resolved}), so this write's content is gone; read the task again and re-apply the change on top of what MLO kept.`;
+    case "expired":
+      return `expired - ${what} (${resolved}) was never applied; the rows are in the dead-letter file.`;
+    case "accepted":
+      return `accepted - ${what} (${resolved}) lands on MLO's next sync; expires at ${clockTime(receipt.expiresAt)} if MLO doesn't sync. Reads already show it, flagged pending.`;
+  }
+}
 function accepted(receipt, what) {
   const caption = receipt.captions[0] ?? "";
   const resolved = receipt.captions.length > 1 ? `"${caption}" +${receipt.captions.length - 1} more` : `"${caption}"`;
-  const message = `accepted - ${what} (${resolved}) lands on MLO's next sync; expires at ${clockTime(receipt.expiresAt)} if MLO doesn't sync. Reads already show it, flagged pending.`;
+  const message = outcomeMessage(receipt, what, resolved);
   return textResult(`${message} [writeId ${receipt.writeId}]`, {
     uid: receipt.uids[0] ?? "",
     ...receipt.uids.length > 1 ? { uids: receipt.uids } : {},
     caption,
     writeId: receipt.writeId,
-    status: "accepted",
+    status: receipt.outcome,
     expiresAt: receipt.expiresAt,
     message
   });
@@ -27338,7 +27379,7 @@ var DEPENDS_ON_IDS = external_exports.array(external_exports.string()).max(25).o
 var addTaskTool = defineTool({
   name: "add_task",
   title: "Add a task",
-  description: "Create one task. Returns at durable accept: MLO applies it on its own next sync, and reads show it immediately, flagged pending. Use write_status to see where the write got to.",
+  description: "Create one task. Returns once MLO applied it (or at durable accept if MLO could not sync inside the wait), and reads show it immediately, flagged pending. Use write_status to see where the write got to.",
   inputSchema: { ...TASK_FIELDS, parentId: PARENT_ID, dependsOnIds: DEPENDS_ON_IDS },
   outputSchema: WRITE_ACCEPT_OUTPUT,
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -27361,7 +27402,7 @@ var TaskEntry = external_exports.object({
 var addTasksTool = defineTool({
   name: "add_tasks",
   title: "Add several tasks",
-  description: "Create 1\u201350 tasks as ONE write \u2014 a whole nested outline, in input order. Atomic: one bad entry and nothing is queued. Returns at durable accept; reads show the tasks immediately, flagged pending.",
+  description: "Create 1\u201350 tasks as ONE write \u2014 a whole nested outline, in input order. Atomic: one bad entry and nothing is queued. Returns once MLO applied it (or at durable accept if MLO could not sync inside the wait); reads show the tasks immediately, flagged pending.",
   inputSchema: {
     tasks: external_exports.array(TaskEntry).min(1).max(50).describe("The tasks to create; input order is sibling order")
   },
@@ -27393,7 +27434,7 @@ var captureTaskTool = defineTool({
 var updateTaskTool = defineTool({
   name: "update_task",
   title: "Update a task",
-  description: 'Change fields of one existing task. Only the fields you pass change; "" clears a text field, and Places / dependsOnIds are COMPLETE replacement sets ([] clears them). Covers the Organize flags too \u2014 IsProject, Folder, sequential subtasks, dependencies. Date edits on recurring tasks are refused: a full-row rewrite would end the series instead of rolling it forward. Returns at durable accept.',
+  description: 'Change fields of one existing task. Only the fields you pass change; "" clears a text field, and Places / dependsOnIds are COMPLETE replacement sets ([] clears them). Covers the Organize flags too \u2014 IsProject, Folder, sequential subtasks, dependencies. Date edits on recurring tasks are refused: a full-row rewrite would end the series instead of rolling it forward. Returns once MLO applied it, or at durable accept if MLO could not sync inside the wait.',
   inputSchema: {
     id: external_exports.string().describe(
       `Path-based id from list_tasks/search_tasks ("1.2.3"), or the task's stable GUID in braces ("{XXXXXXXX-...}") from any read or write accept; ${PATH_ID_CAVEAT}`
@@ -27432,7 +27473,7 @@ var ID = external_exports.string().describe(`Path-based id from list_tasks/searc
 var completeTaskTool = defineTool({
   name: "complete_task",
   title: "Complete a task",
-  description: "Mark one task completed (projects also get their project status closed). Recurring tasks are refused \u2014 completing one in MLO spawns the next occurrence and this write would silently end the series; complete it in the app instead. Returns at durable accept.",
+  description: "Mark one task completed (projects also get their project status closed). Recurring tasks are refused \u2014 completing one in MLO spawns the next occurrence and this write would silently end the series; complete it in the app instead. Returns once MLO applied it, or at durable accept if MLO could not sync inside the wait.",
   inputSchema: { id: ID },
   outputSchema: WRITE_ACCEPT_OUTPUT,
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -27443,7 +27484,7 @@ var completeTaskTool = defineTool({
 var uncompleteTaskTool = defineTool({
   name: "uncomplete_task",
   title: "Reopen a task",
-  description: "Clear one task's completion. Allowed on recurring tasks: reopening generates no occurrence, so there is no app behaviour for this write to bypass. Returns at durable accept.",
+  description: "Clear one task's completion. Allowed on recurring tasks: reopening generates no occurrence, so there is no app behaviour for this write to bypass. Returns once MLO applied it, or at durable accept if MLO could not sync inside the wait.",
   inputSchema: { id: ID },
   outputSchema: WRITE_ACCEPT_OUTPUT,
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -27456,7 +27497,7 @@ var uncompleteTaskTool = defineTool({
 var moveTaskTool = defineTool({
   name: "move_task",
   title: "Move a task",
-  description: "Re-parent one task, taking its whole subtree with it, optionally into a specific slot among its new siblings. Moving a task into its own subtree is refused. Returns at durable accept.",
+  description: "Re-parent one task, taking its whole subtree with it, optionally into a specific slot among its new siblings. Moving a task into its own subtree is refused. Returns once MLO applied it, or at durable accept if MLO could not sync inside the wait.",
   inputSchema: {
     id: external_exports.string().describe(`Path-based id or stable "{GUID}" of the task to move (${PATH_ID_CAVEAT})`),
     newParentId: external_exports.string().optional().describe(
@@ -27475,7 +27516,7 @@ var moveTaskTool = defineTool({
 var deleteTaskTool = defineTool({
   name: "delete_task",
   title: "Delete a task",
-  description: "Tombstone one task AND ITS WHOLE SUBTREE \u2014 a partial tombstone would orphan the children. Every task in the branch must resolve to its stable GUID, or nothing is queued. Returns at durable accept; reads hide the branch immediately. There is no undo through this server: MLO's own recycle bin is the only recovery.",
+  description: "Tombstone one task AND ITS WHOLE SUBTREE \u2014 a partial tombstone would orphan the children. Every task in the branch must resolve to its stable GUID, or nothing is queued. Returns once MLO applied it (or at durable accept if MLO could not sync inside the wait); reads hide the branch immediately. There is no undo through this server: MLO's own recycle bin is the only recovery.",
   inputSchema: {
     id: external_exports.string().describe(
       `Path-based id or stable "{GUID}" of the task to delete (${PATH_ID_CAVEAT}) \u2014 prefer the GUID, and re-read before targeting by path id`
@@ -27575,16 +27616,18 @@ var INSTRUCTIONS = `
 
 MLO is an OUTLINER: tasks live in one deep tree, and deep nesting is idiomatic.
 
-### Writes land on MLO's own next sync
-A write tool returns as soon as the change is DURABLY QUEUED - not when MLO has applied it.
-The response carries a \`writeId\` and an \`expiresAt\`; nothing waits, and there is no
-"verified" flag to read. MLO picks the write up on its own sync (about 90 seconds, or
-immediately if you run sync), and reads show the change straight away, flagged
-\`pending: true\` with the writeId that made it. One residual case: when a task's
-identity cannot be resolved against the captured rows, its queued change shows as a
-separate pending row instead of updating the task in place.
+### Writes are nudged into MLO immediately
+A write tool durably queues the change, nudges MLO to sync, and holds its reply open briefly
+for delivery. \`status\` in the response says what actually happened: "delivered"/"verified"
+means MLO applied it and the change is visible in the app NOW; "accepted" means MLO did not
+sync inside the wait (its nudge budget was spent), so the change lands on MLO's own sync
+(about 90 seconds) - reads still show it straight away, flagged \`pending: true\` with the
+writeId that made it. One residual case: when a task's identity cannot be resolved against
+the captured rows, its queued change shows as a separate pending row instead of updating the
+task in place.
 
-Do not poll: report the change as made. If you want the outcome anyway, write_status(writeId)
+Do not poll: report the change as made (say "syncing to MLO" only when status is "accepted").
+If you want the eventual outcome anyway, write_status(writeId)
 gives the five states - accepted, delivered, verified, expired (MLO never synced; nothing was
 applied), superseded (MLO kept its own conflicting version). cloud_status carries the queue
 depth and the recent writes that never landed.

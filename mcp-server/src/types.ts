@@ -58,6 +58,14 @@ export interface MloConfig {
    * so the default stops at 4 and leaves interactive `sync` calls the headroom.
    */
   quickSyncMaxPerWindow: number;
+  /**
+   * How long a write tool holds its reply open waiting for MLO to apply the
+   * accepted write, so an interactive change is visibly live in the app before
+   * the caller reports it done. The QuickSync nudge lands in ~13 s when MLO's
+   * throttle budget allows; when the window closes first the tool falls back to
+   * the plain accept receipt. 0 restores return-at-accept.
+   */
+  writeWaitMs: number;
   /** Caption of the top-level task acting as the capture inbox, overriding <Inbox>/Inbox detection. */
   inboxCaption?: string;
   cloudHost: string;

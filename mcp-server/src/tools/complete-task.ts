@@ -12,7 +12,7 @@ export const completeTaskTool = defineTool({
   description:
     "Mark one task completed (projects also get their project status closed). Recurring tasks are refused — " +
     "completing one in MLO spawns the next occurrence and this write would silently end the series; complete it " +
-    "in the app instead. Returns at durable accept.",
+    "in the app instead. Returns once MLO applied it, or at durable accept if MLO could not sync inside the wait.",
   inputSchema: { id: ID },
   outputSchema: WRITE_ACCEPT_OUTPUT,
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -26,7 +26,7 @@ export const uncompleteTaskTool = defineTool({
   title: "Reopen a task",
   description:
     "Clear one task's completion. Allowed on recurring tasks: reopening generates no occurrence, so there is no " +
-    "app behaviour for this write to bypass. Returns at durable accept.",
+    "app behaviour for this write to bypass. Returns once MLO applied it, or at durable accept if MLO could not sync inside the wait.",
   inputSchema: { id: ID },
   outputSchema: WRITE_ACCEPT_OUTPUT,
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },

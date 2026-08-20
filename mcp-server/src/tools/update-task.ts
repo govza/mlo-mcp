@@ -9,7 +9,7 @@ export const updateTaskTool = defineTool({
     "Change fields of one existing task. Only the fields you pass change; \"\" clears a text field, and Places / " +
     "dependsOnIds are COMPLETE replacement sets ([] clears them). Covers the Organize flags too — IsProject, " +
     "Folder, sequential subtasks, dependencies. Date edits on recurring tasks are refused: a full-row rewrite " +
-    "would end the series instead of rolling it forward. Returns at durable accept.",
+    "would end the series instead of rolling it forward. Returns once MLO applied it, or at durable accept if MLO could not sync inside the wait.",
   inputSchema: {
     id: z
       .string()

@@ -15,6 +15,7 @@ import {
   type Snapshot,
   type WriteId,
   type WriteReceipt,
+  type WriteStatus,
 } from "../repo/mlo-repository.js";
 import { isGuidTarget, type IdentityService, type SnapshotResolver } from "./identity.js";
 import type { CapturedRow, RowCatalog, RowStore } from "../cloud/row-store.js";
@@ -86,6 +87,13 @@ export interface AcceptReceipt {
   captions: string[];
   writeId: WriteId;
   expiresAt: string;
+  /**
+   * Where the write stood when the tool's bounded delivery wait closed:
+   * "delivered"/"verified" means MLO shows the change now, "accepted" means it
+   * is still queued and rides MLO's own sync. Never a promise beyond what the
+   * write path actually observed.
+   */
+  outcome: WriteStatus;
 }
 
 export type OutlineWrite = ServiceResult<AcceptReceipt, OutlineFailure>;
@@ -145,7 +153,7 @@ export class OutlineService {
     private readonly identity: IdentityService,
     /** Absent while the profile is unbound: every write then refuses `partition-not-ready`. */
     private readonly rows?: AuthoringRows,
-    private readonly options: { inboxCaption?: string } = {}
+    private readonly options: { inboxCaption?: string; writeWaitMs?: number } = {}
   ) {}
 
   /** Visible outline entries under `parentId` (or the root). */
@@ -638,7 +646,28 @@ export class OutlineService {
   private async commit(rows: DeltaRow[], uids: string[], captions: string[]): Promise<OutlineWrite> {
     const written = await this.repo.write(rows);
     if (written.isErrored) return failed(written.failure);
-    return ok({ uids, captions, writeId: written.value.writeId, expiresAt: written.value.expiresAt });
+    const { writeId, expiresAt } = written.value;
+    return ok({ uids, captions, writeId, expiresAt, outcome: await this.awaitDelivery(writeId) });
+  }
+
+  /**
+   * Bounded wait for MLO to apply the write the accept just nudged it about,
+   * so an interactive change is visibly live in the app before the tool
+   * replies. Honesty over hope: the answer is whatever status the window
+   * closed on — "accepted" when MLO did not sync in time (delivery then rides
+   * its own cadence, unchanged), and a status poll that refuses ends the wait
+   * rather than failing a write that was already durably accepted.
+   */
+  private async awaitDelivery(writeId: WriteId): Promise<WriteStatus> {
+    const deadline = Date.now() + (this.options.writeWaitMs ?? 0);
+    let status: WriteStatus = "accepted";
+    while (status === "accepted" && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, Math.min(1_000, deadline - Date.now())));
+      const polled = await this.repo.status(writeId);
+      if (polled.isErrored) break;
+      status = polled.value.status;
+    }
+    return status;
   }
 }
 

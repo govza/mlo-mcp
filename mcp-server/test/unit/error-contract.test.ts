@@ -116,9 +116,16 @@ describe("no automatic retries anywhere", () => {
   it("no failure path sleeps and tries again", async () => {
     // `retryable`/`remedy` are caller metadata: the producer says what would
     // end the condition, and the caller decides. The only waits this server
-    // performs are lock acquisition and startup port polling, neither of which
-    // is a response to a typed failure.
-    const waiters = ["src/repo/mlo-cli.ts", "src/cloud/state-lock.ts", "src/cloud/endpoint.ts", "src/cloud/server.ts"];
+    // performs are lock acquisition, startup port polling, and the bounded
+    // delivery wait after a durable accept (outline.ts) — none is a response
+    // to a typed failure.
+    const waiters = [
+      "src/repo/mlo-cli.ts",
+      "src/cloud/state-lock.ts",
+      "src/cloud/endpoint.ts",
+      "src/cloud/server.ts",
+      "src/services/outline.ts",
+    ];
     const offenders: string[] = [];
     for (const file of await sourceFiles()) {
       const relative = path.relative(path.join(SRC, ".."), file).replace(/\\/g, "/");

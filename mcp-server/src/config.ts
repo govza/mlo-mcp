@@ -97,6 +97,17 @@ export function loadCloudConfig(): CloudConfig {
   };
 }
 
+/**
+ * `Number(...) || default` would erase an explicit 0, and 0 is a meaningful
+ * setting here: it restores return-at-accept. MLO_WRITE_WAIT_MS overrides.
+ */
+export const DEFAULT_WRITE_WAIT_MS = 20_000;
+
+function resolveWriteWaitMs(): number {
+  const overridden = Number(process.env.MLO_WRITE_WAIT_MS ?? "");
+  return Number.isFinite(overridden) && overridden >= 0 ? overridden : DEFAULT_WRITE_WAIT_MS;
+}
+
 export function loadConfig(): MloConfig {
   // Before the data file: detection looks for mlo.exe's process by name, and
   // that name comes from the cloud config's `mloExePath` (which the resident
@@ -110,6 +121,7 @@ export function loadConfig(): MloConfig {
     cacheStaleMs: Number(process.env.MLO_CACHE_STALE_MS) || 30_000,
     quickSyncDebounceMs: Number(process.env.MLO_QUICKSYNC_DEBOUNCE_MS) || 300_000,
     quickSyncMaxPerWindow: Number(process.env.MLO_QUICKSYNC_MAX_PER_WINDOW) || 4,
+    writeWaitMs: resolveWriteWaitMs(),
     // Only needed when the capture inbox is NOT MLO's own <Inbox> node (e.g. a
     // hand-made "Входящие" folder). MLO itself hardcodes the caption "<Inbox>"
     // in every UI language, so most profiles need no override.

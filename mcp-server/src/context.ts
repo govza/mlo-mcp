@@ -29,7 +29,7 @@ export function createToolContext(
 ): ToolContext {
   const identity = new IdentityService(rows?.view() ?? EMPTY_ROW_STORE_VIEW);
   return {
-    outline: new OutlineService(repo, identity, rows, { inboxCaption: config.inboxCaption }),
+    outline: new OutlineService(repo, identity, rows, { inboxCaption: config.inboxCaption, writeWaitMs: config.writeWaitMs }),
     nextActions: new NextActionsService(repo),
     review: new ReviewService(repo, { inboxCaption: config.inboxCaption }),
     admin: new AdminService(config, repo, cloud, endpoint),

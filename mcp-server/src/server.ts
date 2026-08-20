@@ -9,16 +9,18 @@ const INSTRUCTIONS = `
 
 MLO is an OUTLINER: tasks live in one deep tree, and deep nesting is idiomatic.
 
-### Writes land on MLO's own next sync
-A write tool returns as soon as the change is DURABLY QUEUED - not when MLO has applied it.
-The response carries a \`writeId\` and an \`expiresAt\`; nothing waits, and there is no
-"verified" flag to read. MLO picks the write up on its own sync (about 90 seconds, or
-immediately if you run sync), and reads show the change straight away, flagged
-\`pending: true\` with the writeId that made it. One residual case: when a task's
-identity cannot be resolved against the captured rows, its queued change shows as a
-separate pending row instead of updating the task in place.
+### Writes are nudged into MLO immediately
+A write tool durably queues the change, nudges MLO to sync, and holds its reply open briefly
+for delivery. \`status\` in the response says what actually happened: "delivered"/"verified"
+means MLO applied it and the change is visible in the app NOW; "accepted" means MLO did not
+sync inside the wait (its nudge budget was spent), so the change lands on MLO's own sync
+(about 90 seconds) - reads still show it straight away, flagged \`pending: true\` with the
+writeId that made it. One residual case: when a task's identity cannot be resolved against
+the captured rows, its queued change shows as a separate pending row instead of updating the
+task in place.
 
-Do not poll: report the change as made. If you want the outcome anyway, write_status(writeId)
+Do not poll: report the change as made (say "syncing to MLO" only when status is "accepted").
+If you want the eventual outcome anyway, write_status(writeId)
 gives the five states - accepted, delivered, verified, expired (MLO never synced; nothing was
 applied), superseded (MLO kept its own conflicting version). cloud_status carries the queue
 depth and the recent writes that never landed.

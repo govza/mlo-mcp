@@ -36,7 +36,7 @@ export const addTaskTool = defineTool({
   name: "add_task",
   title: "Add a task",
   description:
-    "Create one task. Returns at durable accept: MLO applies it on its own next sync, and reads show it " +
+    "Create one task. Returns once MLO applied it (or at durable accept if MLO could not sync inside the wait), and reads show it " +
     "immediately, flagged pending. Use write_status to see where the write got to.",
   inputSchema: { ...TASK_FIELDS, parentId: PARENT_ID, dependsOnIds: DEPENDS_ON_IDS },
   outputSchema: WRITE_ACCEPT_OUTPUT,

@@ -7,7 +7,7 @@ export const deleteTaskTool = defineTool({
   title: "Delete a task",
   description:
     "Tombstone one task AND ITS WHOLE SUBTREE — a partial tombstone would orphan the children. Every task in the " +
-    "branch must resolve to its stable GUID, or nothing is queued. Returns at durable accept; reads hide the " +
+    "branch must resolve to its stable GUID, or nothing is queued. Returns once MLO applied it (or at durable accept if MLO could not sync inside the wait); reads hide the " +
     "branch immediately. There is no undo through this server: MLO's own recycle bin is the only recovery.",
   inputSchema: {
     id: z
