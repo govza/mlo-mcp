@@ -164,6 +164,27 @@ describe("rowsMatch", () => {
     expect(rowsMatch(injected, { header: ["UID", "Caption", "Note"], cells: [TASK, "mine", ""] })).toBe(true);
   });
 
+  it("ignores MLO's note line-ending serialization", () => {
+    expect(rowsMatch(
+      { header: ["UID", "Note"], cells: [TASK, "first\nsecond"] },
+      { header: ["UID", "Note"], cells: [TASK, "first\\r\\nsecond\\r\\n"] },
+    )).toBe(true);
+  });
+
+  it("ignores MLO's default custom-format cells", () => {
+    expect(rowsMatch(
+      { header: ["UID", "ccChildrenIheritColorCoding", "ccUnderlineEntireRowthickness"], cells: [TASK, "", ""] },
+      { header: ["UID", "ccChildrenIheritColorCoding", "ccUnderlineEntireRowthickness"], cells: [TASK, "0", "1"] },
+    )).toBe(true);
+  });
+
+  it("ignores MLO's zero-valued task defaults", () => {
+    expect(rowsMatch(
+      { header: ["UID", "EstimateMin", "ProjectStatus", "RecDNCCCopy"], cells: [TASK, "", "", "0"] },
+      { header: ["UID", "EstimateMin", "ProjectStatus", "RecDNCCCopy"], cells: [TASK, "0", "0", ""] },
+    )).toBe(true);
+  });
+
   it("flags real content drift — the local-wins conflict signature", () => {
     expect(rowsMatch(injected, { header: ["UID", "Caption"], cells: [TASK, "the user's caption"] })).toBe(false);
   });

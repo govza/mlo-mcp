@@ -1,6 +1,6 @@
 import type { TaskNode } from "../types.js";
 import type { ReadRepository } from "../repo/mlo-repository.js";
-import { containerKind, findInbox, flatten } from "../task-tree.js";
+import { containerKind, findInbox, flatten, isCompleted } from "../task-tree.js";
 import { AvailabilityEngine } from "./availability.js";
 import { failed, ok, type ServiceResult } from "../result.js";
 import type { ReadFailure } from "./failures.js";
@@ -59,7 +59,7 @@ export class ReviewService {
     if (read.isErrored) return failed(read.failure);
     const inbox = findInbox(read.value.tasks, this.options.inboxCaption);
     if (!inbox) return ok([]);
-    return ok(inbox.Children.filter((t) => !t.CompletionDateTime));
+    return ok(inbox.Children.filter((t) => !isCompleted(t)));
   }
 
   /** The outline's project and folder containers with the tasks nested under each. */
@@ -70,7 +70,7 @@ export class ReviewService {
     const engine = new AvailabilityEngine(snapshot, { now: this.options.now?.() });
 
     return ok(flatten(snapshot.tasks)
-      .filter((t) => query.includeCompleted || !t.CompletionDateTime)
+      .filter((t) => query.includeCompleted || !isCompleted(t))
       .flatMap((task) => {
         const kind = containerKind(task);
         if (!kind) return [];
@@ -78,7 +78,7 @@ export class ReviewService {
         if (query.status !== undefined && task.ProjectStatus !== query.status) return [];
 
         const nested = flatten(task.Children);
-        const open = nested.filter((t) => !t.CompletionDateTime);
+        const open = nested.filter((t) => !isCompleted(t));
         return [
           {
             task,
