@@ -23,6 +23,11 @@ export const updateTaskTool = defineTool({
     Effort: z.number().min(0).max(200).optional(),
     DueDateTime: z.string().optional().describe('Local ISO like "2026-08-01T15:00:00"; "" clears'),
     StartDateTime: z.string().optional(),
+    ReminderDateTime: z
+      .string()
+      .regex(/^$|^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/)
+      .optional()
+      .describe('One-off local ISO reminder like "2026-08-01T15:00:00"; "" clears. No recurrence or alert-action options.'),
     CompletionDateTime: z.string().optional().describe('"" reopens (or use uncomplete_task)'),
     ProjectStatus: z.number().int().optional(),
     EstimateMin: z.number().optional().describe("fractional days"),
@@ -30,6 +35,8 @@ export const updateTaskTool = defineTool({
     TheGoal: z.number().int().min(0).max(3).optional().describe("0 none, 1 weekly, 2 monthly, 3 yearly"),
     IsProject: z.boolean().optional(),
     Starred: z.boolean().optional(),
+    Bold: z.boolean().optional().describe("Custom bold task formatting"),
+    Highlight: z.enum(["yellow", ""]).optional().describe('Custom yellow highlight; "" clears it'),
     Folder: z.boolean().optional().describe("Hide only this task from To-Do views; its children remain eligible"),
     HideInToDo: z.boolean().optional().describe("Hide this task and its whole branch from To-Do views"),
     CompleteSubTasksInOrder: z.boolean().optional().describe("Sequential subtasks: only the first uncompleted child is available"),

@@ -43,6 +43,11 @@ before treating the write as correct.
 - Dates are local ISO without timezone ("2026-08-01T15:00:00").
 - Importance/Effort are 0–200 (100 = normal).
 - Contexts are MLO "Places" (@Office); list_contexts enumerates them.
+- update_task supports one-off ReminderDateTime, Bold, and yellow Highlight. Recurrence, custom alert actions, and other fonts/colours are not supported.
+
+### Proven MLO setup details
+- In MLO 6.1.3's cloud-proxy dialog use hostname \`http://127.0.0.1\` and port \`8181\`; the bare hostname is rejected before the proxy is contacted.
+- Keep the built-in Inbox caption exactly \`<Inbox>\`. It is the cloud sync identity used for safe Inbox targeting.
 
 ### The sync endpoint
 MLO's sync proxy points at a loopback endpoint that runs as its own long-lived process, shared

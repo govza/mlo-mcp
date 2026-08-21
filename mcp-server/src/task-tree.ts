@@ -77,6 +77,11 @@ export function flatten(tasks: TaskNode[]): TaskNode[] {
   return out;
 }
 
+/** MLO completion is either a completion timestamp or a completed project status. */
+export function isCompleted(task: TaskNode): boolean {
+  return Boolean(task.CompletionDateTime) || task.ProjectStatus === 3;
+}
+
 export function findById(tasks: TaskNode[], id: string): TaskNode | undefined {
   return flatten(tasks).find((t) => t.id === id);
 }
@@ -147,7 +152,7 @@ export function searchTasks(tasks: TaskNode[], f: SearchFilters): TaskNode[] {
     if (f.dueBefore && !(t.DueDateTime && t.DueDateTime < f.dueBefore)) return false;
     if (f.dueAfter && !(t.DueDateTime && t.DueDateTime > f.dueAfter)) return false;
     if (f.starred !== undefined && (t.Starred ?? false) !== f.starred) return false;
-    if (f.completed !== undefined && Boolean(t.CompletionDateTime) !== f.completed) return false;
+    if (f.completed !== undefined && isCompleted(t) !== f.completed) return false;
     if (f.isProject !== undefined && (t.IsProject ?? false) !== f.isProject) return false;
     if (f.flag && t.Flag !== f.flag) return false;
     if (f.minImportance !== undefined && (t.Importance ?? 100) < f.minImportance) return false;
@@ -162,7 +167,7 @@ export function renderLine(t: TaskNode): string {
   // Named first among the states: everything else on the line is export truth,
   // and this one says the line is a write MLO has not applied yet.
   if (t.pending) marks.push("[pending]");
-  if (t.CompletionDateTime) marks.push("[done]");
+  if (isCompleted(t)) marks.push("[done]");
   if (t.IsProject) marks.push("[project]");
   if (t.Starred) marks.push("[*]");
   if (t.Flag) marks.push(`[flag:${t.Flag}]`);
@@ -191,7 +196,7 @@ export function collectVisible(
   const out: VisibleTask[] = [];
   const walk = (list: TaskNode[], depth: number) => {
     for (const t of list) {
-      if (!opts.includeCompleted && t.CompletionDateTime) continue;
+      if (!opts.includeCompleted && isCompleted(t)) continue;
       if (opts.maxDepth !== undefined && depth >= opts.maxDepth) continue;
       out.push({ task: t, depth });
       walk(t.Children, depth + 1);
