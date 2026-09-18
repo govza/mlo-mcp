@@ -103,8 +103,11 @@ export function loadCloudConfig(): CloudConfig {
  */
 export const DEFAULT_WRITE_WAIT_MS = 20_000;
 
-function resolveWriteWaitMs(): number {
-  const overridden = Number(process.env.MLO_WRITE_WAIT_MS ?? "");
+export function resolveWriteWaitMs(): number {
+  const raw = process.env.MLO_WRITE_WAIT_MS?.trim();
+  // `Number("")` is 0, which would silently turn an unset variable into return-at-accept.
+  if (!raw) return DEFAULT_WRITE_WAIT_MS;
+  const overridden = Number(raw);
   return Number.isFinite(overridden) && overridden >= 0 ? overridden : DEFAULT_WRITE_WAIT_MS;
 }
 

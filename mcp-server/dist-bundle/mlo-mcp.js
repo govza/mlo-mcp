@@ -15402,7 +15402,9 @@ function loadCloudConfig() {
 }
 var DEFAULT_WRITE_WAIT_MS = 2e4;
 function resolveWriteWaitMs() {
-  const overridden = Number(process.env.MLO_WRITE_WAIT_MS ?? "");
+  const raw = process.env.MLO_WRITE_WAIT_MS?.trim();
+  if (!raw) return DEFAULT_WRITE_WAIT_MS;
+  const overridden = Number(raw);
   return Number.isFinite(overridden) && overridden >= 0 ? overridden : DEFAULT_WRITE_WAIT_MS;
 }
 function loadConfig() {
