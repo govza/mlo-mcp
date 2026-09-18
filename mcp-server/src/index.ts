@@ -25,6 +25,9 @@ async function main(): Promise<void> {
   if (process.argv.includes("--preflight")) return runPreflight(fileURLToPath(import.meta.url));
 
   const config = loadConfig();
+  // stderr reaches only the MCP client's own log; the QuickSync nudge decisions
+  // need to survive next to the resident's evidence.
+  mirrorLogToFile(path.join(config.cloudStateRoot, "session.log"));
   // The drivers are wired here and nowhere else — above the repository they do
   // not exist. The ResidentClient attaches (and spawns) lazily on the call
   // that needs it, so a resident that dies mid-session comes back on the next

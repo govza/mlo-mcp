@@ -31321,6 +31321,7 @@ async function main() {
   if (process.argv.includes(RESIDENT_FLAG)) return serveResidentEndpoint();
   if (process.argv.includes("--preflight")) return runPreflight(fileURLToPath2(import.meta.url));
   const config2 = loadConfig();
+  mirrorLogToFile(path17.join(config2.cloudStateRoot, "session.log"));
   const spawn3 = residentSpawner(fileURLToPath2(import.meta.url));
   const resident = new HttpResidentClient({ host: config2.cloudHost, port: config2.cloudPort, spawn: spawn3 });
   const cloud = new CloudGateway({ stateRoot: config2.cloudStateRoot });
