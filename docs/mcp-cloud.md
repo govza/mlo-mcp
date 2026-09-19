@@ -98,11 +98,14 @@ rides MLO's own sync session (spec section 2; proven live for all four verbs):
    binding is the injection gate; every other UID forwards verbatim) and
    presents `vendorVersion + 1`. The bump is transient — MLO stores the
    vendor's real `newServerTimeStamp` after its own Apply.
-4. When MLO's ~90 s background `GetFileTS` poll arrives and the queue is
-   non-empty, the resident answers with the same advanced stamp it will present
-   on the Get; verbatim otherwise. That is what gives a pure-MCP write on a
-   quiet MLO a session to ride: `-QuickSync` opens **no** session when MLO
-   believes nothing changed.
+4. If a `GetFileTS` poll arrives while the queue is non-empty, the resident
+   answers with the same advanced stamp it will present on the Get; verbatim
+   otherwise. In practice none arrives: MLO's cloud-modifications check
+   bypasses the proxy (measured 2026-09-19), and MLO checks only on app
+   activation, not on a cadence. A pure-MCP write on a quiet MLO therefore
+   rides the `-QuickSync` nudge, which with the data-file argument opens a
+   session every time; MLO's throttle (4 per sliding 2–3 min window) is what
+   bounds it — see `docs/mlo/mlo-cli.md`.
 5. `mlo.exe -QuickSync` stays a best-effort accelerator inside the repository,
    never load-bearing, and always invoked with the explicit data-file path.
 6. A row is **delivered** when the resident observes MLO's own Apply carry that

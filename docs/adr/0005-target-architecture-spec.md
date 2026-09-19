@@ -511,6 +511,14 @@ mechanism): the `GetFileTS` nudge. Worst case MLO ignores the advanced
 answer and delivery falls back to riding the next natural session - no worse
 than today; if so, revisit delivery latency vs the 15-minute TTL.
 
+> **Verified 2026-09-19: the worst case is the actual case.** MLO's
+> cloud-modifications check connects to the vendor directly, bypassing the
+> proxy, so the resident never sees a `GetFileTS` and mechanic 4 never fires.
+> Mechanic 5 is load-bearing after all: with the data-file argument
+> `-QuickSync` opens a session every time, bounded by MLO's throttle (4 per
+> sliding 2–3 min window, `docs/mlo/mlo-cli.md`). Delivery latency past the
+> budget is "until the window slides", well inside the 15-minute TTL.
+
 ## 10. Out of scope
 
 - Local mode (`scripts/bootstrap-local.ts`) redesign - dev/test-only surface.

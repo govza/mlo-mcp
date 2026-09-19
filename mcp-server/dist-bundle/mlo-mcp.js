@@ -27343,7 +27343,7 @@ var WRITE_ACCEPT_OUTPUT = {
   ),
   writeId: external_exports.string().describe("The accept receipt \u2014 pass it to write_status to see where the write got to"),
   status: external_exports.enum(["accepted", "delivered", "verified", "superseded", "expired"]).describe(
-    "Where the write stood when the delivery wait closed. delivered/verified: MLO applied it, visible in the app now. accepted: durably queued, MLO applies it on its own sync. superseded: MLO kept its own conflicting version \u2014 re-read and re-apply"
+    "Where the write stood when the delivery wait closed. delivered/verified: MLO applied it, visible in the app now. accepted: durably queued, applied on the next sync MLO runs. superseded: MLO kept its own conflicting version \u2014 re-read and re-apply"
   ),
   expiresAt: external_exports.string().describe("Local ISO time this write gives up if MLO has not synced by then; it then becomes a dead letter"),
   message: external_exports.string()
@@ -27558,7 +27558,7 @@ var deleteTaskTool = defineTool({
 var PROGRESS_WORDS = {
   accepted: {
     detail: "durably queued \u2014 it lands the next time MLO syncs through the endpoint",
-    remedy: "nothing to do; MLO syncs on its own within about 90 seconds, or run `sync` to hurry it"
+    remedy: "run `sync` to deliver it now; otherwise it lands on the next nudge or the next sync MLO runs itself"
   },
   delivered: { detail: "MLO applied this write to the profile" },
   verified: { detail: "MLO applied this write and a fresh export confirmed it" },
@@ -27645,9 +27645,9 @@ MLO is an OUTLINER: tasks live in one deep tree, and deep nesting is idiomatic.
 A write tool durably queues the change, nudges MLO to sync, and holds its reply open briefly
 for delivery. \`status\` in the response says what actually happened: "delivered"/"verified"
 means MLO applied it and the change is visible in the app NOW; "accepted" means MLO did not
-sync inside the wait (its nudge budget was spent), so the change lands on MLO's own sync
-(about 90 seconds) - reads still show it straight away, flagged \`pending: true\` with the
-writeId that made it. One residual case: when a task's identity cannot be resolved against
+sync inside the wait (its nudge budget was spent for a few minutes), so the change lands on
+the next nudge, an explicit sync, or the next sync MLO runs for its own reasons - reads still
+show it straight away, flagged \`pending: true\` with the writeId that made it. One residual case: when a task's identity cannot be resolved against
 the captured rows, its queued change shows as a separate pending row instead of updating the
 task in place.
 

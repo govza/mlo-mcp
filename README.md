@@ -75,7 +75,7 @@ Ask your agent to check `cloud_status` to confirm: it should report the profile 
 
 Writes are live from here. Three things worth knowing:
 
-- **A write returns as soon as it is durably queued, not when MLO has applied it.** MLO picks it up on its own next sync — usually within about 90 seconds, which the endpoint nudges along. `write_status` tells you where a given write got to.
+- **A write returns as soon as it is durably queued, not when MLO has applied it.** The server nudges MLO to sync right away (up to four nudges every few minutes, MLO's own limit); past that the write waits for the next nudge, a `sync` call, or a sync MLO runs itself. `write_status` tells you where a given write got to.
 - **The setup survives client restarts.** The endpoint is a background process that outlives your agent sessions; your account credentials stay in its memory and are never written to disk, so a reboot means one more ordinary sync before writes work again. After a reboot the endpoint returns with your first agent session; MLO syncs attempted before that simply fail to connect and retry later, harmlessly.
 - `cloud_status` reports the binding, the partition lifecycle, whether the endpoint is up, and the write queue's health whenever you want to check where things stand.
 

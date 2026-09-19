@@ -11,7 +11,7 @@ import { defineTool, failureResult, textResult } from "./contract.js";
 const PROGRESS_WORDS: Record<WriteStatus, { detail: string; remedy?: string }> = {
   accepted: {
     detail: "durably queued — it lands the next time MLO syncs through the endpoint",
-    remedy: "nothing to do; MLO syncs on its own within about 90 seconds, or run `sync` to hurry it",
+    remedy: "run `sync` to deliver it now; otherwise it lands on the next nudge or the next sync MLO runs itself",
   },
   delivered: { detail: "MLO applied this write to the profile" },
   verified: { detail: "MLO applied this write and a fresh export confirmed it" },

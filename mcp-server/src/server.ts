@@ -13,9 +13,9 @@ MLO is an OUTLINER: tasks live in one deep tree, and deep nesting is idiomatic.
 A write tool durably queues the change, nudges MLO to sync, and holds its reply open briefly
 for delivery. \`status\` in the response says what actually happened: "delivered"/"verified"
 means MLO applied it and the change is visible in the app NOW; "accepted" means MLO did not
-sync inside the wait (its nudge budget was spent), so the change lands on MLO's own sync
-(about 90 seconds) - reads still show it straight away, flagged \`pending: true\` with the
-writeId that made it. One residual case: when a task's identity cannot be resolved against
+sync inside the wait (its nudge budget was spent for a few minutes), so the change lands on
+the next nudge, an explicit sync, or the next sync MLO runs for its own reasons - reads still
+show it straight away, flagged \`pending: true\` with the writeId that made it. One residual case: when a task's identity cannot be resolved against
 the captured rows, its queued change shows as a separate pending row instead of updating the
 task in place.
 

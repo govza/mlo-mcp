@@ -11,7 +11,7 @@ import { failureResult, textResult } from "./contract.js";
  * The service holds the reply open for a bounded delivery wait (writeWaitMs,
  * usually enough for the QuickSync nudge to land), so `status` is whatever the
  * write path actually observed by then: "delivered"/"verified" means MLO shows
- * the change now, "accepted" means it is still queued and rides MLO's own sync
+ * the change now, "accepted" means it is still queued for the next session
  * — a timeout is never reported as failure, and `write_status(writeId)` stays
  * the surface for the eventual outcome.
  */
@@ -29,7 +29,7 @@ export const WRITE_ACCEPT_OUTPUT = {
     .enum(["accepted", "delivered", "verified", "superseded", "expired"])
     .describe(
       "Where the write stood when the delivery wait closed. delivered/verified: MLO applied it, visible in the " +
-        "app now. accepted: durably queued, MLO applies it on its own sync. superseded: MLO kept its own " +
+        "app now. accepted: durably queued, applied on the next sync MLO runs. superseded: MLO kept its own " +
         "conflicting version — re-read and re-apply",
     ),
   expiresAt: z
