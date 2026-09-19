@@ -56,9 +56,19 @@ The extras beyond the original syntax line: `-zoom` (zoom the GUI to the
   | 5 | **never exits** | 5 | **none** |
 
   - **The limit is 4 per window; the 5th invocation trips it.** It pops the modal *"Very frequent synchronization to the cloud in command line mode is not allowed. Please sync no more than once per several minutes..."*, and the CLI process **hangs until killed** — it does not exit when the modal closes. Always spawn with a timeout that kills the child.
-  - **The state is `HKCU\Software\MyLifeOrganized.net\MyLife\Settings`**: `QuickSyncCount` (REG_DWORD, invocations this window) and `QuickSyncTime` (REG_BINARY, a Delphi `TDateTime` double — the window stamp). The counter increments on every invocation and resets when the window elapses; writing `QuickSyncCount = 0` clears the throttle immediately (verified), and backdating `QuickSyncTime` does too. **The server reads this counter and never writes it** — forging it would defeat a guard the vendor put there deliberately.
-  - The exact window length is still unmeasured. It does not need to be: the server gates on the counter's value (`MLO_QUICKSYNC_MAX_PER_WINDOW`, default 4), so it never needs to know when the window turns over.
-  - The wording flags the switch as deprecated, so nothing may depend on it. A skipped nudge loses nothing — queued writes ride MLO's background `GetFileTS` poll and deliver together in one session.
+  - **The state is `HKCU\Software\MyLifeOrganized.net\MyLife\Settings`**: `QuickSyncCount` (REG_DWORD, invocations this window) and `QuickSyncTime` (REG_BINARY, a Delphi `TDateTime` double in local wall-clock time — the stamp of the **last** invocation). Writing `QuickSyncCount = 0` clears the throttle immediately (verified), and backdating `QuickSyncTime` does too. **The server reads both values and never writes them** — forging them would defeat a guard the vendor put there deliberately.
+  - **The window slides from the last invocation, and only an invocation resets it** (measured 2026-09-19, 6.1.3, `mlo.exe <file.ml> -QuickSync -console`, demo profile):
+
+    | after four invocations, next one at | result | `QuickSyncCount` / `QuickSyncTime` after |
+    |---|---|---|
+    | +2 min 01 s | **modal**, child hung (killed) | 5 / unchanged |
+    | +3 min 01 s | session ran | 0 / re-stamped |
+    | +5 min 11 s | session ran | 0 / re-stamped |
+    | +22 min | session ran | 0 / re-stamped |
+
+    So the window is between 2 and 3 minutes, every successful invocation re-stamps it, a tripped one does not, and the counter never decays on its own: MLO restarting, syncing from the GUI, or the clock passing the window leave it at 4. A server that gates on the counter alone therefore freezes its nudge forever after the fourth write. The server gates on both: a spent counter is affordable again once `QuickSyncTime` is older than `MLO_QUICKSYNC_WINDOW_MS` (default 4 min, a minute above the measured reset), and that nudge is the invocation that makes MLO reset.
+  - Without the file argument (`mlo.exe -QuickSync` alone) the running app only runs its cloud-modifications check and syncs if the cloud reports changes; it opens no session otherwise and touches neither registry value.
+  - The wording flags the switch as deprecated, so nothing may depend on it. A skipped nudge holds the write in the queue until the next affordable nudge, an explicit `sync`, or a session MLO opens for its own reasons — its background cloud-modifications check does **not** pass through the proxy (see `.scratch/write-delivery-bugs/issues/05`), so the endpoint cannot induce one.
 
 ## The `-Parse` rapid-entry parser
 

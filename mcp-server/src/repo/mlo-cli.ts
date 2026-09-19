@@ -32,11 +32,11 @@ export interface MloCli {
   /** Trigger MLO's QuickSync (cloud/Wi-Fi sync as configured in the profile). */
   quickSync(): Promise<void>;
   /**
-   * MLO's own throttle counter for the deprecated `-QuickSync` switch, read
+   * MLO's own throttle state for the deprecated `-QuickSync` switch, read
    * (never written) from its settings. `undefined` when it cannot be read —
    * the caller then falls back to a time-based gate rather than guessing.
    */
-  quickSyncCount(): Promise<number | undefined>;
+  quickSyncThrottle(): Promise<QuickSyncThrottle | undefined>;
   /** Read the raw .ml data file (for GUID extraction). */
   readDataFile(): Promise<Buffer>;
 }
@@ -190,39 +190,84 @@ const execMlo: MloExec = (exePath, args, timeoutMs) =>
   });
 
 /**
- * Where MLO keeps its own client-side guard on the deprecated `-QuickSync`
- * switch: a counter of invocations in the current window, reset when the
- * window elapses. Measured 2026-08-12 against 6.1.3 — the invocation that
- * takes the counter to 5 pops the throttle modal, hangs the CLI and runs no
- * sync session at all. Read-only here: the counter is MLO's state, and
- * forging it would defeat a guard the vendor put there on purpose.
+ * MLO's client-side guard on the deprecated `-QuickSync` switch, as its
+ * settings record it: how many invocations the current window has seen, and
+ * when the last one ran. Measured against 6.1.3 (2026-08-12, 2026-09-19): the
+ * stamp moves on every invocation, so the window slides from the LAST one;
+ * an invocation past the window resets the counter to 0 and runs; one inside
+ * the window that would take the counter to 5 pops the throttle modal, hangs
+ * the CLI and runs no session at all.
  */
-const QUICKSYNC_COUNT_KEY = "HKCU\\Software\\MyLifeOrganized.net\\MyLife\\Settings";
-const QUICKSYNC_COUNT_VALUE = "QuickSyncCount";
+export interface QuickSyncThrottle {
+  count: number;
+  /** Epoch ms of the last invocation; absent when the stamp could not be decoded. */
+  lastInvokedAt?: number;
+}
+
+export type QuickSyncVerdict = { affordable: true } | { affordable: false; retryAfterMs: number };
+
+/**
+ * Whether one more `-QuickSync` stays under MLO's guard. The counter alone
+ * would freeze the nudge for good once it reaches the budget, because MLO
+ * only resets it on the next invocation — so a spent budget is affordable
+ * again once the window has slid past the last invocation.
+ */
+export function quickSyncVerdict(
+  throttle: QuickSyncThrottle,
+  budget: { maxPerWindow: number; windowMs: number },
+  now = Date.now()
+): QuickSyncVerdict {
+  if (throttle.count < budget.maxPerWindow) return { affordable: true };
+  if (throttle.lastInvokedAt === undefined) return { affordable: false, retryAfterMs: budget.windowMs };
+  const remaining = throttle.lastInvokedAt + budget.windowMs - now;
+  return remaining <= 0 ? { affordable: true } : { affordable: false, retryAfterMs: remaining };
+}
+
+/**
+ * Read-only: the state is MLO's, and forging it would defeat a guard the
+ * vendor put there on purpose.
+ */
+const QUICKSYNC_KEY = "HKCU\\Software\\MyLifeOrganized.net\\MyLife\\Settings";
+
+/** A Delphi TDateTime: days since 1899-12-30, in local wall-clock time. */
+const DELPHI_EPOCH_MS = Date.UTC(1899, 11, 30);
+
+export function delphiDateTimeToEpochMs(hex: string, now = new Date()): number | undefined {
+  if (!/^[0-9a-f]{16}$/i.test(hex)) return undefined;
+  const days = Buffer.from(hex, "hex").readDoubleLE(0);
+  if (!Number.isFinite(days)) return undefined;
+  return DELPHI_EPOCH_MS + days * 86_400_000 + now.getTimezoneOffset() * 60_000;
+}
+
+/** Parses `reg query` output for the settings key; `undefined` when the counter is absent. */
+export function parseQuickSyncThrottle(out: string, now = new Date()): QuickSyncThrottle | undefined {
+  // "    QuickSyncCount    REG_DWORD    0x4"
+  const count = /QuickSyncCount\s+REG_DWORD\s+(0x[0-9a-f]+|\d+)/i.exec(out);
+  if (!count) return undefined;
+  const parsed = Number(count[1]);
+  if (!Number.isFinite(parsed)) return undefined;
+  // "    QuickSyncTime    REG_BINARY    945853F68199E640"
+  const stamp = /QuickSyncTime\s+REG_BINARY\s+([0-9a-f]+)/i.exec(out);
+  const lastInvokedAt = stamp ? delphiDateTimeToEpochMs(stamp[1]!, now) : undefined;
+  return lastInvokedAt === undefined ? { count: parsed } : { count: parsed, lastInvokedAt };
+}
 
 /**
  * Best-effort: any failure (not Windows, key absent, `reg.exe` missing, output
  * in a shape we do not recognise) answers `undefined`, never a throw. The
  * nudge is an accelerator — it may never become a source of refusals.
  */
-function readQuickSyncCount(): Promise<number | undefined> {
+function readQuickSyncThrottle(): Promise<QuickSyncThrottle | undefined> {
   return new Promise((resolve) => {
     let out = "";
-    const child = spawn("reg.exe", ["query", QUICKSYNC_COUNT_KEY, "/v", QUICKSYNC_COUNT_VALUE], {
+    const child = spawn("reg.exe", ["query", QUICKSYNC_KEY], {
       timeout: 5_000,
       windowsHide: true,
       stdio: ["ignore", "pipe", "ignore"],
     });
     child.stdout?.on("data", (chunk) => (out += chunk));
     child.on("error", () => resolve(undefined));
-    child.on("exit", (code) => {
-      if (code !== 0) return resolve(undefined);
-      // "    QuickSyncCount    REG_DWORD    0x4"
-      const match = /QuickSyncCount\s+REG_DWORD\s+(0x[0-9a-f]+|\d+)/i.exec(out);
-      if (!match) return resolve(undefined);
-      const parsed = Number(match[1]);
-      resolve(Number.isFinite(parsed) ? parsed : undefined);
-    });
+    child.on("exit", (code) => resolve(code === 0 ? parseQuickSyncThrottle(out) : undefined));
   });
 }
 
@@ -271,8 +316,8 @@ export class SystemMloCli implements MloCli {
     });
   }
 
-  async quickSyncCount(): Promise<number | undefined> {
-    return readQuickSyncCount();
+  async quickSyncThrottle(): Promise<QuickSyncThrottle | undefined> {
+    return readQuickSyncThrottle();
   }
 
   readDataFile(): Promise<Buffer> {

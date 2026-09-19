@@ -59,6 +59,13 @@ export interface MloConfig {
    */
   quickSyncMaxPerWindow: number;
   /**
+   * How long MLO's throttle window slides past the LAST `-QuickSync`
+   * invocation before the next one resets the counter instead of tripping
+   * the modal. MLO only resets on an invocation, so without this a spent
+   * budget would never be spent again.
+   */
+  quickSyncWindowMs: number;
+  /**
    * How long a write tool holds its reply open waiting for MLO to apply the
    * accepted write, so an interactive change is visibly live in the app before
    * the caller reports it done. The QuickSync nudge lands in ~13 s when MLO's

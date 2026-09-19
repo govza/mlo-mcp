@@ -3,7 +3,7 @@ import { parseMloXml } from "../xml.js";
 import { buildTaskTree } from "../task-tree.js";
 import { annotateGuids } from "../guids.js";
 import { log } from "../log.js";
-import type { MloCli } from "./mlo-cli.js";
+import { quickSyncVerdict, type MloCli } from "./mlo-cli.js";
 import type { ResidentClient } from "./resident-client.js";
 import {
   repoFailure,
@@ -167,15 +167,22 @@ export class LocalMloRepository implements MloRepository {
    * fall back to the old blind timer, which is safe by being slow.
    */
   private async nudge(): Promise<void> {
-    const count = await this.cli.quickSyncCount();
-    if (count === undefined) {
+    const throttle = await this.cli.quickSyncThrottle();
+    if (throttle === undefined) {
       if (Date.now() - this.lastQuickSyncAt < this.config.quickSyncDebounceMs) return;
-    } else if (count >= this.config.quickSyncMaxPerWindow) {
-      log(
-        `QuickSync nudge skipped: MLO's throttle budget is spent (${count}/${this.config.quickSyncMaxPerWindow} ` +
-          `this window). The write is queued and rides MLO's own sync.`
-      );
-      return;
+    } else {
+      const verdict = quickSyncVerdict(throttle, {
+        maxPerWindow: this.config.quickSyncMaxPerWindow,
+        windowMs: this.config.quickSyncWindowMs,
+      });
+      if (!verdict.affordable) {
+        log(
+          `QuickSync nudge skipped: MLO's throttle budget is spent (${throttle.count}/${this.config.quickSyncMaxPerWindow}); ` +
+            `the window slides past its last invocation in ${Math.ceil(verdict.retryAfterMs / 1000)} s. ` +
+            `The write is queued and rides MLO's own sync.`
+        );
+        return;
+      }
     }
     const nudged = await this.quickSync();
     if (nudged.isErrored) {

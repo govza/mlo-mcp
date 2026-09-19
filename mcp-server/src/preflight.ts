@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { loadCloudConfig, loadConfig } from "./config.js";
 import { detectProfile } from "./profile-detect.js";
-import { SystemMloCli } from "./repo/mlo-cli.js";
+import { quickSyncVerdict, SystemMloCli } from "./repo/mlo-cli.js";
 import { CloudGateway } from "./cloud/gateway.js";
 import { ensureEndpoint, probe, residentSpawner, type EndpointSpawner } from "./cloud/endpoint.js";
 
@@ -105,9 +105,15 @@ async function reportBindingAndQueue(dataFile: string, stateRoot: string, say: (
 async function drainQueue(say: (line: string) => void): Promise<void> {
   const config = loadConfig();
   const cli = new SystemMloCli(config);
-  const count = await cli.quickSyncCount();
-  if (count !== undefined && count >= config.quickSyncMaxPerWindow) {
-    say(`queue: QuickSync budget spent (${count} this window) — pending writes ride MLO's own ~90s sync`);
+  const throttle = await cli.quickSyncThrottle();
+  const verdict = throttle
+    ? quickSyncVerdict(throttle, { maxPerWindow: config.quickSyncMaxPerWindow, windowMs: config.quickSyncWindowMs })
+    : { affordable: true as const };
+  if (!verdict.affordable) {
+    say(
+      `queue: QuickSync budget spent (${throttle?.count} this window, affordable again in ` +
+        `${Math.ceil(verdict.retryAfterMs / 1000)} s) — pending writes ride MLO's own sync`
+    );
     return;
   }
   try {

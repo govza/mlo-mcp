@@ -15401,6 +15401,7 @@ function loadCloudConfig() {
   };
 }
 var DEFAULT_WRITE_WAIT_MS = 2e4;
+var DEFAULT_QUICKSYNC_WINDOW_MS = 4 * 6e4;
 function resolveWriteWaitMs() {
   const raw = process.env.MLO_WRITE_WAIT_MS?.trim();
   if (!raw) return DEFAULT_WRITE_WAIT_MS;
@@ -15417,6 +15418,7 @@ function loadConfig() {
     cacheStaleMs: Number(process.env.MLO_CACHE_STALE_MS) || 3e4,
     quickSyncDebounceMs: Number(process.env.MLO_QUICKSYNC_DEBOUNCE_MS) || 3e5,
     quickSyncMaxPerWindow: Number(process.env.MLO_QUICKSYNC_MAX_PER_WINDOW) || 4,
+    quickSyncWindowMs: Number(process.env.MLO_QUICKSYNC_WINDOW_MS) || DEFAULT_QUICKSYNC_WINDOW_MS,
     writeWaitMs: resolveWriteWaitMs(),
     // Only needed when the capture inbox is NOT MLO's own <Inbox> node (e.g. a
     // hand-made "Входящие" folder). MLO itself hardcodes the caption "<Inbox>"
@@ -15541,25 +15543,40 @@ var execMlo = (exePath, args, timeoutMs) => new Promise((resolve, reject) => {
     }
   });
 });
-var QUICKSYNC_COUNT_KEY = "HKCU\\Software\\MyLifeOrganized.net\\MyLife\\Settings";
-var QUICKSYNC_COUNT_VALUE = "QuickSyncCount";
-function readQuickSyncCount() {
+function quickSyncVerdict(throttle, budget, now = Date.now()) {
+  if (throttle.count < budget.maxPerWindow) return { affordable: true };
+  if (throttle.lastInvokedAt === void 0) return { affordable: false, retryAfterMs: budget.windowMs };
+  const remaining = throttle.lastInvokedAt + budget.windowMs - now;
+  return remaining <= 0 ? { affordable: true } : { affordable: false, retryAfterMs: remaining };
+}
+var QUICKSYNC_KEY = "HKCU\\Software\\MyLifeOrganized.net\\MyLife\\Settings";
+var DELPHI_EPOCH_MS = Date.UTC(1899, 11, 30);
+function delphiDateTimeToEpochMs(hex, now = /* @__PURE__ */ new Date()) {
+  if (!/^[0-9a-f]{16}$/i.test(hex)) return void 0;
+  const days = Buffer.from(hex, "hex").readDoubleLE(0);
+  if (!Number.isFinite(days)) return void 0;
+  return DELPHI_EPOCH_MS + days * 864e5 + now.getTimezoneOffset() * 6e4;
+}
+function parseQuickSyncThrottle(out, now = /* @__PURE__ */ new Date()) {
+  const count = /QuickSyncCount\s+REG_DWORD\s+(0x[0-9a-f]+|\d+)/i.exec(out);
+  if (!count) return void 0;
+  const parsed = Number(count[1]);
+  if (!Number.isFinite(parsed)) return void 0;
+  const stamp = /QuickSyncTime\s+REG_BINARY\s+([0-9a-f]+)/i.exec(out);
+  const lastInvokedAt = stamp ? delphiDateTimeToEpochMs(stamp[1], now) : void 0;
+  return lastInvokedAt === void 0 ? { count: parsed } : { count: parsed, lastInvokedAt };
+}
+function readQuickSyncThrottle() {
   return new Promise((resolve) => {
     let out = "";
-    const child = spawn("reg.exe", ["query", QUICKSYNC_COUNT_KEY, "/v", QUICKSYNC_COUNT_VALUE], {
+    const child = spawn("reg.exe", ["query", QUICKSYNC_KEY], {
       timeout: 5e3,
       windowsHide: true,
       stdio: ["ignore", "pipe", "ignore"]
     });
     child.stdout?.on("data", (chunk) => out += chunk);
     child.on("error", () => resolve(void 0));
-    child.on("exit", (code) => {
-      if (code !== 0) return resolve(void 0);
-      const match = /QuickSyncCount\s+REG_DWORD\s+(0x[0-9a-f]+|\d+)/i.exec(out);
-      if (!match) return resolve(void 0);
-      const parsed = Number(match[1]);
-      resolve(Number.isFinite(parsed) ? parsed : void 0);
-    });
+    child.on("exit", (code) => resolve(code === 0 ? parseQuickSyncThrottle(out) : void 0));
   });
 }
 var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -15598,8 +15615,8 @@ var SystemMloCli = class {
       await this.exec(this.config.mloExePath, mloArgs(this.config.dataFile, ["-QuickSync"]), 3e4);
     });
   }
-  async quickSyncCount() {
-    return readQuickSyncCount();
+  async quickSyncThrottle() {
+    return readQuickSyncThrottle();
   }
   readDataFile() {
     return fs2.readFile(this.config.dataFile);
@@ -16743,14 +16760,20 @@ var LocalMloRepository = class {
    * fall back to the old blind timer, which is safe by being slow.
    */
   async nudge() {
-    const count = await this.cli.quickSyncCount();
-    if (count === void 0) {
+    const throttle = await this.cli.quickSyncThrottle();
+    if (throttle === void 0) {
       if (Date.now() - this.lastQuickSyncAt < this.config.quickSyncDebounceMs) return;
-    } else if (count >= this.config.quickSyncMaxPerWindow) {
-      log(
-        `QuickSync nudge skipped: MLO's throttle budget is spent (${count}/${this.config.quickSyncMaxPerWindow} this window). The write is queued and rides MLO's own sync.`
-      );
-      return;
+    } else {
+      const verdict = quickSyncVerdict(throttle, {
+        maxPerWindow: this.config.quickSyncMaxPerWindow,
+        windowMs: this.config.quickSyncWindowMs
+      });
+      if (!verdict.affordable) {
+        log(
+          `QuickSync nudge skipped: MLO's throttle budget is spent (${throttle.count}/${this.config.quickSyncMaxPerWindow}); the window slides past its last invocation in ${Math.ceil(verdict.retryAfterMs / 1e3)} s. The write is queued and rides MLO's own sync.`
+        );
+        return;
+      }
     }
     const nudged = await this.quickSync();
     if (nudged.isErrored) {
@@ -31291,9 +31314,12 @@ async function reportBindingAndQueue(dataFile, stateRoot, say) {
 async function drainQueue(say) {
   const config2 = loadConfig();
   const cli = new SystemMloCli(config2);
-  const count = await cli.quickSyncCount();
-  if (count !== void 0 && count >= config2.quickSyncMaxPerWindow) {
-    say(`queue: QuickSync budget spent (${count} this window) \u2014 pending writes ride MLO's own ~90s sync`);
+  const throttle = await cli.quickSyncThrottle();
+  const verdict = throttle ? quickSyncVerdict(throttle, { maxPerWindow: config2.quickSyncMaxPerWindow, windowMs: config2.quickSyncWindowMs }) : { affordable: true };
+  if (!verdict.affordable) {
+    say(
+      `queue: QuickSync budget spent (${throttle?.count} this window, affordable again in ${Math.ceil(verdict.retryAfterMs / 1e3)} s) \u2014 pending writes ride MLO's own sync`
+    );
     return;
   }
   try {

@@ -103,6 +103,15 @@ export function loadCloudConfig(): CloudConfig {
  */
 export const DEFAULT_WRITE_WAIT_MS = 20_000;
 
+/**
+ * MLO's `-QuickSync` throttle window, measured against 6.1.3 (2026-09-19):
+ * a probe 2 min 01 s after the fourth invocation tripped the modal, one at
+ * 3 min 01 s reset the counter and ran. The default sits a minute above the
+ * reset point so the nudge is never the invocation that trips the modal.
+ * MLO_QUICKSYNC_WINDOW_MS overrides.
+ */
+export const DEFAULT_QUICKSYNC_WINDOW_MS = 4 * 60_000;
+
 export function resolveWriteWaitMs(): number {
   const raw = process.env.MLO_WRITE_WAIT_MS?.trim();
   // `Number("")` is 0, which would silently turn an unset variable into return-at-accept.
@@ -124,6 +133,7 @@ export function loadConfig(): MloConfig {
     cacheStaleMs: Number(process.env.MLO_CACHE_STALE_MS) || 30_000,
     quickSyncDebounceMs: Number(process.env.MLO_QUICKSYNC_DEBOUNCE_MS) || 300_000,
     quickSyncMaxPerWindow: Number(process.env.MLO_QUICKSYNC_MAX_PER_WINDOW) || 4,
+    quickSyncWindowMs: Number(process.env.MLO_QUICKSYNC_WINDOW_MS) || DEFAULT_QUICKSYNC_WINDOW_MS,
     writeWaitMs: resolveWriteWaitMs(),
     // Only needed when the capture inbox is NOT MLO's own <Inbox> node (e.g. a
     // hand-made "Входящие" folder). MLO itself hardcodes the caption "<Inbox>"
