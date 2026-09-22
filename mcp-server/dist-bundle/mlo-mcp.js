@@ -27069,7 +27069,6 @@ function registerTool(server, tool, ctx) {
       title: tool.title,
       description: tool.description,
       inputSchema: tool.inputSchema,
-      outputSchema: tool.outputSchema,
       annotations: tool.annotations
     },
     guard(tool.name, (args) => tool.execute(args, ctx))
