@@ -57,7 +57,8 @@ describe.skipIf(!mloInstalled)("MCP server E2E over stdio", () => {
     expect(names).toEqual([...allTools.map((tool) => tool.name)].sort());
     const list = tools.find((t) => t.name === "list_tasks")!;
     expect(list.annotations?.readOnlyHint).toBe(true);
-    expect(list.outputSchema).toBeDefined();
+    // Not advertised on purpose: see registerTool() in src/tools/contract.ts.
+    expect(list.outputSchema).toBeUndefined();
     // every tool states its full annotation contract
     for (const t of tools) {
       for (const hint of ["readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"] as const) {

@@ -61,7 +61,16 @@ export function defineTool<In extends z.ZodRawShape, Out extends z.ZodRawShape>(
   return tool;
 }
 
-/** Wire a declarative tool into the MCP server, wrapping execute() in guard(). */
+/**
+ * Wire a declarative tool into the MCP server, wrapping execute() in guard().
+ *
+ * `outputSchema` is deliberately not forwarded. The SDK (1.29, zod v3 path)
+ * serialises it with zod-to-json-schema, which stamps `$schema: draft-07`;
+ * Claude Code's MCP client validates output schemas with a 2020-12-only
+ * validator and refuses every tool that declares one, before the call is even
+ * sent. Results still carry `structuredContent`; the shape is asserted by the
+ * unit tests against `MloTool.outputSchema` instead of by the SDK at runtime.
+ */
 export function registerTool(server: McpServer, tool: MloTool, ctx: ToolContext): void {
   server.registerTool(
     tool.name,
@@ -69,7 +78,6 @@ export function registerTool(server: McpServer, tool: MloTool, ctx: ToolContext)
       title: tool.title,
       description: tool.description,
       inputSchema: tool.inputSchema,
-      outputSchema: tool.outputSchema,
       annotations: tool.annotations,
     },
     guard(tool.name, (args) => tool.execute(args, ctx))
