@@ -893,8 +893,12 @@ recurring task with blank recurrence cells changes its meaning.
 
 ### Custom color coding
 
-The prefix is `cc`. Only `ccUseCustomColorCoding=0` was nonblank in the full
-fixture, so storage types for most cells remain unverified.
+The prefix is `cc`. Verified 2026-08-21 against MLO 6.1.3: bold is
+`ccUseCustomColorCoding=1, ccBold=1`; yellow highlight is
+`ccUseCustomColorCoding=1, ccHighlightColor=65535`. MLO materializes
+`ccChildrenIheritColorCoding=0` and `ccUnderlineEntireRowthickness=1` on its
+first custom-format write; they are defaults, not user changes. Other cells
+remain unverified.
 
 | Column | Intended property |
 |---|---|
@@ -922,9 +926,25 @@ fixture, so storage types for most cells remain unverified.
 
 ### Reminder and alert action
 
-No controlled payload contained nonblank reminder fields. Names and task-model
-behavior give these preliminary meanings; exact encodings require a dedicated
-capture.
+Verified 2026-08-21 against MLO 6.1.3: a one-off desktop reminder uses a
+Delphi `TDateTime` serial (civil days since 1899-12-30) in both `Reminder` and
+`NextAlert`. MLO accepted and returned this complete default payload:
+
+```text
+AutoAlert=0
+AutoAlertDelta=0.010416667
+LimitAutoAlertCount=1
+MaxAutoAlertCount=3
+AutoAlertIndex=0
+ReminderState=1
+AlertAction=33
+AudioFile=C:\\Windows\\Media\\Windows Message Nudge.wav
+```
+
+Clearing a reminder blanks every reminder/alert column above, including
+`Reminder`, `NextAlert`, and `AudioFile`. This is the only supported reminder
+shape: no recurrence, alternate alert actions, email, app launch, or sound
+selection.
 
 | Column | Intended property |
 |---|---|

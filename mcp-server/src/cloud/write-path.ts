@@ -147,11 +147,23 @@ export function rowDiff(injected: NamedRow, applied: NamedRow): { column: string
   const diffs: { column: string; injected: string; applied: string }[] = [];
   for (const name of columns) {
     if (SUPERSEDE_VOLATILE_COLUMNS.has(name)) continue;
-    const left = injected.cells[injected.header.indexOf(name)] ?? "";
-    const right = applied.cells[applied.header.indexOf(name)] ?? "";
+    const left = comparableCell(name, injected.cells[injected.header.indexOf(name)] ?? "");
+    const right = comparableCell(name, applied.cells[applied.header.indexOf(name)] ?? "");
     if (left !== right) diffs.push({ column: name, injected: left, applied: right });
   }
   return diffs;
+}
+
+/** MLO serializes notes as escaped CRLF text and materializes format defaults on the first custom-format write. */
+function comparableCell(name: string, value: string): string {
+  if (name === "Note") return value.replace(/\\r\\n|\\n|\\r|\r\n?|\n/g, "\n").replace(/\n$/, "");
+  if (
+    ["EstimateMin", "EstimateMax", "ProjectStatus", "GoalFor", "RecUncompleteSubtasks", "RecUncomplIfCompl", "RecHourDelta", "RecDNCCCopy", "RecRecurWSC"].includes(name) &&
+    (value === "" || value === "0")
+  ) return "0";
+  if (name === "ccChildrenIheritColorCoding" && (value === "" || value === "0")) return "0";
+  if (name === "ccUnderlineEntireRowthickness" && (value === "" || value === "1")) return "1";
+  return value;
 }
 
 export type AcceptOutcome =

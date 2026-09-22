@@ -73,6 +73,20 @@ describe("AvailabilityEngine — leaf visibility", () => {
     expect(blockKinds(engine([leaf]), "1")).toEqual(["completed"]);
   });
 
+  it("excludes unfinished children of a completed parent", () => {
+    const leaf = task("1.1", "stale child");
+    const parent = task("1", "completed project", { CompletionDateTime: "2026-07-01T09:00:00", Children: [leaf] });
+    expect(engine([parent]).actions()).toEqual([]);
+    expect(blockKinds(engine([parent]), "1.1")).toEqual(["completed"]);
+  });
+
+  it("treats a completed project status as completion for its descendants", () => {
+    const leaf = task("1.1", "stale child");
+    const parent = task("1", "completed project", { IsProject: true, ProjectStatus: 3, Children: [leaf] });
+    expect(engine([parent]).actions()).toEqual([]);
+    expect(blockKinds(engine([parent]), "1.1")).toEqual(["completed"]);
+  });
+
   it("shows only the next incomplete subtask when the parent is sequential", () => {
     const first = task("1.1", "step one");
     const second = task("1.2", "step two");

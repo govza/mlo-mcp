@@ -1,5 +1,5 @@
 import type { TaskNode } from "../types.js";
-import { containerKind } from "../task-tree.js";
+import { containerKind, isCompleted } from "../task-tree.js";
 import type { Snapshot } from "../repo/mlo-repository.js";
 import { expandContext, isOpenAt, normalizeContext, readPlaces, type PlaceDefinition } from "../places.js";
 
@@ -104,7 +104,7 @@ export class AvailabilityEngine {
         if (t.Guid) {
           const uid = normalizeUid(t.Guid);
           knownUids.add(uid);
-          if (t.CompletionDateTime) completedUids.add(uid);
+          if (isCompleted(t)) completedUids.add(uid);
         }
         walkUids(t.Children);
       }
@@ -121,10 +121,11 @@ export class AvailabilityEngine {
         // otherwise a step's own subtasks would leak into the To-Do list past
         // the step MLO is holding back.
         const outOfOrder = inherited.outOfOrderAbove || (inherited.sequentialParent && sequentialTaken);
-        if (inherited.sequentialParent && !t.CompletionDateTime) sequentialTaken = true;
+        if (inherited.sequentialParent && !isCompleted(t)) sequentialTaken = true;
 
         const blocks = this.blocksFor(t, {
           now,
+          completedAbove: inherited.completedAbove,
           hiddenAbove: inherited.hiddenAbove,
           outOfOrder,
           completedUids,
@@ -140,13 +141,14 @@ export class AvailabilityEngine {
         });
         walk(t.Children, {
           importance,
+          completedAbove: inherited.completedAbove || isCompleted(t),
           hiddenAbove: inherited.hiddenAbove || Boolean(t.HideInToDo),
           outOfOrderAbove: outOfOrder,
           sequentialParent: Boolean(t.CompleteSubTasksInOrder),
         });
       }
     };
-    walk(tasks, { importance: 100, hiddenAbove: false, outOfOrderAbove: false, sequentialParent: false });
+    walk(tasks, { importance: 100, completedAbove: false, hiddenAbove: false, outOfOrderAbove: false, sequentialParent: false });
     return out;
   }
 
@@ -154,6 +156,7 @@ export class AvailabilityEngine {
     t: TaskNode,
     ctx: {
       now: Date;
+      completedAbove: boolean;
       hiddenAbove: boolean;
       outOfOrder: boolean;
       completedUids: Set<string>;
@@ -161,8 +164,9 @@ export class AvailabilityEngine {
     }
   ): Block[] {
     const blocks: Block[] = [];
-    if (t.CompletionDateTime) blocks.push({ kind: "completed", detail: `completed ${t.CompletionDateTime}` });
-    if (t.Children.some((c) => !c.CompletionDateTime)) {
+    if (ctx.completedAbove) blocks.push({ kind: "completed", detail: "completed ancestor" });
+    else if (isCompleted(t)) blocks.push({ kind: "completed", detail: t.CompletionDateTime ? `completed ${t.CompletionDateTime}` : "project status completed" });
+    if (t.Children.some((c) => !isCompleted(c))) {
       blocks.push({ kind: "branch", detail: "has uncompleted subtasks — its leaves are the actions" });
     }
     if (containerKind(t) === "folder") {
@@ -204,6 +208,8 @@ export class AvailabilityEngine {
 interface Inherited {
   /** Absolute importance of the parent; relative sliders multiply down the branch. */
   importance: number;
+  /** A completed parent makes its entire subtree invisible in To-Do views. */
+  completedAbove: boolean;
   hiddenAbove: boolean;
   /** An ancestor is a later step of a sequential branch, so this whole subtree waits with it. */
   outOfOrderAbove: boolean;

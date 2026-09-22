@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { TaskNode } from "./types.js";
+import { isCompleted } from "./task-tree.js";
 
 /**
  * Machine-readable task summary used in structuredContent across tools.
@@ -34,7 +35,7 @@ export function toSummary(t: TaskNode): TaskSummary {
     id: t.id,
     Guid: t.Guid,
     Caption: t.Caption,
-    completed: Boolean(t.CompletionDateTime),
+    completed: isCompleted(t),
     IsProject: t.IsProject || undefined,
     Starred: t.Starred || undefined,
     DueDateTime: t.DueDateTime,

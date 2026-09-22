@@ -39,6 +39,8 @@ export interface TaskPatch {
   Effort?: number;
   DueDateTime?: string;
   StartDateTime?: string;
+  /** Local ISO reminder time; an empty string clears the one-off reminder. */
+  ReminderDateTime?: string;
   CompletionDateTime?: string;
   ProjectStatus?: number;
   EstimateMin?: number;
@@ -46,6 +48,10 @@ export interface TaskPatch {
   TheGoal?: number;
   IsProject?: boolean;
   Starred?: boolean;
+  /** Custom bold formatting. */
+  Bold?: boolean;
+  /** The intentionally small supported colour set; an empty string clears it. */
+  Highlight?: "yellow" | "";
   /** Hide only this task from To-Do views; children stay eligible. */
   Folder?: boolean;
   HideInToDo?: boolean;
@@ -74,6 +80,20 @@ const BOOLEAN_COLUMNS: ReadonlyArray<readonly [keyof TaskPatch, string]> = [
   ["HideInToDo", "HideInToDo"],
   ["CompleteSubTasksInOrder", "CompleteInOrder"],
 ];
+
+/** Delphi's TDateTime is a count of civil days since 1899-12-30. */
+export function localIsoToTDateTime(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/.exec(value);
+  if (!match) throw new Error(`expected local ISO date-time, got "${value}"`);
+  const [, year, month, day, hour, minute, second] = match.map(Number);
+  const time = Date.UTC(year!, month! - 1, day!, hour!, minute!, second!);
+  const parsed = new Date(time);
+  if (
+    parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month! - 1 || parsed.getUTCDate() !== day ||
+    parsed.getUTCHours() !== hour || parsed.getUTCMinutes() !== minute || parsed.getUTCSeconds() !== second
+  ) throw new Error(`invalid local ISO date-time "${value}"`);
+  return ((time - Date.UTC(1899, 11, 30)) / 86_400_000).toFixed(9).replace(/0+$/, "").replace(/\.$/, "");
+}
 
 export interface MoveDestination {
   /** Empty string re-parents to the top level. */
@@ -107,6 +127,30 @@ export function updatePatch(
     columns.StarToggleDateTime = now;
   }
   if (patch.Flag !== undefined) columns.FlagUID = flagUid ?? "";
+  if (patch.ReminderDateTime !== undefined) {
+    if (patch.ReminderDateTime === "") {
+      Object.assign(columns, {
+        Reminder: "", NextAlert: "", AutoAlert: "", AutoAlertDelta: "", LimitAutoAlertCount: "",
+        MaxAutoAlertCount: "", AutoAlertIndex: "", ReminderState: "", AlertAction: "", AudioFile: "",
+      });
+    } else {
+      const reminder = localIsoToTDateTime(patch.ReminderDateTime);
+      Object.assign(columns, {
+        Reminder: reminder, NextAlert: reminder, AutoAlert: "0", AutoAlertDelta: "0.010416667",
+        LimitAutoAlertCount: "1", MaxAutoAlertCount: "3", AutoAlertIndex: "0", ReminderState: "1", AlertAction: "33",
+        AudioFile: "C:\\\\Windows\\\\Media\\\\Windows Message Nudge.wav",
+      });
+    }
+  }
+  if (patch.Bold !== undefined || patch.Highlight !== undefined) {
+    const bold = patch.Bold ?? csvTruthy(rowValue(row, "ccBold"));
+    const highlight = patch.Highlight === undefined
+      ? rowValue(row, "ccHighlightColor")
+      : patch.Highlight === "yellow" ? "65535" : "";
+    columns.ccUseCustomColorCoding = bold || highlight ? "1" : "0";
+    if (patch.Bold !== undefined) columns.ccBold = patch.Bold ? "1" : "";
+    if (patch.Highlight !== undefined) columns.ccHighlightColor = highlight;
+  }
   if (move) {
     columns.ParentUID = move.parentUid;
     if (move.itemIndex !== undefined) columns.ItemIndex = move.itemIndex;

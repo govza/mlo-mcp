@@ -48,7 +48,7 @@ export interface MloDocument {
 const SHARED_OPTIONS = {
   ignoreAttributes: false,
   attributeNamePrefix: "@_",
-  processEntities: true,
+  processEntities: { maxTotalExpansions: 1_000_000, maxExpandedLength: 10_000_000 },
 } as const;
 
 const parser = new XMLParser({

@@ -5,6 +5,7 @@ import {
   itemIndexAt,
   parseCaptureLine,
   updatePatch,
+  localIsoToTDateTime,
   completionPatch,
   reopenPatch,
 } from "../../src/services/outline-authoring.js";
@@ -124,6 +125,22 @@ describe("outline authoring (pure)", () => {
     expect(updatePatch({ Starred: true }, row, "now").StarToggleDateTime).toBe("now");
     const starred = capturedRow(fullRow(UID_ROOT, { Starred: "1" }));
     expect(updatePatch({ Starred: true }, starred, "now").StarToggleDateTime).toBeUndefined();
+  });
+
+  it("authors one-off reminders and the narrow custom-format subset", () => {
+    const row = capturedRow(fullRow(UID_ROOT));
+    expect(localIsoToTDateTime("2026-08-21T10:00:00")).toBe("46255.416666667");
+    expect(updatePatch({ ReminderDateTime: "2026-08-21T10:00:00", Bold: true, Highlight: "yellow" }, row, "now"))
+      .toMatchObject({
+        Reminder: "46255.416666667", NextAlert: "46255.416666667", AutoAlert: "0", AutoAlertDelta: "0.010416667",
+        LimitAutoAlertCount: "1", MaxAutoAlertCount: "3", AutoAlertIndex: "0", ReminderState: "1", AlertAction: "33",
+        AudioFile: "C:\\\\Windows\\\\Media\\\\Windows Message Nudge.wav",
+        ccUseCustomColorCoding: "1", ccBold: "1", ccHighlightColor: "65535",
+      });
+    expect(updatePatch({ ReminderDateTime: "", Bold: false, Highlight: "" }, row, "now"))
+      .toMatchObject({ Reminder: "", NextAlert: "", ReminderState: "", ccUseCustomColorCoding: "0", ccBold: "", ccHighlightColor: "" });
+    const highlighted = capturedRow(fullRow(UID_ROOT, { ccUseCustomColorCoding: "1", ccHighlightColor: "65535" }));
+    expect(updatePatch({ Bold: false }, highlighted, "now")).toMatchObject({ ccUseCustomColorCoding: "1", ccBold: "" });
   });
 
   it("completes a project into ProjectStatus 3 and reopens it to 0", () => {
