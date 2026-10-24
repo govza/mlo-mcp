@@ -67,6 +67,14 @@ describe("AvailabilityEngine — leaf visibility", () => {
     expect(blockKinds(engine([branch]), "1.1")).toEqual(["hidden"]);
   });
 
+  it("hides every task under a Folder ancestor", () => {
+    const leaf = task("1.1.1", "nested leaf");
+    const project = task("1.1", "Project", { IsProject: true, Children: [leaf] });
+    const folder = task("1", "Areas", { HideInToDoThisTask: true, Children: [project] });
+    expect(engine([folder]).actions()).toEqual([]);
+    expect(blockKinds(engine([folder]), "1.1.1")).toEqual(["hidden"]);
+  });
+
   it("excludes completed tasks from the action list", () => {
     const leaf = task("1", "already done", { CompletionDateTime: "2026-07-01T09:00:00" });
     expect(engine([leaf]).actions()).toEqual([]);

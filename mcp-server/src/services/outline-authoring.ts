@@ -52,7 +52,7 @@ export interface TaskPatch {
   Bold?: boolean;
   /** The intentionally small supported colour set; an empty string clears it. */
   Highlight?: "yellow" | "";
-  /** Hide only this task from To-Do views; children stay eligible. */
+  /** Mark as a Folder: hides it and its whole branch from next actions. */
   Folder?: boolean;
   HideInToDo?: boolean;
   CompleteSubTasksInOrder?: boolean;

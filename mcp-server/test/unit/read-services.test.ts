@@ -154,9 +154,15 @@ describe("ReviewService.projects", () => {
   });
 
   it("counts the actions each branch can actually offer, so a stalled one reads zero", async () => {
-    const branches = expectOk(await new ReviewService(repoWith(outline()), { now }).projects());
+    const [folder, stalled] = outline();
+    const branches = expectOk(await new ReviewService(repoWith([...folder.Children, stalled]), { now }).projects());
     expect(branches.find((b) => b.task.id === "1.1")?.availableActions).toBe(1);
     expect(branches.find((b) => b.task.id === "2")?.availableActions).toBe(0);
+  });
+
+  it("offers no actions from a project inside a Folder", async () => {
+    const branches = expectOk(await new ReviewService(repoWith(outline()), { now }).projects());
+    expect(branches.find((b) => b.task.id === "1.1")?.availableActions).toBe(0);
   });
 
   it("filters by kind and by MLO's manual project status", async () => {

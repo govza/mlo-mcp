@@ -14,7 +14,7 @@ export const TASK_FIELDS = {
   startDateTime: z.string().optional(),
   IsProject: z.boolean().optional(),
   Starred: z.boolean().optional(),
-  Folder: z.boolean().optional().describe("Hide only this task from To-Do views; children remain eligible"),
+  Folder: z.boolean().optional().describe("Mark as a Folder: hides it and its whole branch from next actions"),
   HideInToDo: z.boolean().optional().describe("Hide this task and its whole branch from To-Do views"),
   CompleteSubTasksInOrder: z.boolean().optional(),
   Flag: z.string().optional().describe("Existing flag caption"),

@@ -37,7 +37,7 @@ export const updateTaskTool = defineTool({
     Starred: z.boolean().optional(),
     Bold: z.boolean().optional().describe("Custom bold task formatting"),
     Highlight: z.enum(["yellow", ""]).optional().describe('Custom yellow highlight; "" clears it'),
-    Folder: z.boolean().optional().describe("Hide only this task from To-Do views; its children remain eligible"),
+    Folder: z.boolean().optional().describe("Mark as a Folder: hides it and its whole branch from next actions"),
     HideInToDo: z.boolean().optional().describe("Hide this task and its whole branch from To-Do views"),
     CompleteSubTasksInOrder: z.boolean().optional().describe("Sequential subtasks: only the first uncompleted child is available"),
     Flag: z.string().optional().describe('Existing flag caption; "" clears'),

@@ -142,7 +142,7 @@ export class AvailabilityEngine {
         walk(t.Children, {
           importance,
           completedAbove: inherited.completedAbove || isCompleted(t),
-          hiddenAbove: inherited.hiddenAbove || Boolean(t.HideInToDo),
+          hiddenAbove: inherited.hiddenAbove || Boolean(t.HideInToDo || t.HideInToDoThisTask),
           outOfOrderAbove: outOfOrder,
           sequentialParent: Boolean(t.CompleteSubTasksInOrder),
         });
@@ -173,7 +173,7 @@ export class AvailabilityEngine {
       blocks.push({ kind: "folder", detail: "marked Folder: a container, never an action" });
     }
     if (t.HideInToDo || ctx.hiddenAbove) {
-      blocks.push({ kind: "hidden", detail: "hidden from To-Do views by a hide-in-todo branch" });
+      blocks.push({ kind: "hidden", detail: "hidden from To-Do views by a hide-in-todo or Folder ancestor" });
     }
     if (ctx.outOfOrder) {
       blocks.push({ kind: "out-of-order", detail: "its parent completes subtasks in order and an earlier one is open" });
