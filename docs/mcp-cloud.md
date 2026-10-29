@@ -37,14 +37,30 @@ its contract is [the target-architecture spec](adr/0005-target-architecture-spec
    MLO→endpoint is plaintext, and the endpoint upgrades the vendor leg back to
    https (`secureVendorTarget` in `cloud/upstream.ts`, applied to both the
    buffered SOAP forward and the streaming passthrough, so the control-plane
-   calls carrying `loginBytes`/`passwordBytes` are covered too). Set
-   `MLO_VENDOR_PLAINTEXT=1` to disable the upgrade when capturing the vendor
-   leg with mitmproxy.
+   calls carrying `loginBytes`/`passwordBytes` are covered too). For the standard
+   vendor endpoint, the upgrade is mandatory; `MLO_VENDOR_PLAINTEXT` no longer disables it.
+   Synthetic loopback test endpoints retain their explicit HTTP scheme.
+   The plaintext local hop does not authenticate the endpoint to MLO.
 3. **Sync once.** That is the whole setup. The first proxied sync gives the
    endpoint the cloud file's identity and the account contact it needs, and
    initialization then runs by itself (next section). Until a binding exists,
    reads work and writes refuse with a typed kind naming the guard that stopped
    them — there is no bootstrap tool to run.
+
+## Buffered forwarding limits
+
+Buffered SOAP responses are limited to 32 MiB on the wire and 64 MiB after
+gzip/deflate decoding. Each buffered request has a 30-second absolute deadline,
+including response delivery; a slow stream cannot extend that deadline.
+Exceeding a limit fails the operation without adding an automatic retry. Large
+profiles or unusually slow syncs may hit these limits; report the failure rather
+than assuming the operation succeeded or blindly replaying a write.
+
+Buffered requests strip proxy credentials, standard hop-by-hop headers, and
+headers named by `Connection`, then regenerate Host and Content-Length for the
+upstream request. End-to-end headers, SOAPAction and body bytes are preserved.
+These limits apply to buffered SOAP forwarding, not CONNECT tunnels or streaming
+passthrough, and do not add authentication to the resident's control API.
 
 ## Initialization: guarded, automatic, once
 

@@ -48,9 +48,12 @@ describe("the endpoint's vendor-call surface", () => {
     expect(callers.sort()).toEqual(["cloud/auto-init.ts", "cloud/upstream.ts"]);
   });
 
-  it("has no timer anywhere in the cloud plane", async () => {
+  it("has no timer that initiates a call in the cloud plane", async () => {
     const timers = (await sources())
       .filter(({ file }) => file.startsWith("cloud/"))
+      // Permit only the existing-request abort deadline, not arbitrary upstream timers.
+      .map(({ file, text }) => ({ file, text: file === "cloud/upstream.ts" ? text.replace(
+        'setTimeout(() => request.destroy(new Error("Upstream deadline exceeded")), FORWARD_DEADLINE_MS)', "") : text }))
       // No interval anywhere in the plane, and no deferred call at all in the
       // two modules that can reach the vendor: a named helper behind a
       // setTimeout would be exactly as periodic as an interval, so the narrow
