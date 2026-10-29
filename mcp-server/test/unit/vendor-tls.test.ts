@@ -34,9 +34,9 @@ describe("secureVendorTarget", () => {
     }
   });
 
-  it("MLO_VENDOR_PLAINTEXT=1 turns the upgrade off", () => {
+  it("an inherited MLO_VENDOR_PLAINTEXT cannot downgrade the vendor connection", () => {
     process.env.MLO_VENDOR_PLAINTEXT = "1";
     const raw = `http://${VENDOR_SYNC_HOST}/mlo/x.asmx`;
-    expect(secureVendorTarget(new URL(raw)).href).toBe(raw);
+    expect(secureVendorTarget(new URL(raw)).href).toBe(`https://${VENDOR_SYNC_HOST}/mlo/x.asmx`);
   });
 });

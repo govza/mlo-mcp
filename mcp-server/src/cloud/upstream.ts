@@ -11,6 +11,10 @@ import { soapFieldText as text, type SoapOperation } from "./soap.js";
 import { VENDOR_SYNC_HOST } from "./sync-observer.js";
 import type { CloudGateway } from "./gateway.js";
 
+const MAX_RESPONSE_BYTES = 32 * 1024 * 1024;
+const MAX_DECODED_BYTES = 64 * 1024 * 1024;
+const FORWARD_DEADLINE_MS = 30_000;
+
 /**
  * The endpoint is a TRANSPARENT proxy for the three vendor sync operations —
  * the vendor stays the only cursor authority, and requests and responses pass
@@ -61,16 +65,15 @@ export function contactFromRequest(target: URL, fields: Record<string, unknown>)
 
 /**
  * MLO must run with "Use secure connection" unchecked (a TLS tunnel is opaque
- * to the endpoint), so the leg MLO → endpoint is plaintext loopback — fine. The
+ * to the endpoint), so the leg MLO → endpoint remains plaintext loopback. The
  * leg endpoint → vendor crosses the internet, and carries `loginBytes`,
  * `passwordBytes` and the whole task payload, so it is upgraded to TLS here.
  * The vendor serves the identical SOAP service on https, verified against the
  * live host. Only the real vendor host is upgraded: loopback fakes in tests and
- * private endpoints keep whatever scheme they were given. `MLO_VENDOR_PLAINTEXT=1`
- * turns the upgrade off for capture/debugging.
+ * private endpoints keep whatever scheme they were given. An inherited
+ * environment variable must not downgrade the real vendor connection.
  */
 export function secureVendorTarget(target: URL): URL {
-  if (process.env.MLO_VENDOR_PLAINTEXT === "1") return target;
   if (target.protocol !== "http:") return target;
   if (target.hostname.toLowerCase() !== VENDOR_SYNC_HOST) return target;
   if (target.port && target.port !== "80") return target;
@@ -88,13 +91,24 @@ export async function forwardBuffered(
 ): Promise<ForwardResult> {
   const target = secureVendorTarget(rawTarget);
   const transport = target.protocol === "https:" ? https : http;
-  const outgoing: OutgoingHttpHeaders = { ...headers, host: target.host, "content-length": body.byteLength };
-  delete outgoing["proxy-connection"];
-  delete outgoing["transfer-encoding"];
+  const outgoing: OutgoingHttpHeaders = { ...headers };
+  const connectionHeaders = (headers.connection ?? "").split(",").map(name => name.trim().toLowerCase());
+  for (const name of [...connectionHeaders, "proxy-authorization", "proxy-authenticate", "proxy-connection",
+    "connection", "keep-alive", "te", "trailer", "transfer-encoding", "upgrade"]) delete outgoing[name];
+  outgoing.host = target.host;
+  outgoing["content-length"] = body.byteLength;
   return new Promise((resolve, reject) => {
     const request = transport.request(target, { method, headers: outgoing }, (response) => {
       const chunks: Buffer[] = [];
-      response.on("data", (chunk: Buffer) => chunks.push(chunk));
+      let size = 0;
+      response.on("data", (chunk: Buffer) => {
+        size += chunk.length;
+        if (size > MAX_RESPONSE_BYTES) {
+          response.destroy(new Error("Upstream response size limit exceeded"));
+          return;
+        }
+        chunks.push(chunk);
+      });
       response.on("end", () => resolve({
         status: response.statusCode ?? 502,
         headers: response.headers,
@@ -102,6 +116,9 @@ export async function forwardBuffered(
       }));
       response.on("error", reject);
     });
+    // An absolute deadline also bounds a peer that keeps sending small chunks.
+    const deadline = setTimeout(() => request.destroy(new Error("Upstream deadline exceeded")), FORWARD_DEADLINE_MS);
+    request.once("close", () => clearTimeout(deadline));
     request.on("error", reject);
     request.end(body);
   });
@@ -109,9 +126,10 @@ export async function forwardBuffered(
 
 /** The forwarded body as text, undoing the vendor's transfer compression. */
 export function decodeForwardBody(result: ForwardResult): string {
+  if (result.body.length > MAX_RESPONSE_BYTES) throw new Error("Upstream response size limit exceeded");
   const encoding = (result.headers["content-encoding"] ?? "").toString().toLowerCase();
-  if (encoding.includes("gzip")) return zlib.gunzipSync(result.body).toString("utf8");
-  if (encoding.includes("deflate")) return zlib.inflateSync(result.body).toString("utf8");
+  if (encoding.includes("gzip")) return zlib.gunzipSync(result.body, { maxOutputLength: MAX_DECODED_BYTES }).toString("utf8");
+  if (encoding.includes("deflate")) return zlib.inflateSync(result.body, { maxOutputLength: MAX_DECODED_BYTES }).toString("utf8");
   return result.body.toString("utf8");
 }
 
